@@ -1,0 +1,72 @@
+name: AquaMetric web smoke test
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build production Docker image
+        run: docker build -t aquametric-smoke .
+      - name: Start production image
+        run: |
+          docker run -d --name aquametric-smoke \
+            -e PORT=10000 \
+            -e SECRET_KEY=ci-smoke-secret-not-production \
+            -e COOKIE_SECURE=0 \
+            -e DATABASE_URL=sqlite:////tmp/aquametric_ci.db \
+            -e UPLOAD_DIR=/tmp/aquametric_uploads \
+            -e EVIDENCE_DIR=/tmp/aquametric_evidence \
+            -p 10000:10000 aquametric-smoke
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:10000/health >/dev/null; then exit 0; fi
+            sleep 2
+          done
+          docker logs aquametric-smoke
+          exit 1
+      - name: Check security status
+        run: |
+          curl -fsS -H 'Host: localhost:10000' http://127.0.0.1:10000/security-status | tee /tmp/security.json
+          grep -q '"security_headers":true' /tmp/security.json
+          grep -q '"api_docs_public":false' /tmp/security.json
+      - name: Check refreshed team and person pages
+        run: |
+          docker exec aquametric-smoke python - <<'PY'
+          from fastapi.testclient import TestClient
+          import secure_entry
+          from db import SessionLocal
+          import models
+
+          with TestClient(secure_entry.app) as client:
+              assert client.get('/health').status_code == 200
+              assert client.get('/docs').status_code == 404
+              db = SessionLocal()
+              try:
+                  teams = db.query(models.ScoutingTeam).all()
+                  matched = None
+                  catalog = None
+                  for team in teams:
+                      _, data = secure_entry._catalog_for_team(team.name)
+                      if data and data.get('players'):
+                          matched, catalog = team, data
+                          break
+                  assert matched is not None, 'No refreshed scouting team found'
+                  team_page = client.get(f'/scouting/{matched.id}')
+                  assert team_page.status_code == 200, team_page.text[:500]
+                  player = catalog['players'][0]
+                  slug = secure_entry._slug(player['name'])
+                  profile = client.get(f'/scouting-person/{matched.id}/player/{slug}')
+                  assert profile.status_code == 200, profile.text[:500]
+                  assert player['name'] in profile.text
+              finally:
+                  db.close()
+          print('AquaMetric secure roster/profile smoke test passed')
+          PY
+      - name: Show logs on failure
+        if: failure()
+        run: docker logs aquametric-smoke || true
