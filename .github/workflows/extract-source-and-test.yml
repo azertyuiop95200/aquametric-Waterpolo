@@ -27,7 +27,21 @@ jobs:
           tar -xJf aquametric.tar.xz -C extracted
           test -d extracted/aquametric_v11_2_release
           cp -a extracted/aquametric_v11_2_release source
+          test -f source/main.py
           echo "Extracted files: $(find source -type f | wc -l)"
+
+      - name: Commit extracted source
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add source
+          if git diff --cached --quiet; then
+            echo 'Source already current.'
+          else
+            git commit -m 'Extract AquaMetric V11.2 source [skip ci]'
+            git push
+          fi
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -43,15 +57,17 @@ jobs:
       - name: Run full test suite
         working-directory: source
         env:
+          PYTHONPATH: .
           DATABASE_URL: sqlite:////tmp/aquametric_ci.db
           UPLOAD_DIR: /tmp/aquametric_uploads_ci
           EVIDENCE_DIR: /tmp/aquametric_evidence_ci
           SECRET_KEY: ci-only-secret
-        run: pytest -q
+        run: python -m pytest -q
 
       - name: Smoke test FastAPI
         working-directory: source
         env:
+          PYTHONPATH: .
           DATABASE_URL: sqlite:////tmp/aquametric_smoke.db
           UPLOAD_DIR: /tmp/aquametric_uploads_smoke
           EVIDENCE_DIR: /tmp/aquametric_evidence_smoke
@@ -66,16 +82,3 @@ jobs:
               print(path, r.status_code)
               assert r.status_code < 500
           PY
-
-      - name: Commit extracted source
-        shell: bash
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add source
-          if git diff --cached --quiet; then
-            echo 'Source already current.'
-          else
-            git commit -m 'Extract tested AquaMetric V11.2 source [skip ci]'
-            git push
-          fi
