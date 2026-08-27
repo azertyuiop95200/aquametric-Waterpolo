@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Scouting · AquaMetric</title>
+  <style>
+    :root{color-scheme:dark;--bg:#061820;--panel:#0d2a36;--line:#1c4b5a;--cyan:#5ed9ff;--mint:#89f0c4;--text:#eff9fc;--muted:#91aab5}
+    *{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#061820,#09252f 60%,#061820);font-family:ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text);min-height:100vh}.wrap{max-width:1100px;margin:auto;padding:22px 17px 70px}.top{display:flex;align-items:center;justify-content:space-between}.home{padding:10px 13px;border:1px solid var(--line);border-radius:14px;text-decoration:none;color:var(--muted)}.brand{color:var(--cyan);font-weight:900;letter-spacing:.08em}.eyebrow{margin-top:28px;color:var(--cyan);font-size:12px;font-weight:900;letter-spacing:.2em}h1{font-size:clamp(36px,8vw,58px);margin:9px 0 8px}.intro{color:var(--muted);max-width:760px;line-height:1.55}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:14px;margin-top:24px}.card{display:block;text-decoration:none;background:rgba(13,42,54,.94);border:1px solid var(--line);border-radius:21px;padding:18px;transition:.18s transform,.18s border-color}.card:hover{transform:translateY(-2px);border-color:var(--cyan)}.name{font-size:20px;font-weight:900;line-height:1.2}.meta{color:var(--muted);font-size:13px;margin-top:7px;line-height:1.45}.stats{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}.pill{padding:7px 10px;border-radius:999px;background:#08212b;border:1px solid var(--line);font-size:12px;color:#d8eef5}.fresh{color:var(--mint)}.status{margin-top:12px;font-size:11px;line-height:1.4;color:var(--muted)}.chev{float:right;color:var(--cyan);font-size:25px;line-height:1}
+  </style>
+</head>
+<body><div class="wrap">
+  <div class="top"><a class="home" href="/">← Home</a><div class="brand">AQUAMETRIC</div></div>
+  <div class="eyebrow">SCOUTING DATABASE</div><h1>Teams & rosters</h1>
+  <div class="intro">Evidence-first directory. Refreshed teams use official/public 2025-26 or 2026 event evidence; when a 2026-27 roster is not officially published yet, AquaMetric says so instead of guessing.</div>
+  <div class="grid">
+  {% for t in teams %}
+    <a class="card" href="/scouting/{{ t.id }}">
+      <span class="chev">›</span><div class="name">{{ t.name }}</div>
+      <div class="meta">{{ t.country or '—' }} · {{ t.team_type or t.category or 'team' }}{% if t.competition %}<br>{{ t.competition }}{% endif %}</div>
+      <div class="stats"><span class="pill">{{ t.player_count }} players</span><span class="pill">{{ t.coach_count }} coaches</span>{% if t.refreshed %}<span class="pill fresh">refreshed</span>{% endif %}</div>
+      <div class="status">{{ t.season }} · {{ t.status }}</div>
+    </a>
+  {% endfor %}
+  </div>
+</div></body></html>
