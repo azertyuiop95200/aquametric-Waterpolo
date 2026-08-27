@@ -1,0 +1,81 @@
+name: Extract AquaMetric source and test
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/extract-source-and-test.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  extract-test-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Reconstruct source bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat bundle_parts/part_* | base64 -d > aquametric.tar.xz
+          rm -rf extracted source
+          mkdir -p extracted
+          tar -xJf aquametric.tar.xz -C extracted
+          test -d extracted/aquametric_v11_2_release
+          cp -a extracted/aquametric_v11_2_release source
+          echo "Extracted files: $(find source -type f | wc -l)"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r source/requirements.txt
+          pip install pytest httpx
+
+      - name: Run full test suite
+        working-directory: source
+        env:
+          DATABASE_URL: sqlite:////tmp/aquametric_ci.db
+          UPLOAD_DIR: /tmp/aquametric_uploads_ci
+          EVIDENCE_DIR: /tmp/aquametric_evidence_ci
+          SECRET_KEY: ci-only-secret
+        run: pytest -q
+
+      - name: Smoke test FastAPI
+        working-directory: source
+        env:
+          DATABASE_URL: sqlite:////tmp/aquametric_smoke.db
+          UPLOAD_DIR: /tmp/aquametric_uploads_smoke
+          EVIDENCE_DIR: /tmp/aquametric_evidence_smoke
+          SECRET_KEY: ci-only-secret
+        run: |
+          python - <<'PY'
+          from fastapi.testclient import TestClient
+          from main import app
+          c = TestClient(app)
+          for path in ('/health','/'):
+              r = c.get(path)
+              print(path, r.status_code)
+              assert r.status_code < 500
+          PY
+
+      - name: Commit extracted source
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add source
+          if git diff --cached --quiet; then
+            echo 'Source already current.'
+          else
+            git commit -m 'Extract tested AquaMetric V11.2 source [skip ci]'
+            git push
+          fi
