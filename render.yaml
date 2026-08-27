@@ -20,7 +20,9 @@ services:
       - key: MAX_UPLOAD_MB
         value: "50"
       - key: AUTO_REFRESH_OFFICIAL_DATA
-        value: "0"
+        value: "1"
+      - key: OFFICIAL_REFRESH_LOOP_MINUTES
+        value: "30"
       - key: COOKIE_SECURE
         value: "1"
       - key: SECRET_KEY
