@@ -16,7 +16,6 @@ def test_full_product_flow():
     assert r.status_code == 303
     r = client.get('/teams')
     assert 'Test Squad' in r.text
-    # Find team id by following first matching href from page text is unnecessary; DB IDs are incremental, fetch dashboard links via direct model DB.
     from db import SessionLocal
     from models import Team, Match
     from sqlalchemy import select
@@ -34,7 +33,6 @@ def test_full_product_flow():
     location = r.headers['location']
     assert location.startswith('/matches/')
     match_id = int(location.rsplit('/',1)[-1])
-    # player id
     from models import Player
     db = SessionLocal()
     try:
@@ -48,4 +46,6 @@ def test_full_product_flow():
     r = client.get(f'/matches/{match_id}')
     assert r.status_code == 200
     assert 'Player 7' in r.text
-    assert '58.0' in r.text  # base 50 + goal 8
+    assert 'rating-v2' in r.text
+    assert 'Match evaluation /100' in r.text
+    assert 'Attack' in r.text and 'Defence' in r.text and 'Decision' in r.text
