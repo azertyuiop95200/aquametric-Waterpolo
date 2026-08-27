@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>{{ person.name }} · AquaMetric</title>
+  <style>
+    :root{color-scheme:dark;--bg:#061820;--panel:#0d2a36;--panel2:#09212c;--line:#1d4b5b;--cyan:#5ed9ff;--mint:#89f0c4;--text:#f1f9fc;--muted:#91aab5;--amber:#ffd280}
+    *{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 90% 0,#0c3543 0,transparent 38%),linear-gradient(180deg,#061820,#09242f 58%,#061820);font-family:ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text);min-height:100vh}.wrap{max-width:900px;margin:auto;padding:22px 17px 70px}.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:28px;gap:12px}.back{padding:10px 13px;border:1px solid var(--line);border-radius:14px;text-decoration:none;color:var(--muted);background:#071c25}.brand{font-weight:900;letter-spacing:.08em;color:var(--cyan)}.eyebrow{font-size:12px;letter-spacing:.2em;color:var(--cyan);font-weight:900}.kind{display:inline-flex;margin-top:9px;padding:8px 12px;border:1px solid #1c6d65;border-radius:999px;background:#0a2b2d;color:var(--mint);font-size:12px;font-weight:800;letter-spacing:.08em}h1{font-size:clamp(34px,9vw,58px);line-height:1.02;margin:13px 0 6px}.sub{color:var(--muted);font-size:16px;line-height:1.5}.grid{display:grid;grid-template-columns:260px 1fr;gap:18px;margin-top:24px}.card{background:rgba(13,42,54,.94);border:1px solid var(--line);border-radius:24px;padding:21px}.scorebox{display:flex;flex-direction:column;justify-content:center;min-height:220px;text-align:center}.score{font-weight:950;font-size:62px;line-height:1;color:var(--cyan)}.score span{font-size:20px;color:var(--muted)}.na{font-size:31px;font-weight:900;color:var(--muted)}.label{margin-top:10px;color:var(--muted);font-size:13px;text-transform:uppercase;letter-spacing:.1em}.confidence{margin-top:18px;padding-top:15px;border-top:1px solid var(--line);color:var(--mint);font-weight:800}.card h2{margin:3px 0 12px;font-size:22px}.body{color:#d7e6eb;line-height:1.65}.basis{margin-top:14px;padding:12px 14px;border-radius:13px;background:#081f29;border:1px solid var(--line);color:var(--muted);font-size:13px;line-height:1.5}.details{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:16px}.detail{background:#08212b;border:1px solid var(--line);border-radius:14px;padding:13px}.detail b{display:block;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:5px}.source{display:inline-block;margin-top:16px;color:var(--cyan);text-decoration:none;font-weight:800}.warning{margin-top:18px;border-left:3px solid var(--amber);background:#2a2416;color:#f3deb1;border-radius:9px;padding:12px 14px;font-size:13px;line-height:1.5}.metrics{margin-top:18px}.metric{display:grid;grid-template-columns:1.5fr .8fr .8fr;gap:8px;padding:11px 0;border-bottom:1px solid var(--line);font-size:13px}.metric:last-child{border-bottom:0}.muted{color:var(--muted)}
+    @media(max-width:700px){.grid{grid-template-columns:1fr}.scorebox{min-height:170px}.details{grid-template-columns:1fr 1fr}.card{padding:18px;border-radius:20px}.metric{grid-template-columns:1.3fr .7fr .7fr}.wrap{padding:18px 14px 55px}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><a class="back" href="/scouting/{{ team.id }}">← {{ team.name }}</a><div class="brand">AQUAMETRIC</div></div>
+  <div class="eyebrow">PERSON INTELLIGENCE</div>
+  <div class="kind">{{ kind }}</div>
+  <h1>{{ person.name }}</h1>
+  <div class="sub">{{ person.role or 'Role not documented' }}{% if person.nationality %} · {{ person.nationality }}{% endif %}{% if person.birth_year %} · born {{ person.birth_year }}{% endif %}</div>
+
+  <div class="grid">
+    <section class="card scorebox">
+      {% if evaluation.rating is not none %}
+        <div class="score">{{ evaluation.rating }}<span>/100</span></div>
+        <div class="label">AquaMetric provisional performance</div>
+      {% else %}
+        <div class="na">NOT RATED</div>
+        <div class="label">Performance score withheld</div>
+      {% endif %}
+      <div class="confidence">Evidence confidence: {{ evaluation.confidence if evaluation.confidence is not none else '—' }}{% if evaluation.confidence is not none %}/100{% endif %}</div>
+    </section>
+
+    <section class="card">
+      <div class="eyebrow">EVALUATION</div>
+      <h2>Current assessment</h2>
+      <div class="body">{{ evaluation.evaluation }}</div>
+      <div class="basis"><strong>Rating basis:</strong> {{ evaluation.basis }}</div>
+      <div class="details">
+        <div class="detail"><b>Team</b>{{ team.name }}</div>
+        <div class="detail"><b>Evidence window</b>{{ season_label or '—' }}</div>
+        <div class="detail"><b>Status</b>{{ evidence_status or '—' }}</div>
+        <div class="detail"><b>Role</b>{{ person.role or '—' }}</div>
+      </div>
+      {% if source_url %}<a class="source" href="{{ source_url }}" target="_blank" rel="noopener noreferrer">Open primary evidence ↗</a>{% endif %}
+    </section>
+  </div>
+
+  {% if evaluation.metrics %}
+  <section class="card metrics">
+    <div class="eyebrow">MATCH EVIDENCE</div>
+    <h2>Linked metrics</h2>
+    {% for m in evaluation.metrics %}
+      <div class="metric"><div><strong>{{ m.metric }}</strong><div class="muted">{{ m.provenance or 'AquaMetric evidence' }}</div></div><div>{{ m.value if m.value is not none else '—' }} {{ m.unit or '' }}</div><div class="muted">{% if m.confidence is not none %}{{ m.confidence }}/100{% else %}—{% endif %}</div></div>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  <div class="warning">Ratings are evidence-dependent, role-aware provisional evaluations — not permanent judgements. AquaMetric does not create a performance score from a roster listing or a coach name alone. Missing evidence remains “not rated”.</div>
+</div>
+</body>
+</html>
