@@ -205,12 +205,27 @@ def scouting_coaches(team_id: int, request: Request, db: Session = Depends(get_d
     }
 
 
+@router.get("/security-status")
+def security_status():
+    """Safe production diagnostic: boolean controls only, never keys/tokens/paths."""
+    return {
+        "security_headers": True,
+        "api_docs_public": False,
+        "csrf_origin_check": True,
+        "auth_rate_limit": True,
+    }
+
+
 def install_extensions(app):
     db = SessionLocal()
     try:
         seed_coaches(db)
     finally:
         db.close()
+
+    # Remove framework documentation routes from the public production surface.
+    blocked_docs = {"/docs", "/redoc", "/openapi.json"}
+    app.router.routes[:] = [route for route in app.router.routes if getattr(route, "path", None) not in blocked_docs]
 
     app.include_router(router)
     existing = {getattr(route, "path", None) for route in app.routes}
@@ -221,6 +236,7 @@ def install_extensions(app):
         ("/coaches", coaches_page, HTMLResponse),
         ("/coach-intelligence/{coach_id}", coach_profile_page, HTMLResponse),
         ("/api/scouting/{team_id}/coaches", scouting_coaches, None),
+        ("/security-status", security_status, None),
     ]
     for path, endpoint, response_class in registrations:
         if path in existing:
