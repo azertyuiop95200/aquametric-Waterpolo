@@ -1,0 +1,165 @@
+name: AquaMetric V12.1 Mobile Regression
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'source/**'
+      - 'Dockerfile'
+      - 'render.yaml'
+      - '.github/workflows/v121-mobile-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-mobile-and-core:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg tesseract-ocr
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install AquaMetric
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r source/requirements.txt
+
+      - name: Run full Python suite
+        working-directory: source
+        env:
+          PYTHONPATH: .
+          DATABASE_URL: sqlite:////tmp/aquametric_v121_tests.db
+          UPLOAD_DIR: /tmp/aquametric_v121_uploads
+          EVIDENCE_DIR: /tmp/aquametric_v121_evidence
+          SECRET_KEY: v121-test-secret
+          COOKIE_SECURE: '0'
+          WEB_DEMO_MODE: '0'
+          AUTO_REFRESH_OFFICIAL_DATA: '0'
+        run: python -m pytest -q
+
+      - name: Start AquaMetric test server
+        working-directory: source
+        env:
+          PYTHONPATH: .
+          DATABASE_URL: sqlite:////tmp/aquametric_v121_browser.db
+          UPLOAD_DIR: /tmp/aquametric_v121_browser_uploads
+          EVIDENCE_DIR: /tmp/aquametric_v121_browser_evidence
+          SECRET_KEY: v121-browser-secret
+          COOKIE_SECURE: '0'
+          WEB_DEMO_MODE: '1'
+          AUTO_REFRESH_OFFICIAL_DATA: '0'
+        run: |
+          nohup uvicorn main:app --host 127.0.0.1 --port 10000 >/tmp/aquametric-browser.log 2>&1 &
+          echo $! >/tmp/aquametric-browser.pid
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:10000/health >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/aquametric-browser.log
+          exit 1
+
+      - name: Install browser test driver
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install playwright-core@1.55.0 >/dev/null
+          CHROME_BIN="$(which google-chrome || which google-chrome-stable || which chromium || true)"
+          test -n "$CHROME_BIN"
+          echo "CHROME_BIN=$CHROME_BIN" >> "$GITHUB_ENV"
+
+      - name: Test iPhone menu, drag, languages and core features
+        run: |
+          node <<'JS'
+          const { chromium } = require('playwright-core');
+          const assert = (ok, msg) => { if (!ok) throw new Error(msg); };
+          (async()=>{
+            const browser = await chromium.launch({headless:true, executablePath:process.env.CHROME_BIN, args:['--no-sandbox','--disable-dev-shm-usage']});
+            const page = await browser.newPage({viewport:{width:390,height:844}, isMobile:true, hasTouch:true});
+            const base='http://127.0.0.1:10000';
+            await page.goto(base+'/demo-login',{waitUntil:'networkidle'});
+            await page.waitForURL('**/my-team');
+            const original=page.url();
+
+            const toggle=page.locator('[data-menu-toggle]');
+            assert(await toggle.isVisible(),'mobile menu button is not visible');
+            await toggle.click();
+            await page.waitForTimeout(250);
+            assert(await page.locator('#sidebar').evaluate(el=>el.classList.contains('open')),'sidebar did not receive open class');
+            const box=await page.locator('#sidebar').boundingBox();
+            assert(box && box.x >= -1 && box.width >= 250,'sidebar is still off-screen after opening');
+            assert(await page.locator('[data-menu-backdrop]').evaluate(el=>el.classList.contains('open')),'menu backdrop did not open');
+
+            // Exact requested behaviour: tap on the right/outside, remain on the same page.
+            await page.mouse.click(378,420);
+            await page.waitForTimeout(180);
+            assert(!(await page.locator('#sidebar').evaluate(el=>el.classList.contains('open'))),'sidebar did not close after tapping outside');
+            assert(page.url()===original,'closing the menu changed the current page');
+
+            await toggle.click();
+            await page.locator('[data-menu-close]').click();
+            assert(!(await page.locator('#sidebar').evaluate(el=>el.classList.contains('open'))),'close button failed');
+
+            // Language selector and persistence.
+            await page.selectOption('#lang','fr');
+            await page.waitForTimeout(120);
+            assert((await page.locator('[data-i18n="nav.dashboard"]').innerText()).trim()==='Tableau de bord','French navigation translation failed');
+            await page.reload({waitUntil:'networkidle'});
+            assert((await page.locator('#lang').inputValue())==='fr','language preference did not persist');
+            assert((await page.locator('[data-i18n="nav.dashboard"]').innerText()).trim()==='Tableau de bord','French translation did not persist after reload');
+
+            // Horizontal touch/drag areas must actually overflow on iPhone.
+            const tabs=page.locator('.section-tabs');
+            if(await tabs.count()){
+              const dims=await tabs.evaluate(el=>({scrollWidth:el.scrollWidth,clientWidth:el.clientWidth,overflow:getComputedStyle(el).overflowX}));
+              assert(dims.scrollWidth>dims.clientWidth,'section tabs do not provide horizontal scrolling on iPhone');
+              assert(['auto','scroll'].includes(dims.overflow),'section tabs overflow-x is not scrollable');
+            }
+            await page.locator('[data-tab="roster"]').click();
+            const rosterHref=await page.locator('.roster-link').first().getAttribute('href');
+            assert(rosterHref && rosterHref.includes('/intelligence/player'),'team roster player is not linked to a profile');
+
+            await page.goto(base+'/transfer-watch',{waitUntil:'networkidle'});
+            assert(await page.locator('.market-year').count()>0,'transfer page is not grouped by year');
+            assert(await page.locator('.market-window').count()>0,'transfer page is not grouped by transfer window');
+
+            await page.goto(base+'/knowledge',{waitUntil:'networkidle'});
+            assert(await page.locator('.classic-tactic').count()>=8,'classic tactics synthesis is missing');
+            assert(await page.locator('.reference-row').count()===0,'knowledge page still exposes source ledger');
+
+            await page.goto(base+'/calendar',{waitUntil:'networkidle'});
+            assert(await page.locator('form[action="/official-data/refresh"]').count()===0,'calendar still has manual refresh control');
+            await page.goto(base+'/competitions',{waitUntil:'networkidle'});
+            assert(await page.locator('form[action="/official-data/refresh"]').count()===0,'competitions still has manual refresh control');
+
+            await page.goto(base+'/simulation',{waitUntil:'networkidle'});
+            assert(await page.locator('.simulation-score').count()===1,'match simulation UI is missing');
+            assert(await page.locator('.factor-table').count()===1,'simulation factor breakdown is missing');
+
+            await page.goto(base+'/player-intelligence',{waitUntil:'networkidle'});
+            const cards=page.locator('.intel-card');
+            assert(await cards.count()>0,'player intelligence registry is empty');
+            await cards.first().click();
+            await page.waitForLoadState('networkidle');
+            assert(await page.locator('.shot-preferences').count()===1,'shot preference panel is missing from player dossier');
+
+            await page.goto(base+'/coaches',{waitUntil:'networkidle'});
+            assert((await page.locator('body').innerText()).length>100,'coach page did not render');
+
+            console.log('V12.1 iPhone regression: menu, outside-close, drag, i18n, transfer windows, tactics, simulation, profiles and coaches OK');
+            await browser.close();
+          })().catch(async e=>{console.error(e);process.exit(1);});
+          JS
+
+      - name: Print server log on failure
+        if: failure()
+        run: cat /tmp/aquametric-browser.log || true
