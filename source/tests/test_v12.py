@@ -39,7 +39,7 @@ def test_postgres_urls_are_normalized_for_psycopg3():
 def test_v12_routes_and_security_headers_are_installed():
     from main import app
     from fastapi.testclient import TestClient
-    paths = {r.path for r in app.routes}
+    paths = {getattr(r, "path", None) for r in app.routes}
     assert "/matches/{match_id}/intelligence" in paths
     assert "/profiles/players/{profile_id}" in paths
     assert "/coach-intelligence/{coach_id}" in paths
