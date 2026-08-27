@@ -1,5 +1,7 @@
 # AquaMetric Water-Polo Intelligence — V11.2
 
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/azertyuiop95200/aquametric-Waterpolo)
+
 AquaMetric is a FastAPI web application for water-polo analysis, scouting, player intelligence, tactical preparation, competition planning, match simulation, and evidence-assisted video review.
 
 ## V11.2 highlights
@@ -20,6 +22,8 @@ The current release can perform visual pre-scans, scoreboard OCR, audio whistle 
 ## Web deployment
 
 This repository is prepared for a free Render demo. The source bundle is reconstructed automatically during the Docker build. `render.yaml` configures ephemeral `/tmp` storage for the demo database, uploads and evidence.
+
+Tap the **Deploy to Render** button at the top of this page, sign in to Render, review the Blueprint, and approve deployment. Render will provide a public `onrender.com` address after the build completes.
 
 The free instance is intended for preview/testing: local data can disappear after restart/redeploy and heavy long-video AI processing should not be treated as production hosting.
 
