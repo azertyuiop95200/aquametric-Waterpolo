@@ -10,7 +10,7 @@ function seekMatchVideo(seconds){
 document.querySelectorAll('.timeline').forEach(btn=>btn.addEventListener('click',()=>{const sec=parseFloat(btn.dataset.second||0);seekMatchVideo(sec);const evidenceSecond=document.getElementById('evidence-second');if(evidenceSecond)evidenceSecond.value=sec;const evidenceEvent=document.getElementById('evidence-event');if(evidenceEvent&&btn.dataset.eventId)evidenceEvent.value=btn.dataset.eventId;}));
 const hashMatch=location.hash.match(/^#t=(\d+(?:\.\d+)?)$/);if(hashMatch){setTimeout(()=>seekMatchVideo(parseFloat(hashMatch[1])),400);}
 
-// V12.1 mobile navigation. It never navigates when opening/closing, so the user stays on the current page.
+// V12.1 mobile navigation. Opening/closing never changes the URL or page state.
 const sidebar=document.getElementById('sidebar');
 const menuToggle=document.querySelector('[data-menu-toggle]');
 const menuBackdrop=document.querySelector('[data-menu-backdrop]');
@@ -25,9 +25,10 @@ function setMenu(open){
   if(menuBackdrop)menuBackdrop.classList.toggle('open',shouldOpen);
 }
 function toggleMenu(e){if(e){e.preventDefault();e.stopPropagation();}setMenu(!sidebar?.classList.contains('open'));}
-if(menuToggle){menuToggle.addEventListener('click',toggleMenu,{passive:false});menuToggle.addEventListener('touchend',e=>{e.preventDefault();toggleMenu(e);},{passive:false});}
-if(menuClose){menuClose.addEventListener('click',()=>setMenu(false));}
-if(menuBackdrop){menuBackdrop.addEventListener('click',()=>setMenu(false));}
+// Use one activation event only. iOS synthesizes click after touch; registering both caused an immediate open/close double toggle.
+if(menuToggle)menuToggle.addEventListener('click',toggleMenu,{passive:false});
+if(menuClose)menuClose.addEventListener('click',()=>setMenu(false));
+if(menuBackdrop)menuBackdrop.addEventListener('click',()=>setMenu(false));
 document.addEventListener('pointerdown',e=>{
   if(!sidebar?.classList.contains('open'))return;
   if(sidebar.contains(e.target)||menuToggle?.contains(e.target))return;
