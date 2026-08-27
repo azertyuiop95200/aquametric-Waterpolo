@@ -202,11 +202,34 @@ def scouting_coaches(team_id: int, request: Request, db: Session = Depends(get_d
 
 
 def install_extensions(app):
-    # Tables are already registered before Base.metadata.create_all because this
-    # module is imported by main. Seed only evidence-backed coach records here.
+    """Install V12 routes and seed evidence-backed coach records.
+
+    FastAPI's router include is the normal path. The explicit route registration
+    below is an idempotent fallback: it guarantees the four public V12 pages and
+    helper/API endpoints are present even if a host/import sequence leaves the
+    APIRouter detached. Existing paths are never duplicated.
+    """
     db = SessionLocal()
     try:
         seed_coaches(db)
     finally:
         db.close()
+
     app.include_router(router)
+    existing = {getattr(route, "path", None) for route in app.routes}
+    registrations = [
+        ("/matches/{match_id}/intelligence", match_intelligence_page, HTMLResponse),
+        ("/intelligence/player", player_by_name, None),
+        ("/profiles/players/{profile_id}", unified_player_profile, HTMLResponse),
+        ("/coaches", coaches_page, HTMLResponse),
+        ("/coach-intelligence/{coach_id}", coach_profile_page, HTMLResponse),
+        ("/api/scouting/{team_id}/coaches", scouting_coaches, None),
+    ]
+    for path, endpoint, response_class in registrations:
+        if path in existing:
+            continue
+        kwargs = {"methods": ["GET"]}
+        if response_class is not None:
+            kwargs["response_class"] = response_class
+        app.add_api_route(path, endpoint, **kwargs)
+        existing.add(path)
