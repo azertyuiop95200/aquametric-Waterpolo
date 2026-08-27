@@ -54,8 +54,9 @@ def test_knowledge_page_is_synthesis_not_source_directory():
 def test_transfer_watch_is_grouped_by_year_and_market_window_and_links_profiles():
     text = read("templates/transfer_watch.html")
     assert "years.items" in text
-    assert "transfer.summer" in text
-    assert "transfer.winter" in text
+    assert "['summer','winter']" in text
+    assert "window == 'summer'" in text
+    assert "window == 'winter'" in text
     assert "published_date[:4]" in text
     assert "/profiles/players/" in text
     assert "transfer-kind" in text
