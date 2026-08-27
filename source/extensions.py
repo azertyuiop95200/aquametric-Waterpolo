@@ -19,6 +19,7 @@ from services.ratings import calculate_player_rating
 from services.tactical_engine import analyze_match_tactics
 from services.video import timestamped_video_url
 from services.coach_data import seed_coaches
+from services.advanced_metrics import shot_map_summary
 
 BASE_DIR = Path(__file__).resolve().parent
 TEMPLATES = Jinja2Templates(directory=BASE_DIR / "templates")
@@ -129,8 +130,6 @@ def player_by_name(request: Request, name: str = Query(...), db: Session = Depen
     canonical = name.strip()
     profile = db.scalar(select(PlayerIntelligenceProfile).where(PlayerIntelligenceProfile.canonical_name == canonical))
     if not profile:
-        # Player lists remain clickable without sending the user to a dead 404.
-        # The registry search shows whether a canonical dossier already exists.
         return RedirectResponse(f"/player-intelligence?q={quote_plus(canonical)}", status_code=303)
     return RedirectResponse(f"/profiles/players/{profile.id}", status_code=303)
 
@@ -156,10 +155,11 @@ def unified_player_profile(profile_id: int, request: Request, db: Session = Depe
     confidence = round(mean([e.confidence_score for e in valid]), 2) if valid else 0.0
 
     scout_rows = db.scalars(select(ScoutingPlayer).where(ScoutingPlayer.name == profile.canonical_name)).all()
+    shot_map = shot_map_summary(db, profile.id)
     return _render(
         request, "unified_player_profile.html", user=user, app_name="AquaMetric", profile=profile,
         sources=sources, metrics=metrics, library_matches=library_matches, evaluations=evaluations,
-        aggregate=aggregate, aggregate_confidence=confidence, scout_rows=scout_rows,
+        aggregate=aggregate, aggregate_confidence=confidence, scout_rows=scout_rows, shot_map=shot_map,
     )
 
 
@@ -206,13 +206,6 @@ def scouting_coaches(team_id: int, request: Request, db: Session = Depends(get_d
 
 
 def install_extensions(app):
-    """Install V12 routes and seed evidence-backed coach records.
-
-    FastAPI's router include is the normal path. The explicit route registration
-    below is an idempotent fallback: it guarantees the four public V12 pages and
-    helper/API endpoints are present even if a host/import sequence leaves the
-    APIRouter detached. Existing paths are never duplicated.
-    """
     db = SessionLocal()
     try:
         seed_coaches(db)
