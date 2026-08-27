@@ -5,14 +5,17 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#07141d">
   <title>{{ app_name }}</title>
-  <link rel="stylesheet" href="/static/style.css">
-  <link rel="stylesheet" href="/static/v12.css">
+  <link rel="stylesheet" href="/static/style.css?v=12.1.4">
+  <link rel="stylesheet" href="/static/v12.css?v=12.1.4">
 </head>
 <body class="{% if user %}app-body{% else %}public-body{% endif %}">
 {% if user %}
 <div class="app-shell">
-  <aside class="sidebar" id="sidebar" aria-label="Application menu">
-    <a class="brand-lockup" href="/dashboard"><span class="brand-mark">A</span><span><b>{{ app_name }}</b><small data-i18n="brand.tagline">Water Polo Intelligence</small></span></a>
+  <aside class="sidebar" id="sidebar" aria-label="Application menu" aria-hidden="true">
+    <div class="sidebar-head">
+      <a class="brand-lockup" href="/dashboard"><span class="brand-mark">A</span><span><b>{{ app_name }}</b><small data-i18n="brand.tagline">Water Polo Intelligence</small></span></a>
+      <button class="menu-close" type="button" data-menu-close aria-label="Close menu">×</button>
+    </div>
     <nav class="side-nav" aria-label="Primary">
       <a class="{% if request.url.path == '/dashboard' %}active{% endif %}" href="/dashboard"><span>D</span><b class="nav-label" data-i18n="nav.dashboard">Dashboard</b></a>
       <a class="{% if request.url.path.startswith('/matches/new') %}active{% endif %}" href="/matches/new"><span>+</span><b class="nav-label" data-i18n="nav.analyze">Analyze</b></a>
@@ -53,6 +56,6 @@
 {% endif %}
 <main class="content {% if not user %}public-content{% endif %}">{% if web_demo_mode and user %}<div class="demo-banner"><b data-i18n="demo.title">Free web demo</b> — <span data-i18n="demo.text">this workspace is temporary. Uploaded files and edits may disappear when the free host restarts.</span></div>{% endif %}{% block content %}{% endblock %}</main>
 {% if user %}</div></div>{% endif %}
-<script src="/static/app.js"></script>
-<script src="/static/i18n.js"></script>
+<script src="/static/app.js?v=12.1.4"></script>
+<script src="/static/i18n.js?v=12.1.4"></script>
 </body></html>
