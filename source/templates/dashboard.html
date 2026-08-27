@@ -1,0 +1,14 @@
+{% extends 'base.html' %}{% block content %}
+<div class="page-head"><div><span class="eyebrow">DASHBOARD</span><h1>Good to see you, {{ user.name or user.email }}</h1><p>Your teams, analyses and official-data freshness in one place.</p></div><a class="btn" href="/matches/new">+ New analysis</a></div>
+<div class="kpi-grid">
+  <article class="kpi-card"><span>Teams</span><b>{{teams|length}}</b><small>Active workspaces</small></article>
+  <article class="kpi-card"><span>Matches</span><b>{{matches|length}}</b><small>Saved analyses</small></article>
+  <article class="kpi-card"><span>Official records</span><b>{{structured_records}}</b><small>Calendar + standings cache</small></article>
+  <article class="kpi-card trust"><span>Analysis policy</span><b>Evidence</b><small>No invented tactical conclusions</small></article>
+</div>
+<div class="dashboard-grid">
+<section class="panel span2"><div class="section-head"><div><span class="eyebrow">RECENT WORK</span><h2>Recent matches</h2></div><a href="/matches">View all</a></div>{% if matches %}<div class="table-wrap"><table><tr><th>Match</th><th>Competition</th><th>Date</th><th>Status</th></tr>{% for m in matches[:8] %}<tr><td><a class="strong-link" href="/matches/{{m.id}}">{{m.team.name}} <span>vs</span> {{m.opponent}}</a></td><td>{{m.competition or '—'}}</td><td>{{m.match_date or '—'}}</td><td><span class="pill">{{m.status}}</span></td></tr>{% endfor %}</table></div>{% else %}<div class="empty-state"><b>No match analysis yet</b><p>Create your first match, add a video and start building verified evidence.</p><a class="btn secondary" href="/matches/new">Create match</a></div>{% endif %}</section>
+<section class="panel"><div class="section-head"><div><span class="eyebrow">DATA HEALTH</span><h2>Official sources</h2></div><a href="/calendar">Details</a></div><div class="source-stack">{% for s in sources[:6] %}<div class="source-mini"><i class="{% if s.last_error %}bad{% elif s.last_success_at %}good{% endif %}"></i><div><b>{{s.provider}}</b><small>{{s.region}} · {% if s.last_success_at %}checked{% else %}not synced yet{% endif %}</small></div><span>{{s.records_count}}</span></div>{% endfor %}</div></section>
+<section class="panel"><span class="eyebrow">NEXT STEP</span><h2>Build better evidence</h2><p class="muted">Tag phase starts and team/opponent perspective. Tactical remarks become much stronger once the sequence context is explicit.</p><a class="btn secondary full" href="/knowledge">Open tactical knowledge</a></section>
+</div>
+{% endblock %}

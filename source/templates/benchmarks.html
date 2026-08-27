@@ -1,0 +1,19 @@
+{% extends 'base.html' %}{% block content %}
+<div class="page-head"><div><span class="eyebrow">MODEL VALIDATION</span><h1>Official benchmark matches</h1><p>Ground truth from authoritative competition reports. These values validate future computer-vision models; they are never substituted for a real video analysis.</p></div><span class="pill">{{benchmarks|length}} benchmark</span></div>
+{% for b in benchmarks %}
+<section class="panel">
+  <div class="section-head"><div><span class="eyebrow">{{b.id}}</span><h2>{{b.title}}</h2><p>{{b.competition}} · {{b.date}} · {{b.duration_label}} · {{b.video_type|replace('_',' ')|title}}</p></div><span class="pill">{{b.team_a}} {{b.final_score[0]}}–{{b.final_score[1]}} {{b.team_b}}</span></div>
+  <div class="kpi-grid">
+    <article class="kpi"><small>Quarter scores</small><b>{% for q in b.quarters %}{{q[0]}}–{{q[1]}}{% if not loop.last %} · {% endif %}{% endfor %}</b></article>
+    <article class="kpi"><small>Shots</small><b>{{b.shots[b.team_a]}}–{{b.shots[b.team_b]}}</b></article>
+    <article class="kpi"><small>Extra player</small><b>{{b.extra_player[b.team_a].goals}}/{{b.extra_player[b.team_a].attempts}} · {{b.extra_player[b.team_b].goals}}/{{b.extra_player[b.team_b].attempts}}</b></article>
+    <article class="kpi"><small>Steals</small><b>{{b.steals[b.team_a]}}–{{b.steals[b.team_b]}}</b></article>
+  </div>
+  <div class="two-col">
+    <div><h3>Validation targets</h3><div class="tag-cloud">{% for x in b.validation_targets %}<span class="chip">{{x}}</span>{% endfor %}</div></div>
+    <div><h3>Known turning points</h3><ul>{% for x in b.turning_points %}<li>{{x}}</li>{% endfor %}</ul></div>
+  </div>
+  <details><summary>Official sources</summary>{% for s in b.official_sources %}<p><a href="{{s.url}}" target="_blank" rel="noopener noreferrer">{{s.label}}</a></p>{% endfor %}</details>
+</section>
+{% endfor %}
+{% endblock %}

@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="page-head team-hero elite-hero"><div><span class="eyebrow">MY TEAM · ELITE FÉMININE</span><h1>{{ team.name }}</h1><p>2026–27 official calendar, published training grid, opponent scouting and historical roster tracking.</p></div><div class="trust-badge">FFN official · Club schedule · Clupik screenshot cross-check</div></section>
+<div class="kpi-grid four">
+  <article class="kpi"><span>Season</span><b>2026–27</b><small>18 Elite regular-season fixtures ingested from FFN extraNat</small></article>
+  <article class="kpi"><span>Next match</span><b>{{ upcoming[0].start_text[5:10] if upcoming else '—' }}</b><small>{% if upcoming %}{{ upcoming[0].home_team }} vs {{ upcoming[0].away_team }}{% endif %}</small></article>
+  <article class="kpi"><span>Training load</span><b>{{ training|length }} slots</b><small>Monday included · strength work still awaiting coach confirmation</small></article>
+  <article class="kpi"><span>2025–26</span><b>#{{ summary.final_position if summary else '—' }}</b><small>Vice-champion N1 · {{ summary.won if summary else 0 }}–{{ summary.lost if summary else 0 }}</small></article>
+</div>
+
+<div class="section-tabs" data-tabs>
+ <button class="active" data-tab="training">Training</button><button data-tab="calendar">2026–27 Calendar</button><button data-tab="opponents">Next opponents</button><button data-tab="roster">Granville roster</button><button data-tab="history">2025–26</button>
+</div>
+<section data-panel="training" class="tab-panel active">
+ <div class="section-title"><div><span class="eyebrow">PUBLISHED 2026–27</span><h2>Elite women weekly plan</h2></div><span class="source-pill">Club · 20 Aug 2026</span></div>
+ <div class="schedule-grid seven">{% for s in training %}<article class="schedule-card"><div class="day">{{ s.weekday }}</div><div class="time">{{ s.start_time }}–{{ s.end_time }}</div><b>{{ s.session_type }}</b><small>{{ s.venue }}</small></article>{% endfor %}</div>
+ <div class="notice"><b>Strength sessions:</b> the club explicitly says the published visual is incomplete for Elite/N1/CAF strength work. AquaMetric therefore does not invent those slots; they stay “awaiting coach confirmation”.</div>
+</section>
+
+<section data-panel="calendar" class="tab-panel">
+ <div class="section-title"><div><span class="eyebrow">OFFICIAL FFN</span><h2>Elite Féminine — 18 match regular season</h2></div><span class="source-pill">FFN extraNat</span></div>
+ <div class="notice">The user-provided Clupik calendar screenshots match the FFN extraNat 18-match list. FFN remains the authoritative fixture source in AquaMetric; Clupik is stored as corroboration until a direct public integration is available.</div><div class="season-timeline">{% for f in upcoming %}<article class="season-match {% if 'Granville' in f.home_team %}home{% else %}away{% endif %}"><div class="round">J{{ loop.index }}</div><time>{{ f.start_text }}</time><div class="matchline"><b>{{ f.home_team }}</b><span>vs</span><b>{{ f.away_team }}</b></div><span class="venue-chip">{% if 'Granville' in f.home_team %}HOME{% else %}AWAY{% endif %}</span></article>{% endfor %}</div>
+</section>
+
+<section data-panel="opponents" class="tab-panel">
+ <div class="section-title"><div><span class="eyebrow">SCOUTING QUEUE</span><h2>Next opponents</h2></div><a class="btn small secondary" href="/scouting">Open full scouting</a></div>
+ <div class="opponent-grid">{% for row in next_opponents %}<a class="opponent-card" href="{% if row.scout %}/scouting/{{ row.scout.id }}{% else %}/scouting{% endif %}"><div class="opponent-date">{{ row.fixture.start_text }}</div><span class="venue-chip">{% if 'Granville' in row.fixture.home_team %}HOME{% else %}AWAY{% endif %}</span><h3>{{ row.opponent }}</h3>{% if row.scout %}<p>{{ row.scout.roster_status|replace('_',' ') }}</p><small>{{ row.scout.source_note }}</small>{% else %}<p>Roster refresh required</p>{% endif %}<div class="card-arrow">View scouting →</div></a>{% endfor %}</div>
+</section>
+
+<section data-panel="roster" class="tab-panel">
+ <div class="section-title"><div><span class="eyebrow">ROSTER TRACKER</span><h2>Granville players observed in 2025–26</h2></div>{% if granville_scout %}<span class="source-pill">{{ granville_scout.roster_status|replace('_',' ') }}</span>{% endif %}</div>
+ <div class="notice">This is a historical FFN match-sheet roster used to start 2026–27 tracking. A player only becomes “current confirmed” when a new-season official sheet or club announcement supports it.</div>
+ <div class="roster-table"><div class="roster-head"><span>Cap</span><span>Player</span><span>Year</span><span>Nat.</span><span>Role / status</span></div>{% for p in granville_players %}<div class="roster-row"><b>#{{ p.cap_number if p.cap_number is not none else '—' }}</b><strong>{{ p.name }}</strong><span>{{ p.birth_year or '—' }}</span><span>{{ p.nationality or '—' }}</span><small>{{ p.role }} · {{ p.current_status|replace('_',' ') }}</small></div>{% endfor %}</div>
+</section>
+
+<section data-panel="history" class="tab-panel">
+ <div class="section-title"><div><span class="eyebrow">LAST COMPLETE SEASON</span><h2>Nationale 1 Féminine 2025–26</h2></div><span class="source-pill">Club official + FFN</span></div>
+ <div class="standing-focus"><span>Final position</span><strong>2nd</strong><b>Vice-champion</b><p>{{ summary.played if summary else 12 }} matches · {{ summary.won if summary else 10 }} wins · {{ summary.lost if summary else 2 }} losses · {{ summary.goals_for if summary else 166 }} GF · {{ summary.goals_against if summary else 119 }} GA.</p></div>
+ <div class="fixture-list compact-results">{% for f in results %}<article class="fixture-row"><div><small>{{ f.start_text }}</small><b>{{ f.home_team }}</b><span>vs</span><b>{{ f.away_team }}</b></div><strong>{{ f.home_score }}–{{ f.away_score }}</strong></article>{% endfor %}</div>
+</section>
+{% endblock %}

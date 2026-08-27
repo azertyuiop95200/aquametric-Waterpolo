@@ -1,0 +1,11 @@
+__pycache__/
+.pytest_cache/
+*.pyc
+*.pyo
+*.db
+uploads/
+evidence/
+showcase_v10/
+tests/
+.git/
+.env

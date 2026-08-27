@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="topline"><div><span class="eyebrow">VISION LAB · BASELINE V1</span><h1>{{match.team.name}} vs {{match.opponent}}</h1><p>Pre-analysis of owned local footage before trained water-polo models are connected.</p></div><div class="actions compact"><a class="btn secondary" href="/matches/{{match.id}}">Match workspace</a><a class="btn secondary" href="/matches/{{match.id}}/autonomy">Auto Interpreter</a><a class="btn secondary" href="/matches/{{match.id}}/tactics">Tactical report</a></div></div>
+
+<section class="vision-hero panel">
+  <div><span class="eyebrow">EVIDENCE FIRST</span><h2>Look at the video before claiming to understand it.</h2><p>This baseline samples the actual uploaded frames and measures scene, water/pool colour coverage, visual activity and probable overlay regions. It does <b>not</b> pretend to recognize players, ball, passes, goals or tactics yet.</p></div>
+  {% if match.video_source == 'upload' %}<form method="post" action="/matches/{{match.id}}/vision/scan"><button class="btn">Run visual baseline scan</button></form>{% else %}<div class="notice"><b>Third-party source</b> — AquaMetric will not download this video. Upload an owned/local copy or later connect an authorized provider analysis path.</div>{% endif %}
+</section>
+
+{% if analysis %}
+<div class="kpi-grid tactical-kpis">
+  <article class="panel kpi-card"><span>Video type</span><b class="kpi-text">{{analysis.video_type|replace('_',' ')}}</b><small>{{analysis.confidence}} heuristic confidence</small></article>
+  <article class="panel kpi-card"><span>Duration</span><b>{{'%02d:%02d' % ((analysis.duration_seconds//60)|int,(analysis.duration_seconds%60)|int)}}</b><small>{{analysis.width}}×{{analysis.height}} · {{'%.1f'|format(analysis.fps)}} fps</small></article>
+  <article class="panel kpi-card"><span>Sampled frames</span><b>{{analysis.sample_count}}</b><small>≈ every {{'%.1f'|format(analysis.sample_interval_seconds)}} s</small></article>
+  <article class="panel kpi-card trust"><span>Probable active footage</span><b>{{'%02d:%02d' % ((analysis.active_seconds_estimate//60)|int,(analysis.active_seconds_estimate%60)|int)}}</b><small>Heuristic only — not official playing time</small></article>
+</div>
+
+<div class="twocol vision-grid">
+<section class="panel"><div class="section-head"><div><span class="eyebrow">CONTACT SHEET</span><h2>What the scanner actually saw</h2></div></div>{% if analysis.contact_sheet_file %}<img class="contact-sheet" src="/matches/{{match.id}}/vision/contact-sheet" alt="Video contact sheet">{% endif %}<p class="form-help">A human should be able to inspect the sampled broadcast before trusting automation.</p></section>
+<section class="panel"><span class="eyebrow">SIGNALS</span><h2>Visual scan summary</h2><div class="signal-list"><div><span>Pool-colour coverage</span><b>{{(analysis.avg_pool_ratio*100)|round(1)}}%</b></div><div><span>Mean visual motion</span><b>{{(analysis.avg_motion_score*100)|round(1)}}%</b></div><div><span>Hard-cut sample rate</span><b>{{(analysis.scene_cut_rate*100)|round(1)}}%</b></div></div><p class="muted">These are scene cues, not performance statistics.</p></section>
+</div>
+
+<section class="panel"><div class="section-head"><div><span class="eyebrow">TIMELINE SIGNAL</span><h2>Sampled activity profile</h2></div></div><div class="vision-chart">{% for s in samples %}<a href="/matches/{{match.id}}#t={{s.second|int}}" title="{{s.second|round(1)}}s · active {{s.active_score}}" style="height:{{(10 + s.active_score*90)|round(0)}}%"></a>{% endfor %}</div><div class="chart-legend"><span>Low visual activity</span><span>Higher review priority</span></div></section>
+
+<div class="twocol">
+<section class="panel"><span class="eyebrow">PROBABLE ACTIVE WINDOWS</span><h2>Where play-like scenes cluster</h2>{% for w in active_windows[:16] %}<div class="window-row"><b>{{'%02d:%02d' % ((w.start//60)|int,(w.start%60)|int)}} → {{'%02d:%02d' % ((w.end//60)|int,(w.end%60)|int)}}</b><span>{{w.duration|round(1)}} s</span><small>{{(w.confidence*100)|round(0)}}% visual score</small></div>{% else %}<p class="muted">No confident windows found.</p>{% endfor %}</section>
+<section class="panel"><span class="eyebrow">Scoreboard ROI candidates</span><h2>Where OCR should look next</h2>{% for c in scoreboard_candidates %}<div class="window-row"><b>{{c.name|replace('_',' ')|title}}</b><span>ROI {{(c.x*100)|round(0)}}%, {{(c.y*100)|round(0)}}%</span><small>candidate {{(c.score*100)|round(0)}}%</small></div>{% else %}<p class="muted">No candidates.</p>{% endfor %}<p class="form-help">These regions are passed to the Auto Interpreter for fast scoreboard OCR. ROI confidence is not OCR confidence.</p></section>
+</div>
+
+<section class="panel"><div class="section-head"><div><span class="eyebrow">REVIEW CANDIDATES</span><h2>Moments worth inspecting first</h2></div>{% if match.video_source == 'upload' %}<form method="post" action="/matches/{{match.id}}/vision/review-pack"><button class="btn secondary">Create review clips</button></form>{% endif %}</div><div class="candidate-grid">{% for m in interesting_moments %}<a class="candidate" href="/matches/{{match.id}}#t={{m.second|int}}"><b>{{'%02d:%02d' % ((m.second//60)|int,(m.second%60)|int)}}</b><span>Visual activity {{(m.score*100)|round(0)}}%</span><small>Requires verification</small></a>{% else %}<p class="muted">No candidates found.</p>{% endfor %}</div></section>
+
+<section class="panel caution"><span class="eyebrow">LIMITATIONS · DO NOT OVERCLAIM</span><h2>What this scan cannot conclude</h2><ul class="limitation-list">{% for l in limitations %}<li>{{l}}</li>{% endfor %}</ul></section>
+{% else %}
+<section class="panel empty-state"><b>No visual scan yet.</b><p>For an owned uploaded video, run the baseline scan. It samples the real frames and produces the first machine-readable video evidence layer.</p></section>
+{% endif %}
+{% endblock %}

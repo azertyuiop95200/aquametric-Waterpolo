@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#07141d">
+  <title>{{ app_name }}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="{% if user %}app-body{% else %}public-body{% endif %}">
+{% if user %}
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar">
+    <a class="brand-lockup" href="/dashboard"><span class="brand-mark">A</span><span><b>{{ app_name }}</b><small>Water Polo Intelligence</small></span></a>
+    <nav class="side-nav" aria-label="Primary">
+      <a class="{% if request.url.path == '/dashboard' %}active{% endif %}" href="/dashboard"><span>D</span>Dashboard</a>
+      <a class="{% if request.url.path.startswith('/matches/new') %}active{% endif %}" href="/matches/new"><span>+</span>Analyze</a>
+      <a class="{% if request.url.path == '/matches' or (request.url.path.startswith('/matches/') and '/tactics' not in request.url.path) %}active{% endif %}" href="/matches"><span>M</span>Matches</a>
+      <a class="{% if request.url.path == '/my-team' %}active{% endif %}" href="/my-team"><span>★</span>My Team</a>
+      <a class="{% if request.url.path.startswith('/teams') %}active{% endif %}" href="/teams"><span>T</span>Teams</a>
+      <a class="{% if request.url.path.startswith('/players') %}active{% endif %}" href="/players"><span>P</span>Players</a>
+      <div class="nav-sep"></div>
+      <a class="{% if request.url.path == '/calendar' %}active{% endif %}" href="/calendar"><span>C</span>Calendar</a>
+      <a class="{% if request.url.path == '/competitions' %}active{% endif %}" href="/competitions"><span>R</span>Competitions</a>
+      <a class="{% if request.url.path == '/knowledge' %}active{% endif %}" href="/knowledge"><span>K</span>Knowledge</a>
+      <a class="{% if request.url.path.startswith('/scouting') %}active{% endif %}" href="/scouting"><span>S</span>Scouting</a>
+      <a class="{% if request.url.path.startswith('/national-teams') %}active{% endif %}" href="/national-teams"><span>N</span>National teams</a>
+      <a class="{% if request.url.path.startswith('/analysis-library') %}active{% endif %}" href="/analysis-library"><span>A</span>Analysis Library</a>
+      <a class="{% if request.url.path.startswith('/transfer-watch') %}active{% endif %}" href="/transfer-watch"><span>↻</span>Transfer Watch</a>
+      <a class="{% if request.url.path.startswith('/player-data') %}active{% endif %}" href="/player-data"><span>Σ</span>Player Data</a>
+      <a class="{% if request.url.path.startswith('/player-intelligence') %}active{% endif %}" href="/player-intelligence"><span>◎</span>Player Intel</a>
+      <a class="{% if request.url.path.startswith('/france-intelligence') %}active{% endif %}" href="/france-intelligence"><span>FR</span>France Intel</a>
+      <a class="{% if request.url.path.startswith('/tactical-chess') %}active{% endif %}" href="/tactical-chess"><span>♟</span>Tactical Chess</a>
+      <a class="{% if request.url.path.startswith('/simulation') %}active{% endif %}" href="/simulation"><span>~</span>Simulation</a>
+      <a class="{% if request.url.path == '/benchmarks' %}active{% endif %}" href="/benchmarks"><span>B</span>Benchmarks</a>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="data-trust"><i></i><span>Evidence-first analysis<small>Uncertain data stays uncertain</small></span></div>
+      <form method="post" action="/logout"><button class="ghost full">Log out</button></form>
+    </div>
+  </aside>
+  <div class="app-main">
+    <header class="topbar">
+      <button class="menu-toggle" type="button" data-menu-toggle aria-label="Toggle menu">☰</button>
+      <div class="topbar-title"><span class="status-dot"></span><span>Analysis workspace</span></div>
+      <div class="topbar-actions"><select id="lang" aria-label="Interface language"><option>EN</option></select><a class="profile-chip" href="/dashboard">{{ (user.name or user.email)[:1]|upper }}</a></div>
+    </header>
+{% else %}
+<header class="public-header"><a class="brand-lockup" href="/"><span class="brand-mark">A</span><span><b>{{ app_name }}</b><small>Water Polo Intelligence</small></span></a><nav><a href="/guest">Guest demo</a><a href="/knowledge">Knowledge</a><a class="btn small" href="/login">Login</a></nav></header>
+{% endif %}
+<main class="content {% if not user %}public-content{% endif %}">{% if web_demo_mode and user %}<div class="demo-banner"><b>Free web demo</b> — this workspace is temporary. Uploaded files and edits may disappear when the free host restarts.</div>{% endif %}{% block content %}{% endblock %}</main>
+{% if user %}</div></div>{% endif %}
+<script src="/static/app.js"></script>
+</body></html>
