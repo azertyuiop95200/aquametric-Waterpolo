@@ -22,6 +22,18 @@ jobs:
       - name: Apply V12 integration patch
         run: python source/scripts/apply_v12_patch.py
 
+      - name: Publish integrated source for inspection
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add source
+          if git diff --cached --quiet; then
+            echo 'V12 integration already present.'
+          else
+            git commit -m 'Integrate AquaMetric V12 source for validation [skip ci]'
+            git push
+          fi
+
       - name: Install system dependencies
         run: |
           sudo apt-get update
@@ -36,6 +48,24 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r source/requirements.txt
+
+      - name: Debug V12 route registration
+        working-directory: source
+        env:
+          PYTHONPATH: .
+          DATABASE_URL: sqlite:////tmp/aquametric_v12_debug.db
+          UPLOAD_DIR: /tmp/aquametric_v12_uploads_debug
+          EVIDENCE_DIR: /tmp/aquametric_v12_evidence_debug
+          SECRET_KEY: v12-debug-secret-key-only
+          COOKIE_SECURE: '0'
+          WEB_DEMO_MODE: '0'
+        run: |
+          grep -n "extensions\|install_extensions\|install_security" main.py
+          python - <<'PY'
+          from main import app
+          paths = sorted({getattr(r, 'path', '') for r in app.routes})
+          print('\n'.join(p for p in paths if 'intelligence' in p or 'coach' in p or 'profiles' in p))
+          PY
 
       - name: Run full AquaMetric test suite
         working-directory: source
@@ -63,23 +93,15 @@ jobs:
           python - <<'PY'
           from fastapi.testclient import TestClient
           from main import app
+          paths = {getattr(r, 'path', None) for r in app.routes}
+          assert '/matches/{match_id}/intelligence' in paths
+          assert '/profiles/players/{profile_id}' in paths
+          assert '/coach-intelligence/{coach_id}' in paths
           c = TestClient(app)
           r = c.get('/health')
           assert r.status_code == 200, r.text
           assert r.headers.get('x-content-type-options') == 'nosniff'
           assert r.headers.get('content-security-policy')
           print('health:', r.json())
-          print('security headers: OK')
+          print('V12 routes + security headers: OK')
           PY
-
-      - name: Commit integrated V12 source
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add source
-          if git diff --cached --quiet; then
-            echo 'V12 source already integrated.'
-          else
-            git commit -m 'Integrate tested AquaMetric V12 source [skip ci]'
-            git push
-          fi
