@@ -1,4 +1,5 @@
 name: Finalize AquaMetric V12
+# validation-trigger: explicit-route-registration-v2
 
 on:
   push:
@@ -60,11 +61,12 @@ jobs:
           COOKIE_SECURE: '0'
           WEB_DEMO_MODE: '0'
         run: |
-          grep -n "extensions\|install_extensions\|install_security" main.py
           python - <<'PY'
+          import extensions
+          print('extension router routes:', [getattr(r, 'path', None) for r in extensions.router.routes])
           from main import app
           paths = sorted({getattr(r, 'path', '') for r in app.routes})
-          print('\n'.join(p for p in paths if 'intelligence' in p or 'coach' in p or 'profiles' in p))
+          print('app V12 routes:', [p for p in paths if 'intelligence' in p or 'coach' in p or 'profiles' in p])
           PY
 
       - name: Run full AquaMetric test suite
