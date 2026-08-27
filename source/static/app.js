@@ -10,18 +10,23 @@ function seekMatchVideo(seconds){
 document.querySelectorAll('.timeline').forEach(btn=>btn.addEventListener('click',()=>{const sec=parseFloat(btn.dataset.second||0);seekMatchVideo(sec);const evidenceSecond=document.getElementById('evidence-second');if(evidenceSecond)evidenceSecond.value=sec;const evidenceEvent=document.getElementById('evidence-event');if(evidenceEvent&&btn.dataset.eventId)evidenceEvent.value=btn.dataset.eventId;}));
 const hashMatch=location.hash.match(/^#t=(\d+(?:\.\d+)?)$/);if(hashMatch){setTimeout(()=>seekMatchVideo(parseFloat(hashMatch[1])),400);}
 
-// Mobile menu: opening/closing never changes the current URL or page state.
+// V12.1 mobile navigation. It never navigates when opening/closing, so the user stays on the current page.
 const sidebar=document.getElementById('sidebar');
 const menuToggle=document.querySelector('[data-menu-toggle]');
 const menuBackdrop=document.querySelector('[data-menu-backdrop]');
+const menuClose=document.querySelector('[data-menu-close]');
 function setMenu(open){
   if(!sidebar)return;
-  sidebar.classList.toggle('open',open);
-  document.body.classList.toggle('menu-open',open);
-  if(menuToggle)menuToggle.setAttribute('aria-expanded',open?'true':'false');
-  if(menuBackdrop)menuBackdrop.classList.toggle('open',open);
+  const shouldOpen=!!open;
+  sidebar.classList.toggle('open',shouldOpen);
+  sidebar.setAttribute('aria-hidden',shouldOpen?'false':'true');
+  document.body.classList.toggle('menu-open',shouldOpen);
+  if(menuToggle)menuToggle.setAttribute('aria-expanded',shouldOpen?'true':'false');
+  if(menuBackdrop)menuBackdrop.classList.toggle('open',shouldOpen);
 }
-if(menuToggle){menuToggle.addEventListener('click',e=>{e.stopPropagation();setMenu(!sidebar?.classList.contains('open'));});}
+function toggleMenu(e){if(e){e.preventDefault();e.stopPropagation();}setMenu(!sidebar?.classList.contains('open'));}
+if(menuToggle){menuToggle.addEventListener('click',toggleMenu,{passive:false});menuToggle.addEventListener('touchend',e=>{e.preventDefault();toggleMenu(e);},{passive:false});}
+if(menuClose){menuClose.addEventListener('click',()=>setMenu(false));}
 if(menuBackdrop){menuBackdrop.addEventListener('click',()=>setMenu(false));}
 document.addEventListener('pointerdown',e=>{
   if(!sidebar?.classList.contains('open'))return;
