@@ -34,4 +34,4 @@ RUN apt-get update \
 RUN pip install --no-cache-dir -r requirements.txt
 
 EXPOSE 10000
-CMD ["sh", "-c", "uvicorn secure_entry:app --host 0.0.0.0 --port ${PORT:-10000}"]
+CMD ["sh", "-c", "uvicorn web_entry:app --host 0.0.0.0 --port ${PORT:-10000}"]
