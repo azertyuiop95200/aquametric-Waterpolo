@@ -1,10 +1,12 @@
-name: Finalize AquaMetric V12
-# validation-trigger: explicit-route-registration-v2
+name: Validate AquaMetric V12.1
+# validation-trigger: ux-intelligence-v12-1
 
 on:
   push:
     branches: [main]
     paths:
+      - 'source/**'
+      - 'Dockerfile'
       - '.github/workflows/finalize-v12.yml'
   workflow_dispatch:
 
@@ -99,11 +101,12 @@ jobs:
           assert '/matches/{match_id}/intelligence' in paths
           assert '/profiles/players/{profile_id}' in paths
           assert '/coach-intelligence/{coach_id}' in paths
+          assert '/simulation' in paths
           c = TestClient(app)
           r = c.get('/health')
           assert r.status_code == 200, r.text
           assert r.headers.get('x-content-type-options') == 'nosniff'
           assert r.headers.get('content-security-policy')
           print('health:', r.json())
-          print('V12 routes + security headers: OK')
+          print('V12.1 routes + security headers: OK')
           PY
