@@ -22,6 +22,11 @@ src = extract_dir / 'aquametric_v11_2_release'
 shutil.copytree(src, '/app', dirs_exist_ok=True)
 PY
 
+# Small web-deployment overlay: security middleware, refreshed evidence-backed
+# rosters/staff and clickable player/coach profiles. The V11.2 bundle remains
+# unchanged and reproducible underneath this layer.
+COPY overrides/ /app/
+
 WORKDIR /app
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ffmpeg tesseract-ocr \
@@ -29,4 +34,4 @@ RUN apt-get update \
 RUN pip install --no-cache-dir -r requirements.txt
 
 EXPOSE 10000
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-10000}"]
+CMD ["sh", "-c", "uvicorn secure_entry:app --host 0.0.0.0 --port ${PORT:-10000}"]
