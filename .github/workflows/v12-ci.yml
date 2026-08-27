@@ -1,0 +1,81 @@
+name: AquaMetric V12 CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'source/**'
+      - '.github/workflows/v12-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  test-and-integrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Apply idempotent V12 integration patch
+        run: python source/scripts/apply_v12_patch.py
+
+      - name: Install system media tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg tesseract-ocr
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r source/requirements.txt
+
+      - name: Run complete test suite
+        working-directory: source
+        env:
+          PYTHONPATH: .
+          DATABASE_URL: sqlite:////tmp/aquametric_v12_ci.db
+          UPLOAD_DIR: /tmp/aquametric_v12_uploads
+          EVIDENCE_DIR: /tmp/aquametric_v12_evidence
+          SECRET_KEY: ci-only-secret-not-used-in-production
+        run: python -m pytest -q
+
+      - name: Smoke test main pages
+        working-directory: source
+        env:
+          PYTHONPATH: .
+          DATABASE_URL: sqlite:////tmp/aquametric_v12_smoke.db
+          UPLOAD_DIR: /tmp/aquametric_v12_smoke_uploads
+          EVIDENCE_DIR: /tmp/aquametric_v12_smoke_evidence
+          SECRET_KEY: ci-only-secret-not-used-in-production
+        run: |
+          python - <<'PY'
+          from fastapi.testclient import TestClient
+          from main import app
+          c=TestClient(app)
+          for path in ('/','/health'):
+              r=c.get(path)
+              print(path, r.status_code)
+              assert r.status_code < 500
+          paths={r.path for r in app.routes}
+          assert '/matches/{match_id}/intelligence' in paths
+          assert '/coach-intelligence/{coach_id}' in paths
+          PY
+
+      - name: Commit integrated server patch after green tests
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add source/main.py source/templates/base.html
+          if git diff --cached --quiet; then
+            echo 'Integration already committed.'
+          else
+            git commit -m 'Integrate tested AquaMetric V12 intelligence and security [skip ci]'
+            git push
+          fi
