@@ -6,13 +6,13 @@ from urllib.parse import quote_plus
 from fastapi import APIRouter, Request, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import select
+from sqlalchemy import select, or_
 from sqlalchemy.orm import Session
 
 from db import get_db, SessionLocal
 from models import (
     User, Match, Player, MediaArtifact, ScoutingTeam, ScoutingPlayer,
-    PlayerIntelligenceProfile, PlayerSourceRecord, PlayerMatchMetric, MatchLibraryItem,
+    PlayerIntelligenceProfile, PlayerSourceRecord, PlayerMatchMetric, MatchLibraryItem, TransferSignal,
 )
 from intelligence_models import PlayerMatchEvaluation, CoachIntelligenceProfile
 from services.ratings import calculate_player_rating
@@ -205,6 +205,33 @@ def scouting_coaches(team_id: int, request: Request, db: Session = Depends(get_d
     }
 
 
+@router.get("/api/scouting/{team_id}/transfers")
+def scouting_transfers(team_id: int, request: Request, db: Session = Depends(get_db)):
+    _user(request, db)
+    team = db.get(ScoutingTeam, team_id)
+    if not team:
+        raise HTTPException(404)
+    aliases = {team.name.strip()}
+    if team.name == "Union St-Bruno Bordeaux": aliases.update({"USB Bordeaux", "Union Saint-Bruno Bordeaux"})
+    if team.name == "Taverny Sports Nautiques 95": aliases.update({"Taverny SN95", "Taverny"})
+    if team.name == "Cercle des Nageurs de Marseille": aliases.update({"CN Marseille", "CNM"})
+    rows = db.scalars(select(TransferSignal).where(or_(TransferSignal.to_team.in_(aliases), TransferSignal.from_team.in_(aliases))).order_by(TransferSignal.published_date.desc())).all()
+    return {
+        "team": team.name,
+        "movements": [
+            {
+                "player": t.player_name,
+                "direction": "arrival" if t.to_team in aliases else "departure",
+                "from": t.from_team or "—", "to": t.to_team or "—", "date": t.published_date,
+                "status": t.signal_type, "source_tier": t.source_tier,
+                "confidence": t.confidence_score,
+                "profile_url": f"/intelligence/player?name={quote_plus(t.player_name)}",
+            }
+            for t in rows
+        ],
+    }
+
+
 @router.get("/security-status")
 def security_status():
     """Safe production diagnostic: boolean controls only, never keys/tokens/paths."""
@@ -223,7 +250,6 @@ def install_extensions(app):
     finally:
         db.close()
 
-    # Remove framework documentation routes from the public production surface.
     blocked_docs = {"/docs", "/redoc", "/openapi.json"}
     app.router.routes[:] = [route for route in app.router.routes if getattr(route, "path", None) not in blocked_docs]
 
@@ -236,6 +262,7 @@ def install_extensions(app):
         ("/coaches", coaches_page, HTMLResponse),
         ("/coach-intelligence/{coach_id}", coach_profile_page, HTMLResponse),
         ("/api/scouting/{team_id}/coaches", scouting_coaches, None),
+        ("/api/scouting/{team_id}/transfers", scouting_transfers, None),
         ("/security-status", security_status, None),
     ]
     for path, endpoint, response_class in registrations:
