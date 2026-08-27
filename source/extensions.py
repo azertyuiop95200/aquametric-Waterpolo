@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 from statistics import mean
+from urllib.parse import quote_plus
 
 from fastapi import APIRouter, Request, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -125,9 +126,12 @@ def match_intelligence_page(match_id: int, request: Request, db: Session = Depen
 @router.get("/intelligence/player")
 def player_by_name(request: Request, name: str = Query(...), db: Session = Depends(get_db)):
     _user(request, db)
-    profile = db.scalar(select(PlayerIntelligenceProfile).where(PlayerIntelligenceProfile.canonical_name == name.strip()))
+    canonical = name.strip()
+    profile = db.scalar(select(PlayerIntelligenceProfile).where(PlayerIntelligenceProfile.canonical_name == canonical))
     if not profile:
-        raise HTTPException(404, detail="Player intelligence profile not found")
+        # Player lists remain clickable without sending the user to a dead 404.
+        # The registry search shows whether a canonical dossier already exists.
+        return RedirectResponse(f"/player-intelligence?q={quote_plus(canonical)}", status_code=303)
     return RedirectResponse(f"/profiles/players/{profile.id}", status_code=303)
 
 
