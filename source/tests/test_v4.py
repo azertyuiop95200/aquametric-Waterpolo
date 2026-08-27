@@ -87,13 +87,16 @@ def test_calendar_competitions_and_tactical_report_render():
     assert client.get('/competitions').status_code==200
 
 
-def test_knowledge_page_contains_research_registry():
+def test_knowledge_page_contains_classic_tactical_synthesis_without_source_registry():
     client=TestClient(app)
     page=client.get('/knowledge')
     assert page.status_code==200
-    assert 'SCIENCE + COACHING' in page.text
-    assert 'Secrets of a Serbian Water Polo Coach' in page.text
-    assert 'TSAP' in page.text
+    assert 'Classic water-polo tactics, synthesized' in page.text
+    assert 'Press defence' in page.text
+    assert 'Zone+ 4–2' in page.text
+    assert 'Zone− compact 5 v 6' in page.text
+    assert 'SCIENCE + COACHING' not in page.text
+    assert 'Secrets of a Serbian Water Polo Coach' not in page.text
 
 
 def test_official_benchmark_spain_greece_full_match_and_exact_url():
