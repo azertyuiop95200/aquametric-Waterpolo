@@ -9,39 +9,52 @@ from starlette.responses import PlainTextResponse
 
 
 class AquaMetricSecurityMiddleware(BaseHTTPMiddleware):
-    """Small dependency-free web hardening layer for the demo/production app.
+    """Dependency-light hardening for AquaMetric web deployments.
 
-    - security headers / CSP
-    - same-origin validation when browsers send Origin on unsafe requests
-    - lightweight in-memory throttling for authentication/demo-login endpoints
-
-    It intentionally does not pretend to be a WAF; production deployments can add
-    Cloudflare/Render edge controls later without changing application logic.
+    Authentication throttling records failed attempts only. Successful logins and
+    registrations do not consume the quota, which protects real users and keeps
+    automated product tests representative of normal usage.
     """
+
+    AUTH_PATHS = {"/login", "/register", "/demo-login"}
 
     def __init__(self, app):
         super().__init__(app)
-        self.attempts = defaultdict(deque)
+        self.failures = defaultdict(deque)
         self.window_seconds = int(os.getenv("AUTH_RATE_WINDOW_SECONDS", "300"))
-        self.max_attempts = int(os.getenv("AUTH_RATE_MAX", "20"))
+        self.max_failures = int(os.getenv("AUTH_RATE_MAX_FAILURES", os.getenv("AUTH_RATE_MAX", "12")))
 
     def _client_key(self, request: Request):
         host = request.client.host if request.client else "unknown"
+        forwarded = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+        if forwarded:
+            host = forwarded
         return f"{host}:{request.url.path}"
 
-    def _rate_limited(self, request: Request):
-        if request.url.path not in {"/login", "/register", "/demo-login"}:
-            return False
-        key = self._client_key(request)
-        now = time.monotonic()
-        q = self.attempts[key]
+    def _prune(self, key: str, now: float):
+        q = self.failures[key]
         cutoff = now - self.window_seconds
         while q and q[0] < cutoff:
             q.popleft()
-        if len(q) >= self.max_attempts:
-            return True
-        q.append(now)
-        return False
+        return q
+
+    def _failure_limited(self, request: Request) -> bool:
+        if request.url.path not in self.AUTH_PATHS:
+            return False
+        q = self._prune(self._client_key(request), time.monotonic())
+        return len(q) >= self.max_failures
+
+    def _record_auth_result(self, request: Request, status_code: int):
+        if request.url.path not in self.AUTH_PATHS:
+            return
+        key = self._client_key(request)
+        q = self._prune(key, time.monotonic())
+        if status_code >= 400:
+            q.append(time.monotonic())
+        elif status_code < 400:
+            # A successful authentication/registration proves this client can
+            # complete the flow, so stale failures should not lock it out.
+            q.clear()
 
     @staticmethod
     def _origin_is_valid(request: Request):
@@ -49,8 +62,9 @@ class AquaMetricSecurityMiddleware(BaseHTTPMiddleware):
             return True
         origin = request.headers.get("origin")
         if not origin:
-            # Non-browser clients/tests frequently omit Origin. Session cookies are
-            # SameSite=Lax, so absence alone is not treated as hostile.
+            # SameSite=Lax session cookies already prevent ordinary cross-site form
+            # posts from carrying the authenticated session. API/test clients may
+            # legitimately omit Origin, so absence alone is not rejected.
             return True
         try:
             parsed = urlparse(origin)
@@ -61,12 +75,14 @@ class AquaMetricSecurityMiddleware(BaseHTTPMiddleware):
             return False
 
     async def dispatch(self, request: Request, call_next):
-        if self._rate_limited(request):
-            return PlainTextResponse("Too many authentication attempts. Try again later.", status_code=429)
+        if self._failure_limited(request):
+            return PlainTextResponse("Too many failed authentication attempts. Try again later.", status_code=429)
         if not self._origin_is_valid(request):
             return PlainTextResponse("Cross-site request blocked.", status_code=403)
 
         response = await call_next(request)
+        self._record_auth_result(request, response.status_code)
+
         csp = (
             "default-src 'self'; "
             "base-uri 'self'; form-action 'self'; frame-ancestors 'self'; "
