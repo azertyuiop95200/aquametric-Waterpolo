@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#07141d">
   <title>{{ app_name }}</title>
   <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/v12.css">
 </head>
 <body class="{% if user %}app-body{% else %}public-body{% endif %}">
 {% if user %}
@@ -24,6 +25,7 @@
       <a class="{% if request.url.path == '/competitions' %}active{% endif %}" href="/competitions"><span>R</span>Competitions</a>
       <a class="{% if request.url.path == '/knowledge' %}active{% endif %}" href="/knowledge"><span>K</span>Knowledge</a>
       <a class="{% if request.url.path.startswith('/scouting') %}active{% endif %}" href="/scouting"><span>S</span>Scouting</a>
+      <a class="{% if request.url.path.startswith('/coaches') or request.url.path.startswith('/coach-intelligence') %}active{% endif %}" href="/coaches"><span>HC</span>Coaches</a>
       <a class="{% if request.url.path.startswith('/national-teams') %}active{% endif %}" href="/national-teams"><span>N</span>National teams</a>
       <a class="{% if request.url.path.startswith('/analysis-library') %}active{% endif %}" href="/analysis-library"><span>A</span>Analysis Library</a>
       <a class="{% if request.url.path.startswith('/transfer-watch') %}active{% endif %}" href="/transfer-watch"><span>↻</span>Transfer Watch</a>

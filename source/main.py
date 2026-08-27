@@ -41,6 +41,8 @@ from services.france_intelligence import seed_france_intelligence, france_dashbo
 from services.advanced_metrics import METRIC_GROUPS, event_metric_summary, shot_map_summary
 from services.tactical_chess import DEFENCE_PLAYBOOK, recommend_counter_plan
 from services.simulation import simulate_matchup, SIM_TEAMS
+from extensions import install_extensions
+from security import install_security
 
 BASE_DIR = Path(__file__).resolve().parent
 UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", BASE_DIR / "uploads"))
@@ -77,9 +79,15 @@ async def lifespan(app: FastAPI):
             task.cancel()
 
 app = FastAPI(title=APP_NAME, lifespan=lifespan)
+install_security(app)
+SESSION_SECRET = os.getenv("SECRET_KEY", "").strip()
+if not SESSION_SECRET:
+    if WEB_DEMO_MODE or os.getenv("COOKIE_SECURE", "0") == "1":
+        raise RuntimeError("SECRET_KEY is required for secured web deployments")
+    SESSION_SECRET = "dev-only-local-secret-change-me"
 app.add_middleware(
     SessionMiddleware,
-    secret_key=os.getenv("SECRET_KEY", "dev-secret-change-me"),
+    secret_key=SESSION_SECRET,
     same_site="lax",
     https_only=os.getenv("COOKIE_SECURE", "0") == "1",
 )
@@ -87,6 +95,7 @@ app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
 
 Base.metadata.create_all(engine)
+install_extensions(app)
 
 
 def seed():
@@ -232,6 +241,7 @@ def demo_login(request: Request, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
     ensure_granville_team(db, user.id)
+    request.session.clear()
     request.session["user_id"] = user.id
     request.session["web_demo"] = True
     return RedirectResponse("/my-team", status_code=303)
@@ -254,6 +264,7 @@ def register(request: Request, email: str = Form(...), password: str = Form(...)
     db.add(user)
     db.commit()
     db.refresh(user)
+    request.session.clear()
     request.session["user_id"] = user.id
     return RedirectResponse("/dashboard", status_code=303)
 
@@ -268,6 +279,7 @@ def login(request: Request, email: str = Form(...), password: str = Form(...), d
     user = db.scalar(select(User).where(User.email == email.strip().lower()))
     if not user or not verify_password(password, user.password_hash):
         return render(request, "login.html", error="Invalid credentials.", status_code=400)
+    request.session.clear()
     request.session["user_id"] = user.id
     return RedirectResponse("/dashboard", status_code=303)
 
@@ -404,7 +416,7 @@ def player_detail(player_id: int, request: Request, db: Session = Depends(get_db
         .where(Event.player_id == player.id, Match.owner_id == user.id)
         .order_by(Event.id.desc())
     ).all()
-    rating, confidence, evidence = calculate_player_rating(events)
+    rating, confidence, evidence = calculate_player_rating(events, role=player.primary_role)
     return render(request, "player_detail.html", user=user, player=player, events=events, rating=rating, confidence=confidence, evidence=evidence)
 
 
@@ -489,7 +501,7 @@ def match_detail(match_id: int, request: Request, db: Session = Depends(get_db))
     ratings = []
     for p in players:
         pevents = [e for e in match.events if e.player_id == p.id]
-        rating, conf, evidence = calculate_player_rating(pevents)
+        rating, conf, evidence = calculate_player_rating(pevents, role=p.primary_role)
         ratings.append((p, rating, conf, evidence))
     job = db.scalar(select(AnalysisJob).where(AnalysisJob.match_id == match.id).order_by(AnalysisJob.id.desc()))
     return render(
