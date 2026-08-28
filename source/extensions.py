@@ -23,6 +23,7 @@ from services.coach_data import seed_coaches
 from services.advanced_metrics import shot_map_summary
 from services.player_biography import player_biography_context
 from services.elite_match_evidence import seed_elite_match_evidence
+from services.granville_match_evidence import seed_granville_match_evidence
 from services.public_match_ratings import public_profile_evaluations
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -297,6 +298,7 @@ def install_extensions(app):
     db = SessionLocal()
     try:
         seed_elite_match_evidence(db)
+        seed_granville_match_evidence(db)
         seed_coaches(db)
     finally:
         db.close()

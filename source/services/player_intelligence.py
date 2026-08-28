@@ -137,6 +137,7 @@ def seed_player_intelligence(db):
         if not p: continue
         match = db.get(MatchLibraryItem,row.library_match_id)
         src = match.official_source_url if match else ""
+        _metric_once(db,p,row.library_match_id,"appearance",1.0,"","match",row.source_quality or "official_match_sheet",1.0,src,row.note)
         if row.goals is not None: _metric_once(db,p,row.library_match_id,"goals",float(row.goals),"","goals","official_report",1.0,src,row.note)
         if row.saves is not None: _metric_once(db,p,row.library_match_id,"saves",float(row.saves),"","saves","official_report",1.0,src,row.note)
         if row.shots is not None: _metric_once(db,p,row.library_match_id,"shots",float(row.shots),"","shots","official_report",1.0,src,row.note)
