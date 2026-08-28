@@ -149,7 +149,15 @@ def unified_player_profile(profile_id: int, request: Request, db: Session = Depe
     local_ids = [p.id for p in local_players]
     evaluations = []
     if local_ids:
-        evaluations = db.scalars(select(PlayerMatchEvaluation).where(PlayerMatchEvaluation.player_id.in_(local_ids)).order_by(PlayerMatchEvaluation.generated_at.desc())).all()
+        evaluations = db.scalars(
+            select(PlayerMatchEvaluation)
+            .join(Match, PlayerMatchEvaluation.match_id == Match.id)
+            .where(
+                PlayerMatchEvaluation.player_id.in_(local_ids),
+                Match.owner_id == user.id,
+            )
+            .order_by(PlayerMatchEvaluation.generated_at.desc())
+        ).all()
     valid = [e for e in evaluations if e.overall is not None]
     aggregate = round(mean([e.overall for e in valid]), 1) if valid else None
     confidence = round(mean([e.confidence_score for e in valid]), 2) if valid else 0.0
