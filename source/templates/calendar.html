@@ -1,7 +1,70 @@
 {% extends 'base.html' %}{% block content %}
 <div class="page-head"><div><span class="eyebrow">CALENDAR & DATA</span><h1 data-i18n="calendar.title">Calendar</h1><p data-i18n="calendar.intro">Your planning and official competition data load directly from the current AquaMetric cache.</p></div></div>
 <div class="data-banner"><div><span class="status-dot {% if not auto_refresh %}idle{% endif %}"></span><div><b data-i18n="calendar.sync">Automatic data sync</b><small data-i18n="{% if auto_refresh %}calendar.sync_on{% else %}calendar.sync_cache{% endif %}">{% if auto_refresh %}Official feeds are checked by the server when automatic sync is enabled.{% else %}The page opens immediately with the last valid data while newer feeds are collected.{% endif %}</small></div></div><a href="#sources">Source health →</a></div>
-<div class="twocol calendar-layout"><section class="panel"><div class="section-head"><div><span class="eyebrow">YOUR TEAM</span><h2>Saved matches</h2></div><a href="/matches/new">Add match</a></div>{% for m in own_matches %}<a class="fixture-row" href="/matches/{{m.id}}"><time>{{m.match_date or 'Date TBD'}}</time><div><b>{{m.team.name}} vs {{m.opponent}}</b><small>{{m.competition or 'Unspecified competition'}}</small></div><span class="pill">{{m.status}}</span></a>{% else %}<p class="muted">No saved matches yet.</p>{% endfor %}</section>
-<section class="panel"><div class="section-head"><div><span class="eyebrow">OFFICIAL FEED</span><h2>Imported fixtures & results</h2></div><a href="/competitions">Standings</a></div>{% for f in fixtures[:80] %}<div class="fixture-row"><time>{{f.start_text}}</time><div><b>{{f.home_team}} <span class="score">{% if f.home_score is not none %}{{f.home_score}}–{{f.away_score}}{% else %}vs{% endif %}</span> {{f.away_team}}</b><small>{{f.competition}}</small></div><span class="pill">{{f.status}}</span></div>{% else %}<div class="empty-state"><b>No structured official fixtures cached yet</b><p>The page stays available immediately and will display supported official fixtures as soon as validated feed data is present.</p></div>{% endfor %}</section></div>
+
+{% if own_matches %}<section class="panel"><div class="section-head"><div><span class="eyebrow">YOUR TEAM</span><h2>Saved matches</h2></div><a href="/matches/new">Add match</a></div>{% for m in own_matches %}<a class="fixture-row" href="/matches/{{m.id}}"><time>{{m.match_date or 'Date TBD'}}</time><div><b>{{m.team.name}} vs {{m.opponent}}</b><small>{{m.competition or 'Unspecified competition'}}</small></div><span class="pill">{{m.status}}</span></a>{% endfor %}</section>{% endif %}
+
+<section class="panel"><div class="section-head"><div><span class="eyebrow" data-i18n="nav.competitions">Competitions</span><h2><span data-i18n="calendar.title">Calendar</span> · <span data-i18n="competition.title">Standings & official statistics</span></h2></div><a href="/competitions" data-i18n="competition.title">Standings & official statistics</a></div><p class="muted">Chaque championnat dispose ci-dessous de son calendrier complet et de son classement lorsqu’il est disponible dans les données officielles.</p></section>
+
+{% if fixtures %}
+{% for competition, rows in fixtures|groupby('competition') %}
+<section class="panel championship-panel" data-competition="{{competition|e}}">
+  <div class="section-head">
+    <div><span class="eyebrow">{{rows[0].season or '—'}}{% if rows[0].category %} · {{rows[0].category}}{% endif %}</span><h2>{{competition or 'Unspecified competition'}}</h2></div>
+    <span class="pill">{{rows|length}} match{% if rows|length != 1 %}s{% endif %}</span>
+  </div>
+  <div class="twocol championship-grid">
+    <div class="championship-calendar">
+      <div class="section-head"><div><span class="eyebrow" data-i18n="calendar.title">Calendar</span><h3>Matchs & résultats</h3></div></div>
+      {% for f in rows|reverse %}<div class="fixture-row"><time>{{f.start_text}}</time><div><b>{{f.home_team}} <span class="score">{% if f.home_score is not none %}{{f.home_score}}–{{f.away_score}}{% else %}vs{% endif %}</span> {{f.away_team}}</b>{% if f.venue %}<small>{{f.venue}}</small>{% endif %}</div><span class="pill">{{f.status}}</span></div>{% endfor %}
+    </div>
+    <div class="championship-standings" data-standings-for="{{competition|e}}">
+      <div class="section-head"><div><span class="eyebrow" data-i18n="nav.competitions">Competitions</span><h3 data-i18n="competition.title">Standings & official statistics</h3></div><a href="/competitions">→</a></div>
+      <div class="standings-loading muted">…</div>
+    </div>
+  </div>
+</section>
+{% endfor %}
+{% else %}
+<section class="panel empty-state"><b>No structured official fixtures cached yet</b><p>The page stays available immediately and will display supported official fixtures as soon as validated feed data is present.</p></section>
+{% endif %}
+
 <section class="panel" id="sources"><div class="section-head"><div><span class="eyebrow">PROVENANCE</span><h2>Official source health</h2></div><span class="pill">Fail-safe cache</span></div><div class="source-table">{% for s in sources %}<a class="source-row" href="{{s.url}}" target="_blank" rel="noopener noreferrer"><i class="{% if s.last_error %}bad{% elif s.last_success_at %}good{% endif %}"></i><div><b>{{s.name}}</b><small>{{s.parser_kind}} · every {{s.refresh_interval_hours}}h</small></div><div class="source-fresh"><b>{{s.records_count}}</b><small>records</small></div><div><small>{% if s.last_success_at %}Last success {{s.last_success_at}}{% else %}Not synced{% endif %}</small>{% if s.last_error %}<small class="danger">{{s.last_error[:90]}}</small>{% endif %}</div></a>{% endfor %}</div></section>
+
+<script>
+(()=>{
+  const slots=[...document.querySelectorAll('[data-standings-for]')];
+  if(!slots.length)return;
+  fetch('/competitions',{credentials:'same-origin'})
+    .then(r=>{if(!r.ok)throw new Error('standings');return r.text();})
+    .then(html=>{
+      const doc=new DOMParser().parseFromString(html,'text/html');
+      const byCompetition=new Map();
+      doc.querySelectorAll('section.panel').forEach(section=>{
+        const title=section.querySelector('.section-head h2');
+        const table=section.querySelector('.standings');
+        if(title&&table)byCompetition.set(title.textContent.trim(),table.closest('.table-wrap'));
+      });
+      slots.forEach(slot=>{
+        const name=slot.dataset.standingsFor;
+        const loading=slot.querySelector('.standings-loading');
+        const source=byCompetition.get(name);
+        if(source){
+          loading?.remove();
+          slot.appendChild(source.cloneNode(true));
+        }else if(loading){
+          loading.textContent='—';
+          const link=document.createElement('a');
+          link.href='/competitions';
+          link.textContent='Voir les classements disponibles →';
+          loading.after(link);
+        }
+      });
+    })
+    .catch(()=>slots.forEach(slot=>{
+      const loading=slot.querySelector('.standings-loading');
+      if(loading)loading.textContent='—';
+    }));
+})();
+</script>
 {% endblock %}
