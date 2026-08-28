@@ -1,3 +1,4 @@
+import hashlib
 import json
 import re
 
@@ -42,6 +43,21 @@ def _match_key(fixture: OfficialFixture) -> str:
     return f"OFFICIAL-FIXTURE-{fixture.source_id}-{fixture.external_key}"[:255]
 
 
+def _stable_team_key(source: OfficialDataSource, team_name: str) -> str:
+    """Return the same scouting key across Python processes and database rebuilds."""
+    provider = re.sub(r"[^a-z0-9]+", "-", (source.provider or "official").strip().lower()).strip("-") or "official"
+    identity = "|".join(
+        [
+            (source.provider or "official").strip().casefold(),
+            (source.region or "").strip().casefold(),
+            (team_name or "").strip().casefold(),
+            "women",
+        ]
+    )
+    digest = hashlib.sha1(identity.encode("utf-8")).hexdigest()[:16]
+    return f"auto-{provider[:32]}-{digest}"
+
+
 def _find_same_match(db, fixture: OfficialFixture):
     season = _season_label(fixture.season)
     candidates = db.scalars(
@@ -64,7 +80,7 @@ def _ensure_scouting_team(db, team_name: str, source: OfficialDataSource, fixtur
     team = db.scalar(select(ScoutingTeam).where(ScoutingTeam.name == team_name))
     if not team:
         team = ScoutingTeam(
-            external_key=f"auto-{source.provider.lower().replace(' ', '-')}-{abs(hash((source.id, team_name))) % 10**12}",
+            external_key=_stable_team_key(source, team_name),
             name=team_name,
             team_type="club",
             category="Women",
