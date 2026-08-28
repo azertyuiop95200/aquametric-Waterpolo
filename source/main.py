@@ -323,7 +323,11 @@ def dashboard(request: Request, db: Session = Depends(get_db)):
 def teams_page(request: Request, db: Session = Depends(get_db)):
     user = require_user(request, db)
     teams = db.scalars(select(Team).where(Team.owner_id == user.id).order_by(Team.id.desc())).all()
-    clubs = db.scalars(select(Club).order_by(Club.country, Club.category, Club.name)).all()
+    clubs = db.scalars(
+        select(Club)
+        .where(Club.owner_id.is_(None) | (Club.owner_id == user.id))
+        .order_by(Club.country, Club.category, Club.name)
+    ).all()
     return render(request, "teams.html", user=user, teams=teams, clubs=clubs)
 
 
@@ -343,7 +347,14 @@ def create_club(
     category = category if category in {"Women", "Men", "Mixed/Other"} else "Mixed/Other"
     if not name or not country:
         raise HTTPException(400, detail="Club name and country are required.")
-    existing = db.scalar(select(Club).where(Club.name == name, Club.country == country, Club.category == category))
+    existing = db.scalar(
+        select(Club).where(
+            Club.name == name,
+            Club.country == country,
+            Club.category == category,
+            Club.owner_id.is_(None) | (Club.owner_id == user.id),
+        )
+    )
     if existing:
         return RedirectResponse(f"/teams?club_exists={existing.id}", status_code=303)
     db.add(Club(name=name, country=country, division=division, category=category, owner_id=user.id))
@@ -355,8 +366,8 @@ def create_club(
 def create_team(request: Request, name: str = Form(...), club_id: int = Form(...), category: str = Form("Women"), db: Session = Depends(get_db)):
     user = require_user(request, db)
     club = db.get(Club, club_id)
-    if not club:
-        raise HTTPException(400, detail="Selected club does not exist.")
+    if not club or (club.owner_id is not None and club.owner_id != user.id):
+        raise HTTPException(400, detail="Selected club does not exist or is not available.")
     name = clean_text(name)
     if not name:
         raise HTTPException(400, detail="Team name is required.")
@@ -1009,7 +1020,11 @@ def report_json(match_id: int, request: Request, db: Session = Depends(get_db)):
     if not match or match.owner_id != user.id:
         raise HTTPException(404)
     auto = db.scalar(select(AutonomousAnalysis).where(AutonomousAnalysis.match_id == match.id).order_by(AutonomousAnalysis.id.desc()))
-    candidates = db.scalars(select(AutonomousEventCandidate).where(AutonomousEventCandidate.match_id == match.id).order_by(AutonomousEventCandidate.second)).all() if auto else []
+    candidates = db.scalars(
+        select(AutonomousEventCandidate)
+        .where(AutonomousEventCandidate.analysis_id == auto.id)
+        .order_by(AutonomousEventCandidate.second)
+    ).all() if auto else []
     report = build_match_report(match, auto, candidates)
     return {
         "match": {"team": match.team.name, "opponent": match.opponent, "competition": match.competition, "date": match.match_date},
