@@ -9,10 +9,10 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  test-and-integrate:
+  test-integrated-source:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -72,15 +72,3 @@ jobs:
           assert '/redoc' not in paths
           assert '/openapi.json' not in paths
           PY
-
-      - name: Commit integrated server patch after green tests
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+azertyuiop95200@users.noreply.github.com'
-          git add source/main.py source/templates/base.html
-          if git diff --cached --quiet; then
-            echo 'Integration already committed.'
-          else
-            git commit -m 'Integrate tested AquaMetric V12 intelligence and security [skip ci]'
-            git push
-          fi

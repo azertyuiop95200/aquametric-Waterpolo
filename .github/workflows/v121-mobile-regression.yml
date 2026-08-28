@@ -20,6 +20,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Apply idempotent V12 integration patch
+        run: python source/scripts/apply_v12_patch.py
+
       - name: Install system dependencies
         run: |
           sudo apt-get update
@@ -99,7 +102,6 @@ jobs:
             assert(box && box.x >= -1 && box.width >= 250,'sidebar is still off-screen after opening');
             assert(await page.locator('[data-menu-backdrop]').evaluate(el=>el.classList.contains('open')),'menu backdrop did not open');
 
-            // Exact requested behaviour: tap on the right/outside, remain on the same page.
             await page.mouse.click(378,420);
             await page.waitForTimeout(180);
             assert(!(await page.locator('#sidebar').evaluate(el=>el.classList.contains('open'))),'sidebar did not close after tapping outside');
@@ -109,7 +111,6 @@ jobs:
             await page.locator('[data-menu-close]').click();
             assert(!(await page.locator('#sidebar').evaluate(el=>el.classList.contains('open'))),'close button failed');
 
-            // Language selector and persistence.
             await page.selectOption('#lang','fr');
             await page.waitForTimeout(120);
             assert((await page.locator('[data-i18n="nav.dashboard"]').innerText()).trim()==='Tableau de bord','French navigation translation failed');
@@ -117,7 +118,6 @@ jobs:
             assert((await page.locator('#lang').inputValue())==='fr','language preference did not persist');
             assert((await page.locator('[data-i18n="nav.dashboard"]').innerText()).trim()==='Tableau de bord','French translation did not persist after reload');
 
-            // Horizontal touch/drag areas must actually overflow on iPhone.
             const tabs=page.locator('.section-tabs');
             if(await tabs.count()){
               const dims=await tabs.evaluate(el=>({scrollWidth:el.scrollWidth,clientWidth:el.clientWidth,overflow:getComputedStyle(el).overflowX}));

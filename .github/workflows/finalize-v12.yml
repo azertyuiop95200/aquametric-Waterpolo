@@ -25,18 +25,6 @@ jobs:
       - name: Apply V12 integration patch
         run: python source/scripts/apply_v12_patch.py
 
-      - name: Publish integrated source for inspection
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add source
-          if git diff --cached --quiet; then
-            echo 'V12 integration already present.'
-          else
-            git commit -m 'Integrate AquaMetric V12 source for validation [skip ci]'
-            git push
-          fi
-
       - name: Install system dependencies
         run: |
           sudo apt-get update
@@ -110,3 +98,15 @@ jobs:
           print('health:', r.json())
           print('V12.1 routes + security headers: OK')
           PY
+
+      - name: Publish integrated source after green validation
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add source
+          if git diff --cached --quiet; then
+            echo 'V12 integration already present.'
+          else
+            git commit -m 'Integrate AquaMetric V12 source after validation [skip ci]'
+            git push
+          fi
