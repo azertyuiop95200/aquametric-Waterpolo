@@ -47,7 +47,9 @@ def evidence_coverage_api(request: Request, db: Session = Depends(get_db)):
                 "team_type": r["team"].team_type,
                 "country": r["team"].country,
                 "competition": r["team"].competition,
-                "season": r["team"].season,
+                "season": r["team"].season_label,
+                "age_group": r["team"].age_group,
+                "roster_status": r["team"].roster_status,
                 "state": r["state"],
                 "coverage_score": r["coverage_score"],
                 "roster_players": r["roster_players"],
@@ -57,6 +59,7 @@ def evidence_coverage_api(request: Request, db: Session = Depends(get_db)):
                 "performance_matches": r["performance_matches"],
                 "lineup_only_matches": r["lineup_only_matches"],
                 "missing_player_evidence": r["missing_player_evidence"],
+                "evidence_seasons": r["evidence_seasons"],
             }
             for r in rows
         ],
