@@ -12,6 +12,7 @@ ROLE_WEIGHTS = {
     "field": {"attack": .18, "defence": .15, "decision": .15, "tactics": .13, "transition": .11, "discipline": .08, "technique": .10, "impact": .10},
     "goalkeeper": {"attack": .02, "defence": .27, "decision": .18, "tactics": .14, "transition": .08, "discipline": .07, "technique": .16, "impact": .08},
 }
+OFFICIAL_TIERS = {"federation_official", "official", "official_report", "official_match_sheet", "world_aquatics"}
 
 
 def _clamp(value, low=25.0, high=95.0):
@@ -66,19 +67,63 @@ def _result(match, player_team):
                 break
         if opp is None:
             return "unknown"
-    if total > opp:
-        return "win"
-    if total < opp:
-        return "loss"
-    return "draw"
+    return "win" if total > opp else ("loss" if total < opp else "draw")
+
+
+def _public_reliability(coverage, evidence_families, source_tier, scorer_complete):
+    # Public box scores are intrinsically partial. Even an official goals-only sheet
+    # cannot carry the same amplitude as tagged full-match evidence.
+    reliability = .18 + coverage * .34 + min(.24, evidence_families * .07)
+    if source_tier in OFFICIAL_TIERS:
+        reliability += .07
+    if scorer_complete:
+        reliability += .06
+    return round(min(.82, reliability), 3)
+
+
+def _confidence(coverage, evidence_families, source_tier, scorer_complete, appearance_verified):
+    if not appearance_verified and not evidence_families:
+        return 0.0
+    value = .10 + coverage * .36 + min(.24, evidence_families * .08)
+    if source_tier in OFFICIAL_TIERS:
+        value += .10
+    if scorer_complete:
+        value += .08
+    return round(min(.92, value), 2)
+
+
+def _confidence_label(overall, confidence):
+    if overall is None:
+        return "PRESENCE"
+    if confidence < .35:
+        return "LOW SAMPLE"
+    if confidence < .60:
+        return "MODERATE"
+    if confidence < .80:
+        return "STRONG"
+    return "HIGH"
+
+
+def _rating_band(overall, confidence):
+    if overall is None:
+        return "UNRATED"
+    if confidence < .35:
+        return "PROVISIONAL"
+    if overall >= 70:
+        return "STRONG PARTIAL EVIDENCE"
+    if overall >= 57:
+        return "POSITIVE PARTIAL EVIDENCE"
+    if overall >= 44:
+        return "BALANCED / MIXED"
+    return "NEGATIVE PARTIAL EVIDENCE"
 
 
 def evaluate_public_match(match, metrics, role=""):
-    """Rate only what a public source actually documents.
+    """Rate only dimensions directly supported by a public source.
 
-    Missing dimensions stay None. A lineup-only source verifies participation but
-    never produces an individual /100. Partial stat lines can produce a deliberately
-    coverage-adjusted score, always alongside confidence and unavailable dimensions.
+    Missing dimensions stay None. The /100 is a partial-evidence indicator, not a
+    full player grade: amplitude is reliability-shrunk toward 50 according to the
+    breadth of published statistics and source completeness.
     """
     by_metric = {m.metric: m for m in metrics}
     values = {k: (by_metric[k].value if k in by_metric else None) for k in ("goals", "shots", "assists", "steals", "saves", "exclusions")}
@@ -104,49 +149,49 @@ def evaluate_public_match(match, metrics, role=""):
 
     if goals is not None:
         evidence_families += 1
-        share_bonus = min(12.0, (share or 0.0) * 42.0)
-        difficulty = max(-2.0, min(4.0, (level - 3) * 1.6))
-        win_bonus = 1.5 if result == "win" else (-0.5 if result == "loss" else 0.0)
-        dims["attack"] = _clamp(49 + min(25.0, float(goals) * 4.0) + share_bonus + difficulty + win_bonus)
-        dims["impact"] = _clamp(48 + min(24.0, float(goals) * 3.4) + min(13.0, (share or 0.0) * 45.0) + difficulty + win_bonus)
+        share_bonus = min(11.0, (share or 0.0) * 38.0)
+        difficulty = max(-1.5, min(3.5, (level - 3) * 1.4))
+        win_bonus = 1.0 if result == "win" else (-.4 if result == "loss" else 0.0)
+        dims["attack"] = _clamp(49 + min(23.0, float(goals) * 3.7) + share_bonus + difficulty + win_bonus)
+        dims["impact"] = _clamp(48 + min(22.0, float(goals) * 3.1) + min(12.0, (share or 0.0) * 42.0) + difficulty + win_bonus)
         published.append(f"{int(goals)} goal(s)")
 
     shots = values["shots"]
     if shots is not None:
         evidence_families += 1
         efficiency = (float(goals or 0) / float(shots)) if shots else 0.0
-        dims["technique"] = _clamp(42 + efficiency * 52)
-        dims["decision"] = _clamp(44 + efficiency * 40)
+        dims["technique"] = _clamp(44 + efficiency * 46)
+        dims["decision"] = _clamp(45 + efficiency * 36)
         published.append(f"{int(shots)} shot(s)")
 
     assists = values["assists"]
     if assists is not None:
         evidence_families += 1
-        dims["decision"] = _clamp((dims["decision"] or 50) + min(18, assists * 5.0))
-        dims["tactics"] = _clamp(50 + min(20, assists * 4.2))
-        dims["attack"] = _clamp((dims["attack"] or 50) + min(12, assists * 2.5))
+        dims["decision"] = _clamp((dims["decision"] or 50) + min(16, assists * 4.5))
+        dims["tactics"] = _clamp(50 + min(18, assists * 3.8))
+        dims["attack"] = _clamp((dims["attack"] or 50) + min(10, assists * 2.2))
         published.append(f"{int(assists)} assist(s)")
 
     steals = values["steals"]
     if steals is not None:
         evidence_families += 1
-        dims["defence"] = _clamp(50 + min(24, steals * 6.0))
-        dims["transition"] = _clamp(50 + min(22, steals * 5.5))
-        dims["decision"] = _clamp((dims["decision"] or 50) + min(12, steals * 3.0))
+        dims["defence"] = _clamp(50 + min(22, steals * 5.5))
+        dims["transition"] = _clamp(50 + min(20, steals * 5.0))
+        dims["decision"] = _clamp((dims["decision"] or 50) + min(10, steals * 2.6))
         published.append(f"{int(steals)} steal(s)")
 
     saves = values["saves"]
     if saves is not None:
         evidence_families += 1
-        dims["defence"] = _clamp(48 + min(34, saves * 3.2))
-        dims["technique"] = _clamp(48 + min(30, saves * 2.8))
-        dims["impact"] = _clamp((dims["impact"] or 50) + min(25, saves * 2.4))
+        dims["defence"] = _clamp(48 + min(32, saves * 3.0))
+        dims["technique"] = _clamp(48 + min(28, saves * 2.6))
+        dims["impact"] = _clamp((dims["impact"] or 50) + min(23, saves * 2.2))
         published.append(f"{int(saves)} save(s)")
 
     exclusions = values["exclusions"]
     if exclusions is not None:
         evidence_families += 1
-        dims["discipline"] = _clamp(60 - exclusions * 8.0)
+        dims["discipline"] = _clamp(60 - exclusions * 7.0)
         published.append(f"{int(exclusions)} exclusion(s)")
 
     available = [d for d, score in dims.items() if score is not None]
@@ -154,48 +199,31 @@ def evaluate_public_match(match, metrics, role=""):
     weights = ROLE_WEIGHTS[_role_key(role)]
     denom = sum(weights[d] for d in available)
     raw_overall = sum(dims[d] * weights[d] for d in available) / denom if denom else None
+    reliability = _public_reliability(coverage, evidence_families, source_tier, scorer_complete)
+    overall = round(50 + (raw_overall - 50) * reliability, 1) if raw_overall is not None else None
 
-    if raw_overall is not None:
-        shrink = 0.42 + coverage * 0.58
-        overall = round(50 + (raw_overall - 50) * shrink, 1)
-    else:
-        overall = None
-
-    confidence = .14 + coverage * .34
-    if source_tier in {"federation_official", "official", "official_report", "official_match_sheet"}:
-        confidence += .08
-    if scorer_complete:
-        confidence += .10
-    if evidence_families >= 2:
-        confidence += .12
-    confidence = round(min(.92, confidence), 2)
-    if overall is None:
-        confidence_label = "PRESENCE"
-    elif confidence < .35:
-        confidence_label = "LIMITED"
-    elif confidence < .60:
-        confidence_label = "PARTIAL"
-    elif confidence < .80:
-        confidence_label = "SOLID"
-    else:
-        confidence_label = "HIGH"
-
+    confidence = _confidence(coverage, evidence_families, source_tier, scorer_complete, appearance_verified)
+    confidence_label = _confidence_label(overall, confidence)
     unavailable = [d for d in DIMENSIONS if dims[d] is None]
     if evidence_families >= 3:
         scope = "fuller public stat line"
     elif evidence_families >= 2:
         scope = "multi-stat public evidence"
     elif evidence_families == 1:
-        scope = "published scoring evidence only"
+        scope = "single-stat public evidence"
     else:
         scope = "official lineup presence only"
     return {
         "match": match,
         "overall": overall,
+        "raw_overall": round(raw_overall, 1) if raw_overall is not None else None,
         "dimensions": dims,
         "coverage": coverage,
+        "reliability": reliability,
         "confidence_score": confidence,
         "confidence_label": confidence_label,
+        "rating_band": _rating_band(overall, confidence),
+        "evidence_families": evidence_families,
         "source_tier": source_tier,
         "scorer_list_complete": scorer_complete,
         "competition_level": level,
@@ -207,6 +235,7 @@ def evaluate_public_match(match, metrics, role=""):
         "result": result,
         "goals": int(goals) if goals is not None else None,
         "appearance_verified": appearance_verified,
+        "engine_version": "public-rating-v3",
     }
 
 
@@ -245,15 +274,24 @@ def public_profile_evaluations(db, profile, role=""):
         "goals_per_match": round(goals / len(rated), 2) if rated else None,
         "avg_rating": None,
         "weighted_rating": None,
+        "raw_weighted_rating": None,
         "avg_confidence": 0.0,
+        "sample_reliability": 0.0,
         "best": None,
+        "engine_version": "public-rating-v3",
     }
     if rated:
         weighted_den = sum(max(.05, r["confidence_score"]) * max(1, r["competition_level"]) for r in rated)
+        raw_weighted = sum(r["overall"] * max(.05, r["confidence_score"]) * max(1, r["competition_level"]) for r in rated) / weighted_den
+        sample_reliability = min(1.0, len(rated) / 8.0)
+        profile_shrink = .55 + .45 * sample_reliability
+        weighted_rating = 50 + (raw_weighted - 50) * profile_shrink
         summary.update({
             "avg_rating": round(mean(r["overall"] for r in rated), 1),
-            "weighted_rating": round(sum(r["overall"] * max(.05, r["confidence_score"]) * max(1, r["competition_level"]) for r in rated) / weighted_den, 1),
+            "raw_weighted_rating": round(raw_weighted, 1),
+            "weighted_rating": round(weighted_rating, 1),
             "avg_confidence": round(mean(r["confidence_score"] for r in rated), 2),
+            "sample_reliability": round(sample_reliability, 2),
             "best": max(rated, key=lambda r: r["overall"]),
         })
     return {"matches": rows, "summary": summary}
