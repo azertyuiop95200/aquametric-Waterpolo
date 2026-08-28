@@ -25,6 +25,7 @@ from services.player_biography import player_biography_context
 from services.elite_match_evidence import seed_elite_match_evidence
 from services.granville_match_evidence import seed_granville_match_evidence
 from services.public_match_ratings import public_profile_evaluations
+from evidence_coverage_routes import router as evidence_coverage_router
 
 BASE_DIR = Path(__file__).resolve().parent
 TEMPLATES = Jinja2Templates(directory=BASE_DIR / "templates")
@@ -307,6 +308,7 @@ def install_extensions(app):
     app.router.routes[:] = [route for route in app.router.routes if getattr(route, "path", None) not in blocked_docs]
 
     app.include_router(router)
+    app.include_router(evidence_coverage_router)
     existing = {getattr(route, "path", None) for route in app.routes}
     registrations = [
         ("/matches/{match_id}/intelligence", match_intelligence_page, HTMLResponse),

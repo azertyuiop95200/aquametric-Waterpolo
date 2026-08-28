@@ -150,11 +150,13 @@ def seed_player_intelligence(db):
 
 def profile_snapshot(db, profile):
     metrics = db.scalars(select(PlayerMatchMetric).where(PlayerMatchMetric.profile_id==profile.id)).all()
-    match_ids = {m.library_match_id for m in metrics if m.library_match_id}
+    documented_match_ids = {m.library_match_id for m in metrics if m.library_match_id}
+    stat_match_ids = {m.library_match_id for m in metrics if m.library_match_id and m.metric != "appearance"}
     total_goals = sum((m.value or 0) for m in metrics if m.metric == "goals")
     total_saves = sum((m.value or 0) for m in metrics if m.metric == "saves")
     return {
-        "matches": len(match_ids), "goals": int(total_goals), "saves": int(total_saves),
+        "matches": len(stat_match_ids), "documented_matches": len(documented_match_ids),
+        "goals": int(total_goals), "saves": int(total_saves),
         "sources": db.query(PlayerSourceRecord).filter(PlayerSourceRecord.profile_id==profile.id).count(),
         "metrics": len(metrics),
     }

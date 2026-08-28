@@ -30,6 +30,7 @@
       <a class="{% if request.url.path == '/competitions' %}active{% endif %}" href="/competitions"><span>R</span><b class="nav-label" data-i18n="nav.competitions">Competitions</b></a>
       <a class="{% if request.url.path == '/knowledge' %}active{% endif %}" href="/knowledge"><span>K</span><b class="nav-label" data-i18n="nav.knowledge">Knowledge</b></a>
       <a class="{% if request.url.path.startswith('/scouting') %}active{% endif %}" href="/scouting"><span>S</span><b class="nav-label" data-i18n="nav.scouting">Scouting</b></a>
+      <a class="{% if request.url.path == '/evidence-coverage' %}active{% endif %}" href="/evidence-coverage"><span>Σ</span><b class="nav-label">Evidence coverage</b></a>
       <a class="{% if request.url.path.startswith('/coaches') or request.url.path.startswith('/coach-intelligence') %}active{% endif %}" href="/coaches"><span>HC</span><b class="nav-label" data-i18n="nav.coaches">Coaches</b></a>
       <a class="{% if request.url.path.startswith('/national-teams') %}active{% endif %}" href="/national-teams"><span>N</span><b class="nav-label" data-i18n="nav.national_teams">National teams</b></a>
       <a class="{% if request.url.path.startswith('/analysis-library') %}active{% endif %}" href="/analysis-library"><span>A</span><b class="nav-label" data-i18n="nav.analysis_library">Reference Library</b></a>
