@@ -1229,4 +1229,8 @@ def simulation_page(request: Request, team_a: str = "Granville Water Polo", team
 
 @app.get("/health")
 def health():
-    return {"ok": True, "app": APP_NAME}
+    payload = {"ok": True, "app": APP_NAME}
+    render_commit = os.getenv("RENDER_GIT_COMMIT", "").strip()
+    if render_commit:
+        payload["git_commit"] = render_commit
+    return payload
