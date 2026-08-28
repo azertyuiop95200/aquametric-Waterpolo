@@ -7,8 +7,18 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from db import SessionLocal
+from intelligence_models import PlayerMatchEvaluation
 from main import app
-from models import AutonomousAnalysis, AutonomousEventCandidate, Club, Match, Team, User
+from models import (
+    AutonomousAnalysis,
+    AutonomousEventCandidate,
+    Club,
+    Match,
+    Player,
+    PlayerIntelligenceProfile,
+    Team,
+    User,
+)
 
 
 def _register(client: TestClient, email: str):
@@ -42,6 +52,7 @@ def test_private_clubs_are_isolated_between_users():
         private_club = db.scalar(select(Club).where(Club.name == club_name, Club.owner_id == user_a.id))
         assert private_club is not None
         private_club_id = private_club.id
+        user_a_id = user_a.id
     finally:
         db.close()
 
@@ -57,8 +68,6 @@ def test_private_clubs_are_isolated_between_users():
     )
     assert response.status_code == 400
 
-    # Another user may create their own club with the same real-world label;
-    # the first user's private record must not be treated as a global duplicate.
     response = client_b.post(
         "/clubs",
         data={"name": club_name, "country": "France", "division": "Audit", "category": "Women"},
@@ -70,7 +79,7 @@ def test_private_clubs_are_isolated_between_users():
     try:
         user_b = db.scalar(select(User).where(User.email == email_b))
         clubs = db.scalars(select(Club).where(Club.name == club_name).order_by(Club.id)).all()
-        assert {club.owner_id for club in clubs} == {user_a.id, user_b.id}
+        assert {club.owner_id for club in clubs} == {user_a_id, user_b.id}
         leaked_team = db.scalar(
             select(Team).where(Team.owner_id == user_b.id, Team.club_id == private_club_id)
         )
@@ -158,3 +167,66 @@ def test_report_json_uses_only_latest_autonomous_analysis_candidates():
             "summary": "current candidate",
         }
     ]
+
+
+def test_unified_player_profile_keeps_private_match_evaluations_tenant_scoped():
+    token = uuid.uuid4().hex[:10]
+    email_a = f"audit-profile-a-{token}@example.com"
+    email_b = f"audit-profile-b-{token}@example.com"
+    client_a = TestClient(app)
+    client_b = TestClient(app)
+    _register(client_a, email_a)
+    _register(client_b, email_b)
+
+    db = SessionLocal()
+    try:
+        user_a = db.scalar(select(User).where(User.email == email_a))
+        user_b = db.scalar(select(User).where(User.email == email_b))
+        shared_club = db.scalar(select(Club).where(Club.owner_id.is_(None)).order_by(Club.id))
+        profile = db.scalar(select(PlayerIntelligenceProfile).order_by(PlayerIntelligenceProfile.id))
+        assert shared_club is not None
+        assert profile is not None
+
+        team_a = Team(name=f"Profile A {token}", club_id=shared_club.id, owner_id=user_a.id, category="Women")
+        team_b = Team(name=f"Profile B {token}", club_id=shared_club.id, owner_id=user_b.id, category="Women")
+        db.add_all([team_a, team_b])
+        db.flush()
+        player_a = Player(team_id=team_a.id, name=profile.canonical_name, cap_number=7)
+        player_b = Player(team_id=team_b.id, name=profile.canonical_name, cap_number=8)
+        db.add_all([player_a, player_b])
+        db.flush()
+        match_a = Match(owner_id=user_a.id, team_id=team_a.id, opponent="Private A", competition="Audit", match_date="2026-08-28")
+        match_b = Match(owner_id=user_b.id, team_id=team_b.id, opponent="Private B", competition="Audit", match_date="2026-08-28")
+        db.add_all([match_a, match_b])
+        db.flush()
+        db.add_all([
+            PlayerMatchEvaluation(
+                match_id=match_a.id,
+                player_id=player_a.id,
+                overall=91.0,
+                confidence_score=0.9,
+                confidence_label="HIGH",
+                role_snapshot="Audit role",
+                summary=f"PRIVATE-A-{token}",
+            ),
+            PlayerMatchEvaluation(
+                match_id=match_b.id,
+                player_id=player_b.id,
+                overall=73.0,
+                confidence_score=0.7,
+                confidence_label="MEDIUM",
+                role_snapshot="Audit role",
+                summary=f"PRIVATE-B-{token}",
+            ),
+        ])
+        db.commit()
+        profile_id = profile.id
+    finally:
+        db.close()
+
+    response = client_b.get(f"/profiles/players/{profile_id}")
+    assert response.status_code == 200
+    assert f"PRIVATE-B-{token}" in response.text
+    assert f"PRIVATE-A-{token}" not in response.text
+    assert "73.0" in response.text
+    assert "91.0" not in response.text

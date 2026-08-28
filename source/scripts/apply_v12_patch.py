@@ -39,7 +39,7 @@ demo_repl = '''    ensure_granville_team(db, user.id)\n    request.session.clear
 if demo_anchor in text:
     text = text.replace(demo_anchor, demo_repl, 1)
 
-# Audit fix: keep user-created clubs private while preserving shared/demo clubs.
+# Keep user-created clubs private while preserving shared/demo clubs.
 teams_anchor = '''    teams = db.scalars(select(Team).where(Team.owner_id == user.id).order_by(Team.id.desc())).all()\n    clubs = db.scalars(select(Club).order_by(Club.country, Club.category, Club.name)).all()\n    return render(request, "teams.html", user=user, teams=teams, clubs=clubs)\n'''
 teams_repl = '''    teams = db.scalars(select(Team).where(Team.owner_id == user.id).order_by(Team.id.desc())).all()\n    clubs = db.scalars(\n        select(Club)\n        .where(Club.owner_id.is_(None) | (Club.owner_id == user.id))\n        .order_by(Club.country, Club.category, Club.name)\n    ).all()\n    return render(request, "teams.html", user=user, teams=teams, clubs=clubs)\n'''
 if teams_anchor in text:
@@ -61,8 +61,7 @@ if team_create_anchor in text:
 elif "club.owner_id is not None and club.owner_id != user.id" not in text:
     raise SystemExit("team club-ownership anchor not found")
 
-# Audit fix: report.json must use candidates from the latest autonomous run only,
-# matching the HTML report and autonomy page instead of mixing historical runs.
+# report.json must use candidates from the latest autonomous run only.
 report_anchor = '''    candidates = db.scalars(select(AutonomousEventCandidate).where(AutonomousEventCandidate.match_id == match.id).order_by(AutonomousEventCandidate.second)).all() if auto else []\n    report = build_match_report(match, auto, candidates)\n'''
 report_repl = '''    candidates = db.scalars(\n        select(AutonomousEventCandidate)\n        .where(AutonomousEventCandidate.analysis_id == auto.id)\n        .order_by(AutonomousEventCandidate.second)\n    ).all() if auto else []\n    report = build_match_report(match, auto, candidates)\n'''
 if report_anchor in text:
@@ -73,6 +72,18 @@ elif "AutonomousEventCandidate.analysis_id == auto.id" not in text:
 text = text.replace("calculate_player_rating(events)\n    return render(request, \"player_detail.html\"", "calculate_player_rating(events, role=player.primary_role)\n    return render(request, \"player_detail.html\"", 1)
 text = text.replace("calculate_player_rating(pevents)\n        ratings.append", "calculate_player_rating(pevents, role=p.primary_role)\n        ratings.append", 1)
 p.write_text(text, encoding="utf-8")
+
+# Match-derived evaluations are private tenant data even when the scouting
+# identity/profile itself is global and shared.
+extensions = root / "extensions.py"
+e = extensions.read_text(encoding="utf-8")
+eval_anchor = '''        evaluations = db.scalars(select(PlayerMatchEvaluation).where(PlayerMatchEvaluation.player_id.in_(local_ids)).order_by(PlayerMatchEvaluation.generated_at.desc())).all()\n'''
+eval_repl = '''        evaluations = db.scalars(\n            select(PlayerMatchEvaluation)\n            .join(Match, PlayerMatchEvaluation.match_id == Match.id)\n            .where(\n                PlayerMatchEvaluation.player_id.in_(local_ids),\n                Match.owner_id == user.id,\n            )\n            .order_by(PlayerMatchEvaluation.generated_at.desc())\n        ).all()\n'''
+if eval_anchor in e:
+    e = e.replace(eval_anchor, eval_repl, 1)
+elif "Match.owner_id == user.id" not in e:
+    raise SystemExit("player evaluation tenant-scope anchor not found")
+extensions.write_text(e, encoding="utf-8")
 
 # Keep base template changes tiny and idempotent to avoid replacing the whole shell.
 base = root / "templates" / "base.html"
