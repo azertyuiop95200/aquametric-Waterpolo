@@ -9,11 +9,13 @@ from services.transfer_market_2026 import (
     HA10_AUG_URL,
 )
 from services.transfer_market_2026_wave2 import WAVE2_TRANSFER_SIGNALS, JUG_SIMIC_URL
+from services.transfer_market_2026_wave3 import WAVE3_TRANSFER_SIGNALS
 
 # Keep the original seed/deduplication engine intact, but feed it the broader
 # catalogue. Import happens once per process, so the extension is deterministic.
 _core.TRANSFER_SIGNALS.extend(EXTRA_TRANSFER_SIGNALS)
 _core.TRANSFER_SIGNALS.extend(WAVE2_TRANSFER_SIGNALS)
+_core.TRANSFER_SIGNALS.extend(WAVE3_TRANSFER_SIGNALS)
 TRANSFER_SIGNALS = _core.TRANSFER_SIGNALS
 
 _EXTRA_SOURCE_WATCHES = [
@@ -21,6 +23,8 @@ _EXTRA_SOURCE_WATCHES = [
     ("OA Sport — A1 women mercato 2026-27", "media", "web", "Italy — Serie A1 women", OA_WOMEN_URL, "media", 12, "Club-by-club 2026-27 arrivals, departures and retirements; reported evidence until upgraded by club/federation sources."),
     ("HA10 / LEWaterpolo — Spain mercato", "league_media", "web", "Spain — División de Honor women and men", HA10_AUG_URL, "media", 12, "Relays LEWaterpolo summer-market/new-faces coverage; cross-check with clubs and RFEN when available."),
     ("VK Jug — official news", "club_official", "web", "VK Jug Dubrovnik", JUG_SIMIC_URL, "primary", 12, "Official club announcements and current first-team roster changes."),
+    ("CN Sabadell — official water polo", "club_official", "web", "CN Sabadell women and men", "https://nataciosabadell.es/seccio-waterpolo/", "primary", 12, "Official club water-polo section; use for roster validation and cross-checking announced signings/exits."),
+    ("CN Terrassa — official water polo", "club_official", "web", "CN Terrassa women and men", "https://clubnatacioterrassa.cat/", "primary", 12, "Official club site for 2026-27 signings, roster continuity and competition context."),
 ]
 _existing_source_names = {row[0] for row in _core.SOURCE_WATCHES}
 _core.SOURCE_WATCHES.extend(row for row in _EXTRA_SOURCE_WATCHES if row[0] not in _existing_source_names)
