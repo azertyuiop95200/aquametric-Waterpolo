@@ -96,6 +96,37 @@ def test_national_team_aliases_and_age_group_scope_do_not_mix_senior_and_u20():
     assert _match_in_scope(u20, u20_match) is True
 
 
+def test_u20_world_aquatics_library_is_visible_to_each_relevant_team():
+    db = SessionLocal()
+    try:
+        by_name = {r['team'].name:r for r in team_evidence_coverage(db)}
+        for name in ('Spain — Women U20', 'Greece — Women U20', 'United States — Women U20', 'Italy — Women U20', 'Croatia — Women U20', 'Brazil — Women U20'):
+            row = by_name[name]
+            assert row['documented_matches'] > 0, name
+            assert row['performance_matches'] > 0, name
+            assert row['performance_players'] > 0, name
+            assert row['state'] == 'performance_stats', name
+            assert '2025' in row['evidence_seasons'], name
+    finally:
+        db.close()
+
+
+def test_benchmark_does_not_duplicate_canonical_spain_greece_u20_semifinal():
+    db = SessionLocal()
+    try:
+        rows = db.scalars(select(MatchLibraryItem).where(
+            MatchLibraryItem.team_a == 'Spain',
+            MatchLibraryItem.team_b == 'Greece',
+            MatchLibraryItem.score_a == 11,
+            MatchLibraryItem.score_b == 9,
+            MatchLibraryItem.season == '2025',
+        )).all()
+        assert len(rows) == 1
+        assert rows[0].external_key == 'WA-U20W-2025-SF-ESP-GRE'
+    finally:
+        db.close()
+
+
 def test_evidence_coverage_dashboard_and_api_require_login_then_render():
     anonymous = TestClient(app)
     denied = anonymous.get('/evidence-coverage', follow_redirects=False)
