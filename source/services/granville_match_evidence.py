@@ -63,7 +63,9 @@ def seed_granville_match_evidence(db):
                 stat.note = f"Official FFN team composition for {item['date']}. Presence is verified; individual performance statistics are not published on this source."
     db.commit()
 
-    # The same startup pass expands official scorer evidence across every French
-    # Elite club currently represented in the AquaMetric scouting registry.
+    # The shared startup pass expands evidence beyond Granville: all French Elite
+    # scorer reports plus every authoritative World Aquatics benchmark match.
     from services.french_elite_all_teams import seed_french_elite_all_teams
+    from services.benchmark_match_evidence import seed_benchmark_match_evidence
     seed_french_elite_all_teams(db)
+    seed_benchmark_match_evidence(db)
