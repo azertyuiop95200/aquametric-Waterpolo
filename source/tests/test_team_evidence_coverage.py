@@ -5,9 +5,9 @@ from sqlalchemy import select
 
 from db import SessionLocal
 from main import app
-from models import ScoutingTeam, PlayerIntelligenceProfile
+from models import ScoutingTeam, PlayerIntelligenceProfile, MatchLibraryItem
 from services.player_intelligence import profile_snapshot
-from services.team_evidence_coverage import team_evidence_coverage
+from services.team_evidence_coverage import team_evidence_coverage, aliases_for, _match_in_scope
 
 
 FRENCH_ELITE = {
@@ -83,10 +83,30 @@ def test_profile_snapshot_separates_documented_appearances_from_stat_matches():
         db.close()
 
 
+def test_national_team_aliases_and_age_group_scope_do_not_mix_senior_and_u20():
+    senior = ScoutingTeam(name='Greece — Women Senior', team_type='national_team', country='Greece', age_group='Senior')
+    u20 = ScoutingTeam(name='Greece — Women U20', team_type='national_team', country='Greece', age_group='U20')
+    senior_match = MatchLibraryItem(external_key='TEST-GRE-SENIOR', title='Greece vs Spain — World Cup', competition="Women's Water Polo World Cup", team_a='Greece', team_b='Spain')
+    u20_match = MatchLibraryItem(external_key='TEST-GRE-U20', title='Greece vs Spain — Women U20', competition="Women's U20 World Championships", team_a='Greece', team_b='Spain')
+    assert 'Greece' in aliases_for(senior)
+    assert 'GRE' in aliases_for(senior)
+    assert _match_in_scope(senior, senior_match) is True
+    assert _match_in_scope(senior, u20_match) is False
+    assert _match_in_scope(u20, senior_match) is False
+    assert _match_in_scope(u20, u20_match) is True
+
+
 def test_evidence_coverage_dashboard_and_api_require_login_then_render():
     anonymous = TestClient(app)
-    assert anonymous.get('/evidence-coverage').status_code == 401
+    denied = anonymous.get('/evidence-coverage', follow_redirects=False)
+    # The application-wide 401 handler redirects browser users to login. The key
+    # security property is that protected coverage content is not returned directly.
+    assert denied.status_code in (302, 303, 307, 401)
+    if denied.status_code != 401:
+        assert '/login' in denied.headers.get('location', '')
+
     client = TestClient(app)
+    client.cookies.clear()
     _register(client)
     page = client.get('/evidence-coverage')
     assert page.status_code == 200
@@ -98,3 +118,7 @@ def test_evidence_coverage_dashboard_and_api_require_login_then_render():
     data = payload.json()
     assert data['totals']['teams'] >= 10
     assert any(row['name'] == 'Olympic Nice Natation' and row['performance_matches'] > 0 for row in data['teams'])
+    granville = next(row for row in data['teams'] if row['name'] == 'Granville Water Polo')
+    assert granville['season'] == '2026-2027'
+    assert granville['age_group'] == 'Senior'
+    assert granville['evidence_seasons'] == ['2025-2026']
