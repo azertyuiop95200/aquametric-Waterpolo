@@ -5,9 +5,10 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#07141d">
   <title>{{ app_name }}</title>
-  <link rel="stylesheet" href="/static/style.css?v=12.1.8">
-  <link rel="stylesheet" href="/static/v12.css?v=12.1.8">
-  <link rel="stylesheet" href="/static/v121-hotfix.css?v=12.1.8">
+  <link rel="stylesheet" href="/static/style.css?v=12.2.0">
+  <link rel="stylesheet" href="/static/v12.css?v=12.2.0">
+  <link rel="stylesheet" href="/static/v121-hotfix.css?v=12.2.0">
+  <link rel="stylesheet" href="/static/v122.css?v=12.2.0">
 </head>
 <body class="{% if user %}app-body{% else %}public-body{% endif %}">
 {% if user %}
@@ -17,10 +18,12 @@
       <a class="brand-lockup" href="/dashboard"><span class="brand-mark">A</span><span><b>{{ app_name }}</b><small data-i18n="brand.tagline">Water Polo Intelligence</small></span></a>
       <button class="menu-close" type="button" data-menu-close aria-label="Close menu">×</button>
     </div>
+    <div class="language-dock"><small>Language · Langue · Lingua · Idioma · Язык</small><div class="language-buttons"><button type="button" data-lang-choice="en">EN</button><button type="button" data-lang-choice="fr">FR</button><button type="button" data-lang-choice="it">IT</button><button type="button" data-lang-choice="es">ES</button><button type="button" data-lang-choice="ru">RU</button></div></div>
     <nav class="side-nav" aria-label="Primary">
       <a class="{% if request.url.path == '/dashboard' %}active{% endif %}" href="/dashboard"><span>D</span><b class="nav-label" data-i18n="nav.dashboard">Dashboard</b></a>
       <a class="{% if request.url.path.startswith('/matches/new') %}active{% endif %}" href="/matches/new"><span>+</span><b class="nav-label" data-i18n="nav.analyze">Analyze</b></a>
       <a class="{% if request.url.path == '/matches' or (request.url.path.startswith('/matches/') and '/tactics' not in request.url.path) %}active{% endif %}" href="/matches"><span>M</span><b class="nav-label" data-i18n="nav.matches">Matches</b></a>
+      <a class="{% if request.url.path == '/analysis-history' %}active{% endif %}" href="/analysis-history"><span>↺</span><b class="nav-label" data-i18n="nav.analysis_history">Analysis History</b></a>
       <a class="{% if request.url.path == '/my-team' %}active{% endif %}" href="/my-team"><span>★</span><b class="nav-label" data-i18n="nav.my_team">My Team</b></a>
       <a class="{% if request.url.path.startswith('/teams') %}active{% endif %}" href="/teams"><span>T</span><b class="nav-label" data-i18n="nav.teams">Teams</b></a>
       <a class="{% if request.url.path.startswith('/players') %}active{% endif %}" href="/players"><span>P</span><b class="nav-label" data-i18n="nav.players">Players</b></a>
@@ -31,7 +34,7 @@
       <a class="{% if request.url.path.startswith('/scouting') %}active{% endif %}" href="/scouting"><span>S</span><b class="nav-label" data-i18n="nav.scouting">Scouting</b></a>
       <a class="{% if request.url.path.startswith('/coaches') or request.url.path.startswith('/coach-intelligence') %}active{% endif %}" href="/coaches"><span>HC</span><b class="nav-label" data-i18n="nav.coaches">Coaches</b></a>
       <a class="{% if request.url.path.startswith('/national-teams') %}active{% endif %}" href="/national-teams"><span>N</span><b class="nav-label" data-i18n="nav.national_teams">National teams</b></a>
-      <a class="{% if request.url.path.startswith('/analysis-library') %}active{% endif %}" href="/analysis-library"><span>A</span><b class="nav-label" data-i18n="nav.analysis_library">Analysis Library</b></a>
+      <a class="{% if request.url.path.startswith('/analysis-library') %}active{% endif %}" href="/analysis-library"><span>A</span><b class="nav-label" data-i18n="nav.analysis_library">Reference Library</b></a>
       <a class="{% if request.url.path.startswith('/transfer-watch') %}active{% endif %}" href="/transfer-watch"><span>↻</span><b class="nav-label" data-i18n="nav.transfer_watch">Transfer Watch</b></a>
       <a class="{% if request.url.path.startswith('/player-data') %}active{% endif %}" href="/player-data"><span>Σ</span><b class="nav-label" data-i18n="nav.player_data">Player Data</b></a>
       <a class="{% if request.url.path.startswith('/player-intelligence') or request.url.path.startswith('/profiles/players') %}active{% endif %}" href="/player-intelligence"><span>◎</span><b class="nav-label" data-i18n="nav.player_intel">Player Intel</b></a>
@@ -40,24 +43,14 @@
       <a class="{% if request.url.path.startswith('/simulation') %}active{% endif %}" href="/simulation"><span>~</span><b class="nav-label" data-i18n="nav.simulation">Simulation</b></a>
       <a class="{% if request.url.path == '/benchmarks' %}active{% endif %}" href="/benchmarks"><span>B</span><b class="nav-label" data-i18n="nav.benchmarks">Benchmarks</b></a>
     </nav>
-    <div class="sidebar-foot">
-      <div class="data-trust"><i></i><span><b data-i18n="trust.title">Evidence-first analysis</b><small data-i18n="trust.subtitle">Uncertain data stays uncertain</small></span></div>
-      <form method="post" action="/logout"><button class="ghost full" data-i18n="action.logout">Log out</button></form>
-    </div>
+    <div class="sidebar-foot"><div class="data-trust"><i></i><span><b data-i18n="trust.title">Evidence-first analysis</b><small data-i18n="trust.subtitle">Uncertain data stays uncertain</small></span></div><form method="post" action="/logout"><button class="ghost full" data-i18n="action.logout">Log out</button></form></div>
   </aside>
   <button class="sidebar-backdrop" type="button" data-menu-backdrop aria-label="Close menu" tabindex="-1"></button>
-  <div class="app-main">
-    <header class="topbar">
-      <button class="menu-toggle" type="button" data-menu-toggle aria-label="Toggle menu" aria-controls="sidebar" aria-expanded="false">☰</button>
-      <div class="topbar-title"><span class="status-dot"></span><span data-i18n="workspace.title">Analysis workspace</span></div>
-      <div class="topbar-actions"><select id="lang" aria-label="Interface language"><option value="en">EN · English</option><option value="fr">FR · Français</option><option value="it">IT · Italiano</option><option value="es">ES · Español</option><option value="ru">RU · Русский</option></select><a class="profile-chip" href="/dashboard">{{ (user.name or user.email)[:1]|upper }}</a></div>
-    </header>
+  <div class="app-main"><header class="topbar"><button class="menu-toggle" type="button" data-menu-toggle aria-label="Toggle menu" aria-controls="sidebar" aria-expanded="false">☰</button><div class="topbar-title"><span class="status-dot"></span><span data-i18n="workspace.title">Analysis workspace</span></div><div class="topbar-actions"><select id="lang" aria-label="Interface language"><option value="en">EN · English</option><option value="fr">FR · Français</option><option value="it">IT · Italiano</option><option value="es">ES · Español</option><option value="ru">RU · Русский</option></select><a class="profile-chip" href="/dashboard">{{ (user.name or user.email)[:1]|upper }}</a></div></header>
 {% else %}
 <header class="public-header"><a class="brand-lockup" href="/"><span class="brand-mark">A</span><span><b>{{ app_name }}</b><small data-i18n="brand.tagline">Water Polo Intelligence</small></span></a><nav><a href="/guest" data-i18n="public.guest">Guest demo</a><a href="/knowledge" data-i18n="nav.knowledge">Knowledge</a><a class="btn small" href="/login" data-i18n="public.login">Login</a></nav><select id="lang" class="public-lang" aria-label="Interface language"><option value="en">EN</option><option value="fr">FR</option><option value="it">IT</option><option value="es">ES</option><option value="ru">RU</option></select></header>
 {% endif %}
 <main class="content {% if not user %}public-content{% endif %}">{% if web_demo_mode and user %}<div class="demo-banner"><b data-i18n="demo.title">Free web demo</b> — <span data-i18n="demo.text">this workspace is temporary. Uploaded files and edits may disappear when the free host restarts.</span></div>{% endif %}{% block content %}{% endblock %}</main>
 {% if user %}</div></div>{% endif %}
-<script src="/static/app.js?v=12.1.8"></script>
-<script src="/static/i18n.js?v=12.1.8"></script>
-<script src="/static/i18n-auto.js?v=12.1.8"></script>
+<script src="/static/app.js?v=12.2.0"></script><script src="/static/i18n.js?v=12.2.0"></script><script src="/static/i18n-auto.js?v=12.2.0"></script><script src="/static/i18n-v122.js?v=12.2.0"></script>
 </body></html>
