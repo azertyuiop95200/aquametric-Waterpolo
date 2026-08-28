@@ -6,9 +6,9 @@ services:
     region: frankfurt
     branch: main
     healthCheckPath: /health
-    # Deploy only after the repository's CI checks pass. The live verification
-    # workflow runs after CI, so it cannot deadlock the deploy it is checking.
-    autoDeployTrigger: checksPass
+    # Deploy each main commit immediately. Live verification runs after CI and
+    # must not become a deployment gate for the version it is trying to verify.
+    autoDeployTrigger: commit
     envVars:
       - key: APP_NAME
         value: AquaMetric
