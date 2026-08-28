@@ -148,7 +148,6 @@ def seed_eu_youth_2026(db):
         if not team:
             team = ScoutingTeam(external_key=external_key)
             db.add(team)
-            db.flush()
 
         team.name = f"{country} — Women {cfg['age']} · EU Scout 2026"
         team.team_type = "national_team"
@@ -164,6 +163,7 @@ def seed_eu_youth_2026(db):
             f"{cfg['data']}. Filtre conservateur: sélection d’un État membre de l’UE; aucune double nationalité supposée."
         )
         team.priority = 85 + top_score
+        db.flush()
 
         existing = {p.name: p for p in db.scalars(select(ScoutingPlayer).where(ScoutingPlayer.scouting_team_id == team.id)).all()}
         for row in players:
