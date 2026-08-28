@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: aquametric-web-demo
+    runtime: docker
+    plan: free
+    region: frankfurt
+    branch: main
+    healthCheckPath: /health
+    # Deploy each main commit immediately. Live verification runs after CI and
+    # must not become a deployment gate for the version it is trying to verify.
+    autoDeployTrigger: commit
+    envVars:
+      - key: APP_NAME
+        value: AquaMetric
+      - key: WEB_DEMO_MODE
+        value: "1"
+      - key: DATABASE_URL
+        value: sqlite:////tmp/aquametric_demo.db
+      - key: UPLOAD_DIR
+        value: /tmp/aquametric_uploads
+      - key: EVIDENCE_DIR
+        value: /tmp/aquametric_evidence
+      - key: MAX_UPLOAD_MB
+        value: "50"
+      - key: AUTO_REFRESH_OFFICIAL_DATA
+        value: "1"
+      - key: OFFICIAL_REFRESH_LOOP_MINUTES
+        value: "30"
+      - key: COOKIE_SECURE
+        value: "1"
+      - key: SECRET_KEY
+        generateValue: true
