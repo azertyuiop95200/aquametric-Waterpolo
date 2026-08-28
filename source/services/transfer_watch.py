@@ -11,12 +11,17 @@ TRIESTE_2026 = "https://www.pallanuototrieste.com/it/news/articolo/si-riparte-da
 MATARO_FARAGO = "https://waterpolo360news.com/mataro-strengthens-its-project-with-the-signings-of-queralt-anton-and-kamilla-farago/"
 MATARO_CARLA = "https://www.mundodeportivo.com/waterpolo/20260715/1004206746/carla-martin-nueva-jugadora-assolim-mataro.html"
 VLV_NEMET = "https://vlv.hu/nemet-toni-torokorszagba-szerzodott/"
+ATHINA_VOULIAGMENI = "https://nov.gr/en/epistrefei-sti-gynaikeia-omada-ydatosfairisis-i-athina-giannopoyloy/"
+NIC_MARSEILLE = "https://www.abc.net.au/news/2026-07-23/water-polo-world-cup-sharks-underdog-tag/106944526"
+UCLA_GLADOVIC = "https://uclabruins.com/news/2026/08/26/no-1-mens-water-polo-begins-2026-season-saturday"
 
 # Evidence hierarchy: official federation/league/club > official club social >
-# specialist media confirmed > media report/rumour > community discovery only.
+# first-person confirmation / specialist media confirmed > media report/rumour > community discovery only.
 SOURCE_WATCHES = [
     ("FFN extraNat — Elite water polo", "federation", "web", "France — Elite clubs", "https://www.extranat.fr/waterpolo/", "primary", 6, "Official fixtures, match sheets, live scoring/statistics when published."),
     ("FFN — water-polo transfer rules", "federation", "web", "France — transfers and licences", "https://www.ffnatation.fr/reglements-du-water-polo", "primary", 12, "Official French regulations, including transfer rules and the 2026-27 competition framework."),
+    ("CN Marseille — official water polo", "club_official", "web", "CN Marseille", "https://www.cnmarseille.com/category/water-polo-elite/", "primary", 6, "Official French elite club news and roster announcements."),
+    ("Douaisis Agglo Water-Polo — official", "club_official", "web", "Douaisis Agglo Water-Polo", "https://douaisisagglo-waterpolo.fr/", "primary", 12, "Official French elite club site for roster, staff and first-team news."),
     ("RFEN — water polo", "federation", "web", "Spain", "https://rfen.es/especialidades/waterpolo/", "primary", 12, "Official Spanish federation competition and roster context."),
     ("LEWaterpolo — Spanish leagues", "league", "web", "Spain — División de Honor", "https://lewaterpolo.com/", "primary", 12, "League match, roster and club context; cross-check transfer claims with club/RFEN evidence."),
     ("Waterpolo.nl — confirmed transfer overview", "federation_media", "web", "Netherlands and Dutch players abroad", KNZB_URL, "primary", 12, "KNZB editorial overview explicitly listing confirmed 2026-27 transfers for women and men."),
@@ -151,10 +156,10 @@ TRANSFER_SIGNALS = [
     _signal("Women", "Sinia Plotz", "", "SIS Roma", "2026-07-08", "Waterpolo 360", WP360_CONFIRMED, "media_confirmed", .92),
     _signal("Women", "Iva Rozic", "", "SIS Roma", "2026-07-08", "Waterpolo 360", WP360_CONFIRMED, "media_confirmed", .92),
     _signal("Women", "Sofia Giustini", "", "Pallanuoto Trieste", "2026-07-01", "Waterpolo 360", WP360_CONFIRMED, "media_confirmed", .92),
-    _signal("Women", "Nic Porter", "", "CN Marseille", "2026-06-04", "Waterpolo 360", WP360_HUB, "media_rumour", .52, "Rumour only; never use as confirmed roster evidence.", "rumour"),
-    _signal("Women", "Athina Giannopoulou", "CN Sabadell", "Vouliagmeni", "2026-06-02", "Waterpolo 360", WP360_HUB, "media_rumour", .55, "Rumour only; requires official corroboration.", "rumour"),
+    _signal("Women", "Athina Giannopoulou", "CN Sabadell", "Vouliagmeni", "2026-06-24", "Vouliagmeni Nautical Club", ATHINA_VOULIAGMENI, "club_official", .99, "Official club announcement confirms her return after one season at Sabadell."),
 
     # Men — current confirmations.
+    _signal("Men", "Luka Gladovic", "VK Novi Beograd", "UCLA", "2026-08-26", "UCLA Athletics", UCLA_GLADOVIC, "team_official", .99, "Official UCLA season preview lists Gladovic among the newcomers after VK Novi Beograd."),
     _signal("Men", "Toni Nemet", "Jadran Split", "ENKA Istanbul", "2026-08-20", "VLV.hu — player interview", VLV_NEMET, "first_person_media", .98, "Nemet directly confirms in interview that he decided to join ENKA Istanbul."),
     _signal("Men", "Angelos Foskolos", "", "CN Posillipo", "2026-08-08", "Waterpolo 360", WP360_HUB, "media_confirmed", .92),
     _signal("Men", "Nemanja Ubovic", "", "Primorac Kotor", "2026-08-02", "Waterpolo 360", WP360_CONFIRMED, "media_confirmed", .92),
@@ -162,6 +167,7 @@ TRANSFER_SIGNALS = [
     _signal("Men", "Lukas Durik", "Pro Recco", "Jadran Herceg Novi", "2026-07-30", "Waterpolo 360", WP360_CONFIRMED, "media_confirmed", .92),
     _signal("Men", "Nicolas Saveljic", "", "Dinamo Bucharest", "2026-07-29", "Waterpolo 360", WP360_CONFIRMED, "media_confirmed", .92),
     _signal("Men", "Jerko Marinic Kragic", "", "Steaua Bucharest", "2026-07-28", "Waterpolo 360", WP360_CONFIRMED, "media_confirmed", .92),
+    _signal("Men", "Nic Porter", "Panionios", "CN Marseille", "2026-07-23", "ABC Sport — Australian team coach", NIC_MARSEILLE, "media_confirmed", .96, "Australia coach confirms Porter has just signed for Marseille after playing for Panionios."),
     _signal("Men", "Joao Pedro", "", "Pallanuoto Trieste", "2026-07-17", "Waterpolo 360", WP360_CONFIRMED, "media_confirmed", .92),
 
     *[_signal("Women", player, fr, to, "2026-07-20", "Waterpolo.nl / KNZB", KNZB_URL, "federation_confirmed", .97, "Listed in the KNZB confirmed 2026-27 transfer overview.") for player, fr, to in KNZB_WOMEN],
