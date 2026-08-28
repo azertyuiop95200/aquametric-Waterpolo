@@ -69,8 +69,6 @@ if report_anchor in text:
 elif "AutonomousEventCandidate.analysis_id == auto.id" not in text:
     raise SystemExit("report candidate-scope anchor not found")
 
-# Publish a non-secret deploy identity so the live verifier can prove that
-# Render is serving the actual current commit, not merely an older V12.1 build.
 health_anchor = '''@app.get("/health")\ndef health():\n    return {"ok": True, "app": APP_NAME}\n'''
 health_repl = '''@app.get("/health")\ndef health():\n    payload = {"ok": True, "app": APP_NAME}\n    render_commit = os.getenv("RENDER_GIT_COMMIT", "").strip()\n    if render_commit:\n        payload["git_commit"] = render_commit\n    return payload\n'''
 if health_anchor in text:
@@ -82,8 +80,8 @@ text = text.replace("calculate_player_rating(events)\n    return render(request,
 text = text.replace("calculate_player_rating(pevents)\n        ratings.append", "calculate_player_rating(pevents, role=p.primary_role)\n        ratings.append", 1)
 p.write_text(text, encoding="utf-8")
 
-# Match-derived evaluations are private tenant data even when the scouting
-# identity/profile itself is global and shared.
+# Shared dossier extension: preserve tenant isolation and seed official Granville
+# match-sheet appearances before player-intelligence metrics are generated.
 extensions = root / "extensions.py"
 e = extensions.read_text(encoding="utf-8")
 eval_anchor = '''        evaluations = db.scalars(select(PlayerMatchEvaluation).where(PlayerMatchEvaluation.player_id.in_(local_ids)).order_by(PlayerMatchEvaluation.generated_at.desc())).all()\n'''
@@ -92,7 +90,29 @@ if eval_anchor in e:
     e = e.replace(eval_anchor, eval_repl, 1)
 elif "Match.owner_id == user.id" not in e:
     raise SystemExit("player evaluation tenant-scope anchor not found")
+if "from services.granville_match_evidence import seed_granville_match_evidence" not in e:
+    anchor = "from services.elite_match_evidence import seed_elite_match_evidence\n"
+    if anchor not in e:
+        raise SystemExit("elite evidence import anchor not found")
+    e = e.replace(anchor, anchor + "from services.granville_match_evidence import seed_granville_match_evidence\n", 1)
+if "seed_granville_match_evidence(db)" not in e:
+    anchor = "        seed_elite_match_evidence(db)\n"
+    if anchor not in e:
+        raise SystemExit("elite evidence seed anchor not found")
+    e = e.replace(anchor, anchor + "        seed_granville_match_evidence(db)\n", 1)
 extensions.write_text(e, encoding="utf-8")
+
+# Every official library row verifies at least a match appearance. This is stored
+# separately from performance stats so lineup-only evidence can never create a rating.
+player_intel = root / "services" / "player_intelligence.py"
+pi = player_intel.read_text(encoding="utf-8")
+appearance_anchor = '''        match = db.get(MatchLibraryItem,row.library_match_id)\n        src = match.official_source_url if match else ""\n        if row.goals is not None: _metric_once(db,p,row.library_match_id,"goals",float(row.goals),"","goals","official_report",1.0,src,row.note)\n'''
+appearance_repl = '''        match = db.get(MatchLibraryItem,row.library_match_id)\n        src = match.official_source_url if match else ""\n        _metric_once(db,p,row.library_match_id,"appearance",1.0,"","match",row.source_quality or "official_match_sheet",1.0,src,row.note)\n        if row.goals is not None: _metric_once(db,p,row.library_match_id,"goals",float(row.goals),"","goals","official_report",1.0,src,row.note)\n'''
+if appearance_anchor in pi:
+    pi = pi.replace(appearance_anchor, appearance_repl, 1)
+elif 'row.library_match_id,"appearance",1.0' not in pi:
+    raise SystemExit("player appearance metric anchor not found")
+player_intel.write_text(pi, encoding="utf-8")
 
 # Keep base template changes tiny and idempotent to avoid replacing the whole shell.
 base = root / "templates" / "base.html"
