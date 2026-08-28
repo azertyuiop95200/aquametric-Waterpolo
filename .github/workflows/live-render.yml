@@ -24,7 +24,7 @@ jobs:
         run: |
           set -u
           base='https://aquametric-web-demo.onrender.com'
-          marker='AQUAMETRIC_V12_1_FINAL_2026_08_28'
+          marker='AQUAMETRIC_V12_3_PLAYER_EVAL_2026_08_28'
           target="$TARGET_SHA"
           echo "Target commit: $target"
           for i in $(seq 1 8); do
@@ -39,11 +39,11 @@ jobs:
             fi
             sleep 15
           done
-          echo "::warning::Render has not exposed target commit $target yet; leaving this verification non-blocking so deployment itself can proceed."
+          echo "::warning::Render has not exposed target commit $target yet; deployment verification will retry on the next workflow/schedule."
           echo "deployed=false" >> "$GITHUB_OUTPUT"
           exit 0
 
-      - name: Verify public security and V12.2 product assets
+      - name: Verify public security and V12.3 product assets
         if: ${{ steps.live.outputs.deployed == 'true' }}
         run: |
           base='https://aquametric-web-demo.onrender.com'
@@ -53,6 +53,7 @@ jobs:
           curl -L --max-time 30 -fsS "$base/static/app.js" | grep -q 'menuBackdrop'
           curl -L --max-time 30 -fsS "$base/static/i18n.js" | grep -q 'aquametric.language'
           curl -L --max-time 30 -fsS "$base/static/i18n-v122.js" | grep -q 'history.title'
-          curl -L --max-time 30 -fsS "$base/static/v122.css" | grep -q 'tactic-board'
+          curl -L --max-time 30 -fsS "$base/static/i18n-v123.js" | grep -q 'public.partial_rating'
+          curl -L --max-time 30 -fsS "$base/static/v122.css" | grep -q 'public-match-card'
           curl -L --max-time 30 -fsS "$base/knowledge" | grep -q 'tactic-board-card'
           curl -L --max-time 30 -fsS "$base/scouting" | grep -q 'scout-card'
