@@ -1,18 +1,18 @@
 from collections import Counter
 
-# AquaMetric rating-v2 is deliberately evidence-bound. It scores only dimensions
-# supported by tagged match actions. Physical output stays unavailable until a
-# calibrated tracking layer measures speed/distance/repeated effort.
+# AquaMetric rating-v3 remains evidence-bound, but reduces volatility from tiny samples.
+# Scores are shrunk toward neutral (50) when action coverage/confidence is limited.
+# Physical output stays unavailable until calibrated tracking measures speed/distance/effort.
 DIMENSION_DELTAS = {
     "goal": {"attack": 7, "decision": 2, "technique": 4, "impact": 7},
     "assist": {"attack": 5, "decision": 5, "tactics": 2, "technique": 2, "impact": 4},
     "key_pass": {"attack": 4, "decision": 4, "tactics": 2, "technique": 2, "impact": 2},
     "action_created": {"attack": 4, "decision": 3, "tactics": 3, "impact": 2},
-    "touch": {"technique": 0.3},
+    "touch": {"technique": 0.25},
     "centre_touch": {"attack": 1.5, "tactics": 1.5, "technique": 1},
     "duel_won": {"defence": 3, "technique": 2, "impact": 2},
     "duel_lost": {"defence": -2, "technique": -1.5},
-    "pass_complete": {"decision": 0.5, "technique": 0.5},
+    "pass_complete": {"decision": 0.4, "technique": 0.4},
     "shot_on_target": {"attack": 1.5, "technique": 1},
     "shot_off_target": {"attack": -1, "decision": -1, "technique": -1},
     "shot_blocked": {"attack": -0.5, "decision": -0.5},
@@ -38,6 +38,7 @@ DIMENSION_DELTAS = {
 
 NEGATIVE_EVENTS = {"bad_pass", "turnover", "foul", "exclusion", "exclusion_committed", "penalty_committed", "duel_lost", "late_recovery", "shot_off_target"}
 DIMENSIONS = ("attack", "defence", "decision", "tactics", "transition", "discipline", "technique", "impact")
+VOLUME_EVENTS = {"touch", "pass_complete"}
 
 
 def _clamp(value, low=25.0, high=95.0):
@@ -53,46 +54,92 @@ def _role_weights(role: str):
     return {"attack": .16, "defence": .15, "decision": .15, "tactics": .14, "transition": .11, "discipline": .08, "technique": .11, "impact": .10}
 
 
+def _confidence(n, distinct, contextual, covered_dimensions):
+    if not n:
+        return 0.0
+    sample = min(1.0, n / 28)
+    diversity = min(1.0, distinct / 10)
+    context = min(1.0, contextual / max(1, n))
+    coverage = min(1.0, covered_dimensions / len(DIMENSIONS))
+    return round(min(1.0, sample * .45 + diversity * .25 + context * .10 + coverage * .20), 2)
+
+
+def _confidence_label(score, n):
+    if not n:
+        return "INSUFFICIENT DATA"
+    if score < .30:
+        return "LOW SAMPLE"
+    if score < .62:
+        return "MODERATE"
+    if score < .82:
+        return "STRONG"
+    return "HIGH"
+
+
+def _rating_band(overall, confidence):
+    if overall is None:
+        return "UNRATED"
+    if confidence < .30:
+        return "PROVISIONAL"
+    if overall >= 75:
+        return "OUTSTANDING MATCH EVIDENCE"
+    if overall >= 65:
+        return "STRONG MATCH EVIDENCE"
+    if overall >= 56:
+        return "POSITIVE MATCH EVIDENCE"
+    if overall >= 45:
+        return "BALANCED / MIXED"
+    return "NEGATIVE MATCH EVIDENCE"
+
+
 def build_detailed_evaluation(events, role: str = "") -> dict:
     events = list(events or [])
     counts = Counter(e.event_type for e in events)
     raw = {d: 0.0 for d in DIMENSIONS}
     context_tags = Counter()
+    volume_seen = Counter()
+
     for event in events:
-        for dimension, delta in DIMENSION_DELTAS.get(event.event_type, {}).items():
-            raw[dimension] += delta
+        kind = event.event_type
+        multiplier = 1.0
+        if kind in VOLUME_EVENTS:
+            volume_seen[kind] += 1
+            # Repeated low-information events still matter, but progressively less.
+            multiplier = 1 / (volume_seen[kind] ** .35)
+        for dimension, delta in DIMENSION_DELTAS.get(kind, {}).items():
+            raw[dimension] += delta * multiplier
         meta = getattr(event, "context_meta", None)
         phase = getattr(meta, "phase_tag", "") if meta else ""
         if phase and phase != "auto":
             context_tags[phase] += 1
             raw["tactics"] += 0.25
 
-    # Diminish very large counting-volume effects while retaining action direction.
-    scores = {}
-    for d in DIMENSIONS:
-        delta = raw[d]
-        adjusted = (abs(delta) ** 0.82) * (1 if delta >= 0 else -1)
-        scores[d] = _clamp(50 + adjusted * 2.15)
-
     n = len(events)
     distinct = len(counts)
-    confidence_score = round(min(1.0, (n / 18) * .72 + (distinct / 9) * .28), 2) if n else 0.0
-    if n == 0:
-        confidence_label = "INSUFFICIENT DATA"
-    elif confidence_score < .35:
-        confidence_label = "LOW SAMPLE"
-    elif confidence_score < .68:
-        confidence_label = "MODERATE"
-    else:
-        confidence_label = "HIGH"
+    covered_dimensions = sum(1 for d in DIMENSIONS if abs(raw[d]) > .01)
+    confidence_score = _confidence(n, distinct, sum(context_tags.values()), covered_dimensions)
+    confidence_label = _confidence_label(confidence_score, n)
+
+    # Raw action signal is deliberately non-linear, then confidence-shrunk toward 50.
+    # This stops one goal or one turnover from looking like a stable 80/20-level trait.
+    reliability = .30 + .70 * confidence_score if n else 0.0
+    scores = {}
+    unshrunk = {}
+    for d in DIMENSIONS:
+        delta = raw[d]
+        adjusted = (abs(delta) ** 0.80) * (1 if delta >= 0 else -1)
+        base = _clamp(50 + adjusted * 2.10)
+        unshrunk[d] = base
+        scores[d] = _clamp(50 + (base - 50) * reliability)
 
     weights = _role_weights(role)
     overall = round(sum(scores[d] * weights[d] for d in DIMENSIONS), 1) if n else None
+    coverage_score = round(covered_dimensions / len(DIMENSIONS), 2) if n else 0.0
 
     ranked = sorted(DIMENSIONS, key=lambda d: scores[d], reverse=True)
     strengths = []
     for d in ranked:
-        if scores[d] >= 54 and raw[d] > 0:
+        if scores[d] >= 53 and raw[d] > 0:
             strengths.append(f"{d.replace('_', ' ').title()} supported by tagged actions ({scores[d]}/100).")
         if len(strengths) == 3:
             break
@@ -105,23 +152,27 @@ def build_detailed_evaluation(events, role: str = "") -> dict:
         if len(improvements) == 3:
             break
     if negatives and not improvements:
-        improvements.append(f"Review {negatives} negative tagged action(s) before prescribing a technical correction.")
+        improvements.append(f"Review {negatives} negative tagged action(s); the sample is not broad enough for a stronger prescription.")
 
     if not n:
         summary = "No verified player actions in this match yet; AquaMetric does not invent a performance score."
     else:
-        summary = f"Evidence-based evaluation from {n} verified/tagged actions across {distinct} action types."
-        if confidence_label in {"LOW SAMPLE", "MODERATE"}:
-            summary += " Treat the score as provisional until more of the match is tagged or automatically attributed."
+        summary = f"Evidence-based evaluation from {n} verified/tagged actions across {distinct} action types and {covered_dimensions}/8 covered dimensions."
+        if confidence_score < .62:
+            summary += " The displayed score is deliberately pulled toward neutral because the evidence sample is incomplete."
 
     return {
         "rated": bool(n),
         "overall": overall,
         "dimensions": scores,
+        "raw_dimensions": unshrunk,
         "physical": None,
         "physical_note": "Not rated: calibrated player tracking is required for swim speed, distance, repeated effort and fatigue.",
         "confidence_score": confidence_score,
         "confidence_label": confidence_label,
+        "rating_band": _rating_band(overall, confidence_score),
+        "coverage_score": coverage_score,
+        "covered_dimensions": covered_dimensions,
         "sample_size": n,
         "distinct_event_types": distinct,
         "event_counts": dict(counts),
@@ -129,16 +180,12 @@ def build_detailed_evaluation(events, role: str = "") -> dict:
         "strengths": strengths,
         "improvements": improvements,
         "summary": summary,
-        "engine_version": "rating-v2",
+        "engine_version": "rating-v3",
     }
 
 
 def calculate_player_rating(events, role: str = ""):
-    """Backward-compatible tuple used by existing routes, with rating-v2 detail in evidence.
-
-    The first three return values keep V11 templates/tests compatible. New templates
-    read ``evidence['__evaluation__']`` for the multi-dimensional breakdown.
-    """
+    """Backward-compatible tuple with rating-v3 detail stored in evidence."""
     evaluation = build_detailed_evaluation(events, role=role)
     evidence = dict(evaluation["event_counts"])
     evidence["__evaluation__"] = evaluation

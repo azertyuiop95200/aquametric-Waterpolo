@@ -28,7 +28,7 @@ class PlayerMatchEvaluation(Base):
     strengths_json: Mapped[str] = mapped_column(Text, default="[]")
     improvements_json: Mapped[str] = mapped_column(Text, default="[]")
     evidence_json: Mapped[str] = mapped_column(Text, default="{}")
-    engine_version: Mapped[str] = mapped_column(String(50), default="rating-v2")
+    engine_version: Mapped[str] = mapped_column(String(50), default="rating-v3")
     generated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
@@ -54,3 +54,9 @@ class CoachIntelligenceProfile(Base):
     development_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     note: Mapped[str] = mapped_column(Text, default="")
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    @property
+    def biography(self):
+        # Kept outside the DB schema so historical enrichment can evolve without a migration.
+        from services.coach_biography import coach_biography_for
+        return coach_biography_for(self)

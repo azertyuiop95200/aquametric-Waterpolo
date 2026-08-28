@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="/static/v121-hotfix.css?v=12.3.0">
   <link rel="stylesheet" href="/static/v122.css?v=12.3.0">
   <link rel="stylesheet" href="/static/v122-tactical.css?v=12.3.0">
+  <link rel="stylesheet" href="/static/v124.css?v=12.4.0">
 </head>
 <body class="{% if user %}app-body{% else %}public-body{% endif %}">
 {% if user %}
@@ -18,28 +19,36 @@
     <div class="sidebar-head"><a class="brand-lockup" href="/dashboard"><span class="brand-mark">A</span><span><b>{{ app_name }}</b><small data-i18n="brand.tagline">Water Polo Intelligence</small></span></a><button class="menu-close" type="button" data-menu-close aria-label="Close menu">×</button></div>
     <div class="language-dock"><small>Language · Langue · Lingua · Idioma · Язык</small><div class="language-buttons"><button type="button" data-lang-choice="en">EN</button><button type="button" data-lang-choice="fr">FR</button><button type="button" data-lang-choice="it">IT</button><button type="button" data-lang-choice="es">ES</button><button type="button" data-lang-choice="ru">RU</button></div></div>
     <nav class="side-nav" aria-label="Primary">
+      <small class="nav-group-title">Workspace</small>
       <a class="{% if request.url.path == '/dashboard' %}active{% endif %}" href="/dashboard"><span>D</span><b class="nav-label" data-i18n="nav.dashboard">Dashboard</b></a>
+      <a class="{% if request.url.path == '/my-team' %}active{% endif %}" href="/my-team"><span>★</span><b class="nav-label" data-i18n="nav.my_team">My Team</b></a>
+
+      <small class="nav-group-title">Matches & results</small>
       <a class="{% if request.url.path.startswith('/matches/new') %}active{% endif %}" href="/matches/new"><span>+</span><b class="nav-label" data-i18n="nav.analyze">Analyze</b></a>
+      <a class="{% if request.url.path == '/competitions' %}active{% endif %}" href="/competitions"><span>R</span><b class="nav-label" data-i18n="nav.competitions">Competitions</b></a>
       <a class="{% if request.url.path == '/matches' or (request.url.path.startswith('/matches/') and '/tactics' not in request.url.path) %}active{% endif %}" href="/matches"><span>M</span><b class="nav-label" data-i18n="nav.matches">Matches</b></a>
       <a class="{% if request.url.path == '/analysis-history' %}active{% endif %}" href="/analysis-history"><span>↺</span><b class="nav-label" data-i18n="nav.analysis_history">Analysis History</b></a>
-      <a class="{% if request.url.path == '/my-team' %}active{% endif %}" href="/my-team"><span>★</span><b class="nav-label" data-i18n="nav.my_team">My Team</b></a>
-      <a class="{% if request.url.path.startswith('/teams') %}active{% endif %}" href="/teams"><span>T</span><b class="nav-label" data-i18n="nav.teams">Teams</b></a>
-      <a class="{% if request.url.path.startswith('/players') %}active{% endif %}" href="/players"><span>P</span><b class="nav-label" data-i18n="nav.players">Players</b></a>
-      <div class="nav-sep"></div>
       <a class="{% if request.url.path == '/calendar' %}active{% endif %}" href="/calendar"><span>C</span><b class="nav-label" data-i18n="nav.calendar">Calendar</b></a>
-      <a class="{% if request.url.path == '/competitions' %}active{% endif %}" href="/competitions"><span>R</span><b class="nav-label" data-i18n="nav.competitions">Competitions</b></a>
-      <a class="{% if request.url.path == '/knowledge' %}active{% endif %}" href="/knowledge"><span>K</span><b class="nav-label" data-i18n="nav.knowledge">Knowledge</b></a>
-      <a class="{% if request.url.path.startswith('/scouting') %}active{% endif %}" href="/scouting"><span>S</span><b class="nav-label" data-i18n="nav.scouting">Scouting</b></a>
-      <a class="{% if request.url.path == '/evidence-coverage' %}active{% endif %}" href="/evidence-coverage"><span>Σ</span><b class="nav-label">Evidence coverage</b></a>
+
+      <small class="nav-group-title">People & market</small>
+      <a class="{% if request.url.path.startswith('/player-intelligence') or request.url.path.startswith('/profiles/players') %}active{% endif %}" href="/player-intelligence"><span>◎</span><b class="nav-label" data-i18n="nav.player_intel">Player Intel</b></a>
       <a class="{% if request.url.path.startswith('/coaches') or request.url.path.startswith('/coach-intelligence') %}active{% endif %}" href="/coaches"><span>HC</span><b class="nav-label" data-i18n="nav.coaches">Coaches</b></a>
       <a class="{% if request.url.path.startswith('/national-teams') %}active{% endif %}" href="/national-teams"><span>N</span><b class="nav-label" data-i18n="nav.national_teams">National teams</b></a>
-      <a class="{% if request.url.path.startswith('/analysis-library') %}active{% endif %}" href="/analysis-library"><span>A</span><b class="nav-label" data-i18n="nav.analysis_library">Reference Library</b></a>
+      <a class="{% if request.url.path.startswith('/scouting') %}active{% endif %}" href="/scouting"><span>S</span><b class="nav-label" data-i18n="nav.scouting">Scouting</b></a>
       <a class="{% if request.url.path.startswith('/transfer-watch') %}active{% endif %}" href="/transfer-watch"><span>↻</span><b class="nav-label" data-i18n="nav.transfer_watch">Transfer Watch</b></a>
-      <a class="{% if request.url.path.startswith('/player-data') %}active{% endif %}" href="/player-data"><span>Σ</span><b class="nav-label" data-i18n="nav.player_data">Player Data</b></a>
-      <a class="{% if request.url.path.startswith('/player-intelligence') or request.url.path.startswith('/profiles/players') %}active{% endif %}" href="/player-intelligence"><span>◎</span><b class="nav-label" data-i18n="nav.player_intel">Player Intel</b></a>
-      <a class="{% if request.url.path.startswith('/france-intelligence') %}active{% endif %}" href="/france-intelligence"><span>FR</span><b class="nav-label" data-i18n="nav.france_intel">France Intel</b></a>
+
+      <small class="nav-group-title">Analysis tools</small>
       <a class="{% if request.url.path.startswith('/tactical-chess') %}active{% endif %}" href="/tactical-chess"><span>♟</span><b class="nav-label" data-i18n="nav.tactical_chess">Tactical Chess</b></a>
       <a class="{% if request.url.path.startswith('/simulation') %}active{% endif %}" href="/simulation"><span>~</span><b class="nav-label" data-i18n="nav.simulation">Simulation</b></a>
+      <a class="{% if request.url.path.startswith('/france-intelligence') %}active{% endif %}" href="/france-intelligence"><span>FR</span><b class="nav-label" data-i18n="nav.france_intel">France Intel</b></a>
+
+      <small class="nav-group-title">Data & research</small>
+      <a class="{% if request.url.path.startswith('/teams') %}active{% endif %}" href="/teams"><span>T</span><b class="nav-label" data-i18n="nav.teams">Teams</b></a>
+      <a class="{% if request.url.path.startswith('/players') %}active{% endif %}" href="/players"><span>P</span><b class="nav-label" data-i18n="nav.players">Players</b></a>
+      <a class="{% if request.url.path.startswith('/player-data') %}active{% endif %}" href="/player-data"><span>Σ</span><b class="nav-label" data-i18n="nav.player_data">Player Data</b></a>
+      <a class="{% if request.url.path == '/evidence-coverage' %}active{% endif %}" href="/evidence-coverage"><span>✓</span><b class="nav-label">Evidence coverage</b></a>
+      <a class="{% if request.url.path.startswith('/analysis-library') %}active{% endif %}" href="/analysis-library"><span>A</span><b class="nav-label" data-i18n="nav.analysis_library">Reference Library</b></a>
+      <a class="{% if request.url.path == '/knowledge' %}active{% endif %}" href="/knowledge"><span>K</span><b class="nav-label" data-i18n="nav.knowledge">Knowledge</b></a>
       <a class="{% if request.url.path == '/benchmarks' %}active{% endif %}" href="/benchmarks"><span>B</span><b class="nav-label" data-i18n="nav.benchmarks">Benchmarks</b></a>
     </nav>
     <div class="sidebar-foot"><div class="data-trust"><i></i><span><b data-i18n="trust.title">Evidence-first analysis</b><small data-i18n="trust.subtitle">Uncertain data stays uncertain</small></span></div><form method="post" action="/logout"><button class="ghost full" data-i18n="action.logout">Log out</button></form></div>
