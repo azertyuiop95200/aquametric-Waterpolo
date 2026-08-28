@@ -30,6 +30,6 @@ def verify_password(password: str, stored: str) -> bool:
 # main.py imports auth before importing services.scouting_data.seed_scouting. Register
 # the additive EU youth scouting seed here so the existing startup call also loads
 # the summer-2026 shortlist without a schema migration.
-from services.scouting_eu_2026 import install_scouting_seed_patch as _install_scouting_seed_patch
+from services.scouting_eu_2026_runtime import install_scouting_seed_patch as _install_scouting_seed_patch
 
 _install_scouting_seed_patch()
