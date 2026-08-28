@@ -1,6 +1,12 @@
 GRANVILLE_LAPINA = "https://www.granvillewaterpolo.com/caf/"
 USB_COLACO = "https://www.saint-bruno.org/water-polo/la-section/les-entraineurs"
 TAVERNY_MICHAELI = "https://haut-niveau.tsn95.fr/index.php/equipe-n1-feminine/"
+FFN_FUNCHAL_2026 = "https://www.ffnatation.fr/sites/default/files/2026-01/DP%20FUNCHAL%202026_VF.pdf"
+RFEN_FUNCHAL_2026 = "https://rfen.es/noticia/convocatoria-oficial-de-espana-para-el-campeonato-de-europa-de-funchal-355013/"
+RFEN_WORLD_2025 = "https://cdn.rfen.es/sectionFiles/1761831026_4363.pdf"
+RFEN_WORLD_CUP_2026 = "https://cdn.rfen.es/sectionFiles/1777365783_2818.pdf"
+FIN_MIRARCHI_2026 = "https://www.federnuoto.it/home/pallanuoto/news-pallanuoto/42888-world-cup-il-setterosa-riparte-da-rotterdam.html"
+FIN_WORLD_CUP_2026 = "https://www.federnuoto.it/home/pallanuoto/news-pallanuoto/43212-finali-world-cup-australia-italia-15-14%2C-setterosa-per-il-quinto-posto.html"
 
 
 def _fact(kind, title, detail, season, url, trust="club_official"):
@@ -44,6 +50,37 @@ COACH_CURATED = {
         "honours": [
             _fact("honour", "Champion de France avec Taverny", "La page officielle indique que le dernier match 2024–25 permet à l'équipe féminine de conserver le titre de championne de France.", "2024–2025", TAVERNY_MICHAELI),
         ],
+    },
+    "Lorène Derenty": {
+        "career": [
+            _fact("player_pathway", "Équipe de France", "Le dossier officiel FFN 2026 indique un parcours de joueuse en équipe de France de 2014 à 2020.", "2014–2020", FFN_FUNCHAL_2026, "federation_official"),
+            _fact("coach", "Équipe de France féminine", "Le dossier officiel FFN 2026 indique qu'elle entraîne la sélection française depuis 2023.", "depuis 2023", FFN_FUNCHAL_2026, "federation_official"),
+        ],
+        "honours": [],
+    },
+    "Stefania Giuliani": {
+        "career": [
+            _fact("player_pathway", "Championnat italien", "La FFN mentionne quinze années de carrière comme joueuse dans le championnat italien.", "carrière joueuse", FFN_FUNCHAL_2026, "federation_official"),
+            _fact("coach", "Équipe de France féminine", "Assistante du staff de l'équipe de France au Championnat d'Europe 2026.", "2026", FFN_FUNCHAL_2026, "federation_official"),
+        ],
+        "honours": [],
+    },
+    "Jordi Valls": {
+        "career": [
+            _fact("coach", "Équipe d'Espagne féminine — staff", "La documentation RFEN 2023 le listait déjà comme entraîneur dans le staff de la sélection senior féminine.", "2023", "https://campeonatos.rfen.es/boletines/REVISTA%20DIGITAL%20Campeonato%20del%20Mundo%202023-Fukuoka%20World%20Aquatics%20Championships-alta.pdf", "federation_official"),
+            _fact("head_coach", "Équipe d'Espagne féminine", "La RFEN le crédite comme entraîneur responsable de la sélection senior aux Mondiaux 2025.", "2025", RFEN_WORLD_2025, "federation_official"),
+            _fact("head_coach", "Équipe d'Espagne féminine", "La RFEN confirme qu'il dirige la sélection à l'Euro 2026 et lors de la World Cup 2026.", "2026", RFEN_FUNCHAL_2026, "federation_official"),
+        ],
+        "honours": [
+            _fact("honour", "Médaille de bronze — Championnats du monde", "La RFEN attribue à la sélection senior féminine dirigée par Jordi Valls la médaille de bronze à Singapour.", "2025", RFEN_WORLD_2025, "federation_official"),
+        ],
+    },
+    "Maurizio Mirarchi": {
+        "career": [
+            _fact("head_coach", "Setterosa — Italie", "La Federazione Italiana Nuoto annonce son premier rassemblement comme nouveau commissaire technique de la sélection senior féminine.", "2026", FIN_MIRARCHI_2026, "federation_official"),
+            _fact("head_coach", "Setterosa — World Cup", "La FIN le confirme toujours comme commissaire technique lors de la Super Final de World Cup à Sydney.", "2026", FIN_WORLD_CUP_2026, "federation_official"),
+        ],
+        "honours": [],
     },
 }
 
