@@ -6,7 +6,7 @@ from sqlalchemy import select
 
 from db import SessionLocal
 from main import app
-from models import MatchLibraryItem, PlayerIntelligenceProfile, PlayerMatchMetric, User
+from models import MatchLibraryItem, PlayerIntelligenceProfile, PlayerMatchMetric
 from services.public_match_ratings import public_profile_evaluations
 
 
@@ -77,6 +77,26 @@ def test_incomplete_official_scorer_list_reduces_confidence_and_stays_labelled()
         db.close()
 
 
+def test_granville_lineups_expand_sample_without_fabricating_player_rating():
+    db = SessionLocal()
+    try:
+        morgane = db.scalar(select(PlayerIntelligenceProfile).where(PlayerIntelligenceProfile.canonical_name == "Morgane Le Berre"))
+        rumina = db.scalar(select(PlayerIntelligenceProfile).where(PlayerIntelligenceProfile.canonical_name == "Rumina Edgerton"))
+        assert morgane is not None and rumina is not None
+        morgane_evidence = public_profile_evaluations(db, morgane, role=morgane.role)
+        rumina_evidence = public_profile_evaluations(db, rumina, role=rumina.role)
+        granville_morgane = [r for r in morgane_evidence["matches"] if r["match"].external_key.startswith("FFN-N1F-2526-")]
+        granville_rumina = [r for r in rumina_evidence["matches"] if r["match"].external_key.startswith("FFN-N1F-2526-")]
+        assert len(granville_morgane) == 12
+        assert len(granville_rumina) == 11
+        assert all(r["appearance_verified"] for r in granville_morgane)
+        assert all(r["overall"] is None for r in granville_morgane)
+        assert all(r["coverage"] == 0.0 for r in granville_morgane)
+        assert all(r["confidence_label"] == "PRESENCE" for r in granville_morgane)
+    finally:
+        db.close()
+
+
 def test_player_dossier_renders_public_match_evaluation_with_precision_labels():
     client = TestClient(app)
     _register(client)
@@ -92,9 +112,27 @@ def test_player_dossier_renders_public_match_evaluation_with_precision_labels():
     assert response.status_code == 200
     soup = BeautifulSoup(response.text, "html.parser")
     text = soup.get_text(" ", strip=True)
-    assert "Match-by-match evaluation from published statistics" in text
+    assert "Match-by-match evidence and evaluation" in text
     assert len(soup.select(".public-match-card")) >= 12
     assert "7 goals" in text
     assert "dimension coverage" in text
     assert "Not rated from this source" in text
     assert "Published scorer list is incomplete" in text
+
+
+def test_granville_dossier_shows_presence_only_precision_message():
+    client = TestClient(app)
+    _register(client)
+    db = SessionLocal()
+    try:
+        profile = db.scalar(select(PlayerIntelligenceProfile).where(PlayerIntelligenceProfile.canonical_name == "Rumina Edgerton"))
+        assert profile is not None
+        profile_id = profile.id
+    finally:
+        db.close()
+    response = client.get(f"/profiles/players/{profile_id}")
+    assert response.status_code == 200
+    text = BeautifulSoup(response.text, "html.parser").get_text(" ", strip=True)
+    assert "11 official matches documented" in text
+    assert "No individual rating from this match sheet" in text
+    assert "Presence verified; goals, assists, shots, saves, exclusions and tactical actions remain unknown" in text
