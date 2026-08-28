@@ -39,6 +39,37 @@ demo_repl = '''    ensure_granville_team(db, user.id)\n    request.session.clear
 if demo_anchor in text:
     text = text.replace(demo_anchor, demo_repl, 1)
 
+# Audit fix: keep user-created clubs private while preserving shared/demo clubs.
+teams_anchor = '''    teams = db.scalars(select(Team).where(Team.owner_id == user.id).order_by(Team.id.desc())).all()\n    clubs = db.scalars(select(Club).order_by(Club.country, Club.category, Club.name)).all()\n    return render(request, "teams.html", user=user, teams=teams, clubs=clubs)\n'''
+teams_repl = '''    teams = db.scalars(select(Team).where(Team.owner_id == user.id).order_by(Team.id.desc())).all()\n    clubs = db.scalars(\n        select(Club)\n        .where(Club.owner_id.is_(None) | (Club.owner_id == user.id))\n        .order_by(Club.country, Club.category, Club.name)\n    ).all()\n    return render(request, "teams.html", user=user, teams=teams, clubs=clubs)\n'''
+if teams_anchor in text:
+    text = text.replace(teams_anchor, teams_repl, 1)
+elif ".where(Club.owner_id.is_(None) | (Club.owner_id == user.id))" not in text:
+    raise SystemExit("teams club-scope anchor not found")
+
+club_anchor = '''    existing = db.scalar(select(Club).where(Club.name == name, Club.country == country, Club.category == category))\n    if existing:\n        return RedirectResponse(f"/teams?club_exists={existing.id}", status_code=303)\n'''
+club_repl = '''    existing = db.scalar(\n        select(Club).where(\n            Club.name == name,\n            Club.country == country,\n            Club.category == category,\n            Club.owner_id.is_(None) | (Club.owner_id == user.id),\n        )\n    )\n    if existing:\n        return RedirectResponse(f"/teams?club_exists={existing.id}", status_code=303)\n'''
+if club_anchor in text:
+    text = text.replace(club_anchor, club_repl, 1)
+elif "Club.owner_id.is_(None) | (Club.owner_id == user.id)," not in text:
+    raise SystemExit("club duplicate-scope anchor not found")
+
+team_create_anchor = '''    club = db.get(Club, club_id)\n    if not club:\n        raise HTTPException(400, detail="Selected club does not exist.")\n    name = clean_text(name)\n'''
+team_create_repl = '''    club = db.get(Club, club_id)\n    if not club or (club.owner_id is not None and club.owner_id != user.id):\n        raise HTTPException(400, detail="Selected club does not exist or is not available.")\n    name = clean_text(name)\n'''
+if team_create_anchor in text:
+    text = text.replace(team_create_anchor, team_create_repl, 1)
+elif "club.owner_id is not None and club.owner_id != user.id" not in text:
+    raise SystemExit("team club-ownership anchor not found")
+
+# Audit fix: report.json must use candidates from the latest autonomous run only,
+# matching the HTML report and autonomy page instead of mixing historical runs.
+report_anchor = '''    candidates = db.scalars(select(AutonomousEventCandidate).where(AutonomousEventCandidate.match_id == match.id).order_by(AutonomousEventCandidate.second)).all() if auto else []\n    report = build_match_report(match, auto, candidates)\n'''
+report_repl = '''    candidates = db.scalars(\n        select(AutonomousEventCandidate)\n        .where(AutonomousEventCandidate.analysis_id == auto.id)\n        .order_by(AutonomousEventCandidate.second)\n    ).all() if auto else []\n    report = build_match_report(match, auto, candidates)\n'''
+if report_anchor in text:
+    text = text.replace(report_anchor, report_repl, 1)
+elif "AutonomousEventCandidate.analysis_id == auto.id" not in text:
+    raise SystemExit("report candidate-scope anchor not found")
+
 text = text.replace("calculate_player_rating(events)\n    return render(request, \"player_detail.html\"", "calculate_player_rating(events, role=player.primary_role)\n    return render(request, \"player_detail.html\"", 1)
 text = text.replace("calculate_player_rating(pevents)\n        ratings.append", "calculate_player_rating(pevents, role=p.primary_role)\n        ratings.append", 1)
 p.write_text(text, encoding="utf-8")
