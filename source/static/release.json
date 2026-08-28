@@ -1,19 +1,19 @@
 {
-  "release": "AquaMetric V12.1 Finalization",
-  "marker": "AQUAMETRIC_V12_1_FINAL_2026_08_28",
+  "release": "AquaMetric V12.3 Player Evaluation",
+  "marker": "AQUAMETRIC_V12_3_PLAYER_EVAL_2026_08_28",
   "date": "2026-08-28",
   "validated_features": [
-    "mobile_menu_outside_close",
-    "drag_scroll_mobile",
     "languages_en_fr_it_es_ru",
-    "transfer_windows_by_year",
-    "knowledge_tactics_synthesis",
-    "automatic_data_refresh_ui",
     "linked_player_profiles",
-    "linked_coach_profiles",
+    "career_and_honours_evidence",
+    "official_match_player_statistics",
+    "coverage_adjusted_public_player_ratings",
+    "eight_dimension_evaluation_with_missing_values_visible",
+    "competition_level_weighting",
+    "confidence_and_source_provenance",
+    "saved_multi_run_analysis_history",
+    "visual_tactical_tablet",
     "shot_preferences_min_sample",
-    "level_dominant_match_simulation",
-    "deep_match_intelligence",
     "security_headers"
   ]
 }
