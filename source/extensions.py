@@ -6,13 +6,14 @@ from urllib.parse import quote_plus
 from fastapi import APIRouter, Request, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import select, or_
+from sqlalchemy import select, or_, func
 from sqlalchemy.orm import Session
 
 from db import get_db, SessionLocal
 from models import (
-    User, Match, Player, MediaArtifact, ScoutingTeam, ScoutingPlayer,
-    PlayerIntelligenceProfile, PlayerSourceRecord, PlayerMatchMetric, MatchLibraryItem, TransferSignal,
+    User, Match, Player, Event, AnalysisJob, VisionAnalysis, AutonomousAnalysis,
+    MediaArtifact, ScoutingTeam, ScoutingPlayer, PlayerIntelligenceProfile,
+    PlayerSourceRecord, PlayerMatchMetric, MatchLibraryItem, TransferSignal,
 )
 from intelligence_models import PlayerMatchEvaluation, CoachIntelligenceProfile
 from services.ratings import calculate_player_rating
@@ -20,6 +21,7 @@ from services.tactical_engine import analyze_match_tactics
 from services.video import timestamped_video_url
 from services.coach_data import seed_coaches
 from services.advanced_metrics import shot_map_summary
+from services.player_biography import player_biography_context
 
 BASE_DIR = Path(__file__).resolve().parent
 TEMPLATES = Jinja2Templates(directory=BASE_DIR / "templates")
@@ -128,7 +130,11 @@ def match_intelligence_page(match_id: int, request: Request, db: Session = Depen
 def player_by_name(request: Request, name: str = Query(...), db: Session = Depends(get_db)):
     _user(request, db)
     canonical = name.strip()
-    profile = db.scalar(select(PlayerIntelligenceProfile).where(PlayerIntelligenceProfile.canonical_name == canonical))
+    profile = db.scalar(
+        select(PlayerIntelligenceProfile).where(
+            func.lower(PlayerIntelligenceProfile.canonical_name) == canonical.lower()
+        )
+    )
     if not profile:
         return RedirectResponse(f"/player-intelligence?q={quote_plus(canonical)}", status_code=303)
     return RedirectResponse(f"/profiles/players/{profile.id}", status_code=303)
@@ -164,10 +170,42 @@ def unified_player_profile(profile_id: int, request: Request, db: Session = Depe
 
     scout_rows = db.scalars(select(ScoutingPlayer).where(ScoutingPlayer.name == profile.canonical_name)).all()
     shot_map = shot_map_summary(db, profile.id)
+    bio_context = player_biography_context(db, profile, scout_rows)
     return _render(
         request, "unified_player_profile.html", user=user, app_name="AquaMetric", profile=profile,
         sources=sources, metrics=metrics, library_matches=library_matches, evaluations=evaluations,
         aggregate=aggregate, aggregate_confidence=confidence, scout_rows=scout_rows, shot_map=shot_map,
+        **bio_context,
+    )
+
+
+@router.get("/analysis-history", response_class=HTMLResponse)
+def analysis_history_page(request: Request, db: Session = Depends(get_db)):
+    user = _user(request, db)
+    matches = db.scalars(
+        select(Match).where(Match.owner_id == user.id).order_by(Match.created_at.desc(), Match.id.desc())
+    ).all()
+    rows = []
+    total_runs = 0
+    for match in matches:
+        jobs = db.scalars(select(AnalysisJob).where(AnalysisJob.match_id == match.id).order_by(AnalysisJob.created_at.desc())).all()
+        visions = db.scalars(select(VisionAnalysis).where(VisionAnalysis.match_id == match.id).order_by(VisionAnalysis.created_at.desc())).all()
+        autos = db.scalars(select(AutonomousAnalysis).where(AutonomousAnalysis.match_id == match.id).order_by(AutonomousAnalysis.created_at.desc())).all()
+        events_count = db.scalar(select(func.count(Event.id)).where(Event.match_id == match.id)) or 0
+        media_count = db.scalar(select(func.count(MediaArtifact.id)).where(MediaArtifact.match_id == match.id)) or 0
+        runs = []
+        for item in jobs:
+            runs.append({"kind": "analysis", "id": item.id, "created_at": item.created_at, "status": item.status, "engine": item.stage, "detail": item.message})
+        for item in visions:
+            runs.append({"kind": "vision", "id": item.id, "created_at": item.created_at, "status": item.status, "engine": item.engine_version, "detail": f"{item.sample_count} samples · {item.confidence} confidence"})
+        for item in autos:
+            runs.append({"kind": "auto", "id": item.id, "created_at": item.created_at, "status": item.status, "engine": item.engine_version, "detail": "OCR / periods / event candidates"})
+        runs.sort(key=lambda r: r["created_at"], reverse=True)
+        total_runs += len(runs)
+        rows.append({"match": match, "runs": runs, "events_count": events_count, "media_count": media_count})
+    return _render(
+        request, "analysis_history.html", user=user, app_name="AquaMetric",
+        rows=rows, total_runs=total_runs,
     )
 
 
@@ -267,6 +305,7 @@ def install_extensions(app):
         ("/matches/{match_id}/intelligence", match_intelligence_page, HTMLResponse),
         ("/intelligence/player", player_by_name, None),
         ("/profiles/players/{profile_id}", unified_player_profile, HTMLResponse),
+        ("/analysis-history", analysis_history_page, HTMLResponse),
         ("/coaches", coaches_page, HTMLResponse),
         ("/coach-intelligence/{coach_id}", coach_profile_page, HTMLResponse),
         ("/api/scouting/{team_id}/coaches", scouting_coaches, None),
