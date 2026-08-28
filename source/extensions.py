@@ -22,6 +22,8 @@ from services.video import timestamped_video_url
 from services.coach_data import seed_coaches
 from services.advanced_metrics import shot_map_summary
 from services.player_biography import player_biography_context
+from services.elite_match_evidence import seed_elite_match_evidence
+from services.public_match_ratings import public_profile_evaluations
 
 BASE_DIR = Path(__file__).resolve().parent
 TEMPLATES = Jinja2Templates(directory=BASE_DIR / "templates")
@@ -171,10 +173,12 @@ def unified_player_profile(profile_id: int, request: Request, db: Session = Depe
     scout_rows = db.scalars(select(ScoutingPlayer).where(ScoutingPlayer.name == profile.canonical_name)).all()
     shot_map = shot_map_summary(db, profile.id)
     bio_context = player_biography_context(db, profile, scout_rows)
+    public_evidence = public_profile_evaluations(db, profile, role=profile.role)
     return _render(
         request, "unified_player_profile.html", user=user, app_name="AquaMetric", profile=profile,
         sources=sources, metrics=metrics, library_matches=library_matches, evaluations=evaluations,
         aggregate=aggregate, aggregate_confidence=confidence, scout_rows=scout_rows, shot_map=shot_map,
+        public_evidence=public_evidence,
         **bio_context,
     )
 
@@ -292,6 +296,7 @@ def security_status():
 def install_extensions(app):
     db = SessionLocal()
     try:
+        seed_elite_match_evidence(db)
         seed_coaches(db)
     finally:
         db.close()
