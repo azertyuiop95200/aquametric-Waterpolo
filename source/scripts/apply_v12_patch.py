@@ -80,8 +80,8 @@ text = text.replace("calculate_player_rating(events)\n    return render(request,
 text = text.replace("calculate_player_rating(pevents)\n        ratings.append", "calculate_player_rating(pevents, role=p.primary_role)\n        ratings.append", 1)
 p.write_text(text, encoding="utf-8")
 
-# Shared dossier extension: preserve tenant isolation and seed official Granville
-# match-sheet appearances before player-intelligence metrics are generated.
+# Shared dossier extension: preserve tenant isolation, seed match evidence and expose
+# a global evidence-coverage dashboard across every tracked club/national team.
 extensions = root / "extensions.py"
 e = extensions.read_text(encoding="utf-8")
 eval_anchor = '''        evaluations = db.scalars(select(PlayerMatchEvaluation).where(PlayerMatchEvaluation.player_id.in_(local_ids)).order_by(PlayerMatchEvaluation.generated_at.desc())).all()\n'''
@@ -100,10 +100,20 @@ if "seed_granville_match_evidence(db)" not in e:
     if anchor not in e:
         raise SystemExit("elite evidence seed anchor not found")
     e = e.replace(anchor, anchor + "        seed_granville_match_evidence(db)\n", 1)
+if "from evidence_coverage_routes import router as evidence_coverage_router" not in e:
+    anchor = "from services.public_match_ratings import public_profile_evaluations\n"
+    if anchor not in e:
+        raise SystemExit("public ratings import anchor not found")
+    e = e.replace(anchor, anchor + "from evidence_coverage_routes import router as evidence_coverage_router\n", 1)
+if "app.include_router(evidence_coverage_router)" not in e:
+    anchor = "    app.include_router(router)\n"
+    if anchor not in e:
+        raise SystemExit("extension router anchor not found")
+    e = e.replace(anchor, anchor + "    app.include_router(evidence_coverage_router)\n", 1)
 extensions.write_text(e, encoding="utf-8")
 
-# Every official library row verifies at least a match appearance. This is stored
-# separately from performance stats so lineup-only evidence can never create a rating.
+# Every official library row verifies at least a match appearance. Appearance-only
+# evidence is kept separate from matches that contain actual individual statistics.
 player_intel = root / "services" / "player_intelligence.py"
 pi = player_intel.read_text(encoding="utf-8")
 appearance_anchor = '''        match = db.get(MatchLibraryItem,row.library_match_id)\n        src = match.official_source_url if match else ""\n        if row.goals is not None: _metric_once(db,p,row.library_match_id,"goals",float(row.goals),"","goals","official_report",1.0,src,row.note)\n'''
@@ -112,6 +122,13 @@ if appearance_anchor in pi:
     pi = pi.replace(appearance_anchor, appearance_repl, 1)
 elif 'row.library_match_id,"appearance",1.0' not in pi:
     raise SystemExit("player appearance metric anchor not found")
+
+snapshot_anchor = '''def profile_snapshot(db, profile):\n    metrics = db.scalars(select(PlayerMatchMetric).where(PlayerMatchMetric.profile_id==profile.id)).all()\n    match_ids = {m.library_match_id for m in metrics if m.library_match_id}\n    total_goals = sum((m.value or 0) for m in metrics if m.metric == "goals")\n    total_saves = sum((m.value or 0) for m in metrics if m.metric == "saves")\n    return {\n        "matches": len(match_ids), "goals": int(total_goals), "saves": int(total_saves),\n        "sources": db.query(PlayerSourceRecord).filter(PlayerSourceRecord.profile_id==profile.id).count(),\n        "metrics": len(metrics),\n    }\n'''
+snapshot_repl = '''def profile_snapshot(db, profile):\n    metrics = db.scalars(select(PlayerMatchMetric).where(PlayerMatchMetric.profile_id==profile.id)).all()\n    documented_match_ids = {m.library_match_id for m in metrics if m.library_match_id}\n    stat_match_ids = {m.library_match_id for m in metrics if m.library_match_id and m.metric != "appearance"}\n    total_goals = sum((m.value or 0) for m in metrics if m.metric == "goals")\n    total_saves = sum((m.value or 0) for m in metrics if m.metric == "saves")\n    return {\n        "matches": len(stat_match_ids), "documented_matches": len(documented_match_ids),\n        "goals": int(total_goals), "saves": int(total_saves),\n        "sources": db.query(PlayerSourceRecord).filter(PlayerSourceRecord.profile_id==profile.id).count(),\n        "metrics": len(metrics),\n    }\n'''
+if snapshot_anchor in pi:
+    pi = pi.replace(snapshot_anchor, snapshot_repl, 1)
+elif '"documented_matches": len(documented_match_ids)' not in pi:
+    raise SystemExit("profile snapshot precision anchor not found")
 player_intel.write_text(pi, encoding="utf-8")
 
 # Keep base template changes tiny and idempotent to avoid replacing the whole shell.
@@ -124,6 +141,11 @@ if 'href="/coaches"' not in b:
     coach = '      <a class="{% if request.url.path.startswith(\'/coaches\') or request.url.path.startswith(\'/coach-intelligence\') %}active{% endif %}" href="/coaches"><span>HC</span>Coaches</a>\n'
     if anchor in b:
         b = b.replace(anchor, coach + anchor, 1)
+if 'href="/evidence-coverage"' not in b:
+    anchor = '      <a class="{% if request.url.path.startswith(\'/scouting\') %}active{% endif %}" href="/scouting"><span>S</span><b class="nav-label" data-i18n="nav.scouting">Scouting</b></a>\n'
+    coverage = '      <a class="{% if request.url.path == \'/evidence-coverage\' %}active{% endif %}" href="/evidence-coverage"><span>Σ</span><b class="nav-label">Evidence coverage</b></a>\n'
+    if anchor in b:
+        b = b.replace(anchor, anchor + coverage, 1)
 base.write_text(b, encoding="utf-8")
 
 print("Applied AquaMetric V12 server + shell patch")
