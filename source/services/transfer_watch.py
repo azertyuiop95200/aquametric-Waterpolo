@@ -14,6 +14,12 @@ from services.transfer_market_2026 import (
 from services.transfer_market_2026_wave2 import WAVE2_TRANSFER_SIGNALS, JUG_SIMIC_URL
 from services.transfer_market_2026_wave3 import WAVE3_TRANSFER_SIGNALS
 from services.transfer_market_2026_wave4_france import WAVE4_FRANCE_SIGNALS, MWP_PUBLIC
+from services.transfer_market_2026_wave5_official import (
+    WAVE5_TRANSFER_SIGNALS,
+    APOLLON_NEWS,
+    JADRAN_ROSTER,
+    CAL_AMOROSO,
+)
 from services.transfer_market_ncaa_2026 import NCAA_2026_TRANSFER_SIGNALS
 
 
@@ -40,6 +46,7 @@ _extend_unique(EXTRA_TRANSFER_SIGNALS)
 _extend_unique(WAVE2_TRANSFER_SIGNALS)
 _extend_unique(WAVE3_TRANSFER_SIGNALS)
 _extend_unique(WAVE4_FRANCE_SIGNALS)
+_extend_unique(WAVE5_TRANSFER_SIGNALS)
 _extend_unique(NCAA_2026_TRANSFER_SIGNALS)
 TRANSFER_SIGNALS = _core.TRANSFER_SIGNALS
 
@@ -51,9 +58,12 @@ _EXTRA_SOURCE_WATCHES = [
     ("CN Sabadell — official water polo", "club_official", "web", "CN Sabadell women and men", "https://nataciosabadell.es/seccio-waterpolo/", "primary", 12, "Official club water-polo section; use for roster validation and cross-checking announced signings/exits."),
     ("CN Terrassa — official water polo", "club_official", "web", "CN Terrassa women and men", "https://clubnatacioterrassa.cat/", "primary", 12, "Official club site for 2026-27 signings, roster continuity and competition context."),
     ("Montpellier Water-Polo — public club feed", "club_social", "instagram", "Montpellier Water-Polo", MWP_PUBLIC, "club_public", 6, "Public club feed embedded on the official shop; useful for explicit signing and farewell announcements."),
+    ("Apollon Smyrnis — official water polo", "club_official", "web", "Apollon Smyrnis", APOLLON_NEWS, "primary", 6, "Official club signing, renewal and first-team roster announcements. Renewals are not counted as transfers."),
+    ("VK Jadran Split — official water polo", "club_official", "web", "Jadran Split", JADRAN_ROSTER, "primary", 6, "Official first-team roster and reinforcement announcements for the 2026-27 season."),
     ("UCLA Water Polo — official athletics", "team_official", "web", "NCAA — UCLA women and men", "https://uclabruins.com/sports/water-polo", "primary", 12, "Official UCLA rosters and season previews; primary source for NCAA transfer arrivals."),
     ("USC Water Polo — official athletics", "team_official", "web", "NCAA — USC women and men", "https://usctrojans.com/", "primary", 12, "Official USC roster and season news; primary source for collegiate transfers."),
     ("Stanford Water Polo — official athletics", "team_official", "web", "NCAA — Stanford women and men", "https://gostanford.com/", "primary", 12, "Official Stanford transfer announcements and current rosters."),
+    ("California Water Polo — official athletics", "team_official", "web", "NCAA — California women", CAL_AMOROSO, "primary", 12, "Official California Golden Bears transfer announcements and roster news."),
 ]
 _existing_source_names = {row[0] for row in _core.SOURCE_WATCHES}
 _core.SOURCE_WATCHES.extend(row for row in _EXTRA_SOURCE_WATCHES if row[0] not in _existing_source_names)
