@@ -12,13 +12,39 @@ WA_EURO_2026 = "https://www.worldaquatics.com/news/4445408/netherlands-goes-back
 GRANVILLE_RUMINA = "https://www.granvillewaterpolo.com/2025/10/24/effectif-saison-2025-2026/"
 GRANVILLE_MORGANE = "https://www.granvillewaterpolo.com/2025/10/26/effectif-saison-2025-2026/"
 GRANVILLE_CAPUCINE = "https://www.granvillewaterpolo.com/2025/10/28/effectif-saison-2025-2026/"
-WP360_TRANSFERS = "https://waterpolo360news.com/water-polo-transfers-and-gossip/confirmed-transfers/"
+USC_AUSMUS = "https://usctrojans.com/sports/womens-water-polo/roster/emily-ausmus/17964"
+CNAB_ELENA = "https://www.cnab.cat/elena-ruiz-nueva-incorporacion-del-equipo-femenino/"
+SIS_ROMA_ROZIC = "https://sisroma.it/secondo-acquisto-per-la-sis-roma-iva-rozic-vestira-il-giallorosso-nella-stagione-2026-2027/"
+RFEN_PIRALKOVA_4X4 = "https://rfen.es/noticia/convocatorias-de-espana-para-el-world-aquatics-4x4-open-championships-de-dubrovnik-359123/"
+FFN_FUNCHAL_2026 = "https://www.ffnatation.fr/sites/default/files/2026-01/DP%20FUNCHAL%202026_VF.pdf"
+FFN_SINGAPOUR_2025 = "https://www.ffnatation.fr/sites/default/files/2025-07/DP%20FSINGAPOUR%202025%20V9juillet.pdf"
 
 PROFILE_SEEDS = [
-    dict(name="Emily Ausmus", nationality="USA", role="Perimeter / attacker", club="", national="United States — Women Senior", status="current_national_team", season="2026", confidence=.98, source=WA_WC_2026_FINAL, note="World Cup 2026 top scorer; player of the final. Club affiliation intentionally left blank until a current official club source is attached."),
-    dict(name="Elena Ruiz", nationality="ESP", role="Left-hander / perimeter", club="CN Atlètic-Barceloneta", national="Spain — Women Senior", status="media_confirmed_transfer", season="2026-2027", confidence=.92, source=WP360_TRANSFERS, note="Transfer is media-confirmed and described as confirmed by the destination club; AquaMetric keeps the evidence tier visible until a direct club/federation roster source is attached."),
-    dict(name="Iva Rozic", nationality="CRO", role="Perimeter / scorer", club="SIS Roma", national="Croatia — Women Senior", status="media_confirmed_transfer", season="2026-2027", confidence=.92, source=WP360_TRANSFERS, note="Croatian scorer with U20 and senior international evidence. Transfer is stored separately from match-performance evidence."),
-    dict(name="Isabel Piralkova", nationality="ESP", role="Perimeter / scorer", club="", national="Spain — Women U20", status="event_roster_evidence", season="2025", confidence=.96, source=WA_U20_2025_SF, note="U20 profile currently driven by official World Aquatics match reports; club affiliation awaits a current club source."),
+    # International priority profiles: direct club/federation sources replace old media-only placeholders.
+    dict(name="Emily Ausmus", nationality="USA", role="Perimeter / attacker", club="USC Trojans", national="United States — Women Senior", status="official_club_and_national", season="2026", confidence=.99, source=USC_AUSMUS, note="USC official roster confirms her 2026 college affiliation; international evidence remains attached separately."),
+    dict(name="Elena Ruiz", nationality="ESP", role="Left-hander / perimeter", club="CN Atlètic-Barceloneta", national="Spain — Women Senior", status="club_official_transfer", season="2026-2027", confidence=.99, source=CNAB_ELENA, note="Destination club officially announced Elena Ruiz for its first-team project in August 2026."),
+    dict(name="Iva Rozic", nationality="CRO", role="Perimeter / scorer", club="SIS Roma", national="Croatia — Women Senior", status="club_official_transfer", season="2026-2027", confidence=.99, source=SIS_ROMA_ROZIC, note="SIS Roma officially announced Iva Rožić for 2026-27; the club article also documents her previous Cosenza/Mladost pathway."),
+    dict(name="Isabel Piralkova", nationality="ESP", role="Perimeter / scorer", club="CN Sabadell", national="Spain — Women Senior", status="federation_current_roster", season="2026-2027", confidence=.99, source=RFEN_PIRALKOVA_4X4, note="RFEN August 2026 call-up lists Piralkova with CN Sabadell; U20 and Olympic evidence remain attached through official competition records."),
+
+    # France 2026 federation roster: this prevents match-only profiles from losing current club/national context.
+    dict(name="Lara Andres", nationality="FRA", role="Right-handed / polyvalente", club="Lille UC Natation", national="France — Women Senior", status="federation_current_roster", season="2026", confidence=.99, source=FFN_FUNCHAL_2026, note="FFN Funchal 2026 dossier: Lille UC, polyvalente; Paris 2024 Olympian and France senior international."),
+    dict(name="Arianna Banchi", nationality="FRA", role="Right-handed / polyvalente", club="US Locatelli Genova Pallanuoto", national="France — Women Senior", status="federation_current_roster", season="2026", confidence=.99, source=FFN_FUNCHAL_2026, note="FFN Funchal 2026 official France roster and player card."),
+    dict(name="Kahena Benlekbir", nationality="FRA", role="Winger / demi", club="Grand Nancy Aquatique Club", national="France — Women Senior", status="federation_current_roster", season="2026", confidence=.99, source=FFN_FUNCHAL_2026, note="FFN Funchal 2026 official France roster and player card."),
+    dict(name="Jade Boughrara", nationality="FRA", role="Right-handed / polyvalente", club="Taverny SN 95", national="France — Women Senior", status="federation_current_roster", season="2026", confidence=.99, source=FFN_FUNCHAL_2026, note="FFN Funchal 2026 official France roster and player card."),
+    dict(name="Camelia Bouloukbachi", nationality="FRA", role="Centre defender / demi", club="Arizona State Sun Devils", national="France — Women Senior", status="federation_current_roster", season="2026", confidence=.99, source=FFN_FUNCHAL_2026, note="FFN Funchal 2026 lists Arizona State and France senior; Paris 2024 Olympian."),
+    dict(name="Léopoldine Burle", nationality="FRA", role="Winger", club="Toulon Water-Polo", national="France — Women Senior", status="federation_current_roster", season="2026", confidence=.99, source=FFN_FUNCHAL_2026, note="FFN Funchal 2026 official France roster and player card."),
+    dict(name="Lana Di Fraja", nationality="FRA", role="Right-handed / polyvalente", club="Lille UC Natation", national="France — Women Senior", status="federation_current_roster", season="2026", confidence=.99, source=FFN_FUNCHAL_2026, note="FFN Funchal 2026: born 2006, Lille UC, polyvalente, senior European Championship roster."),
+    dict(name="Emma Duflos", nationality="FRA", role="Right-handed / polyvalente", club="Toulon Water-Polo", national="France — Women Senior", status="federation_current_roster", season="2026", confidence=.99, source=FFN_FUNCHAL_2026, note="FFN Funchal 2026 official France roster and player card."),
+    dict(name="Valentine Heurtaux", nationality="FRA", role="Right-handed / polyvalente", club="Toulon Water-Polo", national="France — Women Senior", status="federation_current_roster", season="2026", confidence=.99, source=FFN_FUNCHAL_2026, note="FFN Funchal 2026: Toulon, Paris 2024 Olympian, senior Worlds and Europeans experience."),
+    dict(name="Elhyne Kilic-Pegourie", nationality="FRA", role="Centre / pointe", club="Lille UC Natation", national="France — Women Senior", status="federation_current_roster", season="2026", confidence=.99, source=FFN_FUNCHAL_2026, note="FFN Funchal 2026: born 2007, Lille UC, pointe; Singapore 2025 Worlds and Funchal 2026 Europeans."),
+    dict(name="Eszter Lefebvre", nationality="FRA", role="Goalkeeper", club="Lille UC Natation", national="France — Women Senior", status="federation_current_roster", season="2026", confidence=.99, source=FFN_FUNCHAL_2026, note="FFN Funchal 2026: Lille UC goalkeeper; Singapore 2025 Worlds and Funchal 2026 Europeans."),
+    dict(name="Ona Pourtau Sire", nationality="FRA", role="Right-handed / polyvalente", club="Club Esportiu Mediterrani", national="France — Women Senior", status="federation_current_roster", season="2026", confidence=.99, source=FFN_FUNCHAL_2026, note="FFN Funchal 2026 official France roster and player card."),
+    dict(name="Tiziana Raspo", nationality="FRA", role="Centre defender", club="Grand Nancy Aquatique Club", national="France — Women Senior", status="federation_current_roster", season="2026", confidence=.99, source=FFN_FUNCHAL_2026, note="FFN Funchal 2026: Grand Nancy, Paris 2024 Olympian and senior international."),
+    dict(name="Romane Secheresse", nationality="FRA", role="Goalkeeper", club="Union St-Bruno Bordeaux", national="France — Women Senior", status="federation_current_roster", season="2026", confidence=.99, source=FFN_FUNCHAL_2026, note="FFN Funchal 2026 official France roster and goalkeeper card."),
+    dict(name="Ema Vernoux", nationality="FRA", role="Winger / demi", club="University of Hawai'i", national="France — Women Senior", status="federation_current_roster", season="2026", confidence=.99, source=FFN_FUNCHAL_2026, note="FFN Funchal 2026: University of Hawai'i; Paris 2024 Olympian with extensive Worlds/Euro experience."),
+    dict(name="Lily Vernoux", nationality="FRA", role="Field player", club="Lille UC Natation", national="France — Women recent senior roster", status="federation_recent_roster", season="2025-2026", confidence=.97, source=FFN_SINGAPOUR_2025, note="FFN Singapore 2025 dossier lists Lille UC and France senior context; not labelled current 2026 national roster without a newer call-up."),
+
+    # Granville official player presentations.
     dict(name="Rumina Edgerton", nationality="CAN", role="Goalkeeper", club="Granville Water Polo", national="Canada — junior history", status="historical_club_confirmed_pending_2627", season="2025-2026", confidence=.98, source=GRANVILLE_RUMINA, note="Granville officially announced her for 2025-26. 2026-27 status remains pending until a new roster or match sheet confirms continuity."),
     dict(name="Morgane Le Berre", nationality="FRA", role="Field player", club="Granville Water Polo", national="France youth history", status="historical_club_confirmed_pending_2627", season="2025-2026", confidence=.98, source=GRANVILLE_MORGANE, note="Official Granville 2025-26 player presentation; current-season confirmation remains separate."),
     dict(name="Capucine Pillais", nationality="FRA", role="Centre defender / contre-pointe", club="Granville Water Polo", national="France youth pathway", status="historical_club_confirmed_pending_2627", season="2025-2026", confidence=.98, source=GRANVILLE_CAPUCINE, note="Official Granville 2025-26 player presentation identifies her role and youth honours."),
@@ -76,6 +102,11 @@ def seed_player_intelligence(db):
     profiles = {s["name"]:_profile(db,s) for s in PROFILE_SEEDS}
     db.flush()
 
+    # Every curated seed gets its primary identity/roster evidence as a first-class source record.
+    for seed in PROFILE_SEEDS:
+        p = profiles[seed["name"]]
+        _source_once(db, p, "primary_profile", f"Primary profile evidence — {seed['season']}", seed["source"], seed["season"], "official", seed["note"])
+
     # Generic expansion: any newly discovered roster player, transfer subject, or match-stat player
     # gets a canonical profile. This is the path from a small curated demo to a large player registry.
     scouting_rows = db.scalars(select(ScoutingPlayer)).all()
@@ -118,10 +149,11 @@ def seed_player_intelligence(db):
 
     _source_once(db,profiles["Emily Ausmus"],"official_match","World Aquatics — World Cup 2026 final",WA_WC_2026_FINAL,"2026","official","Six goals in the final; tournament top scorer with 11 goals.")
     _source_once(db,profiles["Emily Ausmus"],"official_video","World Aquatics — USA vs Spain final video",WA_WC_2026_VIDEO,"2026","official","Official video/clip page for final evidence.")
-    _source_once(db,profiles["Elena Ruiz"],"media_transfer","Waterpolo 360 — confirmed transfer",WP360_TRANSFERS,"2026-2027","media_confirmed","Transfer to CN Atlètic-Barceloneta reported as confirmed.")
+    _source_once(db,profiles["Elena Ruiz"],"club_announcement","CN Atlètic-Barceloneta — official arrival",CNAB_ELENA,"2026-2027","club_official","Destination club officially announced Elena Ruiz.")
     _source_once(db,profiles["Elena Ruiz"],"official_match","World Aquatics — World Cup 2026 final",WA_WC_2026_FINAL,"2026","official","Two goals for Spain in the final.")
-    _source_once(db,profiles["Iva Rozic"],"media_transfer","Waterpolo 360 — confirmed transfer",WP360_TRANSFERS,"2026-2027","media_confirmed","Transfer to SIS Roma reported as confirmed.")
+    _source_once(db,profiles["Iva Rozic"],"club_announcement","SIS Roma — official arrival",SIS_ROMA_ROZIC,"2026-2027","club_official","SIS Roma officially announced Iva Rozic for 2026-27.")
     _source_once(db,profiles["Iva Rozic"],"official_competition","World Aquatics / European championship report",WA_EURO_2026,"2026","official","Finished second on the scoring ladder with 24 goals in the cited senior European championship report.")
+    _source_once(db,profiles["Isabel Piralkova"],"federation_roster","RFEN — August 2026 senior call-up",RFEN_PIRALKOVA_4X4,"2026-2027","federation_official","RFEN lists Piralkova with CN Sabadell.")
     _source_once(db,profiles["Rumina Edgerton"],"club_announcement","Granville Water Polo — player announcement",GRANVILLE_RUMINA,"2025-2026","club_official","Granville announced Edgerton as its new goalkeeper for 2025-26.")
     _source_once(db,profiles["Morgane Le Berre"],"club_announcement","Granville Water Polo — player announcement",GRANVILLE_MORGANE,"2025-2026","club_official","Granville official player presentation.")
     _source_once(db,profiles["Capucine Pillais"],"club_announcement","Granville Water Polo — player announcement",GRANVILLE_CAPUCINE,"2025-2026","club_official","Granville official player presentation and role information.")
@@ -131,7 +163,6 @@ def seed_player_intelligence(db):
     for row in library_rows:
         p = profiles.get(row.player_name)
         if not p:
-            # small alias bridge for World Aquatics naming currently used in the library
             if row.player_name == "Iva Rozic": p = profiles.get("Iva Rozic")
             elif row.player_name == "Isabel Piralkova": p = profiles.get("Isabel Piralkova")
         if not p: continue
