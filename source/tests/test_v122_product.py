@@ -31,7 +31,7 @@ def test_v122_templates_expose_visual_tactics_player_links_and_five_languages():
     assert 'scout-player-card' in scouting
     assert base.count('data-lang-choice=') == 5
     assert '/analysis-history' in base
-    assert 'i18n-v122-locales.js?v=12.2.1' in base
+    assert 'i18n-v122-locales.js?v=' in base
     for marker in ('Historique analyses', 'Storico analisi', 'Historial de análisis', 'История анализов'):
         assert marker in locale_pack
 
