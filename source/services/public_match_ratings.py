@@ -38,12 +38,12 @@ def _team_total(match, player_team):
         return match.score_a
     if player_team == match.team_b:
         return match.score_b
-    # Current curated Lille rows can use a shortened alias in older records.
-    if "lille" in player_team.lower():
-        if "lille" in (match.team_a or "").lower():
-            return match.score_a
-        if "lille" in (match.team_b or "").lower():
-            return match.score_b
+    for alias in ("lille", "granville"):
+        if alias in player_team.lower():
+            if alias in (match.team_a or "").lower():
+                return match.score_a
+            if alias in (match.team_b or "").lower():
+                return match.score_b
     return None
 
 
@@ -51,12 +51,21 @@ def _result(match, player_team):
     total = _team_total(match, player_team)
     if total is None or match.score_a is None or match.score_b is None:
         return "unknown"
-    opp = match.score_b if total == match.score_a and player_team == match.team_a else match.score_a
-    if "lille" in (player_team or "").lower():
-        if "lille" in (match.team_a or "").lower():
-            opp = match.score_b
-        elif "lille" in (match.team_b or "").lower():
-            opp = match.score_a
+    if player_team == match.team_a:
+        opp = match.score_b
+    elif player_team == match.team_b:
+        opp = match.score_a
+    else:
+        opp = None
+        for alias in ("lille", "granville"):
+            if alias in (player_team or "").lower():
+                if alias in (match.team_a or "").lower():
+                    opp = match.score_b
+                elif alias in (match.team_b or "").lower():
+                    opp = match.score_a
+                break
+        if opp is None:
+            return "unknown"
     if total > opp:
         return "win"
     if total < opp:
@@ -67,9 +76,9 @@ def _result(match, player_team):
 def evaluate_public_match(match, metrics, role=""):
     """Rate only what a public source actually documents.
 
-    Missing dimensions are returned as None. A /100 score is still provided so
-    matches can be compared, but it is explicitly coverage-adjusted and carries
-    a confidence ceiling when the source only publishes scorers.
+    Missing dimensions stay None. A lineup-only source verifies participation but
+    never produces an individual /100. Partial stat lines can produce a deliberately
+    coverage-adjusted score, always alongside confidence and unavailable dimensions.
     """
     by_metric = {m.metric: m for m in metrics}
     values = {k: (by_metric[k].value if k in by_metric else None) for k in ("goals", "shots", "assists", "steals", "saves", "exclusions")}
@@ -77,9 +86,9 @@ def evaluate_public_match(match, metrics, role=""):
     source_tier = meta.get("source_tier", "official_report")
     scorer_complete = bool(meta.get("scorer_list_complete", False))
     level = int(meta.get("competition_level", 3) or 3)
+    appearance_verified = "appearance" in by_metric or meta.get("evidence_scope") == "official_match_sheet_lineup"
     player_team = next((getattr(m, "_team_name", None) for m in metrics if getattr(m, "_team_name", None)), None)
     if not player_team:
-        # PlayerMatchMetric does not persist team_name; caller may attach it.
         player_team = getattr(metrics[0], "team_name", "") if metrics else ""
     team_total = _team_total(match, player_team)
     goals = values["goals"]
@@ -89,6 +98,8 @@ def evaluate_public_match(match, metrics, role=""):
     dims = {d: None for d in DIMENSIONS}
     evidence_families = 0
     published = []
+    if appearance_verified:
+        published.append("official match-sheet appearance")
 
     if goals is not None:
         evidence_families += 1
@@ -143,8 +154,6 @@ def evaluate_public_match(match, metrics, role=""):
     denom = sum(weights[d] for d in available)
     raw_overall = sum(dims[d] * weights[d] for d in available) / denom if denom else None
 
-    # Pull low-coverage ratings gently toward neutral so a goals-only report cannot
-    # masquerade as a complete all-round performance evaluation.
     if raw_overall is not None:
         shrink = 0.42 + coverage * 0.58
         overall = round(50 + (raw_overall - 50) * shrink, 1)
@@ -152,14 +161,16 @@ def evaluate_public_match(match, metrics, role=""):
         overall = None
 
     confidence = .14 + coverage * .34
-    if source_tier in {"federation_official", "official", "official_report"}:
+    if source_tier in {"federation_official", "official", "official_report", "official_match_sheet"}:
         confidence += .08
     if scorer_complete:
         confidence += .10
     if evidence_families >= 2:
         confidence += .12
     confidence = round(min(.92, confidence), 2)
-    if confidence < .35:
+    if overall is None:
+        confidence_label = "PRESENCE"
+    elif confidence < .35:
         confidence_label = "LIMITED"
     elif confidence < .60:
         confidence_label = "PARTIAL"
@@ -169,7 +180,14 @@ def evaluate_public_match(match, metrics, role=""):
         confidence_label = "HIGH"
 
     unavailable = [d for d in DIMENSIONS if dims[d] is None]
-    scope = "fuller public stat line" if evidence_families >= 3 else ("multi-stat public evidence" if evidence_families >= 2 else "published scoring evidence only")
+    if evidence_families >= 3:
+        scope = "fuller public stat line"
+    elif evidence_families >= 2:
+        scope = "multi-stat public evidence"
+    elif evidence_families == 1:
+        scope = "published scoring evidence only"
+    else:
+        scope = "official lineup presence only"
     return {
         "match": match,
         "overall": overall,
@@ -187,6 +205,7 @@ def evaluate_public_match(match, metrics, role=""):
         "goal_share": round(share * 100, 1) if share is not None else None,
         "result": result,
         "goals": int(goals) if goals is not None else None,
+        "appearance_verified": appearance_verified,
     }
 
 
@@ -205,8 +224,6 @@ def public_profile_evaluations(db, profile, role=""):
         match = db.get(MatchLibraryItem, library_id)
         if not match:
             continue
-        # Recover team name from the canonical library stat if available without
-        # adding a duplicate persistence field to PlayerMatchMetric.
         from models import LibraryPlayerMatchStat
         stat = db.scalar(select(LibraryPlayerMatchStat).where(
             LibraryPlayerMatchStat.library_match_id == library_id,
@@ -218,21 +235,24 @@ def public_profile_evaluations(db, profile, role=""):
 
     rows.sort(key=lambda r: r["match"].id, reverse=True)
     rated = [r for r in rows if r["overall"] is not None]
-    if not rated:
-        return {"matches": rows, "summary": {"rated_matches": 0, "goals": 0, "avg_rating": None, "weighted_rating": None, "avg_confidence": 0.0, "best": None}}
-
-    goals = sum(r["goals"] or 0 for r in rated)
-    weighted_den = sum(max(.05, r["confidence_score"]) * max(1, r["competition_level"]) for r in rated)
-    weighted_rating = round(sum(r["overall"] * max(.05, r["confidence_score"]) * max(1, r["competition_level"]) for r in rated) / weighted_den, 1)
-    return {
-        "matches": rows,
-        "summary": {
-            "rated_matches": len(rated),
-            "goals": goals,
-            "goals_per_match": round(goals / len(rated), 2),
+    goals = sum(r["goals"] or 0 for r in rows)
+    summary = {
+        "documented_matches": len(rows),
+        "rated_matches": len(rated),
+        "appearance_only_matches": sum(r["overall"] is None and r["appearance_verified"] for r in rows),
+        "goals": goals,
+        "goals_per_match": round(goals / len(rated), 2) if rated else None,
+        "avg_rating": None,
+        "weighted_rating": None,
+        "avg_confidence": 0.0,
+        "best": None,
+    }
+    if rated:
+        weighted_den = sum(max(.05, r["confidence_score"]) * max(1, r["competition_level"]) for r in rated)
+        summary.update({
             "avg_rating": round(mean(r["overall"] for r in rated), 1),
-            "weighted_rating": weighted_rating,
+            "weighted_rating": round(sum(r["overall"] * max(.05, r["confidence_score"]) * max(1, r["competition_level"]) for r in rated) / weighted_den, 1),
             "avg_confidence": round(mean(r["confidence_score"] for r in rated), 2),
             "best": max(rated, key=lambda r: r["overall"]),
-        },
-    }
+        })
+    return {"matches": rows, "summary": summary}
