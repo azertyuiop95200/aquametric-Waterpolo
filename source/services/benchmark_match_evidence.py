@@ -25,6 +25,25 @@ def _competition_level(item):
     return 4
 
 
+def _same_match_definition(candidate, item, score):
+    return (
+        candidate.get("team_a") == item.get("team_a")
+        and candidate.get("team_b") == item.get("team_b")
+        and candidate.get("score_a") == score[0]
+        and candidate.get("score_b") == score[1]
+        and candidate.get("season") == (item.get("date", "")[:4] or "")
+    )
+
+
+def _canonical_definition_exists(item, score):
+    # Import lazily to avoid creating an import cycle while club_data itself starts.
+    try:
+        from services.club_data import LIBRARY_MATCHES
+    except ImportError:
+        return False
+    return any(_same_match_definition(candidate, item, score) for candidate in LIBRARY_MATCHES)
+
+
 def _existing_canonical_match(db, item, score):
     """Find the same sporting match even if the benchmark uses another key/title."""
     year = (item.get("date", "")[:4] or "")
@@ -53,6 +72,12 @@ def seed_benchmark_match_evidence(db):
         row = db.scalar(select(MatchLibraryItem).where(MatchLibraryItem.external_key == key))
         if not row:
             row = _existing_canonical_match(db, item, score)
+        # install_extensions runs before the legacy seed_library call. If the match
+        # is already scheduled to be created by that canonical library, do not create
+        # a second benchmark-key row during this earlier pass.
+        if not row and _canonical_definition_exists(item, score):
+            continue
+
         metadata = {
             "_aquametric": {
                 "competition_level": _competition_level(item),
@@ -91,7 +116,6 @@ def seed_benchmark_match_evidence(db):
             db.add(row)
             db.flush()
         else:
-            # Preserve the canonical library identity/title while enriching evidence.
             row.video_url = _official_video(item) or row.video_url
             row.official_source_url = _official_source(item) or row.official_source_url
             row.analysis_status = "official_benchmark_evidence"
