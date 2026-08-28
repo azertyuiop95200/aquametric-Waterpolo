@@ -84,12 +84,13 @@ def evaluate_public_match(match, metrics, role=""):
     values = {k: (by_metric[k].value if k in by_metric else None) for k in ("goals", "shots", "assists", "steals", "saves", "exclusions")}
     meta = _meta(match)
     source_tier = meta.get("source_tier", "official_report")
-    scorer_complete = bool(meta.get("scorer_list_complete", False))
     level = int(meta.get("competition_level", 3) or 3)
     appearance_verified = "appearance" in by_metric or meta.get("evidence_scope") == "official_match_sheet_lineup"
     player_team = next((getattr(m, "_team_name", None) for m in metrics if getattr(m, "_team_name", None)), None)
     if not player_team:
         player_team = getattr(metrics[0], "team_name", "") if metrics else ""
+    completeness_by_team = meta.get("scorer_list_complete_by_team") or {}
+    scorer_complete = bool(completeness_by_team.get(player_team, meta.get("scorer_list_complete", False)))
     team_total = _team_total(match, player_team)
     goals = values["goals"]
     share = (float(goals) / float(team_total)) if goals is not None and team_total else None
