@@ -20,19 +20,61 @@ TEAM_ALIASES = {
     "France — Women Senior": {"France — Women Senior", "France", "FRA"},
 }
 
-PERFORMANCE_FIELDS = ("goals", "saves", "shots", "assists", "steals")
+COUNTRY_CODES = {
+    "United States": {"USA", "US"}, "Spain": {"ESP"}, "France": {"FRA"},
+    "Greece": {"GRE", "GRC"}, "Italy": {"ITA"}, "Hungary": {"HUN"},
+    "Netherlands": {"NED"}, "Canada": {"CAN"}, "Australia": {"AUS"},
+    "China": {"CHN"}, "Croatia": {"CRO"}, "New Zealand": {"NZL"},
+    "Israel": {"ISR"}, "Mexico": {"MEX"}, "Brazil": {"BRA"},
+    "Argentina": {"ARG"}, "South Africa": {"RSA"},
+}
+
+PERFORMANCE_FIELDS = ("goals", "saves", "shots", "assists", "steals", "exclusions")
+U20_MARKERS = ("u20", "u-20", "under 20", "under-20", "under20")
 
 
-def aliases_for(team_name: str) -> set[str]:
-    return TEAM_ALIASES.get(team_name, {team_name})
+def aliases_for(team_or_name) -> set[str]:
+    """Return safe aliases without confusing senior and age-group scope.
+
+    Team-name aliases resolve spelling/abbreviation only. Competition/age-group
+    separation is enforced independently by ``_match_in_scope``.
+    """
+    if isinstance(team_or_name, str):
+        return set(TEAM_ALIASES.get(team_or_name, {team_or_name}))
+    team = team_or_name
+    aliases = set(TEAM_ALIASES.get(team.name, {team.name}))
+    if team.team_type == "national_team" and team.country:
+        aliases.add(team.country)
+        aliases.update(COUNTRY_CODES.get(team.country, set()))
+    return {a for a in aliases if a}
 
 
-def _matches_for_team(db, aliases: set[str]):
-    return db.scalars(
+def _is_u20_match(match: MatchLibraryItem) -> bool:
+    text = " ".join([
+        match.external_key or "", match.title or "", match.competition or "",
+    ]).lower()
+    return any(marker in text for marker in U20_MARKERS)
+
+
+def _match_in_scope(team: ScoutingTeam, match: MatchLibraryItem) -> bool:
+    if team.team_type != "national_team":
+        return True
+    age = (team.age_group or "").strip().lower()
+    is_u20 = _is_u20_match(match)
+    if age == "u20":
+        return is_u20
+    if age == "senior":
+        return not is_u20
+    return True
+
+
+def _matches_for_team(db, team: ScoutingTeam, aliases: set[str]):
+    rows = db.scalars(
         select(MatchLibraryItem).where(
             MatchLibraryItem.team_a.in_(aliases) | MatchLibraryItem.team_b.in_(aliases)
         )
     ).all()
+    return [row for row in rows if _match_in_scope(team, row)]
 
 
 def _has_performance_stat(row: LibraryPlayerMatchStat) -> bool:
@@ -45,11 +87,11 @@ def team_evidence_coverage(db):
     ).all()
     output = []
     for team in teams:
-        aliases = aliases_for(team.name)
+        aliases = aliases_for(team)
         roster = db.scalars(
             select(ScoutingPlayer).where(ScoutingPlayer.scouting_team_id == team.id)
         ).all()
-        matches = _matches_for_team(db, aliases)
+        matches = _matches_for_team(db, team, aliases)
         match_ids = [m.id for m in matches]
         stats = []
         if match_ids:
@@ -67,6 +109,7 @@ def team_evidence_coverage(db):
         performance_match_ids = {s.library_match_id for s in performance_rows}
         lineup_only_match_ids = {s.library_match_id for s in stats if not _has_performance_stat(s)} - performance_match_ids
         official_matches = [m for m in matches if (m.official_source_url or "").strip()]
+        evidence_seasons = sorted({m.season for m in matches if (m.season or "").strip()}, reverse=True)
 
         if performance_match_ids:
             state = "performance_stats"
@@ -102,6 +145,7 @@ def team_evidence_coverage(db):
             "lineup_only_matches": len(lineup_only_match_ids),
             "missing_player_evidence": len(player_names - evidence_players),
             "latest_match_id": max(match_ids) if match_ids else None,
+            "evidence_seasons": evidence_seasons,
         })
     return output
 
