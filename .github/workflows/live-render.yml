@@ -57,3 +57,21 @@ jobs:
           curl -L --max-time 30 -fsS "$base/static/v122.css" | grep -q 'public-match-card'
           curl -L --max-time 30 -fsS "$base/knowledge" | grep -q 'tactic-board-card'
           curl -L --max-time 30 -fsS "$base/scouting" | grep -q 'scout-card'
+
+      - name: Verify Coaches directory is actually served
+        if: ${{ steps.live.outputs.deployed == 'true' }}
+        run: |
+          set -euo pipefail
+          base='https://aquametric-web-demo.onrender.com'
+          cookie=/tmp/aquametric-cookie.txt
+          # Enter the public demo workspace so /coaches is rendered with the same
+          # authenticated path used by the mobile demo.
+          curl -L --max-time 45 -fsS -c "$cookie" -b "$cookie" "$base/demo-login" >/tmp/demo.html
+          curl -L --max-time 45 -fsS -c "$cookie" -b "$cookie" "$base/coaches" >/tmp/coaches.html
+          grep -q 'data-coach-directory-version="2026-08-28-v2"' /tmp/coaches.html
+          grep -q 'data-season="2026-2027"' /tmp/coaches.html
+          grep -q 'data-season="2025-2026"' /tmp/coaches.html
+          grep -q 'data-view="national"' /tmp/coaches.html
+          grep -q 'coach-directory.js?v=20260828-2' /tmp/coaches.html
+          curl -L --max-time 30 -fsS "$base/static/coach-directory.js?v=20260828-2" | grep -q "const CURRENT = '2026-2027'"
+          echo 'Coaches directory v2 is live and verified.'
