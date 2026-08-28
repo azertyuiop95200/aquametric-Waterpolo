@@ -51,13 +51,13 @@ def test_knowledge_page_is_synthesis_not_source_directory():
     assert "reference-row" not in text
 
 
-def test_transfer_watch_is_grouped_by_year_and_market_window_and_links_profiles():
+def test_transfer_watch_is_grouped_by_season_gender_evidence_and_links_profiles():
     text = read("templates/transfer_watch.html")
-    assert "years.items" in text
-    assert "['summer','winter']" in text
-    assert "window == 'summer'" in text
-    assert "window == 'winter'" in text
-    assert "published_date[:4]" in text
+    assert "seasons.items" in text
+    assert "['2026-2027','2027','2026']" in text
+    assert "for gender in ['Women','Men']" in text
+    assert "for status in ['confirmed','reported','rumour']" in text
+    assert "x.season == season" in text
     assert "/profiles/players/" in text
     assert "transfer-kind" in text
 
