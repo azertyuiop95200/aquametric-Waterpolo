@@ -10,29 +10,44 @@ on:
       - '.github/workflows/live-render.yml'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   verify-live:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Wait for Render and verify current release marker
+      - name: Wait for Render and verify deployed commit
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -u
           base='https://aquametric-web-demo.onrender.com'
           marker='AQUAMETRIC_V12_1_FINAL_2026_08_28'
+          api="https://api.github.com/repos/${GITHUB_REPOSITORY}/commits/main"
           for i in $(seq 1 45); do
             echo "Live check $i/45"
+            latest=$(curl -L --max-time 20 -fsS \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H 'Accept: application/vnd.github+json' \
+              "$api" 2>/dev/null | python -c 'import json,sys; print(json.load(sys.stdin).get("sha", ""))' 2>/dev/null || true)
             health=$(curl -L --max-time 30 -fsS "$base/health" 2>/dev/null || true)
             release=$(curl -L --max-time 30 -fsS "$base/static/release.json" 2>/dev/null || true)
-            if echo "$health" | grep -q '"ok":true' && echo "$release" | grep -q "$marker"; then
-              echo "Latest AquaMetric release is live on Render."
+            if [ -n "$latest" ] \
+              && echo "$health" | grep -q '"ok":true' \
+              && echo "$health" | grep -q "\"git_commit\":\"$latest\"" \
+              && echo "$release" | grep -q "$marker"; then
+              echo "Current main commit is live on Render: $latest"
               echo "$health"
-              echo "$release"
               exit 0
+            fi
+            if [ -n "$latest" ]; then
+              echo "Waiting for Render to serve main commit: $latest"
             fi
             sleep 15
           done
-          echo 'Render did not expose the latest release marker within the verification window.'
+          echo 'Render did not expose the current main commit within the verification window.'
           exit 1
 
       - name: Verify public security and V12.1 assets

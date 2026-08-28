@@ -69,6 +69,15 @@ if report_anchor in text:
 elif "AutonomousEventCandidate.analysis_id == auto.id" not in text:
     raise SystemExit("report candidate-scope anchor not found")
 
+# Publish a non-secret deploy identity so the live verifier can prove that
+# Render is serving the actual current commit, not merely an older V12.1 build.
+health_anchor = '''@app.get("/health")\ndef health():\n    return {"ok": True, "app": APP_NAME}\n'''
+health_repl = '''@app.get("/health")\ndef health():\n    payload = {"ok": True, "app": APP_NAME}\n    render_commit = os.getenv("RENDER_GIT_COMMIT", "").strip()\n    if render_commit:\n        payload["git_commit"] = render_commit\n    return payload\n'''
+if health_anchor in text:
+    text = text.replace(health_anchor, health_repl, 1)
+elif 'payload["git_commit"] = render_commit' not in text:
+    raise SystemExit("health deploy-identity anchor not found")
+
 text = text.replace("calculate_player_rating(events)\n    return render(request, \"player_detail.html\"", "calculate_player_rating(events, role=player.primary_role)\n    return render(request, \"player_detail.html\"", 1)
 text = text.replace("calculate_player_rating(pevents)\n        ratings.append", "calculate_player_rating(pevents, role=p.primary_role)\n        ratings.append", 1)
 p.write_text(text, encoding="utf-8")

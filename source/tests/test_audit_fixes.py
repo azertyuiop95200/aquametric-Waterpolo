@@ -276,3 +276,13 @@ def test_shot_preference_profile_renders_nested_summary_contract():
     assert "100% of located attempts" in response.text
     assert "100% of observations with a known side label" in response.text
     assert "None%" not in response.text
+
+
+def test_health_exposes_render_commit_when_runtime_provides_it(monkeypatch):
+    commit = "abcdef0123456789abcdef0123456789abcdef01"
+    monkeypatch.setenv("RENDER_GIT_COMMIT", commit)
+    response = TestClient(app).get("/health")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["ok"] is True
+    assert payload["git_commit"] == commit
