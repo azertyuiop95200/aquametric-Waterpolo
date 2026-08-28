@@ -107,6 +107,8 @@ jobs:
           if git diff --cached --quiet; then
             echo 'V12 integration already present.'
           else
-            git commit -m 'Integrate AquaMetric V12 source after validation [skip ci]'
+            # Do not use [skip ci]: Render may be configured to deploy only after
+            # GitHub checks pass, and a skipped commit has zero checks.
+            git commit -m 'Integrate AquaMetric V12 source after validation'
             git push
           fi

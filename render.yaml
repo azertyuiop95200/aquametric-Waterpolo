@@ -4,8 +4,11 @@ services:
     runtime: docker
     plan: free
     region: frankfurt
+    branch: main
     healthCheckPath: /health
-    autoDeployTrigger: commit
+    # Deploy only after the repository's CI checks pass. The live verification
+    # workflow runs after CI, so it cannot deadlock the deploy it is checking.
+    autoDeployTrigger: checksPass
     envVars:
       - key: APP_NAME
         value: AquaMetric

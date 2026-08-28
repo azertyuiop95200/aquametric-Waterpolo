@@ -1,13 +1,11 @@
 name: Verify live AquaMetric Render
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'source/**'
-      - 'Dockerfile'
-      - 'render.yaml'
-      - '.github/workflows/live-render.yml'
+  workflow_run:
+    workflows: ["AquaMetric V12 CI"]
+    types: [completed]
+  schedule:
+    - cron: '17 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -15,6 +13,7 @@ permissions:
 
 jobs:
   verify-live:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -34,12 +33,12 @@ jobs:
               "$api" 2>/dev/null | python -c 'import json,sys; print(json.load(sys.stdin).get("sha", ""))' 2>/dev/null || true)
             health=$(curl -L --max-time 30 -fsS "$base/health" 2>/dev/null || true)
             release=$(curl -L --max-time 30 -fsS "$base/static/release.json" 2>/dev/null || true)
+            echo "Live health: ${health:-unavailable}"
             if [ -n "$latest" ] \
               && echo "$health" | grep -q '"ok":true' \
               && echo "$health" | grep -q "\"git_commit\":\"$latest\"" \
               && echo "$release" | grep -q "$marker"; then
               echo "Current main commit is live on Render: $latest"
-              echo "$health"
               exit 0
             fi
             if [ -n "$latest" ]; then
