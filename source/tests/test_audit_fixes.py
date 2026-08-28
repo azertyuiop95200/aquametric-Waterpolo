@@ -16,6 +16,7 @@ from models import (
     Match,
     Player,
     PlayerIntelligenceProfile,
+    PlayerShotObservation,
     Team,
     User,
 )
@@ -230,3 +231,48 @@ def test_unified_player_profile_keeps_private_match_evaluations_tenant_scoped():
     assert f"PRIVATE-A-{token}" not in response.text
     assert "73.0" in response.text
     assert "91.0" not in response.text
+
+
+def test_shot_preference_profile_renders_nested_summary_contract():
+    token = uuid.uuid4().hex[:10]
+    client = TestClient(app)
+    _register(client, f"audit-shots-{token}@example.com")
+
+    db = SessionLocal()
+    try:
+        profile = PlayerIntelligenceProfile(
+            canonical_name=f"Shot Audit {token}",
+            role="Driver",
+            roster_status="audit_fixture",
+            confidence_score=0.9,
+        )
+        db.add(profile)
+        db.flush()
+        for second in (10.0, 20.0, 30.0):
+            db.add(
+                PlayerShotObservation(
+                    profile_id=profile.id,
+                    second=second,
+                    pool_x=0.2,
+                    pool_y=0.2,
+                    goal_x=0.1,
+                    goal_y=0.1,
+                    outcome="goal",
+                    shot_context="front_court",
+                    shooter_side="right",
+                    provenance="audit_fixture",
+                    confidence_score=0.9,
+                )
+            )
+        db.commit()
+        profile_id = profile.id
+    finally:
+        db.close()
+
+    response = client.get(f"/profiles/players/{profile_id}")
+    assert response.status_code == 200
+    assert "upper left" in response.text
+    assert "right" in response.text
+    assert "100% of located attempts" in response.text
+    assert "100% of observations with a known side label" in response.text
+    assert "None%" not in response.text
