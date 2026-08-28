@@ -3,134 +3,170 @@ from models import SourceWatch, TransferSignal, MatchResearchTarget
 
 TRANSFER_SEASON = "2026-2027"
 
-# Trust policy:
-# primary / federation_confirmed = federation, league or official club evidence
-# club_public = official public club social account
-# media_confirmed = specialised media explicitly labels the move confirmed
-# media / media_rumour = reporting or rumour only; never upgrades a roster by itself
-# discovery_only = forum/community signal; research lead only
+KNZB_URL = "https://www.waterpolo.nl/nieuws/transferoverzicht-wie-speelt-waar-komend-seizoen/?type=Eredivisie"
+WP360_CONFIRMED = "https://waterpolo360news.com/confirmed-transfers/"
+WP360_HUB = "https://waterpolo360news.com/water-polo-confirmed-transfers-and-gossip/"
+TOTAL_WP = "https://total-waterpolo.com/water-polo-transfers/"
+TRIESTE_2026 = "https://www.pallanuototrieste.com/it/news/articolo/si-riparte-dall-ausonia-la-pallanuoto-trieste-femminile-e-pronta-a-scendere-in-campo-per-la-stagione-2026-27"
+MATARO_FARAGO = "https://waterpolo360news.com/mataro-strengthens-its-project-with-the-signings-of-queralt-anton-and-kamilla-farago/"
+MATARO_CARLA = "https://www.mundodeportivo.com/waterpolo/20260715/1004206746/carla-martin-nueva-jugadora-assolim-mataro.html"
+VLV_NEMET = "https://vlv.hu/nemet-toni-torokorszagba-szerzodott/"
+
+# Evidence hierarchy: official federation/league/club > official club social >
+# specialist media confirmed > media report/rumour > community discovery only.
 SOURCE_WATCHES = [
     ("FFN extraNat — Elite water polo", "federation", "web", "France — Elite clubs", "https://www.extranat.fr/waterpolo/", "primary", 6, "Official fixtures, match sheets, live scoring/statistics when published."),
-    ("FFN — water-polo transfer rules", "federation", "web", "France — transfers and licences", "https://www.ffnatation.fr/reglements-du-water-polo", "primary", 12, "Official French regulations, including the transfer-right annex and 2026-27 competition rules."),
+    ("FFN — water-polo transfer rules", "federation", "web", "France — transfers and licences", "https://www.ffnatation.fr/reglements-du-water-polo", "primary", 12, "Official French regulations, including transfer rules and the 2026-27 competition framework."),
     ("RFEN — water polo", "federation", "web", "Spain", "https://rfen.es/especialidades/waterpolo/", "primary", 12, "Official Spanish federation competition and roster context."),
-    ("LEWaterpolo — Spanish leagues", "league", "web", "Spain — División de Honor", "https://lewaterpolo.com/", "primary", 12, "League match, roster and club context for Spain; cross-check transfer claims with club/RFEN evidence."),
-    ("Waterpolo.nl — confirmed transfer overview", "federation_media", "web", "Netherlands and Dutch players abroad", "https://www.waterpolo.nl/nieuws/transferoverzicht-wie-speelt-waar-komend-seizoen/?type=Eredivisie", "primary", 12, "KNZB editorial overview explicitly listing confirmed 2026-27 transfers for women and men."),
-    ("European Aquatics — transfer regulations", "federation", "web", "Europe — ITC rules", "https://europeanaquatics.org/wp-content/uploads/2024/10/WATER-POLO-TRANSFER-REGULATIONS.pdf", "primary", 24, "Official ITC rules. Useful to distinguish a media announcement from formal international eligibility."),
+    ("LEWaterpolo — Spanish leagues", "league", "web", "Spain — División de Honor", "https://lewaterpolo.com/", "primary", 12, "League match, roster and club context; cross-check transfer claims with club/RFEN evidence."),
+    ("Waterpolo.nl — confirmed transfer overview", "federation_media", "web", "Netherlands and Dutch players abroad", KNZB_URL, "primary", 12, "KNZB editorial overview explicitly listing confirmed 2026-27 transfers for women and men."),
+    ("European Aquatics — transfer regulations", "federation", "web", "Europe — ITC rules", "https://europeanaquatics.org/wp-content/uploads/2024/10/WATER-POLO-TRANSFER-REGULATIONS.pdf", "primary", 24, "Official ITC rules; distinguishes transfer reporting from formal international eligibility."),
     ("European Aquatics — schedule/results", "federation", "web", "Europe", "https://europeanaquatics.org/events/schedule-and-results/", "primary", 6, "Official European calendar/results and competition rosters when published."),
     ("World Aquatics — competitions", "federation", "web", "International", "https://www.worldaquatics.com/competitions", "primary", 6, "Official competition pages, reports, videos and event rosters."),
     ("USA Water Polo — news", "federation", "web", "United States", "https://usawaterpolo.org/", "primary", 12, "Official USA Water Polo news and national-team/college context."),
-    ("Waterpolo 360 — confirmed transfers", "media", "web", "International transfers", "https://waterpolo360news.com/confirmed-transfers/", "media_confirmed", 6, "High-value transfer discovery source; upgrade with club/federation corroboration when available."),
-    ("Waterpolo 360 — transfer hub", "media", "web", "International transfers and rumours", "https://waterpolo360news.com/water-polo-confirmed-transfers-and-gossip/", "media", 6, "Confirmed deals and rumours remain separate evidence states."),
-    ("Waterpolo 360 — Instagram", "media_social", "instagram", "International water polo", "https://www.instagram.com/waterpolo360news/", "media", 6, "Fast public social signal from the specialist outlet; article/club evidence remains preferred."),
-    ("Total Waterpolo — transfers", "media", "web", "International transfers", "https://total-waterpolo.com/water-polo-transfers/", "media_confirmed", 6, "Transfer timeline with explicit confirmed/rumour labels."),
+    ("Waterpolo 360 — confirmed transfers", "media", "web", "International transfers", WP360_CONFIRMED, "media_confirmed", 6, "High-value specialist transfer source; upgrade with club/federation corroboration when available."),
+    ("Waterpolo 360 — transfer hub", "media", "web", "International transfers and rumours", WP360_HUB, "media", 6, "Confirmed deals and rumours remain separate evidence states."),
+    ("Waterpolo 360 — Instagram", "media_social", "instagram", "International water polo", "https://www.instagram.com/waterpolo360news/", "media", 6, "Fast public social signal; article/club evidence remains preferred."),
+    ("Total Waterpolo — transfers", "media", "web", "International transfers", TOTAL_WP, "media_confirmed", 6, "Transfer timeline with explicit confirmed/rumour labels."),
     ("Total Waterpolo — Instagram", "media_social", "instagram", "International water polo", "https://www.instagram.com/total_waterpolo/", "media", 6, "Public specialist-media social feed for rapid discovery; confirm before roster updates."),
     ("Total Waterpolo — Facebook", "media_social", "facebook", "International water polo", "https://www.facebook.com/totalwaterpolonews", "media", 12, "Public specialist-media social feed; discovery/corroboration rather than registration evidence."),
     ("SO POLO — public social", "media_social", "instagram", "France water polo", "https://www.instagram.com/sopolo.news/", "media", 6, "French water-polo news signal; media reporting, not an official registration source."),
+    ("Mundo Deportivo — water polo", "media", "web", "Spain", "https://www.mundodeportivo.com/waterpolo", "media_confirmed", 12, "Spanish water-polo reporting that frequently relays official club announcements."),
+    ("VLV.hu — Hungarian water polo", "media", "web", "Hungary and Hungarian players abroad", "https://vlv.hu/", "media_confirmed", 12, "Specialist Hungarian source; direct player interviews can provide strong first-person transfer confirmation."),
     ("Water Polo Exchange — transfer portal discussions", "community", "web", "USA college water polo", "https://waterpoloexchange.com/latest", "discovery_only", 12, "Community/forum signal only. Never marks a transfer confirmed without official school/team evidence."),
     ("Granville Water Polo — official site", "club_official", "web", "Granville Water Polo", "https://www.granvillewaterpolo.com/", "primary", 12, "Club roster, schedules, announcements and links to public social pages."),
     ("Granville Water Polo — Facebook", "club_social", "facebook", "Granville Water Polo", "https://www.facebook.com/GRANVILLEWATERPOLO/", "club_public", 6, "Public official club posts; confirm roster changes with official club/FFN evidence when possible."),
     ("Granville Water Polo — Instagram", "club_social", "instagram", "Granville Water Polo", "https://www.instagram.com/granvillewaterpolo/", "club_public", 6, "Public official club account; useful for fast signing/departure announcements."),
     ("PAOK — women official news", "club_official", "web", "PAOK women", "https://acpaok.gr/news/womens-polo/", "primary", 12, "Official club announcements for the women's roster."),
     ("PAOK — men official news", "club_official", "web", "PAOK men", "https://acpaok.gr/news/mens-polo/", "primary", 12, "Official club announcements for the men's roster."),
-    ("PAOK — Instagram", "club_social", "instagram", "PAOK water polo", "https://www.instagram.com/acpaok/", "club_public", 6, "Official multisport club social account; use as club-public evidence and cross-check the website when available."),
+    ("PAOK — Instagram", "club_social", "instagram", "PAOK water polo", "https://www.instagram.com/acpaok/", "club_public", 6, "Official multisport club social account; cross-check the website when available."),
     ("Pallanuoto Trieste — official news", "club_official", "web", "Pallanuoto Trieste", "https://www.pallanuototrieste.com/it/news/", "primary", 12, "Official club roster and signing announcements for women and men."),
     ("Pallanuoto Trieste — Instagram", "club_social", "instagram", "Pallanuoto Trieste", "https://www.instagram.com/pallanuoto_trieste/", "club_public", 6, "Official club social feed for fast roster signals."),
     ("Grand Nancy — official site/social hub", "club_official", "web", "Grand Nancy Aquatique Club", "https://www.grandnancyaquatiqueclub.com/contact/", "primary", 12, "Official site exposes public social links."),
     ("Taverny SN95 — official site", "club_official", "web", "Taverny Sports Nautiques 95", "https://tsn95.fr/", "primary", 12, "Official club information and public match posts."),
 ]
 
-# gender, player, from, to, signal type, published date, source, url, tier, confidence, note
+
+def _signal(gender, player, fr, to, date, source, url, tier, confidence, note="", kind="confirmed"):
+    return {
+        "gender": gender,
+        "player": player,
+        "from": fr,
+        "to": to,
+        "kind": kind,
+        "date": date,
+        "source": source,
+        "url": url,
+        "tier": tier,
+        "confidence": confidence,
+        "note": note,
+    }
+
+
+KNZB_WOMEN = [
+    ("Indy Waltman", "ZPB H&L Productions", "GZC Donk"),
+    ("Jolijn Joor", "ZVL-1886", "GZC Donk"),
+    ("Linde Haksteen", "Polar Bears", "GZC Donk"),
+    ("Anne Heidenrijk", "ZPC Amersfoort", "Het Ravijn"),
+    ("Silvanne Slot", "ZV De Zaan", "ZPB H&L Productions"),
+    ("Sam Jutte", "UZSC", "ZV De Zaan"),
+    ("Melissa Schipper", "ZV De Ham ZC", "ZV De Zaan"),
+    ("Anne Klein Langenhorst", "UZSC", "ZV De Zaan"),
+    ("Nina van der Vorst", "PSV", "Het Ravijn"),
+    ("Cynthia Mulder", "UZSC", "ZVL-1886"),
+    ("Saloua Maafi", "UZSC", "ZVL-1886"),
+    ("Lotte van Wingerden", "UZSC", "ZVL-1886"),
+    ("Lisa Schep", "PSV", "ZVL-1886"),
+    ("Maxine Schaap", "SIS Roma", "ZV De Zaan"),
+    ("Britt van den Dobbelsteen", "Olympiakos", "ZV De Zaan"),
+    ("Sanne Keijzer", "Arizona State University", "ZPB H&L Productions"),
+    ("Vivian Sevenich", "L'Ekipe Orizzonte", "ZV De Zaan"),
+    ("Tatum van der Elst", "Polar Bears", "Arizona State University"),
+    ("Kiara Heerink", "Polar Bears", "Arizona State University"),
+    ("Jill Oort", "Polar Bears", "Club Natació Rubí"),
+    ("Maartje Keuning", "GZC Donk", "CN Sabadell"),
+    ("Sarah Buis", "GZC Donk", "CN Sant Andreu"),
+    ("Bente Rogge", "ZV De Zaan", "Vouliagmeni"),
+    ("Esmee Ouwens", "GZC Donk", "California State University Long Beach"),
+    ("Noa de Vries", "FTC Telekom", "Pallanuoto Trieste"),
+    ("Fleurien Bosveld", "Alimos NAC", "SIS Roma"),
+    ("Nikki Meijer", "Smile Cosenza Pallanuoto", "Rapallo Pallanuoto"),
+]
+
+KNZB_MEN = [
+    ("Roko Mujan", "ZPC Amersfoort", "ZPB H&L Productions"),
+    ("George Athymaritis", "UZSC", "SWOL 1894"),
+    ("Dynand Muller", "ZPC Amersfoort", "OZ&PC"),
+    ("Alex Horvath", "EZC", "OZ&PC"),
+    ("Ruben van Vierzen", "ZV De Ham ZC", "ZV De Zaan"),
+    ("Paul Kerstens", "ESTA", "SWOL 1894"),
+    ("Pim Hageman", "Het Ravijn", "OZ&PC"),
+    ("Mitchell Budding", "HZC De Robben", "ZPC Amersfoort"),
+    ("Jorrit van der Weijden", "GZC Donk", "PAOK"),
+    ("Daan Bakker", "ZV De Zaan", "Montpellier Water-Polo"),
+    ("Bas Grummer", "ZVL-1886", "ASC Duisburg"),
+    ("Fabio Jukic", "PSV", "IREN Genova Quinto 1921"),
+    ("Stan Schuring", "Orange Coast College", "SWOL 1894"),
+    ("Jeroen Rouwenhorst", "Rari Nantes Florentia", "AN Brescia"),
+    ("Marnick Snel", "VK Primorje", "CC Ortigia"),
+    ("Tim de Mey", "Rari Nantes Florentia", "Douaisis Agglo Water-Polo"),
+]
+
+TOTAL_WP_MEN = [
+    ("Francesco Di Fulvio", "", "CN Atlètic-Barceloneta", "2026-07-16"),
+    ("Vincenzo Dolce", "", "Panathinaikos", "2026-07-13"),
+    ("Tommaso Gianazza", "", "Pro Recco", "2026-07-13"),
+    ("Marko Bijac", "", "Pro Recco", "2026-07-11"),
+    ("Toni Popadic", "", "Jadran Split", "2026-07-07"),
+    ("Gergo Zalanki", "", "Pro Recco", "2026-07-03"),
+    ("Loren Fatovic", "", "Olympiacos", "2026-07-01"),
+    ("Konstantin Kharkov", "", "Olympiacos", "2026-06-29"),
+    ("Gergely Burian", "", "VK Jug", "2026-06-23"),
+    ("Vladan Spaic", "", "Vouliagmeni", "2026-06-20"),
+    ("Dmitri Kholod", "", "Oradea", "2026-06-18"),
+    ("Konstantinos Kakaris", "", "Ferencvaros", "2026-06-17"),
+    ("Marko Vavic", "", "Apollon Smyrnis", "2026-06-11"),
+    ("Djordje Lazic", "", "Panionios", "2026-06-08"),
+    ("Nikola Kojic", "", "Novi Beograd", "2026-06-06"),
+    ("Dimitrije Risticevic", "", "Panionios", "2026-06-06"),
+]
+
 TRANSFER_SIGNALS = [
-    # Women — specialist media / official club evidence
-    ("Women", "Izabella Chiappini", "", "Sori Pool Beach", "confirmed", "2026-08-05", "Waterpolo 360", "https://waterpolo360news.com/water-polo-confirmed-transfers-and-gossip/", "media_confirmed", .92, "Major signing for newly promoted Italian side."),
-    ("Women", "Elena Ruiz", "", "CN Atlètic-Barceloneta", "confirmed", "2026-08-04", "Waterpolo 360", "https://waterpolo360news.com/water-polo-confirmed-transfers-and-gossip/", "media_confirmed", .92, "Spain international move signal."),
-    ("Women", "Maryn Dempsey", "", "CN Atlètic-Barceloneta", "confirmed", "2026-07-22", "Waterpolo 360", "https://waterpolo360news.com/confirmed-transfers/", "media_confirmed", .92, "USA attacker signed by CNAB."),
-    ("Women", "Anna Pearson", "", "CE Mediterrani", "confirmed", "2026-07-21", "Waterpolo 360", "https://waterpolo360news.com/confirmed-transfers/", "media_confirmed", .92, "Women's first-team signing."),
-    ("Women", "Emma Lineback", "", "CE Mediterrani", "confirmed", "2026-07-21", "Waterpolo 360", "https://waterpolo360news.com/confirmed-transfers/", "media_confirmed", .92, "Women's first-team signing."),
-    ("Women", "Isabel Williams", "CN Sabadell", "Rapallo", "confirmed", "2026-07-17", "Waterpolo 360", "https://waterpolo360news.com/confirmed-transfers/", "media_confirmed", .92, "USA goalkeeper move."),
-    ("Women", "Kata Hajdu", "UVSE", "Olympiacos", "confirmed", "2026-07-13", "Waterpolo 360", "https://waterpolo360news.com/confirmed-transfers/", "media_confirmed", .92, "Hungary international move."),
-    ("Women", "Nikoleta Eleftheriadou", "", "Vouliagmeni", "confirmed", "2026-07-11", "Waterpolo 360", "https://waterpolo360news.com/confirmed-transfers/", "media_confirmed", .92, "High-profile Greek signing."),
-    ("Women", "Sinia Plotz", "", "SIS Roma", "confirmed", "2026-07-08", "Waterpolo 360", "https://waterpolo360news.com/confirmed-transfers/", "media_confirmed", .92, "Women's roster reinforcement."),
-    ("Women", "Iva Rozic", "", "SIS Roma", "confirmed", "2026-07-08", "Waterpolo 360", "https://waterpolo360news.com/confirmed-transfers/", "media_confirmed", .92, "Croatian U20 standout joins SIS Roma."),
-    ("Women", "Sofia Giustini", "", "Pallanuoto Trieste", "confirmed", "2026-07-01", "Waterpolo 360", "https://waterpolo360news.com/confirmed-transfers/", "media_confirmed", .92, "Italy international signing."),
-    ("Women", "Paola Di Maria", "", "Pallanuoto Trieste", "confirmed", "2026-08-25", "Pallanuoto Trieste", "https://www.pallanuototrieste.com/it/news/articolo/si-riparte-dall-ausonia-la-pallanuoto-trieste-femminile-e-pronta-a-scendere-in-campo-per-la-stagione-2026-27", "club_official", .99, "Official 2026-27 squad presentation lists Di Maria among five summer additions."),
-    ("Women", "Malika Gaia Bovo", "", "Pallanuoto Trieste", "confirmed", "2026-08-25", "Pallanuoto Trieste", "https://www.pallanuototrieste.com/it/news/articolo/si-riparte-dall-ausonia-la-pallanuoto-trieste-femminile-e-pronta-a-scendere-in-campo-per-la-stagione-2026-27", "club_official", .99, "Official 2026-27 squad presentation lists Bovo among five summer additions."),
-    ("Women", "Anna Mamoglou", "", "PAOK", "confirmed", "2026-08-07", "AC PAOK", "https://acpaok.gr/%CE%AC%CE%BD%CE%BD%CE%B1-%CE%BC%CE%B1%CE%BC%CF%8C%CE%B3%CE%BB%CE%BF%CF%85-%CE%BC%CE%AF%CE%B1-%CE%BC%CE%B5%CF%84%CE%B1%CE%B3%CF%81%CE%B1%CF%86%CE%AE-%CE%B5%CE%BC%CF%80%CE%B5%CE%B9%CF%81%CE%AF%CE%B1/", "club_official", .99, "Official PAOK announcement for the 2026-27 season."),
-    ("Women", "Margarita Bitsakou", "", "PAOK", "confirmed", "2026-07-29", "AC PAOK", "https://acpaok.gr/%CF%83%CF%80%CE%BF%CF%85%CE%B4%CE%B1%CE%AF%CE%B1-%CE%B5%CE%BD%CE%AF%CF%83%CF%87%CF%85%CF%83%CE%B7-%CF%83%CF%84%CE%BF%CE%BD-%CF%86%CE%BF%CF%85%CE%BD%CF%84%CE%B1%CF%81%CE%B9%CF%83%CF%84%CF%8C-%CE%BC/", "club_official", .99, "Official PAOK announcement for the 2026-27 season."),
-    ("Women", "Kamilla Farago", "UVSE", "CN Mataró", "rumour", "2026-07-08", "Waterpolo 360", "https://waterpolo360news.com/", "media_rumour", .72, "Newer media report points to Mataró. Kept as a rumour until club/federation evidence is captured."),
+    # Current women — official/strong confirmations.
+    _signal("Women", "Paola Di Maria", "", "Pallanuoto Trieste", "2026-08-25", "Pallanuoto Trieste", TRIESTE_2026, "club_official", .99, "Official 2026-27 squad presentation lists Di Maria among five summer additions."),
+    _signal("Women", "Malika Gaia Bovo", "", "Pallanuoto Trieste", "2026-08-25", "Pallanuoto Trieste", TRIESTE_2026, "club_official", .99, "Official 2026-27 squad presentation lists Bovo among five summer additions."),
+    _signal("Women", "Anna Mamoglou", "", "PAOK", "2026-08-07", "AC PAOK", "https://acpaok.gr/%CE%AC%CE%BD%CE%BD%CE%B1-%CE%BC%CE%B1%CE%BC%CF%8C%CE%B3%CE%BB%CE%BF%CF%85-%CE%BC%CE%AF%CE%B1-%CE%BC%CE%B5%CF%84%CE%B1%CE%B3%CF%81%CE%B1%CF%86%CE%AE-%CE%B5%CE%BC%CF%80%CE%B5%CE%B9%CF%81%CE%AF%CE%B1/", "club_official", .99, "Official PAOK announcement for 2026-27."),
+    _signal("Women", "Izabella Chiappini", "", "Sori Pool Beach", "2026-08-05", "Waterpolo 360", WP360_HUB, "media_confirmed", .92),
+    _signal("Women", "Elena Ruiz", "", "CN Atlètic-Barceloneta", "2026-08-04", "Waterpolo 360", WP360_HUB, "media_confirmed", .92),
+    _signal("Women", "Margarita Bitsakou", "", "PAOK", "2026-07-29", "AC PAOK", "https://acpaok.gr/%CF%83%CF%80%CE%BF%CF%85%CE%B4%CE%B1%CE%AF%CE%B1-%CE%B5%CE%BD%CE%AF%CF%83%CF%87%CF%85%CF%83%CE%B7-%CF%83%CF%84%CE%BF%CE%BD-%CF%86%CE%BF%CF%85%CE%BD%CF%84%CE%B1%CF%81%CE%B9%CF%83%CF%84%CF%8C-%CE%BC/", "club_official", .99, "Official PAOK announcement for 2026-27."),
+    _signal("Women", "Maryn Dempsey", "", "CN Atlètic-Barceloneta", "2026-07-22", "Waterpolo 360", WP360_CONFIRMED, "media_confirmed", .92),
+    _signal("Women", "Anna Pearson", "", "CE Mediterrani", "2026-07-21", "Waterpolo 360", WP360_CONFIRMED, "media_confirmed", .92),
+    _signal("Women", "Emma Lineback", "", "CE Mediterrani", "2026-07-21", "Waterpolo 360", WP360_CONFIRMED, "media_confirmed", .92),
+    _signal("Women", "Isabel Williams", "CN Sabadell", "Rapallo", "2026-07-17", "Waterpolo 360", WP360_CONFIRMED, "media_confirmed", .92),
+    _signal("Women", "Kamilla Farago", "UVSE", "CN Mataró", "2026-07-16", "Waterpolo 360 / CN Mataró announcement", MATARO_FARAGO, "media_confirmed", .97, "CN Mataró officially announced the signing; later Spanish reporting also confirmed it."),
+    _signal("Women", "Carla Martín", "Tenerife Echeyde", "CN Mataró", "2026-07-15", "Mundo Deportivo / CN Mataró announcement", MATARO_CARLA, "media_confirmed", .97, "Mataró-announced return after three seasons at Tenerife Echeyde."),
+    _signal("Women", "Kata Hajdu", "UVSE", "Olympiacos", "2026-07-13", "Waterpolo 360", WP360_CONFIRMED, "media_confirmed", .92),
+    _signal("Women", "Nikoleta Eleftheriadou", "", "Vouliagmeni", "2026-07-11", "Waterpolo 360", WP360_CONFIRMED, "media_confirmed", .92),
+    _signal("Women", "Queralt Anton", "CN Sant Andreu", "CN Mataró", "2026-07-08", "Waterpolo 360 / CN Mataró announcement", MATARO_FARAGO, "media_confirmed", .97, "Article states CN Mataró officially announced Anton for 2026-27."),
+    _signal("Women", "Sinia Plotz", "", "SIS Roma", "2026-07-08", "Waterpolo 360", WP360_CONFIRMED, "media_confirmed", .92),
+    _signal("Women", "Iva Rozic", "", "SIS Roma", "2026-07-08", "Waterpolo 360", WP360_CONFIRMED, "media_confirmed", .92),
+    _signal("Women", "Sofia Giustini", "", "Pallanuoto Trieste", "2026-07-01", "Waterpolo 360", WP360_CONFIRMED, "media_confirmed", .92),
+    _signal("Women", "Nic Porter", "", "CN Marseille", "2026-06-04", "Waterpolo 360", WP360_HUB, "media_rumour", .52, "Rumour only; never use as confirmed roster evidence.", "rumour"),
+    _signal("Women", "Athina Giannopoulou", "CN Sabadell", "Vouliagmeni", "2026-06-02", "Waterpolo 360", WP360_HUB, "media_rumour", .55, "Rumour only; requires official corroboration.", "rumour"),
 
-    # Women — KNZB/Waterpolo.nl confirmed 2026-27 overview
-    ("Women", "Indy Waltman", "ZPB H&L Productions", "GZC Donk", "confirmed", "2026-07-20", "Waterpolo.nl / KNZB", "https://www.waterpolo.nl/nieuws/transferoverzicht-wie-speelt-waar-komend-seizoen/?type=Eredivisie", "federation_confirmed", .97, "Listed in the KNZB transfer overview for 2026-27."),
-    ("Women", "Jolijn Joor", "ZVL-1886", "GZC Donk", "confirmed", "2026-07-20", "Waterpolo.nl / KNZB", "https://www.waterpolo.nl/nieuws/transferoverzicht-wie-speelt-waar-komend-seizoen/?type=Eredivisie", "federation_confirmed", .97, "Listed in the KNZB transfer overview for 2026-27."),
-    ("Women", "Linde Haksteen", "Polar Bears", "GZC Donk", "confirmed", "2026-07-20", "Waterpolo.nl / KNZB", "https://www.waterpolo.nl/nieuws/transferoverzicht-wie-speelt-waar-komend-seizoen/?type=Eredivisie", "federation_confirmed", .97, "Listed in the KNZB transfer overview for 2026-27."),
-    ("Women", "Anne Heidenrijk", "ZPC Amersfoort", "Het Ravijn", "confirmed", "2026-07-20", "Waterpolo.nl / KNZB", "https://www.waterpolo.nl/nieuws/transferoverzicht-wie-speelt-waar-komend-seizoen/?type=Eredivisie", "federation_confirmed", .97, "Listed in the KNZB transfer overview for 2026-27."),
-    ("Women", "Silvanne Slot", "ZV De Zaan", "ZPB H&L Productions", "confirmed", "2026-07-20", "Waterpolo.nl / KNZB", "https://www.waterpolo.nl/nieuws/transferoverzicht-wie-speelt-waar-komend-seizoen/?type=Eredivisie", "federation_confirmed", .97, "Listed in the KNZB transfer overview for 2026-27."),
-    ("Women", "Sam Jutte", "UZSC", "ZV De Zaan", "confirmed", "2026-07-20", "Waterpolo.nl / KNZB", "https://www.waterpolo.nl/nieuws/transferoverzicht-wie-speelt-waar-komend-seizoen/?type=Eredivisie", "federation_confirmed", .97, "Listed in the KNZB transfer overview for 2026-27."),
-    ("Women", "Melissa Schipper", "ZV De Ham ZC", "ZV De Zaan", "confirmed", "2026-07-20", "Waterpolo.nl / KNZB", "https://www.waterpolo.nl/nieuws/transferoverzicht-wie-speelt-waar-komend-seizoen/?type=Eredivisie", "federation_confirmed", .97, "Listed in the KNZB transfer overview for 2026-27."),
-    ("Women", "Anne Klein Langenhorst", "UZSC", "ZV De Zaan", "confirmed", "2026-07-20", "Waterpolo.nl / KNZB", "https://www.waterpolo.nl/nieuws/transferoverzicht-wie-speelt-waar-komend-seizoen/?type=Eredivisie", "federation_confirmed", .97, "Listed in the KNZB transfer overview for 2026-27."),
-    ("Women", "Nina van der Vorst", "PSV", "Het Ravijn", "confirmed", "2026-07-20", "Waterpolo.nl / KNZB", "https://www.waterpolo.nl/nieuws/transferoverzicht-wie-speelt-waar-komend-seizoen/?type=Eredivisie", "federation_confirmed", .97, "Listed in the KNZB transfer overview for 2026-27."),
-    ("Women", "Cynthia Mulder", "UZSC", "ZVL-1886", "confirmed", "2026-07-20", "Waterpolo.nl / KNZB", "https://www.waterpolo.nl/nieuws/transferoverzicht-wie-speelt-waar-komend-seizoen/?type=Eredivisie", "federation_confirmed", .97, "Listed in the KNZB transfer overview for 2026-27."),
-    ("Women", "Saloua Maafi", "UZSC", "ZVL-1886", "confirmed", "2026-07-20", "Waterpolo.nl / KNZB", "https://www.waterpolo.nl/nieuws/transferoverzicht-wie-speelt-waar-komend-seizoen/?type=Eredivisie", "federation_confirmed", .97, "Listed in the KNZB transfer overview for 2026-27."),
-    ("Women", "Lotte van Wingerden", "UZSC", "ZVL-1886", "confirmed", "2026-07-20", "Waterpolo.nl / KNZB", "https://www.waterpolo.nl/nieuws/transferoverzicht-wie-speelt-waar-komend-seizoen/?type=Eredivisie", "federation_confirmed", .97, "Listed in the KNZB transfer overview for 2026-27."),
-    ("Women", "Lisa Schep", "PSV", "ZVL-1886", "confirmed", "2026-07-20", "Waterpolo.nl / KNZB", "https://www.waterpolo.nl/nieuws/transferoverzicht-wie-speelt-waar-komend-seizoen/?type=Eredivisie", "federation_confirmed", .97, "Listed in the KNZB transfer overview for 2026-27."),
-    ("Women", "Maxine Schaap", "SIS Roma", "ZV De Zaan", "confirmed", "2026-07-20", "Waterpolo.nl / KNZB", "https://www.waterpolo.nl/nieuws/transferoverzicht-wie-speelt-waar-komend-seizoen/?type=Eredivisie", "federation_confirmed", .97, "Return to the Netherlands, confirmed by the KNZB overview."),
-    ("Women", "Britt van den Dobbelsteen", "Olympiakos", "ZV De Zaan", "confirmed", "2026-07-20", "Waterpolo.nl / KNZB", "https://www.waterpolo.nl/nieuws/transferoverzicht-wie-speelt-waar-komend-seizoen/?type=Eredivisie", "federation_confirmed", .97, "Return to the Netherlands, confirmed by the KNZB overview."),
-    ("Women", "Sanne Keijzer", "Arizona State University", "ZPB H&L Productions", "confirmed", "2026-07-20", "Waterpolo.nl / KNZB", "https://www.waterpolo.nl/nieuws/transferoverzicht-wie-speelt-waar-komend-seizoen/?type=Eredivisie", "federation_confirmed", .97, "Return to the Netherlands, confirmed by the KNZB overview."),
-    ("Women", "Vivian Sevenich", "L'Ekipe Orizzonte", "ZV De Zaan", "confirmed", "2026-07-20", "Waterpolo.nl / KNZB", "https://www.waterpolo.nl/nieuws/transferoverzicht-wie-speelt-waar-komend-seizoen/?type=Eredivisie", "federation_confirmed", .97, "Return to the Netherlands, confirmed by the KNZB overview."),
-    ("Women", "Tatum van der Elst", "Polar Bears", "Arizona State University", "confirmed", "2026-07-20", "Waterpolo.nl / KNZB", "https://www.waterpolo.nl/nieuws/transferoverzicht-wie-speelt-waar-komend-seizoen/?type=Eredivisie", "federation_confirmed", .97, "Move abroad listed in the KNZB transfer overview."),
-    ("Women", "Kiara Heerink", "Polar Bears", "Arizona State University", "confirmed", "2026-07-20", "Waterpolo.nl / KNZB", "https://www.waterpolo.nl/nieuws/transferoverzicht-wie-speelt-waar-komend-seizoen/?type=Eredivisie", "federation_confirmed", .97, "Move abroad listed in the KNZB transfer overview."),
-    ("Women", "Jill Oort", "Polar Bears", "Club Natació Rubí", "confirmed", "2026-07-20", "Waterpolo.nl / KNZB", "https://www.waterpolo.nl/nieuws/transferoverzicht-wie-speelt-waar-komend-seizoen/?type=Eredivisie", "federation_confirmed", .97, "Move abroad listed in the KNZB transfer overview."),
-    ("Women", "Maartje Keuning", "GZC Donk", "CN Sabadell", "confirmed", "2026-07-20", "Waterpolo.nl / KNZB", "https://www.waterpolo.nl/nieuws/transferoverzicht-wie-speelt-waar-komend-seizoen/?type=Eredivisie", "federation_confirmed", .97, "Move abroad listed in the KNZB transfer overview."),
-    ("Women", "Sarah Buis", "GZC Donk", "CN Sant Andreu", "confirmed", "2026-07-20", "Waterpolo.nl / KNZB", "https://www.waterpolo.nl/nieuws/transferoverzicht-wie-speelt-waar-komend-seizoen/?type=Eredivisie", "federation_confirmed", .97, "Move abroad listed in the KNZB transfer overview."),
-    ("Women", "Bente Rogge", "ZV De Zaan", "Vouliagmeni", "confirmed", "2026-07-20", "Waterpolo.nl / KNZB", "https://www.waterpolo.nl/nieuws/transferoverzicht-wie-speelt-waar-komend-seizoen/?type=Eredivisie", "federation_confirmed", .97, "Move abroad listed in the KNZB transfer overview."),
-    ("Women", "Esmee Ouwens", "GZC Donk", "California State University Long Beach", "confirmed", "2026-07-20", "Waterpolo.nl / KNZB", "https://www.waterpolo.nl/nieuws/transferoverzicht-wie-speelt-waar-komend-seizoen/?type=Eredivisie", "federation_confirmed", .97, "Move abroad listed in the KNZB transfer overview."),
-    ("Women", "Noa de Vries", "FTC Telekom", "Pallanuoto Trieste", "confirmed", "2026-07-20", "Waterpolo.nl / KNZB", "https://www.waterpolo.nl/nieuws/transferoverzicht-wie-speelt-waar-komend-seizoen/?type=Eredivisie", "federation_confirmed", .97, "Transfer between foreign clubs listed in the KNZB overview; later corroborated by Trieste's official squad presentation."),
-    ("Women", "Fleurien Bosveld", "Alimos NAC", "SIS Roma", "confirmed", "2026-07-20", "Waterpolo.nl / KNZB", "https://www.waterpolo.nl/nieuws/transferoverzicht-wie-speelt-waar-komend-seizoen/?type=Eredivisie", "federation_confirmed", .97, "Transfer between foreign clubs listed in the KNZB overview."),
-    ("Women", "Nikki Meijer", "Smile Cosenza Pallanuoto", "Rapallo Pallanuoto", "confirmed", "2026-07-20", "Waterpolo.nl / KNZB", "https://www.waterpolo.nl/nieuws/transferoverzicht-wie-speelt-waar-komend-seizoen/?type=Eredivisie", "federation_confirmed", .97, "Transfer between foreign clubs listed in the KNZB overview."),
+    # Men — current confirmations.
+    _signal("Men", "Toni Nemet", "Jadran Split", "ENKA Istanbul", "2026-08-20", "VLV.hu — player interview", VLV_NEMET, "first_person_media", .98, "Nemet directly confirms in interview that he decided to join ENKA Istanbul."),
+    _signal("Men", "Angelos Foskolos", "", "CN Posillipo", "2026-08-08", "Waterpolo 360", WP360_HUB, "media_confirmed", .92),
+    _signal("Men", "Nemanja Ubovic", "", "Primorac Kotor", "2026-08-02", "Waterpolo 360", WP360_CONFIRMED, "media_confirmed", .92),
+    _signal("Men", "Nika Shushiashvili", "BVSC", "Novi Beograd", "2026-07-30", "Waterpolo 360", WP360_CONFIRMED, "media_confirmed", .92),
+    _signal("Men", "Lukas Durik", "Pro Recco", "Jadran Herceg Novi", "2026-07-30", "Waterpolo 360", WP360_CONFIRMED, "media_confirmed", .92),
+    _signal("Men", "Nicolas Saveljic", "", "Dinamo Bucharest", "2026-07-29", "Waterpolo 360", WP360_CONFIRMED, "media_confirmed", .92),
+    _signal("Men", "Jerko Marinic Kragic", "", "Steaua Bucharest", "2026-07-28", "Waterpolo 360", WP360_CONFIRMED, "media_confirmed", .92),
+    _signal("Men", "Joao Pedro", "", "Pallanuoto Trieste", "2026-07-17", "Waterpolo 360", WP360_CONFIRMED, "media_confirmed", .92),
 
-    # Men — KNZB/Waterpolo.nl confirmed 2026-27 overview
-    ("Men", "Roko Mujan", "ZPC Amersfoort", "ZPB H&L Productions", "confirmed", "2026-07-20", "Waterpolo.nl / KNZB", "https://www.waterpolo.nl/nieuws/transferoverzicht-wie-speelt-waar-komend-seizoen/?type=Eredivisie", "federation_confirmed", .97, "Listed in the KNZB transfer overview for 2026-27."),
-    ("Men", "George Athymaritis", "UZSC", "SWOL 1894", "confirmed", "2026-07-20", "Waterpolo.nl / KNZB", "https://www.waterpolo.nl/nieuws/transferoverzicht-wie-speelt-waar-komend-seizoen/?type=Eredivisie", "federation_confirmed", .97, "Listed in the KNZB transfer overview for 2026-27."),
-    ("Men", "Dynand Muller", "ZPC Amersfoort", "OZ&PC", "confirmed", "2026-07-20", "Waterpolo.nl / KNZB", "https://www.waterpolo.nl/nieuws/transferoverzicht-wie-speelt-waar-komend-seizoen/?type=Eredivisie", "federation_confirmed", .97, "Listed in the KNZB transfer overview for 2026-27."),
-    ("Men", "Alex Horvath", "EZC", "OZ&PC", "confirmed", "2026-07-20", "Waterpolo.nl / KNZB", "https://www.waterpolo.nl/nieuws/transferoverzicht-wie-speelt-waar-komend-seizoen/?type=Eredivisie", "federation_confirmed", .97, "Listed in the KNZB transfer overview for 2026-27."),
-    ("Men", "Ruben van Vierzen", "ZV De Ham ZC", "ZV De Zaan", "confirmed", "2026-07-20", "Waterpolo.nl / KNZB", "https://www.waterpolo.nl/nieuws/transferoverzicht-wie-speelt-waar-komend-seizoen/?type=Eredivisie", "federation_confirmed", .97, "Listed in the KNZB transfer overview for 2026-27."),
-    ("Men", "Paul Kerstens", "ESTA", "SWOL 1894", "confirmed", "2026-07-20", "Waterpolo.nl / KNZB", "https://www.waterpolo.nl/nieuws/transferoverzicht-wie-speelt-waar-komend-seizoen/?type=Eredivisie", "federation_confirmed", .97, "Listed in the KNZB transfer overview for 2026-27."),
-    ("Men", "Pim Hageman", "Het Ravijn", "OZ&PC", "confirmed", "2026-07-20", "Waterpolo.nl / KNZB", "https://www.waterpolo.nl/nieuws/transferoverzicht-wie-speelt-waar-komend-seizoen/?type=Eredivisie", "federation_confirmed", .97, "Listed in the KNZB transfer overview for 2026-27."),
-    ("Men", "Mitchell Budding", "HZC De Robben", "ZPC Amersfoort", "confirmed", "2026-07-20", "Waterpolo.nl / KNZB", "https://www.waterpolo.nl/nieuws/transferoverzicht-wie-speelt-waar-komend-seizoen/?type=Eredivisie", "federation_confirmed", .97, "Return listed in the updated KNZB transfer overview."),
-    ("Men", "Jorrit van der Weijden", "GZC Donk", "PAOK", "confirmed", "2026-07-20", "Waterpolo.nl / KNZB", "https://www.waterpolo.nl/nieuws/transferoverzicht-wie-speelt-waar-komend-seizoen/?type=Eredivisie", "federation_confirmed", .98, "Move to PAOK listed by KNZB and subsequently announced by PAOK."),
-    ("Men", "Daan Bakker", "ZV De Zaan", "Montpellier Water-Polo", "confirmed", "2026-07-20", "Waterpolo.nl / KNZB", "https://www.waterpolo.nl/nieuws/transferoverzicht-wie-speelt-waar-komend-seizoen/?type=Eredivisie", "federation_confirmed", .97, "Move to the French league listed in the KNZB transfer overview."),
-    ("Men", "Bas Grummer", "ZVL-1886", "ASC Duisburg", "confirmed", "2026-07-20", "Waterpolo.nl / KNZB", "https://www.waterpolo.nl/nieuws/transferoverzicht-wie-speelt-waar-komend-seizoen/?type=Eredivisie", "federation_confirmed", .97, "Move abroad listed in the KNZB transfer overview."),
-    ("Men", "Fabio Jukic", "PSV", "IREN Genova Quinto 1921", "confirmed", "2026-07-20", "Waterpolo.nl / KNZB", "https://www.waterpolo.nl/nieuws/transferoverzicht-wie-speelt-waar-komend-seizoen/?type=Eredivisie", "federation_confirmed", .97, "Move abroad listed in the KNZB transfer overview."),
-    ("Men", "Stan Schuring", "Orange Coast College", "SWOL 1894", "confirmed", "2026-07-20", "Waterpolo.nl / KNZB", "https://www.waterpolo.nl/nieuws/transferoverzicht-wie-speelt-waar-komend-seizoen/?type=Eredivisie", "federation_confirmed", .97, "Return to the Netherlands listed in the KNZB overview."),
-    ("Men", "Jeroen Rouwenhorst", "Rari Nantes Florentia", "AN Brescia", "confirmed", "2026-07-20", "Waterpolo.nl / KNZB", "https://www.waterpolo.nl/nieuws/transferoverzicht-wie-speelt-waar-komend-seizoen/?type=Eredivisie", "federation_confirmed", .97, "Transfer between foreign clubs listed in the KNZB overview."),
-    ("Men", "Marnick Snel", "VK Primorje", "CC Ortigia", "confirmed", "2026-07-20", "Waterpolo.nl / KNZB", "https://www.waterpolo.nl/nieuws/transferoverzicht-wie-speelt-waar-komend-seizoen/?type=Eredivisie", "federation_confirmed", .97, "Transfer between foreign clubs listed in the KNZB overview."),
-    ("Men", "Tim de Mey", "Rari Nantes Florentia", "Douaisis Agglo Water-Polo", "confirmed", "2026-07-20", "Waterpolo.nl / KNZB", "https://www.waterpolo.nl/nieuws/transferoverzicht-wie-speelt-waar-komend-seizoen/?type=Eredivisie", "federation_confirmed", .97, "Move to the French league listed in the KNZB transfer overview."),
-
-    # Men — current international specialist-media confirmations
-    ("Men", "Angelos Foskolos", "", "CN Posillipo", "confirmed", "2026-08-08", "Waterpolo 360", "https://waterpolo360news.com/water-polo-confirmed-transfers-and-gossip/", "media_confirmed", .92, "Specialist outlet reports Posillipo signing the Greek centre-forward."),
-    ("Men", "Nemanja Ubovic", "", "Primorac Kotor", "confirmed", "2026-08-02", "Waterpolo 360", "https://waterpolo360news.com/confirmed-transfers/", "media_confirmed", .92, "Olympic champion joins Primorac Kotor."),
-    ("Men", "Nika Shushiashvili", "BVSC", "Novi Beograd", "confirmed", "2026-07-30", "Waterpolo 360", "https://waterpolo360news.com/confirmed-transfers/", "media_confirmed", .92, "Return to Novi Beograd after BVSC spell."),
-    ("Men", "Lukas Durik", "Pro Recco", "Jadran Herceg Novi", "confirmed", "2026-07-30", "Waterpolo 360", "https://waterpolo360news.com/confirmed-transfers/", "media_confirmed", .92, "Move after two years at Pro Recco."),
-    ("Men", "Nicolas Saveljic", "", "Dinamo Bucharest", "confirmed", "2026-07-29", "Waterpolo 360", "https://waterpolo360news.com/confirmed-transfers/", "media_confirmed", .92, "USA international signing."),
-    ("Men", "Jerko Marinic Kragic", "", "Steaua Bucharest", "confirmed", "2026-07-28", "Waterpolo 360", "https://waterpolo360news.com/confirmed-transfers/", "media_confirmed", .92, "Croatian international completes return to Steaua."),
-    ("Men", "Joao Pedro", "", "Pallanuoto Trieste", "confirmed", "2026-07-17", "Waterpolo 360", "https://waterpolo360news.com/confirmed-transfers/", "media_confirmed", .92, "Trieste signing reported as a two-year deal."),
-    ("Men", "Francesco Di Fulvio", "", "CN Atlètic-Barceloneta", "confirmed", "2026-07-16", "Total Waterpolo", "https://total-waterpolo.com/water-polo-transfers/", "media_confirmed", .92, "Listed as confirmed on Total Waterpolo's 2026 transfer timeline."),
-    ("Men", "Vincenzo Dolce", "", "Panathinaikos", "confirmed", "2026-07-13", "Total Waterpolo", "https://total-waterpolo.com/water-polo-transfers/", "media_confirmed", .92, "Listed as confirmed on Total Waterpolo's 2026 transfer timeline."),
-    ("Men", "Tommaso Gianazza", "", "Pro Recco", "confirmed", "2026-07-13", "Total Waterpolo", "https://total-waterpolo.com/water-polo-transfers/", "media_confirmed", .92, "Listed as confirmed on Total Waterpolo's 2026 transfer timeline."),
-    ("Men", "Marko Bijac", "", "Pro Recco", "confirmed", "2026-07-11", "Total Waterpolo", "https://total-waterpolo.com/water-polo-transfers/", "media_confirmed", .92, "Listed as confirmed on Total Waterpolo's 2026 transfer timeline."),
-    ("Men", "Toni Popadic", "", "Jadran Split", "confirmed", "2026-07-07", "Total Waterpolo", "https://total-waterpolo.com/water-polo-transfers/", "media_confirmed", .92, "Listed as confirmed on Total Waterpolo's 2026 transfer timeline."),
-    ("Men", "Gergo Zalanki", "", "Pro Recco", "confirmed", "2026-07-03", "Total Waterpolo", "https://total-waterpolo.com/water-polo-transfers/", "media_confirmed", .92, "Listed as confirmed on Total Waterpolo's 2026 transfer timeline."),
-    ("Men", "Loren Fatovic", "", "Olympiacos", "confirmed", "2026-07-01", "Total Waterpolo", "https://total-waterpolo.com/water-polo-transfers/", "media_confirmed", .92, "Listed as confirmed on Total Waterpolo's 2026 transfer timeline."),
-    ("Men", "Konstantin Kharkov", "", "Olympiacos", "confirmed", "2026-06-29", "Total Waterpolo", "https://total-waterpolo.com/water-polo-transfers/", "media_confirmed", .92, "Listed as confirmed on Total Waterpolo's 2026 transfer timeline."),
-    ("Men", "Gergely Burian", "", "VK Jug", "confirmed", "2026-06-23", "Total Waterpolo", "https://total-waterpolo.com/water-polo-transfers/", "media_confirmed", .92, "Listed as confirmed on Total Waterpolo's 2026 transfer timeline."),
-    ("Men", "Vladan Spaic", "", "Vouliagmeni", "confirmed", "2026-06-20", "Total Waterpolo", "https://total-waterpolo.com/water-polo-transfers/", "media_confirmed", .92, "Listed as confirmed on Total Waterpolo's 2026 transfer timeline."),
-    ("Men", "Dmitri Kholod", "", "Oradea", "confirmed", "2026-06-18", "Total Waterpolo", "https://total-waterpolo.com/water-polo-transfers/", "media_confirmed", .92, "Listed as confirmed on Total Waterpolo's 2026 transfer timeline."),
-    ("Men", "Konstantinos Kakaris", "", "Ferencvaros", "confirmed", "2026-06-17", "Total Waterpolo", "https://total-waterpolo.com/water-polo-transfers/", "media_confirmed", .92, "Listed as confirmed on Total Waterpolo's 2026 transfer timeline."),
-    ("Men", "Marko Vavic", "", "Apollon Smyrnis", "confirmed", "2026-06-11", "Total Waterpolo", "https://total-waterpolo.com/water-polo-transfers/", "media_confirmed", .92, "Listed as confirmed on Total Waterpolo's 2026 transfer timeline."),
-    ("Men", "Djordje Lazic", "", "Panionios", "confirmed", "2026-06-08", "Total Waterpolo", "https://total-waterpolo.com/water-polo-transfers/", "media_confirmed", .92, "Listed as confirmed on Total Waterpolo's 2026 transfer timeline."),
-    ("Men", "Nikola Kojic", "", "Novi Beograd", "confirmed", "2026-06-06", "Total Waterpolo", "https://total-waterpolo.com/water-polo-transfers/", "media_confirmed", .92, "Listed as confirmed on Total Waterpolo's 2026 transfer timeline."),
-    ("Men", "Dimitrije Risticevic", "", "Panionios", "confirmed", "2026-06-06", "Total Waterpolo", "https://total-waterpolo.com/water-polo-transfers/", "media_confirmed", .92, "Listed as confirmed on Total Waterpolo's 2026 transfer timeline."),
-    ("Men", "Toni Nemet", "", "ENKA Istanbul", "rumour", "2026-08-20", "Waterpolo 360", "https://waterpolo360news.com/water-polo-transfers-and-gossip/mens-transfers-and-gossip/", "media_rumour", .58, "Rumour only; keep isolated until official club/federation evidence appears."),
+    *[_signal("Women", player, fr, to, "2026-07-20", "Waterpolo.nl / KNZB", KNZB_URL, "federation_confirmed", .97, "Listed in the KNZB confirmed 2026-27 transfer overview.") for player, fr, to in KNZB_WOMEN],
+    *[_signal("Men", player, fr, to, "2026-07-20", "Waterpolo.nl / KNZB", KNZB_URL, "federation_confirmed", .97, "Listed in the KNZB confirmed 2026-27 transfer overview.") for player, fr, to in KNZB_MEN],
+    *[_signal("Men", player, fr, to, date, "Total Waterpolo", TOTAL_WP, "media_confirmed", .92, "Listed as confirmed on Total Waterpolo's 2026 transfer timeline.") for player, fr, to, date in TOTAL_WP_MEN],
 ]
 
 MATCH_TARGETS = [
@@ -146,13 +182,18 @@ MATCH_TARGETS = [
 
 def _append_note(current, addition):
     current = (current or "").strip()
-    if addition in current:
+    addition = (addition or "").strip()
+    if not addition or addition in current:
         return current
     return f"{current} {addition}".strip()
 
 
+def _rank(kind):
+    return {"superseded": 0, "rumour": 1, "reported": 2, "confirmed": 3}.get(kind, 1)
+
+
 def seed_transfer_watch(db):
-    # Upsert watches so the monitored-source catalogue can evolve between releases.
+    # Upsert source catalogue so trust tiers, URLs and refresh rates evolve cleanly.
     for name, stype, platform, scope, url, trust, hours, note in SOURCE_WATCHES:
         watch = db.scalar(select(SourceWatch).where(SourceWatch.name == name))
         if not watch:
@@ -167,53 +208,55 @@ def seed_transfer_watch(db):
             watch.note = note
             watch.enabled = True
 
-    # Upsert signals. A later signal can correct missing from-club/source details without duplicating the row.
-    for gender, player, fr, to, kind, date, sname, url, tier, conf, note in TRANSFER_SIGNALS:
-        signal = db.scalar(select(TransferSignal).where(
-            TransferSignal.player_name == player,
-            TransferSignal.to_team == to,
-            TransferSignal.published_date == date,
-        ))
-        if not signal:
+    # Merge corroborating reports for the same move and retain the strongest evidence.
+    for item in TRANSFER_SIGNALS:
+        same_move = db.scalars(select(TransferSignal).where(
+            TransferSignal.player_name == item["player"],
+            TransferSignal.to_team == item["to"],
+            TransferSignal.season == TRANSFER_SEASON,
+        ).order_by(TransferSignal.id.asc())).all()
+
+        if same_move:
+            signal = same_move[0]
+            dates = [d for d in [signal.published_date, item["date"]] if d]
+            signal.published_date = min(dates) if dates else item["date"]
+            signal.gender = item["gender"]
+            signal.from_team = item["from"] or signal.from_team
+            signal.to_team = item["to"]
+            signal.season = TRANSFER_SEASON
+            if _rank(item["kind"]) >= _rank(signal.signal_type):
+                signal.signal_type = item["kind"]
+            if item["confidence"] >= float(signal.confidence_score or 0):
+                signal.source_name = item["source"]
+                signal.source_url = item["url"]
+                signal.source_tier = item["tier"]
+                signal.confidence_score = item["confidence"]
+            signal.note = _append_note(signal.note, item["note"])
+            for duplicate in same_move[1:]:
+                signal.note = _append_note(signal.note, duplicate.note)
+                db.delete(duplicate)
+        else:
             signal = TransferSignal(
-                player_name=player,
-                gender=gender,
-                from_team=fr,
-                to_team=to,
-                signal_type=kind,
-                season=TRANSFER_SEASON,
-                published_date=date,
-                source_name=sname,
-                source_url=url,
-                source_tier=tier,
-                confidence_score=conf,
-                note=note,
+                player_name=item["player"], gender=item["gender"], from_team=item["from"], to_team=item["to"],
+                signal_type=item["kind"], season=TRANSFER_SEASON, published_date=item["date"],
+                source_name=item["source"], source_url=item["url"], source_tier=item["tier"],
+                confidence_score=item["confidence"], note=item["note"],
             )
             db.add(signal)
-        else:
-            signal.gender = gender
-            signal.from_team = fr or signal.from_team
-            signal.to_team = to
-            signal.signal_type = kind
-            signal.season = TRANSFER_SEASON
-            signal.source_name = sname
-            signal.source_url = url
-            signal.source_tier = tier
-            signal.confidence_score = conf
-            signal.note = note
 
-        # Keep an audit trail but remove an older contradictory rumour from the active board.
-        older_rumours = db.scalars(select(TransferSignal).where(
-            TransferSignal.player_name == player,
-            TransferSignal.season == TRANSFER_SEASON,
-            TransferSignal.signal_type == "rumour",
-        )).all()
-        for older in older_rumours:
-            if older is signal or older.to_team == to:
-                continue
-            if not older.published_date or older.published_date <= date:
-                older.signal_type = "superseded"
-                older.note = _append_note(older.note, f"Superseded by newer evidence pointing to {to} ({sname}, {date}).")
+        # Newer contradictory evidence removes stale rumours from the active board but preserves the audit row.
+        if item["kind"] in {"confirmed", "reported", "rumour"}:
+            older_rumours = db.scalars(select(TransferSignal).where(
+                TransferSignal.player_name == item["player"],
+                TransferSignal.season == TRANSFER_SEASON,
+                TransferSignal.signal_type == "rumour",
+            )).all()
+            for older in older_rumours:
+                if older is signal or older.to_team == item["to"]:
+                    continue
+                if not older.published_date or older.published_date <= item["date"]:
+                    older.signal_type = "superseded"
+                    older.note = _append_note(older.note, f"Superseded by newer evidence pointing to {item['to']} ({item['source']}, {item['date']}).")
 
     for key, comp, season, a, b, date, score, src, video, status, priority, note in MATCH_TARGETS:
         target = db.scalar(select(MatchResearchTarget).where(MatchResearchTarget.external_key == key))
