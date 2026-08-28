@@ -17,7 +17,11 @@ def test_priority_transfers_use_direct_official_sources():
 
 
 def test_france_2026_roster_has_current_club_identity_evidence():
-    names = {row["name"] for row in PROFILE_SEEDS if row["status"] == "federation_current_roster"}
+    names = {
+        row["name"] for row in PROFILE_SEEDS
+        if row["status"] == "federation_current_roster"
+        and row["national"] == "France — Women Senior"
+    }
     assert {"Lara Andres", "Lana Di Fraja", "Elhyne Kilic-Pegourie", "Eszter Lefebvre"} <= names
     for name in names:
         row = _seed(name)
