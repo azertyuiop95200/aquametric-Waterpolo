@@ -1,4 +1,226 @@
 {% extends 'base.html' %}{% block content %}
-<div class="page-head"><div><span class="eyebrow">COMPETITIONS</span><h1 data-i18n="competition.title">Standings & official statistics</h1><p data-i18n="competition.intro">Standings and official team statistics load directly from the current validated cache.</p></div></div>
-{% if competitions %}{% for key, rows in competitions.items() %}<section class="panel"><div class="section-head"><div><span class="eyebrow">{{key[1]}} · {{key[2]}}</span><h2>{{key[0]}}</h2></div><span class="pill">{{rows|length}} teams</span></div><div class="table-wrap" data-drag-scroll><table class="standings"><tr><th>#</th><th>Team</th><th>Pts</th><th>P</th><th>W</th><th>L</th><th>GF</th><th>GA</th><th>Diff</th></tr>{% for r in rows %}<tr><td>{{r.position}}</td><td><b>{{r.team_name}}</b></td><td><strong>{{r.points}}</strong></td><td>{{r.played}}</td><td>{{r.won}}</td><td>{{r.lost}}</td><td>{{r.goals_for}}</td><td>{{r.goals_against}}</td><td>{{'%+d'|format(r.goal_diff)}}</td></tr>{% endfor %}</table></div>{% set teamstats = stats_by_competition.get(key[0], {}) %}{% if teamstats %}<details class="stats-details"><summary>Official team statistics (RFEN codes)</summary><div class="table-wrap" data-drag-scroll><table><tr><th>Team</th><th>G</th><th>GP</th><th>GP-5P</th><th>EX20</th><th>TR</th><th>PE</th></tr>{% for team, metrics in teamstats.items() %}<tr><td><b>{{team}}</b></td><td>{{metrics.get('G','—')}}</td><td>{{metrics.get('GP','—')}}</td><td>{{metrics.get('GP-5P','—')}}</td><td>{{metrics.get('EX20','—')}}</td><td>{{metrics.get('TR','—')}}</td><td>{{metrics.get('PE','—')}}</td></tr>{% endfor %}</table></div><p class="muted">Codes are preserved from the official federation feed; semantic mapping is versioned before AquaMetric uses them in cross-country comparisons.</p></details>{% endif %}</section>{% endfor %}{% else %}<section class="panel empty-state"><b data-i18n="competition.empty">No standings are available yet. AquaMetric keeps the page ready and fills supported feeds when validated data is available.</b></section>{% endif %}
+<div class="page-head">
+  <div>
+    <span class="eyebrow">RÉSULTATS</span>
+    <h1>Résultats & classements</h1>
+    <p>Les matchs sont regroupés par championnat et filtrés automatiquement sur aujourd’hui, la semaine ou le mois. Les classements proviennent du cache officiel AquaMetric et évoluent avec les mises à jour des résultats.</p>
+  </div>
+</div>
+
+<div class="data-banner">
+  <div><span class="status-dot"></span><div><b>Mise à jour automatique</b><small>Écran actualisé toutes les 5 min · flux officiels contrôlés automatiquement côté serveur.</small></div></div>
+  <a href="/calendar">Calendrier complet →</a>
+</div>
+
+<section class="panel">
+  <div class="section-head">
+    <div><span class="eyebrow">PÉRIODE</span><h2 id="results-period-title">Aujourd’hui</h2></div>
+    <span class="pill" id="results-match-count">0 match</span>
+  </div>
+  <div class="actions-row" role="group" aria-label="Période des résultats">
+    <button class="btn small" type="button" data-results-period="day" aria-pressed="true">Aujourd’hui</button>
+    <button class="ghost small" type="button" data-results-period="week" aria-pressed="false">Cette semaine</button>
+    <button class="ghost small" type="button" data-results-period="month" aria-pressed="false">Ce mois-ci</button>
+  </div>
+  <p class="muted">Le classement de chaque championnat reste accessible même lorsqu’aucun match n’est programmé sur la période sélectionnée.</p>
+</section>
+
+<div id="results-groups"><section class="panel empty-state"><b>Chargement des résultats officiels…</b></section></div>
+
+<div id="standings-templates" hidden>
+{% if competitions %}
+  {% for key, rows in competitions.items() %}
+  <template data-standing-template data-competition="{{key[0]|e}}" data-meta="{{key[1]|e}}{% if key[2] %} · {{key[2]|e}}{% endif %}">
+    <div class="table-wrap" data-drag-scroll>
+      <table class="standings">
+        <tr><th>#</th><th>Équipe</th><th>Pts</th><th>J</th><th>V</th><th>D</th><th>BP</th><th>BC</th><th>Diff</th></tr>
+        {% for r in rows %}
+        <tr><td>{{r.position}}</td><td><b>{{r.team_name}}</b></td><td><strong>{{r.points}}</strong></td><td>{{r.played}}</td><td>{{r.won}}</td><td>{{r.lost}}</td><td>{{r.goals_for}}</td><td>{{r.goals_against}}</td><td>{{'%+d'|format(r.goal_diff)}}</td></tr>
+        {% endfor %}
+      </table>
+    </div>
+    {% set teamstats=stats_by_competition.get(key[0], {}) %}
+    {% if teamstats %}
+    <details class="stats-details">
+      <summary>Statistiques officielles du championnat</summary>
+      <div class="table-wrap" data-drag-scroll>
+        <table>
+          <tr><th>Équipe</th><th>G</th><th>GP</th><th>GP-5P</th><th>EX20</th><th>TR</th><th>PE</th></tr>
+          {% for team, metrics in teamstats.items() %}
+          <tr><td><b>{{team}}</b></td><td>{{metrics.get('G','—')}}</td><td>{{metrics.get('GP','—')}}</td><td>{{metrics.get('GP-5P','—')}}</td><td>{{metrics.get('EX20','—')}}</td><td>{{metrics.get('TR','—')}}</td><td>{{metrics.get('PE','—')}}</td></tr>
+          {% endfor %}
+        </table>
+      </div>
+    </details>
+    {% endif %}
+  </template>
+  {% endfor %}
+{% endif %}
+</div>
+
+<script>
+(()=>{
+  const container=document.getElementById('results-groups');
+  const title=document.getElementById('results-period-title');
+  const count=document.getElementById('results-match-count');
+  const buttons=[...document.querySelectorAll('[data-results-period]')];
+  const standings=new Map(
+    [...document.querySelectorAll('template[data-standing-template]')].map(t=>[t.dataset.competition,t])
+  );
+  let fixturesByCompetition=new Map();
+  let championshipMeta=new Map();
+
+  const parseFixtureDate=text=>{
+    const m=(text||'').match(/(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}):(\d{2}))?/);
+    if(!m)return null;
+    return new Date(Number(m[3]),Number(m[2])-1,Number(m[1]),Number(m[4]||12),Number(m[5]||0),0,0);
+  };
+
+  const rangeFor=period=>{
+    const now=new Date();
+    let start,end,label;
+    if(period==='week'){
+      const offset=(now.getDay()+6)%7;
+      start=new Date(now.getFullYear(),now.getMonth(),now.getDate()-offset);
+      end=new Date(start); end.setDate(end.getDate()+7);
+      label='Cette semaine';
+    }else if(period==='month'){
+      start=new Date(now.getFullYear(),now.getMonth(),1);
+      end=new Date(now.getFullYear(),now.getMonth()+1,1);
+      label='Ce mois-ci';
+    }else{
+      start=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+      end=new Date(start); end.setDate(end.getDate()+1);
+      label='Aujourd’hui';
+    }
+    return {start,end,label};
+  };
+
+  const setButtonState=period=>{
+    buttons.forEach(btn=>{
+      const active=btn.dataset.resultsPeriod===period;
+      btn.setAttribute('aria-pressed',String(active));
+      btn.classList.toggle('btn',active);
+      btn.classList.toggle('ghost',!active);
+    });
+  };
+
+  const buildCard=(competition,periodRange)=>{
+    const panel=document.createElement('section');
+    panel.className='panel championship-panel';
+
+    const head=document.createElement('div');
+    head.className='section-head';
+    const left=document.createElement('div');
+    const eyebrow=document.createElement('span');
+    eyebrow.className='eyebrow';
+    const meta=championshipMeta.get(competition)||standings.get(competition)?.dataset.meta||'Championnat';
+    eyebrow.textContent=meta;
+    const h2=document.createElement('h2');
+    h2.textContent=competition||'Championnat';
+    left.append(eyebrow,h2);
+
+    const rankingButton=document.createElement('button');
+    rankingButton.type='button';
+    rankingButton.className='btn small';
+    rankingButton.textContent=standings.has(competition)?'Voir le classement':'Classement indisponible';
+    rankingButton.disabled=!standings.has(competition);
+    head.append(left,rankingButton);
+    panel.append(head);
+
+    const rows=(fixturesByCompetition.get(competition)||[])
+      .filter(item=>item.date && item.date>=periodRange.start && item.date<periodRange.end)
+      .sort((a,b)=>b.date-a.date);
+
+    const list=document.createElement('div');
+    list.className='championship-calendar';
+    if(rows.length){
+      rows.forEach(item=>list.appendChild(item.row.cloneNode(true)));
+    }else{
+      const empty=document.createElement('p');
+      empty.className='muted';
+      empty.textContent='Aucun match sur cette période.';
+      list.appendChild(empty);
+    }
+    panel.append(list);
+
+    if(standings.has(competition)){
+      const ranking=document.createElement('div');
+      ranking.hidden=true;
+      ranking.appendChild(standings.get(competition).content.cloneNode(true));
+      rankingButton.addEventListener('click',()=>{
+        ranking.hidden=!ranking.hidden;
+        rankingButton.textContent=ranking.hidden?'Voir le classement':'Masquer le classement';
+      });
+      panel.append(ranking);
+    }
+    return {panel,matchCount:rows.length};
+  };
+
+  const renderPeriod=period=>{
+    const valid=['day','week','month'].includes(period)?period:'day';
+    const range=rangeFor(valid);
+    title.textContent=range.label;
+    setButtonState(valid);
+    const params=new URLSearchParams(location.search);
+    params.set('period',valid);
+    history.replaceState(null,'',`${location.pathname}?${params.toString()}`);
+
+    container.replaceChildren();
+    const names=new Set([...fixturesByCompetition.keys(),...standings.keys()]);
+    let total=0;
+    [...names].sort((a,b)=>a.localeCompare(b,'fr')).forEach(name=>{
+      const built=buildCard(name,range);
+      total+=built.matchCount;
+      container.appendChild(built.panel);
+    });
+    count.textContent=`${total} match${total===1?'':'s'}`;
+    if(!names.size){
+      const empty=document.createElement('section');
+      empty.className='panel empty-state';
+      const label=document.createElement('b');
+      label.textContent='Aucune donnée de championnat disponible pour le moment.';
+      empty.appendChild(label);
+      container.appendChild(empty);
+    }
+  };
+
+  const load=()=>{
+    fetch('/calendar',{credentials:'same-origin'})
+      .then(r=>{if(!r.ok)throw new Error('calendar');return r.text();})
+      .then(html=>{
+        const doc=new DOMParser().parseFromString(html,'text/html');
+        fixturesByCompetition=new Map();
+        championshipMeta=new Map();
+        doc.querySelectorAll('.championship-panel[data-competition]').forEach(section=>{
+          const competition=section.dataset.competition||'Championnat';
+          const meta=section.querySelector('.section-head .eyebrow')?.textContent.trim()||'Championnat';
+          championshipMeta.set(competition,meta);
+          const items=[...section.querySelectorAll('.championship-calendar .fixture-row')].map(row=>({
+            row,
+            date:parseFixtureDate(row.querySelector('time')?.textContent)
+          }));
+          fixturesByCompetition.set(competition,items);
+        });
+        const initial=new URLSearchParams(location.search).get('period')||'day';
+        renderPeriod(initial);
+      })
+      .catch(()=>{
+        container.replaceChildren();
+        const empty=document.createElement('section');
+        empty.className='panel empty-state';
+        const label=document.createElement('b');
+        label.textContent='Impossible de charger les résultats pour le moment.';
+        const detail=document.createElement('p');
+        detail.textContent='Le dernier classement officiel reste disponible dès que la synchronisation revient.';
+        empty.append(label,detail);
+        container.appendChild(empty);
+      });
+  };
+
+  buttons.forEach(btn=>btn.addEventListener('click',()=>renderPeriod(btn.dataset.resultsPeriod)));
+  load();
+  setInterval(()=>location.reload(),5*60*1000);
+})();
+</script>
 {% endblock %}
