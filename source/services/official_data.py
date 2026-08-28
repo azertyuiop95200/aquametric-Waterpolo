@@ -13,6 +13,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from models import OfficialDataSource, OfficialFixture, OfficialStanding, OfficialTeamStat, DataRefreshRun
+from services.official_fixture_evidence import promote_official_fixtures
 
 REQUEST_TIMEOUT = float(os.getenv("OFFICIAL_DATA_HTTP_TIMEOUT", "10"))
 USER_AGENT = "AquaMetric/0.4 official-water-polo-data (+research/analysis platform)"
@@ -298,6 +299,9 @@ def refresh_due_sources(db: Session, force: bool = False, max_sources: int = 20)
     for source in sources[:max_sources]:
         if force or source_is_due(source):
             runs.append(refresh_source(db, source))
+    # Promote every final structured women's result after a refresh pass. This is
+    # idempotent and deliberately creates match/team evidence only, never fake players.
+    promote_official_fixtures(db)
     return runs
 
 
