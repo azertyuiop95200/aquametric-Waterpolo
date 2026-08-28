@@ -3,6 +3,7 @@ import uuid
 
 os.environ.setdefault("DATABASE_URL", "sqlite:///./test_aquametric.db")
 
+from bs4 import BeautifulSoup
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
@@ -271,11 +272,12 @@ def test_shot_preference_profile_renders_nested_summary_contract():
 
     response = client.get(f"/profiles/players/{profile_id}")
     assert response.status_code == 200
-    assert "upper left" in response.text
-    assert "right" in response.text
-    assert "100% of located attempts" in response.text
-    assert "100% of observations with a known side label" in response.text
-    assert "None%" not in response.text
+    visible_text = BeautifulSoup(response.text, "html.parser").get_text(" ", strip=True)
+    assert "upper left" in visible_text
+    assert "right" in visible_text
+    assert "100% of located attempts" in visible_text
+    assert "100% of observations with a known side label" in visible_text
+    assert "None%" not in visible_text
 
 
 def test_health_exposes_render_commit_when_runtime_provides_it(monkeypatch):
