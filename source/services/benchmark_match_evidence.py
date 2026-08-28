@@ -25,17 +25,34 @@ def _competition_level(item):
     return 4
 
 
+def _existing_canonical_match(db, item, score):
+    """Find the same sporting match even if the benchmark uses another key/title."""
+    year = (item.get("date", "")[:4] or "")
+    return db.scalar(
+        select(MatchLibraryItem).where(
+            MatchLibraryItem.team_a == item.get("team_a", ""),
+            MatchLibraryItem.team_b == item.get("team_b", ""),
+            MatchLibraryItem.score_a == score[0],
+            MatchLibraryItem.score_b == score[1],
+            MatchLibraryItem.season == year,
+        )
+    )
+
+
 def seed_benchmark_match_evidence(db):
     """Promote authoritative benchmark facts into the shared evidence library.
 
     Only explicitly attributed player statistics are persisted. Team totals such as
     combined goalkeeper saves or total shots stay in match metadata and never become
     individual player metrics unless the benchmark names the player unambiguously.
+    Existing canonical library matches are enriched in place rather than duplicated.
     """
     for item in BENCHMARK_MATCHES:
         key = item["id"]
         score = item.get("final_score") or [None, None]
         row = db.scalar(select(MatchLibraryItem).where(MatchLibraryItem.external_key == key))
+        if not row:
+            row = _existing_canonical_match(db, item, score)
         metadata = {
             "_aquametric": {
                 "competition_level": _competition_level(item),
@@ -43,6 +60,7 @@ def seed_benchmark_match_evidence(db):
                 "evidence_scope": "official_benchmark_attributions",
                 "scorer_list_complete": False,
                 "benchmark": True,
+                "benchmark_id": key,
                 "match_date": item.get("date", ""),
             },
             "team_shots": item.get("shots", {}),
@@ -73,12 +91,7 @@ def seed_benchmark_match_evidence(db):
             db.add(row)
             db.flush()
         else:
-            row.title = item.get("title", row.title)
-            row.competition = item.get("competition", row.competition)
-            row.team_a = item.get("team_a", row.team_a)
-            row.team_b = item.get("team_b", row.team_b)
-            row.score_a, row.score_b = score[0], score[1]
-            row.quarter_scores_json = json.dumps(item.get("quarters", []))
+            # Preserve the canonical library identity/title while enriching evidence.
             row.video_url = _official_video(item) or row.video_url
             row.official_source_url = _official_source(item) or row.official_source_url
             row.analysis_status = "official_benchmark_evidence"
