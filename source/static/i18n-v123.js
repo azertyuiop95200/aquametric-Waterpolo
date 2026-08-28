@@ -22,6 +22,7 @@ const T={
  }
 };
 function current(){return (window.AquaMetricI18n?.current?.()||localStorage.getItem('aquametric.language')||document.documentElement.lang||'en').toLowerCase();}
-function apply(){const l=current();const dict=T[l]||T.en;document.querySelectorAll('[data-i18n]').forEach(el=>{const key=el.dataset.i18n;if(dict[key]!==undefined)el.textContent=dict[key];});}
-window.addEventListener('aquametric:language',apply);document.addEventListener('DOMContentLoaded',apply);new MutationObserver(apply).observe(document.documentElement,{subtree:true,childList:true});apply();
+function apply(){const l=current();const dict=T[l]||T.en;document.querySelectorAll('[data-i18n]').forEach(el=>{const key=el.dataset.i18n;const value=dict[key];if(value!==undefined&&el.textContent!==value)el.textContent=value;});}
+window.addEventListener('aquametric:language',apply);
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',apply,{once:true});else apply();
 })();
