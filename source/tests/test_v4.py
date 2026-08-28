@@ -87,11 +87,11 @@ def test_calendar_competitions_and_tactical_report_render():
     assert client.get('/competitions').status_code==200
 
 
-def test_knowledge_page_contains_classic_tactical_synthesis_without_source_registry():
+def test_knowledge_page_contains_visual_tactical_synthesis_without_source_registry():
     client=TestClient(app)
     page=client.get('/knowledge')
     assert page.status_code==200
-    assert 'Classic water-polo tactics, synthesized' in page.text
+    assert "Understand tactics like on a coach's tablet" in page.text
     assert 'Press defence' in page.text
     assert 'Zone+ 4–2' in page.text
     assert 'Zone− compact 5 v 6' in page.text
