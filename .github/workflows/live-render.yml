@@ -27,29 +27,20 @@ jobs:
           api="https://api.github.com/repos/${GITHUB_REPOSITORY}/commits/main"
           for i in $(seq 1 45); do
             echo "Live check $i/45"
-            latest=$(curl -L --max-time 20 -fsS \
-              -H "Authorization: Bearer $GH_TOKEN" \
-              -H 'Accept: application/vnd.github+json' \
-              "$api" 2>/dev/null | python -c 'import json,sys; print(json.load(sys.stdin).get("sha", ""))' 2>/dev/null || true)
+            latest=$(curl -L --max-time 20 -fsS -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' "$api" 2>/dev/null | python -c 'import json,sys; print(json.load(sys.stdin).get("sha", ""))' 2>/dev/null || true)
             health=$(curl -L --max-time 30 -fsS "$base/health" 2>/dev/null || true)
             release=$(curl -L --max-time 30 -fsS "$base/static/release.json" 2>/dev/null || true)
             echo "Live health: ${health:-unavailable}"
-            if [ -n "$latest" ] \
-              && echo "$health" | grep -q '"ok":true' \
-              && echo "$health" | grep -q "\"git_commit\":\"$latest\"" \
-              && echo "$release" | grep -q "$marker"; then
+            if [ -n "$latest" ] && echo "$health" | grep -q '"ok":true' && echo "$health" | grep -q "\"git_commit\":\"$latest\"" && echo "$release" | grep -q "$marker"; then
               echo "Current main commit is live on Render: $latest"
               exit 0
             fi
-            if [ -n "$latest" ]; then
-              echo "Waiting for Render to serve main commit: $latest"
-            fi
+            [ -n "$latest" ] && echo "Waiting for Render to serve main commit: $latest"
             sleep 15
           done
           echo 'Render did not expose the current main commit within the verification window.'
           exit 1
-
-      - name: Verify public security and V12.1 assets
+      - name: Verify public security and V12.2 product assets
         run: |
           base='https://aquametric-web-demo.onrender.com'
           curl -L --max-time 30 -fsS "$base/security-status" | tee /tmp/security.json
@@ -57,4 +48,7 @@ jobs:
           grep -q '"api_docs_public":false' /tmp/security.json
           curl -L --max-time 30 -fsS "$base/static/app.js" | grep -q 'menuBackdrop'
           curl -L --max-time 30 -fsS "$base/static/i18n.js" | grep -q 'aquametric.language'
-          curl -L --max-time 30 -fsS "$base/knowledge" | grep -q 'Classic water-polo tactics'
+          curl -L --max-time 30 -fsS "$base/static/i18n-v122.js" | grep -q 'history.title'
+          curl -L --max-time 30 -fsS "$base/static/v122.css" | grep -q 'tactic-board'
+          curl -L --max-time 30 -fsS "$base/knowledge" | grep -q 'tactic-board-card'
+          curl -L --max-time 30 -fsS "$base/scouting" | grep -q 'scout-card'
