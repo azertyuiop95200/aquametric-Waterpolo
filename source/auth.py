@@ -27,9 +27,10 @@ def verify_password(password: str, stored: str) -> bool:
         return False
 
 
-# main.py imports auth before importing services.scouting_data.seed_scouting. Register
-# the additive EU youth scouting seed here so the existing startup call also loads
-# the summer-2026 shortlist without a schema migration.
+# main.py imports auth before the shared scouting and extension installers. Register
+# additive patches here so the normal startup path keeps a single source of truth.
 from services.scouting_eu_2026_runtime import install_scouting_seed_patch as _install_scouting_seed_patch
+from prospect_routes import install_prospect_routes_patch as _install_prospect_routes_patch
 
 _install_scouting_seed_patch()
+_install_prospect_routes_patch()
