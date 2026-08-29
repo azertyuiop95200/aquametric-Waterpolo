@@ -22,7 +22,7 @@
     <button class="ghost small" type="button" data-results-period="week" aria-pressed="false">Cette semaine</button>
     <button class="ghost small" type="button" data-results-period="month" aria-pressed="false">Ce mois-ci</button>
   </div>
-  <p class="muted">Le classement de chaque championnat reste accessible même lorsqu’aucun match n’est programmé sur la période sélectionnée.</p>
+  <p class="muted">Le classement de chaque championnat reste accessible même lorsqu’aucun match n’est programmé sur la période sélectionnée. Avant la première journée, les équipes engagées sont affichées à 0 point, 0 journée et 0 de différence de buts.</p>
 </section>
 
 <div id="results-groups"><section class="panel empty-state"><b>Chargement des résultats officiels…</b></section></div>
@@ -68,12 +68,97 @@
     [...document.querySelectorAll('template[data-standing-template]')].map(t=>[t.dataset.competition,t])
   );
   let fixturesByCompetition=new Map();
+  let teamsByCompetition=new Map();
   let championshipMeta=new Map();
 
   const parseFixtureDate=text=>{
     const m=(text||'').match(/(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}):(\d{2}))?/);
     if(!m)return null;
     return new Date(Number(m[3]),Number(m[2])-1,Number(m[1]),Number(m[4]||12),Number(m[5]||0),0,0);
+  };
+
+  const fixtureTeams=row=>{
+    const label=row.querySelector('b');
+    if(!label)return [];
+    const textParts=[...label.childNodes]
+      .filter(node=>node.nodeType===Node.TEXT_NODE)
+      .map(node=>node.textContent.trim())
+      .filter(Boolean);
+    if(textParts.length<2)return [];
+    return [textParts[0],textParts[textParts.length-1]];
+  };
+
+  const createZeroRow=team=>{
+    const tr=document.createElement('tr');
+    tr.dataset.provisional='true';
+    const values=['—',team,'0','0','0','0','0','0','0'];
+    values.forEach((value,index)=>{
+      const td=document.createElement('td');
+      if(index===1){
+        const b=document.createElement('b');
+        b.textContent=value;
+        td.appendChild(b);
+      }else if(index===2){
+        const strong=document.createElement('strong');
+        strong.textContent=value;
+        td.appendChild(strong);
+      }else{
+        td.textContent=value;
+      }
+      tr.appendChild(td);
+    });
+    return tr;
+  };
+
+  const createStandingsBlock=competition=>{
+    const engaged=[...(teamsByCompetition.get(competition)||new Set())].sort((a,b)=>a.localeCompare(b,'fr'));
+    const official=standings.get(competition);
+    const wrapper=document.createElement('div');
+    let table;
+
+    if(official){
+      wrapper.appendChild(official.content.cloneNode(true));
+      table=wrapper.querySelector('table.standings');
+    }else{
+      const tableWrap=document.createElement('div');
+      tableWrap.className='table-wrap';
+      tableWrap.dataset.dragScroll='';
+      table=document.createElement('table');
+      table.className='standings';
+      const header=document.createElement('tr');
+      ['#','Équipe','Pts','J','V','D','BP','BC','Diff'].forEach(label=>{
+        const th=document.createElement('th');
+        th.textContent=label;
+        header.appendChild(th);
+      });
+      table.appendChild(header);
+      tableWrap.appendChild(table);
+      wrapper.appendChild(tableWrap);
+    }
+
+    if(table && engaged.length){
+      const existing=new Set(
+        [...table.querySelectorAll('tr')].slice(1)
+          .map(row=>row.querySelector('td:nth-child(2)')?.textContent.trim())
+          .filter(Boolean)
+      );
+      engaged.forEach(team=>{
+        if(!existing.has(team))table.appendChild(createZeroRow(team));
+      });
+    }
+
+    if(!official && engaged.length){
+      const note=document.createElement('p');
+      note.className='muted';
+      note.textContent='Classement officiel en attente · équipes engagées affichées à zéro avant la première journée.';
+      wrapper.appendChild(note);
+    }else if(official && wrapper.querySelector('[data-provisional="true"]')){
+      const note=document.createElement('p');
+      note.className='muted';
+      note.textContent='Les équipes engagées absentes du classement officiel sont conservées provisoirement à zéro.';
+      wrapper.appendChild(note);
+    }
+    return wrapper;
   };
 
   const rangeFor=period=>{
@@ -120,11 +205,13 @@
     h2.textContent=competition||'Championnat';
     left.append(eyebrow,h2);
 
+    const hasEngagedTeams=(teamsByCompetition.get(competition)?.size||0)>0;
+    const hasRanking=standings.has(competition)||hasEngagedTeams;
     const rankingButton=document.createElement('button');
     rankingButton.type='button';
     rankingButton.className='btn small';
-    rankingButton.textContent=standings.has(competition)?'Voir le classement':'Classement indisponible';
-    rankingButton.disabled=!standings.has(competition);
+    rankingButton.textContent=hasRanking?'Voir le classement':'Classement indisponible';
+    rankingButton.disabled=!hasRanking;
     head.append(left,rankingButton);
     panel.append(head);
 
@@ -144,10 +231,9 @@
     }
     panel.append(list);
 
-    if(standings.has(competition)){
-      const ranking=document.createElement('div');
+    if(hasRanking){
+      const ranking=createStandingsBlock(competition);
       ranking.hidden=true;
-      ranking.appendChild(standings.get(competition).content.cloneNode(true));
       rankingButton.addEventListener('click',()=>{
         ranking.hidden=!ranking.hidden;
         rankingButton.textContent=ranking.hidden?'Voir le classement':'Masquer le classement';
@@ -167,7 +253,7 @@
     history.replaceState(null,'',`${location.pathname}?${params.toString()}`);
 
     container.replaceChildren();
-    const names=new Set([...fixturesByCompetition.keys(),...standings.keys()]);
+    const names=new Set([...fixturesByCompetition.keys(),...standings.keys(),...teamsByCompetition.keys()]);
     let total=0;
     [...names].sort((a,b)=>a.localeCompare(b,'fr')).forEach(name=>{
       const built=buildCard(name,range);
@@ -191,16 +277,22 @@
       .then(html=>{
         const doc=new DOMParser().parseFromString(html,'text/html');
         fixturesByCompetition=new Map();
+        teamsByCompetition=new Map();
         championshipMeta=new Map();
         doc.querySelectorAll('.championship-panel[data-competition]').forEach(section=>{
           const competition=section.dataset.competition||'Championnat';
           const meta=section.querySelector('.section-head .eyebrow')?.textContent.trim()||'Championnat';
           championshipMeta.set(competition,meta);
-          const items=[...section.querySelectorAll('.championship-calendar .fixture-row')].map(row=>({
-            row,
-            date:parseFixtureDate(row.querySelector('time')?.textContent)
-          }));
+          const teams=new Set();
+          const items=[...section.querySelectorAll('.championship-calendar .fixture-row')].map(row=>{
+            fixtureTeams(row).forEach(team=>teams.add(team));
+            return {
+              row,
+              date:parseFixtureDate(row.querySelector('time')?.textContent)
+            };
+          });
           fixturesByCompetition.set(competition,items);
+          teamsByCompetition.set(competition,teams);
         });
         const initial=new URLSearchParams(location.search).get('period')||'day';
         renderPeriod(initial);
