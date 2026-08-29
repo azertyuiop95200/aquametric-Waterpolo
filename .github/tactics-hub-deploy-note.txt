@@ -1,0 +1,3 @@
+AQUAMETRIC_TACTICS_HUB_2026_08_29_V2
+Deployment target: /knowledge
+Required checks: Jinja compile, full pytest suite, mobile tactical-board compatibility, Render target commit.
