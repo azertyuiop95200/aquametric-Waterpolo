@@ -38,6 +38,7 @@
       <a class="{% if request.url.path.startswith('/transfer-watch') %}active{% endif %}" href="/transfer-watch"><span>↻</span><b class="nav-label" data-i18n="nav.transfer_watch">Transfer Watch</b></a>
 
       <small class="nav-group-title">Analysis tools</small>
+      <a class="{% if request.url.path == '/knowledge' %}active{% endif %}" href="/knowledge"><span>TK</span><b class="nav-label">Tactique & Connaissance</b></a>
       <a class="{% if request.url.path.startswith('/tactical-chess') %}active{% endif %}" href="/tactical-chess"><span>♟</span><b class="nav-label" data-i18n="nav.tactical_chess">Tactical Chess</b></a>
       <a class="{% if request.url.path.startswith('/simulation') %}active{% endif %}" href="/simulation"><span>~</span><b class="nav-label" data-i18n="nav.simulation">Simulation</b></a>
       <a class="{% if request.url.path.startswith('/france-intelligence') %}active{% endif %}" href="/france-intelligence"><span>FR</span><b class="nav-label" data-i18n="nav.france_intel">France Intel</b></a>
@@ -48,7 +49,6 @@
       <a class="{% if request.url.path.startswith('/player-data') %}active{% endif %}" href="/player-data"><span>Σ</span><b class="nav-label" data-i18n="nav.player_data">Player Data</b></a>
       <a class="{% if request.url.path == '/evidence-coverage' %}active{% endif %}" href="/evidence-coverage"><span>✓</span><b class="nav-label">Evidence coverage</b></a>
       <a class="{% if request.url.path.startswith('/analysis-library') %}active{% endif %}" href="/analysis-library"><span>A</span><b class="nav-label" data-i18n="nav.analysis_library">Reference Library</b></a>
-      <a class="{% if request.url.path == '/knowledge' %}active{% endif %}" href="/knowledge"><span>K</span><b class="nav-label" data-i18n="nav.knowledge">Knowledge</b></a>
       <a class="{% if request.url.path == '/benchmarks' %}active{% endif %}" href="/benchmarks"><span>B</span><b class="nav-label" data-i18n="nav.benchmarks">Benchmarks</b></a>
     </nav>
     <div class="sidebar-foot"><div class="data-trust"><i></i><span><b data-i18n="trust.title">Evidence-first analysis</b><small data-i18n="trust.subtitle">Uncertain data stays uncertain</small></span></div><form method="post" action="/logout"><button class="ghost full" data-i18n="action.logout">Log out</button></form></div>
@@ -56,7 +56,7 @@
   <button class="sidebar-backdrop" type="button" data-menu-backdrop aria-label="Close menu" tabindex="-1"></button>
   <div class="app-main"><header class="topbar"><button class="menu-toggle" type="button" data-menu-toggle aria-label="Toggle menu" aria-controls="sidebar" aria-expanded="false">☰</button><div class="topbar-title"><span class="status-dot"></span><span data-i18n="workspace.title">Analysis workspace</span></div><div class="topbar-actions"><select id="lang" aria-label="Interface language"><option value="en">EN · English</option><option value="fr">FR · Français</option><option value="it">IT · Italiano</option><option value="es">ES · Español</option><option value="ru">RU · Русский</option></select><a class="profile-chip" href="/dashboard">{{ (user.name or user.email)[:1]|upper }}</a></div></header>
 {% else %}
-<header class="public-header"><a class="brand-lockup" href="/"><span class="brand-mark">A</span><span><b>{{ app_name }}</b><small data-i18n="brand.tagline">Water Polo Intelligence</small></span></a><nav><a href="/guest" data-i18n="public.guest">Guest demo</a><a href="/knowledge" data-i18n="nav.knowledge">Knowledge</a><a class="btn small" href="/login" data-i18n="public.login">Login</a></nav><select id="lang" class="public-lang" aria-label="Interface language"><option value="en">EN</option><option value="fr">FR</option><option value="it">IT</option><option value="es">ES</option><option value="ru">RU</option></select></header>
+<header class="public-header"><a class="brand-lockup" href="/"><span class="brand-mark">A</span><span><b>{{ app_name }}</b><small data-i18n="brand.tagline">Water Polo Intelligence</small></span></a><nav><a href="/guest" data-i18n="public.guest">Guest demo</a><a href="/knowledge">Tactique & Connaissance</a><a class="btn small" href="/login" data-i18n="public.login">Login</a></nav><select id="lang" class="public-lang" aria-label="Interface language"><option value="en">EN</option><option value="fr">FR</option><option value="it">IT</option><option value="es">ES</option><option value="ru">RU</option></select></header>
 {% endif %}
 <main class="content {% if not user %}public-content{% endif %}">{% if web_demo_mode and user %}<div class="demo-banner"><b data-i18n="demo.title">Free web demo</b> — <span data-i18n="demo.text">this workspace is temporary. Uploaded files and edits may disappear when the free host restarts.</span></div>{% endif %}{% block content %}{% endblock %}</main>
 {% if user %}</div></div>{% endif %}
