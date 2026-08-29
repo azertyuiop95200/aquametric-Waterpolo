@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from db import get_db
 from models import PlayerIntelligenceProfile, ScoutingPlayer, ScoutingTeam, User
+from services.deep_scouting_review import enrich_with_deep_review
 from services.prospect_ratings import build_prospect_evaluation, eu_youth_prospect_rows
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -27,6 +28,21 @@ def _jsonable(row):
     return {key: value for key, value in row.items() if key != "public_summary"}
 
 
+def _deep_rows(db: Session, user_id: int):
+    rows = [enrich_with_deep_review(row) for row in eu_youth_prospect_rows(db, user_id)]
+    rows.sort(
+        key=lambda row: (
+            row.get("overall") is not None,
+            row.get("overall") or 0,
+            row.get("confidence_score") or 0,
+        ),
+        reverse=True,
+    )
+    for idx, row in enumerate(rows, start=1):
+        row["rank"] = idx
+    return rows
+
+
 @router.get("/api/scouting/eu-youth-ranking")
 def eu_youth_ranking(
     request: Request,
@@ -34,7 +50,7 @@ def eu_youth_ranking(
     db: Session = Depends(get_db),
 ):
     user = _user(request, db)
-    rows = eu_youth_prospect_rows(db, user.id)
+    rows = _deep_rows(db, user.id)
     normalized_age = age.upper()
     if normalized_age in {"U16", "U18", "U20"}:
         rows = [row for row in rows if normalized_age in row["age_groups"]]
@@ -42,11 +58,12 @@ def eu_youth_ranking(
             row["rank"] = idx
     return {
         "age": normalized_age if normalized_age in {"U16", "U18", "U20"} else "all",
-        "engine_version": "prospect-rating-v4",
+        "engine_version": "prospect-rating-v4.1-deep-review",
         "count": len(rows),
         "players": [_jsonable(row) for row in rows],
         "policy": {
-            "video": "Official video availability never increases the score by itself. Only tagged/analyzed match evidence contributes.",
+            "video": "Linked official videos are review material only. They affect the score only when AquaMetric has player-attributed/tagged match evidence.",
+            "play_by_play": "Detailed official match reports may add a low-weight tactical signal (15%) for explicitly described actions.",
             "physical": "Physical output is not scored without calibrated tracking.",
         },
     }
@@ -62,6 +79,7 @@ def prospect_api(profile_id: int, request: Request, db: Session = Depends(get_db
     evaluation = build_prospect_evaluation(db, profile, scout_rows, user.id)
     if not evaluation:
         raise HTTPException(404, detail="EU youth prospect evaluation not available")
+    evaluation = enrich_with_deep_review(evaluation)
     return _jsonable(evaluation)
 
 
@@ -75,7 +93,8 @@ def prospect_detail(profile_id: int, request: Request, db: Session = Depends(get
     evaluation = build_prospect_evaluation(db, profile, scout_rows, user.id)
     if not evaluation:
         raise HTTPException(404, detail="EU youth prospect evaluation not available")
-    ranking = eu_youth_prospect_rows(db, user.id)
+    evaluation = enrich_with_deep_review(evaluation)
+    ranking = _deep_rows(db, user.id)
     rank = next((row["rank"] for row in ranking if row["profile_id"] == profile.id), None)
     evaluation["rank"] = rank
     return TEMPLATES.TemplateResponse(
