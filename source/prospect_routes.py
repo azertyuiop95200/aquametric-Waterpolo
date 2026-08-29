@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from db import get_db
 from models import PlayerIntelligenceProfile, ScoutingPlayer, ScoutingTeam, User
 from services.deep_scouting_review import enrich_with_deep_review
-from services.prospect_ratings import build_prospect_evaluation, eu_youth_prospect_rows
+from services.prospect_ratings import _band, build_prospect_evaluation, eu_youth_prospect_rows
 
 BASE_DIR = Path(__file__).resolve().parent
 TEMPLATES = Jinja2Templates(directory=BASE_DIR / "templates")
@@ -28,8 +28,14 @@ def _jsonable(row):
     return {key: value for key, value in row.items() if key != "public_summary"}
 
 
+def _enrich(row):
+    row = enrich_with_deep_review(row)
+    row["band"] = _band(row.get("overall"))
+    return row
+
+
 def _deep_rows(db: Session, user_id: int):
-    rows = [enrich_with_deep_review(row) for row in eu_youth_prospect_rows(db, user_id)]
+    rows = [_enrich(row) for row in eu_youth_prospect_rows(db, user_id)]
     rows.sort(
         key=lambda row: (
             row.get("overall") is not None,
@@ -79,7 +85,7 @@ def prospect_api(profile_id: int, request: Request, db: Session = Depends(get_db
     evaluation = build_prospect_evaluation(db, profile, scout_rows, user.id)
     if not evaluation:
         raise HTTPException(404, detail="EU youth prospect evaluation not available")
-    evaluation = enrich_with_deep_review(evaluation)
+    evaluation = _enrich(evaluation)
     return _jsonable(evaluation)
 
 
@@ -93,7 +99,7 @@ def prospect_detail(profile_id: int, request: Request, db: Session = Depends(get
     evaluation = build_prospect_evaluation(db, profile, scout_rows, user.id)
     if not evaluation:
         raise HTTPException(404, detail="EU youth prospect evaluation not available")
-    evaluation = enrich_with_deep_review(evaluation)
+    evaluation = _enrich(evaluation)
     ranking = _deep_rows(db, user.id)
     rank = next((row["rank"] for row in ranking if row["profile_id"] == profile.id), None)
     evaluation["rank"] = rank
