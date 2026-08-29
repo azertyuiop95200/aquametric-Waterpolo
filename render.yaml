@@ -28,5 +28,7 @@ services:
         value: "30"
       - key: COOKIE_SECURE
         value: "1"
+      - key: TACTICS_HUB_RELEASE
+        value: "2026-08-29-v2"
       - key: SECRET_KEY
         generateValue: true
