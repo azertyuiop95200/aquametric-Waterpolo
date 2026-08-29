@@ -25,6 +25,22 @@
   <p class="muted">Le classement de chaque championnat reste accessible même lorsqu’aucun match n’est programmé sur la période sélectionnée. Avant la première journée, les équipes engagées sont affichées à 0 point, 0 journée et 0 de différence de buts.</p>
 </section>
 
+<section class="panel">
+  <div class="section-head">
+    <div><span class="eyebrow">FÉMININ</span><h2>Championnats suivis</h2></div>
+    <span class="pill">6 pays</span>
+  </div>
+  <div class="actions-row" aria-label="Championnats féminins suivis">
+    <a class="ghost small" href="#women-italie">🇮🇹 Italie</a>
+    <a class="ghost small" href="#women-france">🇫🇷 France</a>
+    <a class="ghost small" href="#women-allemagne">🇩🇪 Allemagne</a>
+    <a class="ghost small" href="#women-espagne">🇪🇸 Espagne</a>
+    <a class="ghost small" href="#women-hongrie">🇭🇺 Hongrie</a>
+    <a class="ghost small" href="#women-russie">🇷🇺 Russie</a>
+  </div>
+  <p class="muted">Ces six championnats féminins restent proposés même avant le premier match. Dès qu’un calendrier ou classement officiel correspondant est détecté, le bloc est alimenté automatiquement.</p>
+</section>
+
 <div id="results-groups"><section class="panel empty-state"><b>Chargement des résultats officiels…</b></section></div>
 
 <div id="standings-templates" hidden>
@@ -67,9 +83,43 @@
   const standings=new Map(
     [...document.querySelectorAll('template[data-standing-template]')].map(t=>[t.dataset.competition,t])
   );
+  const featuredWomen=[
+    {country:'Italie',id:'women-italie',fallback:'Championnat féminin — Italie',aliases:['italie','italy','italia','serie a1 femminile','a1 femminile']},
+    {country:'France',id:'women-france',fallback:'Championnat féminin — France',aliases:['france','élite féminine','elite feminine','elite femmes','pro a feminine']},
+    {country:'Allemagne',id:'women-allemagne',fallback:'Championnat féminin — Allemagne',aliases:['allemagne','germany','deutschland','bundesliga frauen','bundesliga women','dwl']},
+    {country:'Espagne',id:'women-espagne',fallback:'Championnat féminin — Espagne',aliases:['espagne','spain','españa','division de honor femenina','división de honor femenina']},
+    {country:'Hongrie',id:'women-hongrie',fallback:'Championnat féminin — Hongrie',aliases:['hongrie','hungary','magyar','ob i női','ob i noi','noi ob i']},
+    {country:'Russie',id:'women-russie',fallback:'Championnat féminin — Russie',aliases:['russie','russia','россия','женщины','women championship russia','russian women']}
+  ];
   let fixturesByCompetition=new Map();
   let teamsByCompetition=new Map();
   let championshipMeta=new Map();
+  let featuredCompetitionById=new Map();
+
+  const normalize=value=>(value||'').toLocaleLowerCase('fr').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+
+  const featuredForCompetition=competition=>{
+    const haystack=normalize(`${competition} ${championshipMeta.get(competition)||''}`);
+    return featuredWomen.find(item=>
+      competition===item.fallback || item.aliases.some(alias=>haystack.includes(normalize(alias)))
+    );
+  };
+
+  const resolveFeaturedCompetitions=()=>{
+    const existing=new Set([...fixturesByCompetition.keys(),...standings.keys(),...teamsByCompetition.keys()]);
+    featuredCompetitionById=new Map();
+    featuredWomen.forEach(item=>{
+      const match=[...existing].find(name=>{
+        const haystack=normalize(`${name} ${championshipMeta.get(name)||standings.get(name)?.dataset.meta||''}`);
+        return item.aliases.some(alias=>haystack.includes(normalize(alias)));
+      });
+      const competition=match||item.fallback;
+      featuredCompetitionById.set(item.id,competition);
+      if(!championshipMeta.has(competition))championshipMeta.set(competition,`${item.country} · Féminin`);
+      if(!fixturesByCompetition.has(competition))fixturesByCompetition.set(competition,[]);
+      if(!teamsByCompetition.has(competition))teamsByCompetition.set(competition,new Set());
+    });
+  };
 
   const parseFixtureDate=text=>{
     const m=(text||'').match(/(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}):(\d{2}))?/);
@@ -193,6 +243,8 @@
   const buildCard=(competition,periodRange)=>{
     const panel=document.createElement('section');
     panel.className='panel championship-panel';
+    const featured=featuredForCompetition(competition);
+    if(featured)panel.id=featured.id;
 
     const head=document.createElement('div');
     head.className='section-head';
@@ -200,7 +252,7 @@
     const eyebrow=document.createElement('span');
     eyebrow.className='eyebrow';
     const meta=championshipMeta.get(competition)||standings.get(competition)?.dataset.meta||'Championnat';
-    eyebrow.textContent=meta;
+    eyebrow.textContent=featured?`${featured.country} · Féminin`:meta;
     const h2=document.createElement('h2');
     h2.textContent=competition||'Championnat';
     left.append(eyebrow,h2);
@@ -210,7 +262,7 @@
     const rankingButton=document.createElement('button');
     rankingButton.type='button';
     rankingButton.className='btn small';
-    rankingButton.textContent=hasRanking?'Voir le classement':'Classement indisponible';
+    rankingButton.textContent=hasRanking?'Voir le classement':'Classement en attente';
     rankingButton.disabled=!hasRanking;
     head.append(left,rankingButton);
     panel.append(head);
@@ -226,7 +278,9 @@
     }else{
       const empty=document.createElement('p');
       empty.className='muted';
-      empty.textContent='Aucun match sur cette période.';
+      empty.textContent=featured && !(fixturesByCompetition.get(competition)||[]).length
+        ? 'Calendrier officiel en attente. Ce championnat reste suivi dans AquaMetric.'
+        : 'Aucun match sur cette période.';
       list.appendChild(empty);
     }
     panel.append(list);
@@ -240,7 +294,7 @@
       });
       panel.append(ranking);
     }
-    return {panel,matchCount:rows.length};
+    return {panel,matchCount:rows.length,featured:!!featured};
   };
 
   const renderPeriod=period=>{
@@ -252,23 +306,21 @@
     params.set('period',valid);
     history.replaceState(null,'',`${location.pathname}?${params.toString()}`);
 
+    resolveFeaturedCompetitions();
     container.replaceChildren();
-    const names=new Set([...fixturesByCompetition.keys(),...standings.keys(),...teamsByCompetition.keys()]);
+    const names=new Set([...fixturesByCompetition.keys(),...standings.keys(),...teamsByCompetition.keys(),...featuredCompetitionById.values()]);
+    const featuredNames=new Set(featuredCompetitionById.values());
+    const ordered=[
+      ...featuredWomen.map(item=>featuredCompetitionById.get(item.id)).filter(Boolean),
+      ...[...names].filter(name=>!featuredNames.has(name)).sort((a,b)=>a.localeCompare(b,'fr'))
+    ];
     let total=0;
-    [...names].sort((a,b)=>a.localeCompare(b,'fr')).forEach(name=>{
+    [...new Set(ordered)].forEach(name=>{
       const built=buildCard(name,range);
       total+=built.matchCount;
       container.appendChild(built.panel);
     });
     count.textContent=`${total} match${total===1?'':'s'}`;
-    if(!names.size){
-      const empty=document.createElement('section');
-      empty.className='panel empty-state';
-      const label=document.createElement('b');
-      label.textContent='Aucune donnée de championnat disponible pour le moment.';
-      empty.appendChild(label);
-      container.appendChild(empty);
-    }
   };
 
   const load=()=>{
@@ -298,15 +350,11 @@
         renderPeriod(initial);
       })
       .catch(()=>{
-        container.replaceChildren();
-        const empty=document.createElement('section');
-        empty.className='panel empty-state';
-        const label=document.createElement('b');
-        label.textContent='Impossible de charger les résultats pour le moment.';
-        const detail=document.createElement('p');
-        detail.textContent='Le dernier classement officiel reste disponible dès que la synchronisation revient.';
-        empty.append(label,detail);
-        container.appendChild(empty);
+        fixturesByCompetition=new Map();
+        teamsByCompetition=new Map();
+        championshipMeta=new Map();
+        const initial=new URLSearchParams(location.search).get('period')||'day';
+        renderPeriod(initial);
       });
   };
 
