@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero compact"><div><span class="eyebrow">Analyse · Session vidéo avancée</span><h1>Lire le jeu comme une joueuse de haut niveau</h1><p>Session staff dédiée au duel, contact, mouvement sans ballon, passes clés, lecture, transition, contre-attaque et repli. Fil conducteur : water-polo féminin élite, avec Israël U20 comme étude de cas prioritaire.</p></div><div class="trust-badge">Evidence-first · extraits à valider</div></section>
+
+<section class="video-session-grid">
+  <aside class="session-toc card"><h2>12 chapitres</h2>{% for c in chapters %}<a href="#c{{ loop.index }}"><b>{{ loop.index|string|zfill(2) }}</b><span>{{ c.title }}</span><small>{{ c.focus }}</small></a>{% endfor %}</aside>
+  <div class="session-main">
+    <section class="card session-principle"><h2>Grille d'analyse d'une séquence</h2><div class="analysis-steps"><div><b>T−3 s</b><span>Scan : ballon, adversaire, gardienne, espace.</span></div><div><b>T−2 s</b><span>Pré-contact : hanches, épaule, bras de contrôle.</span></div><div><b>T−1 s</b><span>Création : rythme, séparation, fixation.</span></div><div><b>T0</b><span>Décision : passe, tir, drive, conservation.</span></div><div><b>T+1</b><span>Conséquence : aide déplacée, avantage créé.</span></div><div><b>T+2</b><span>Deuxième action : re-seal, one-more, repli.</span></div></div></section>
+
+    <section class="card"><div class="section-head"><div><span class="eyebrow">Mode interactif</span><h2>Stop avant la décision</h2></div><span class="pill">Expert</span></div><p>La vidéo s'arrête 0,5 à 1 seconde avant l'action. La joueuse doit identifier la meilleure décision avant de voir le choix réel.</p><div class="decision-grid"><button type="button">Tirer</button><button type="button">Passe centre</button><button type="button">Skip</button><button type="button">Drive</button><button type="button">Conserver</button></div><p class="muted">Les réponses deviendront actives quand les séquences vidéo validées seront attachées à la bibliothèque.</p></section>
+
+    {% for c in chapters %}<section class="card chapter-card" id="c{{ loop.index }}"><div class="section-head"><div><span class="eyebrow">Chapitre {{ loop.index }}</span><h2>{{ c.title }}</h2></div><span class="pill">{{ c.focus }}</span></div><p>{{ c.intro }}</p><div class="detail-columns"><div><h3>Ce que l'on observe</h3><ul>{% for x in c.observe %}<li>{{ x }}</li>{% endfor %}</ul></div><div><h3>Questions staff</h3><ul>{% for x in c.questions %}<li>{{ x }}</li>{% endfor %}</ul></div></div><div class="sequence-card"><div class="sequence-placeholder"><span>VIDÉO / CAPTURE</span><small>Replay officiel ou source validée uniquement</small></div><div><h3>Décomposition attendue</h3><p><b>Action → détail technique → lecture → avantage → réponse adverse → contre-mesure.</b></p><p class="muted">Chaque extrait conservera le match, quart-temps, timestamp, source, niveau de confiance et captures avant/pendant/après la décision.</p></div></div></section>{% endfor %}
+
+    <section class="card"><span class="eyebrow">Tags de recherche</span><h2>Bibliothèque de micro-détails</h2><div class="tag-cloud">{% for tag in tags %}<span>{{ tag }}</span>{% endfor %}</div></section>
+    <section class="card"><span class="eyebrow">Pipeline vidéo</span><h2>Sources à étudier et valider</h2><p>Priorité aux matchs féminins complets et replays officiels. Israël U20 2025–2026 sert de fil rouge, puis comparaison avec Espagne, Grèce, Hongrie, Italie, Pays-Bas et USA. Aucun mouvement, numéro de joueuse ou timestamp n'est présenté comme vérifié sans contrôle du replay.</p></section>
+  </div>
+</section>
+{% endblock %}
