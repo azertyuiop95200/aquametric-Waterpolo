@@ -80,7 +80,6 @@
   // For leagues not yet published for 2026-27, display the complete N-1 list as a clearly labelled reference.
   LEAGUES.forEach(l => { if (!l.currentTeams) l.currentTeams = l.previousTeams || []; });
 
-  const NATIONAL_COUNTRIES = ['France','Spain','Italy','Hungary','Greece','Croatia','Serbia','Montenegro','Germany','Netherlands','Romania','Turkey','Portugal','United Kingdom','United States','Canada','Brazil','Argentina','Australia','New Zealand','Japan','China','Kazakhstan','South Africa','Egypt'];
   const NATIONAL_CATEGORIES = ['Senior','U20 / Junior','U18','U16'];
 
   const app = document.getElementById('coachDirectoryApp');
@@ -108,15 +107,41 @@
   const keyTeam = name => aliases[norm(name)] || norm(name);
   const recordSeason = season => {
     const s = norm(season);
-    if (s.includes('2026 2027')) return CURRENT;
+    if (s === '2026' || s.includes('2026 2027')) return CURRENT;
     if (s.includes('2025 2026')) return PREVIOUS;
     return season || '';
   };
   const esc = value => String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+  const nationalCountry = record => (String(record?.team || '').split(/\s+[—–-]\s+/)[0] || '').trim();
+  const nationalGender = record => {
+    const text = `${record?.category || ''} ${record?.team || ''}`;
+    if (/\bWomen\b/i.test(text)) return 'Women';
+    if (/\bMen\b/i.test(text)) return 'Men';
+    return '';
+  };
+
+  function leagueTeams(league) { return state.season === CURRENT ? league.currentTeams : league.previousTeams; }
+
+  function availableCountries() {
+    if (state.view === 'national') {
+      return [...new Set(records
+        .filter(r => r.team_type === 'national_team' && recordSeason(r.season) === state.season)
+        .filter(r => state.gender === 'all' || nationalGender(r) === state.gender)
+        .map(nationalCountry)
+        .filter(Boolean))]
+        .sort((a,b)=>a.localeCompare(b));
+    }
+    return [...new Set(LEAGUES
+      .filter(l => (state.gender === 'all' || l.gender === state.gender) && leagueTeams(l)?.length)
+      .map(l => l.country))]
+      .sort((a,b)=>a.localeCompare(b));
+  }
 
   function countryOptions() {
-    const countries = [...new Set([...LEAGUES.map(x => x.country), ...NATIONAL_COUNTRIES])].sort((a,b)=>a.localeCompare(b));
-    countrySelect.innerHTML = '<option value="all">Tous les pays</option>' + countries.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+    const countries = availableCountries();
+    if (state.country !== 'all' && !countries.includes(state.country)) state.country = 'all';
+    countrySelect.innerHTML = '<option value="all">Tous les pays couverts</option>' + countries.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+    countrySelect.value = state.country;
   }
 
   function linkedRecords(team, season, teamType='club') {
@@ -140,8 +165,6 @@
     if (status === 'reference') return '<span class="coach-status-badge reference">D1 internationale · N-1 référence</span>';
     return '<span class="coach-status-badge provisional">2026-27 à confirmer</span>';
   }
-
-  function leagueTeams(league) { return state.season === CURRENT ? league.currentTeams : league.previousTeams; }
 
   function matchSearch(parts) {
     if (!state.search) return true;
@@ -189,16 +212,32 @@
     }).join('');
   }
 
+  function coveredNationalGenders(country) {
+    return [...new Set(records
+      .filter(r => r.team_type === 'national_team' && recordSeason(r.season) === state.season && nationalCountry(r) === country)
+      .map(nationalGender)
+      .filter(Boolean))];
+  }
+
   function renderNational() {
-    const countries = NATIONAL_COUNTRIES.filter(c => (state.country==='all'||c===state.country) && (!state.search || matchSearch([c,(FEDERATIONS[c]||[]).join(' ')])));
-    const genders = state.gender==='all' ? ['Women','Men'] : [state.gender];
-    const totalTeams = countries.length * genders.length * NATIONAL_CATEGORIES.length;
-    const sourced = records.filter(r => r.team_type === 'national_team' && recordSeason(r.season) === state.season).length;
-    kpis.innerHTML = `<div class="coach-kpi"><strong>${countries.length}</strong><span>Fédérations nationales</span></div><div class="coach-kpi"><strong>${genders.length}</strong><span>Genres</span></div><div class="coach-kpi"><strong>${totalTeams}</strong><span>Sélections / catégories</span></div><div class="coach-kpi"><strong>${sourced}</strong><span>Staffs sourcés en base</span></div>`;
-    note.innerHTML = `<b>Équipes nationales :</b> classement Fédération → pays → Femmes/Hommes → Senior/U20/U18/U16. Les catégories sont affichées comme index de recherche ; seules les nominations reliées à une source saison/compétition sont considérées confirmées.`;
-    if (!countries.length) { directory.innerHTML='<div class="coach-empty">Aucune fédération nationale ne correspond aux filtres.</div>'; return; }
+    const countries = availableCountries().filter(c => (state.country==='all'||c===state.country) && (!state.search || matchSearch([c,(FEDERATIONS[c]||[]).join(' ')])));
+    const totalTeams = countries.reduce((sum, country) => {
+      const genders = state.gender === 'all' ? coveredNationalGenders(country) : [state.gender];
+      return sum + genders.length * NATIONAL_CATEGORIES.length;
+    }, 0);
+    const displayedGenders = new Set(countries.flatMap(country => state.gender === 'all' ? coveredNationalGenders(country) : [state.gender]));
+    const sourced = records.filter(r =>
+      r.team_type === 'national_team' &&
+      recordSeason(r.season) === state.season &&
+      (state.country === 'all' || nationalCountry(r) === state.country) &&
+      (state.gender === 'all' || nationalGender(r) === state.gender)
+    ).length;
+    kpis.innerHTML = `<div class="coach-kpi"><strong>${countries.length}</strong><span>Fédérations nationales</span></div><div class="coach-kpi"><strong>${displayedGenders.size}</strong><span>Genres couverts</span></div><div class="coach-kpi"><strong>${totalTeams}</strong><span>Sélections / catégories</span></div><div class="coach-kpi"><strong>${sourced}</strong><span>Staffs sourcés en base</span></div>`;
+    note.innerHTML = `<b>Équipes nationales :</b> seuls les pays et genres disposant d'au moins un staff sourcé pour la saison sélectionnée sont proposés. Aucun pays théorique ou non couvert n'est ajouté au déroulant.`;
+    if (!countries.length) { directory.innerHTML='<div class="coach-empty">Aucune fédération nationale couverte ne correspond aux filtres.</div>'; return; }
     directory.innerHTML = countries.map(country => {
       const fed=FEDERATIONS[country]||['🌐',country,country,'International'];
+      const genders = state.gender === 'all' ? coveredNationalGenders(country) : [state.gender];
       const cards = genders.map(g => {
         const teamLabel = `${country} — ${g==='Women'?'Women':'Men'} Senior`;
         const staff = linkedRecords(teamLabel,state.season,'national_team');
@@ -214,15 +253,17 @@
   app.querySelectorAll('[data-season]').forEach(btn => btn.addEventListener('click', () => {
     state.season = btn.dataset.season;
     app.querySelectorAll('[data-season]').forEach(x=>x.classList.toggle('is-active',x===btn));
+    countryOptions();
     render();
   }));
   app.querySelectorAll('[data-view]').forEach(btn => btn.addEventListener('click', () => {
     state.view = btn.dataset.view;
     app.querySelectorAll('[data-view]').forEach(x=>x.classList.toggle('is-active',x===btn));
+    countryOptions();
     render();
   }));
   countrySelect.addEventListener('change',()=>{state.country=countrySelect.value;render();});
-  genderSelect.addEventListener('change',()=>{state.gender=genderSelect.value;render();});
+  genderSelect.addEventListener('change',()=>{state.gender=genderSelect.value;countryOptions();render();});
   searchInput.addEventListener('input',()=>{state.search=searchInput.value;render();});
 
   countryOptions();
