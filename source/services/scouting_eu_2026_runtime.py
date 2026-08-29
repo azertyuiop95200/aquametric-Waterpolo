@@ -2,7 +2,8 @@
 
 This module deliberately reuses the curated data in scouting_eu_2026 while
 persisting required ScoutingTeam fields before the first flush. It also keeps
-seeding idempotent across application restarts.
+seeding idempotent across application restarts. The original U18 snapshot is
+then overlaid with final-tournament evidence now that the event is complete.
 """
 
 from collections import defaultdict
@@ -11,6 +12,7 @@ from sqlalchemy import select
 
 from models import ScoutingPlayer, ScoutingTeam
 from services.scouting_eu_2026 import COMPETITIONS, PROSPECT_ROWS, SOURCES, _player_note, _status_for
+from services.scouting_eu_2026_final import apply_final_u18_updates
 
 
 def seed_eu_youth_2026_safe(db):
@@ -77,6 +79,9 @@ def seed_eu_youth_2026_safe(db):
                 total, peak_goals, peak_saves, distinction, performance, score, level
             )
 
+    # Final World Aquatics reporting supersedes the original J1-J2 U18 snapshot
+    # for runtime scouting, while the base dataset remains preserved for provenance.
+    apply_final_u18_updates(db)
     db.commit()
 
 
