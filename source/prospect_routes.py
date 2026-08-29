@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from db import get_db
 from models import PlayerIntelligenceProfile, ScoutingPlayer, ScoutingTeam, User
 from services.deep_scouting_review import enrich_with_deep_review
+from services.game_reading import add_game_reading_score
 from services.prospect_ratings import _band, build_prospect_evaluation, eu_youth_prospect_rows
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -31,6 +32,7 @@ def _jsonable(row):
 def _enrich(row):
     row = enrich_with_deep_review(row)
     row["band"] = _band(row.get("overall"))
+    row = add_game_reading_score(row)
     return row
 
 
@@ -64,12 +66,13 @@ def eu_youth_ranking(
             row["rank"] = idx
     return {
         "age": normalized_age if normalized_age in {"U16", "U18", "U20"} else "all",
-        "engine_version": "prospect-rating-v4.1-deep-review",
+        "engine_version": "prospect-rating-v4.2-game-reading",
         "count": len(rows),
         "players": [_jsonable(row) for row in rows],
         "policy": {
             "video": "Linked official videos are review material only. They affect the score only when AquaMetric has player-attributed/tagged match evidence.",
             "play_by_play": "Detailed official match reports may add a low-weight tactical signal (15%) for explicitly described actions.",
+            "game_reading": "Game-reading is a separate /100 grade built from evidence-bound decision, tactics, anticipation/transition, impact and role-specific defensive signals; weak samples are shrunk toward neutral.",
             "physical": "Physical output is not scored without calibrated tracking.",
         },
     }

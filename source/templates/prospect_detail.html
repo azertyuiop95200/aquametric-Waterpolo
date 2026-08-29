@@ -2,7 +2,7 @@
 {% set e = evaluation %}
 <section class="page-head intelligence-hero player-profile-hero">
   <div>
-    <span class="eyebrow">EU YOUTH PROSPECT · MULTI-EVIDENCE RATING V4.1</span>
+    <span class="eyebrow">EU YOUTH PROSPECT · MULTI-EVIDENCE RATING V4.2</span>
     <h1>#{{ e.rank or '—' }} · {{ profile.canonical_name }}</h1>
     <p>{{ profile.role }} · {{ e.countries|join(', ') }} · {{ e.age_groups|join(' / ') }}</p>
     <div class="profile-quick">
@@ -10,6 +10,7 @@
       <span>{{ e.confidence_label }} · {{ (e.confidence_score*100)|round|int }}% confiance</span>
       <span>{{ e.evidence_count }} blocs/matchs de preuve</span>
       <span>{{ e.covered_dimensions }}/8 dimensions couvertes</span>
+      <span>🧠 Lecture de jeu {{ e.game_reading.score if e.game_reading.score is not none else '—' }}{% if e.game_reading.score is not none %}/100{% endif %}</span>
     </div>
   </div>
   <div class="score-card">
@@ -32,10 +33,22 @@
   <section class="panel profile-policy">
     <span class="eyebrow">POLITIQUE DE NOTATION</span><h2>Pas de fausse précision</h2>
     <p>Une vidéo officielle simplement disponible <b>ne donne aucun point</b>. Elle ne pèse dans la note qu'après attribution/tagging d'actions à la joueuse dans AquaMetric.</p>
-    <p>Les comptes rendus officiels détaillés peuvent désormais apporter un <b>signal tactique faible (15 %)</b> uniquement lorsque l'action de la joueuse est explicitement décrite.</p>
+    <p>Les comptes rendus officiels détaillés peuvent apporter un <b>signal tactique faible (15 %)</b> uniquement lorsque l'action de la joueuse est explicitement décrite.</p>
+    <p>La <b>lecture de jeu</b> est une note séparée : elle n'est jamais déduite du nombre de buts et reste non évaluée quand la couverture tactique est insuffisante.</p>
     <p class="muted">{{ e.physical_note }}</p>
   </section>
 </div>
+
+<section class="panel">
+  <div class="section-head"><div><span class="eyebrow">🧠 LECTURE DE JEU</span><h2>{% if e.game_reading.score is not none %}{{ e.game_reading.score }}/100 · {{ e.game_reading.label }}{% else %}Non évaluée{% endif %}</h2><p class="muted">Choix, compréhension tactique, anticipation, transition et gestion des moments du match. Pondération adaptée au poste.</p></div><span class="pill">{{ e.game_reading.confidence_label }}{% if e.game_reading.confidence_score %} · {{ (e.game_reading.confidence_score*100)|round|int }}%{% endif %}</span></div>
+  <p>{{ e.game_reading.summary }}</p>
+  <div class="metric-cards">
+    {% for name, value in e.game_reading.components.items() %}
+      <div class="metric-card"><small>{{ name|replace('_',' ')|title }}</small><strong>{{ value if value is not none else '—' }}</strong><p>{% if value is not none %}/100{% else %}non couvert{% endif %}</p></div>
+    {% endfor %}
+  </div>
+  <p class="muted">Couverture utile : {{ (e.game_reading.coverage*100)|round|int }}%. {% if e.game_reading.sources %}Sources : {{ e.game_reading.sources|join(' · ') }}.{% endif %}</p>
+</section>
 
 <section class="panel">
   <div class="section-head"><div><span class="eyebrow">8 DIMENSIONS</span><h2>Profil d'évaluation</h2></div></div>
