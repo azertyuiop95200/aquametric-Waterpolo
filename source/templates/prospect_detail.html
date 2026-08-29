@@ -1,0 +1,74 @@
+{% extends "base.html" %}{% block content %}
+{% set e = evaluation %}
+<section class="page-head intelligence-hero player-profile-hero">
+  <div>
+    <span class="eyebrow">EU YOUTH PROSPECT · MULTI-EVIDENCE RATING V4</span>
+    <h1>#{{ e.rank or '—' }} · {{ profile.canonical_name }}</h1>
+    <p>{{ profile.role }} · {{ e.countries|join(', ') }} · {{ e.age_groups|join(' / ') }}</p>
+    <div class="profile-quick">
+      <span>{{ e.band }}</span>
+      <span>{{ e.confidence_label }} · {{ (e.confidence_score*100)|round|int }}% confiance</span>
+      <span>{{ e.evidence_count }} blocs/matchs de preuve</span>
+      <span>{{ e.covered_dimensions }}/8 dimensions couvertes</span>
+    </div>
+  </div>
+  <div class="score-card">
+    <strong>{{ e.overall if e.overall is not none else '—' }}</strong><span>{% if e.overall is not none %}/100{% endif %}</span>
+    <div style="font-size:1.25rem;letter-spacing:.08em;margin-top:.35rem">{{ e.star_text }}</div>
+    <small>{{ e.stars }}/5 étoiles · {{ e.engine_version }}</small>
+  </div>
+</section>
+
+<div class="profile-dashboard-grid">
+  <section class="panel">
+    <span class="eyebrow">COUVERTURE DE PREUVES</span><h2>Ce qui alimente réellement la note</h2>
+    <div class="public-summary-grid">
+      <div><small>Dossiers scouting</small><b>{{ e.scouting_records }}</b></div>
+      <div><small>Matchs publics documentés</small><b>{{ e.public_matches }}</b></div>
+      <div><small>Matchs vidéo/taggés analysés</small><b>{{ e.video_analyzed_matches }}</b></div>
+      <div><small>Observations de tirs</small><b>{{ e.shot_observations }}</b></div>
+    </div>
+  </section>
+  <section class="panel profile-policy">
+    <span class="eyebrow">POLITIQUE DE NOTATION</span><h2>Pas de fausse précision</h2>
+    <p>Une vidéo officielle simplement disponible <b>ne donne aucun point</b>. Elle ne pèse dans la note qu'après attribution/tagging d'actions à la joueuse dans AquaMetric.</p>
+    <p class="muted">{{ e.physical_note }}</p>
+  </section>
+</div>
+
+<section class="panel">
+  <div class="section-head"><div><span class="eyebrow">8 DIMENSIONS</span><h2>Profil d'évaluation</h2></div></div>
+  <div class="public-dimensions">
+  {% for name, score in e.dimensions.items() %}
+    <div class="public-dimension {{ 'available' if score is not none else 'missing' }}">
+      <small>{{ name|replace('_',' ')|title }}</small><b>{{ score if score is not none else '—' }}</b>
+      {% if e.dimension_sources[name] %}<span class="muted">{{ e.dimension_sources[name]|join(' · ') }}</span>{% endif %}
+    </div>
+  {% endfor %}
+  </div>
+</section>
+
+<section class="panel">
+  <span class="eyebrow">CONTEXTE PROSPECT</span><h2>Paramètres complémentaires</h2>
+  <div class="metric-cards">
+    {% for name, value in e.context_components.items() %}
+    <div class="metric-card"><small>{{ name|replace('_',' ')|title }}</small><strong>{{ value if value is not none else '—' }}</strong><p>{% if value is not none %}/100{% else %}preuve insuffisante{% endif %}</p></div>
+    {% endfor %}
+  </div>
+</section>
+
+{% if e.official_video_sources %}
+<section class="panel">
+  <div class="section-head"><div><span class="eyebrow">VIDÉOS OFFICIELLES</span><h2>Matchs disponibles pour approfondir l'analyse</h2><p class="muted">Ces liens sont des sources vidéo. Ils ne modifient la note qu'après analyse/tagging attribuable.</p></div><span class="pill">{{ e.official_video_sources|length }} vidéos</span></div>
+  <div class="evaluation-grid">
+    {% for item in e.official_video_sources %}<article class="evaluation-card"><h3>{{ item.label }}</h3><a class="mini-link" href="{{ item.url }}" target="_blank" rel="noopener">Ouvrir la vidéo World Aquatics →</a></article>{% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% if e.source_urls %}
+<section class="panel"><span class="eyebrow">SOURCES STATISTIQUES</span><h2>Rapports utilisés</h2><div class="source-list">{% for url in e.source_urls %}<a class="mini-link" href="{{ url }}" target="_blank" rel="noopener">Source officielle {{ loop.index }} →</a>{% endfor %}</div></section>
+{% endif %}
+
+<section class="panel"><div class="section-head"><div><span class="eyebrow">DOSSIER COMPLET</span><h2>Carrière, matchs, tirs et historique</h2></div><a class="btn secondary small" href="/profiles/players/{{ profile.id }}">Ouvrir la fiche joueuse complète →</a></div></section>
+{% endblock %}
