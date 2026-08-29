@@ -2,7 +2,7 @@
 {% set e = evaluation %}
 <section class="page-head intelligence-hero player-profile-hero">
   <div>
-    <span class="eyebrow">EU YOUTH PROSPECT · MULTI-EVIDENCE RATING V4</span>
+    <span class="eyebrow">EU YOUTH PROSPECT · MULTI-EVIDENCE RATING V4.1</span>
     <h1>#{{ e.rank or '—' }} · {{ profile.canonical_name }}</h1>
     <p>{{ profile.role }} · {{ e.countries|join(', ') }} · {{ e.age_groups|join(' / ') }}</p>
     <div class="profile-quick">
@@ -32,6 +32,7 @@
   <section class="panel profile-policy">
     <span class="eyebrow">POLITIQUE DE NOTATION</span><h2>Pas de fausse précision</h2>
     <p>Une vidéo officielle simplement disponible <b>ne donne aucun point</b>. Elle ne pèse dans la note qu'après attribution/tagging d'actions à la joueuse dans AquaMetric.</p>
+    <p>Les comptes rendus officiels détaillés peuvent désormais apporter un <b>signal tactique faible (15 %)</b> uniquement lorsque l'action de la joueuse est explicitement décrite.</p>
     <p class="muted">{{ e.physical_note }}</p>
   </section>
 </div>
@@ -56,6 +57,30 @@
     {% endfor %}
   </div>
 </section>
+
+{% if e.deep_review %}
+<section class="panel">
+  <div class="section-head"><div><span class="eyebrow">ANALYSE POUSSÉE MULTI-MATCHS</span><h2>Lecture tactique et comportementale</h2><p class="muted">Analyse fondée sur les actions explicitement décrites dans les rapports officiels et reliée aux vidéos officielles lorsqu'elles existent. Une vidéo non taggée n'est pas comptée comme analyse visuelle.</p></div><span class="pill">{{ e.deep_review.evidence_count }} matchs/rapports</span></div>
+  <p>{{ e.deep_review.summary }}</p>
+  <div class="profile-dashboard-grid">
+    <div class="notice"><b>Forces observées</b><ul>{% for item in e.deep_review.strengths %}<li>{{ item }}</li>{% endfor %}</ul></div>
+    <div class="notice"><b>Points de vigilance</b><ul>{% for item in e.deep_review.risks %}<li>{{ item }}</li>{% endfor %}</ul></div>
+  </div>
+  <div class="evaluation-grid">
+    {% for item in e.deep_review.evidence %}
+    <article class="evaluation-card">
+      <h3>{{ item.title }}</h3>
+      <p>{{ item.observations }}</p>
+      <div style="display:flex;gap:.75rem;flex-wrap:wrap">
+        <a class="mini-link" href="{{ item.report_url }}" target="_blank" rel="noopener">Rapport officiel →</a>
+        {% if item.video_url %}<a class="mini-link" href="{{ item.video_url }}" target="_blank" rel="noopener">Vidéo officielle →</a>{% endif %}
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+  <p class="muted">Statut vidéo : {{ e.deep_review.video_status }}</p>
+</section>
+{% endif %}
 
 {% if e.official_video_sources %}
 <section class="panel">
