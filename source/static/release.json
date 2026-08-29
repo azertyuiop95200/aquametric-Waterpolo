@@ -1,8 +1,8 @@
 {
-  "release": "AquaMetric V12.3 Player Evaluation",
+  "release": "AquaMetric V12.3 Player Evaluation + Tactique & Connaissance Hub",
   "marker": "AQUAMETRIC_V12_3_PLAYER_EVAL_2026_08_28",
-  "date": "2026-08-28",
-  "deployment_refresh": "2026-08-28T19:43:19+02:00",
+  "date": "2026-08-29",
+  "deployment_refresh": "2026-08-29T22:00:00+02:00",
   "validated_features": [
     "languages_en_fr_it_es_ru",
     "linked_player_profiles",
@@ -15,6 +15,9 @@
     "confidence_and_source_provenance",
     "saved_multi_run_analysis_history",
     "visual_tactical_tablet",
+    "tactics_knowledge_multi_diagram_hub",
+    "tactics_decision_branches",
+    "elite_video_analysis_entry",
     "shot_preferences_min_sample",
     "security_headers"
   ]
