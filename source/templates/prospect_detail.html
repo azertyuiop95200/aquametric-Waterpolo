@@ -1,57 +1,37 @@
 {% extends "base.html" %}{% block content %}
 {% set e = evaluation %}
+<style>
+.recruitment-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:16px 0 0}.recruitment-summary .metric-card{padding:14px;min-height:102px}.recruitment-summary strong{font-size:1.35rem}.recruitment-stars{letter-spacing:.08em;color:var(--accent2)}.recruitment-dossier-nav{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 18px}.recruitment-dossier-nav a{padding:7px 10px;border:1px solid var(--line);border-radius:999px;color:var(--muted);font-size:.76rem}.recruitment-dossier-nav a:hover{color:var(--text);border-color:#3a7288}.recruitment-evidence-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.recruitment-evidence-grid>div{padding:14px;border:1px solid var(--line);border-radius:12px;background:#0c202a}.recruitment-evidence-grid small,.recruitment-evidence-grid b{display:block}.recruitment-evidence-grid b{font-size:1.2rem;margin-top:4px}
+@media(max-width:900px){.recruitment-summary,.recruitment-evidence-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:540px){.recruitment-summary,.recruitment-evidence-grid{grid-template-columns:1fr}}
+</style>
+
 <section class="page-head intelligence-hero player-profile-hero">
   <div>
-    <span class="eyebrow">EU YOUTH PROSPECT · MULTI-EVIDENCE RATING V4.2</span>
+    <span class="eyebrow">DOSSIER RECRUTEMENT · PROSPECT UE 2026</span>
     <h1>#{{ e.rank or '—' }} · {{ profile.canonical_name }}</h1>
     <p>{{ profile.role }} · {{ e.countries|join(', ') }} · {{ e.age_groups|join(' / ') }}</p>
     <div class="profile-quick">
       <span>{{ e.band }}</span>
-      <span>{{ e.confidence_label }} · {{ (e.confidence_score*100)|round|int }}% confiance</span>
-      <span>{{ e.evidence_count }} blocs/matchs de preuve</span>
+      <span>{{ e.evidence_count }} preuves</span>
       <span>{{ e.covered_dimensions }}/8 dimensions couvertes</span>
-      <span>🧠 Lecture de jeu {{ e.game_reading.score if e.game_reading.score is not none else '—' }}{% if e.game_reading.score is not none %}/100{% endif %}</span>
+      <span>{{ e.video_analyzed_matches }} match(s) vidéo analysé(s)/taggé(s)</span>
     </div>
-  </div>
-  <div class="score-card">
-    <strong>{{ e.overall if e.overall is not none else '—' }}</strong><span>{% if e.overall is not none %}/100{% endif %}</span>
-    <div style="font-size:1.25rem;letter-spacing:.08em;margin-top:.35rem">{{ e.star_text }}</div>
-    <small>{{ e.stars }}/5 étoiles · {{ e.engine_version }}</small>
   </div>
 </section>
 
-<div class="profile-dashboard-grid">
-  <section class="panel">
-    <span class="eyebrow">COUVERTURE DE PREUVES</span><h2>Ce qui alimente réellement la note</h2>
-    <div class="public-summary-grid">
-      <div><small>Dossiers scouting</small><b>{{ e.scouting_records }}</b></div>
-      <div><small>Matchs publics documentés</small><b>{{ e.public_matches }}</b></div>
-      <div><small>Matchs vidéo/taggés analysés</small><b>{{ e.video_analyzed_matches }}</b></div>
-      <div><small>Observations de tirs</small><b>{{ e.shot_observations }}</b></div>
-    </div>
-  </section>
-  <section class="panel profile-policy">
-    <span class="eyebrow">POLITIQUE DE NOTATION</span><h2>Pas de fausse précision</h2>
-    <p>Une vidéo officielle simplement disponible <b>ne donne aucun point</b>. Elle ne pèse dans la note qu'après attribution/tagging d'actions à la joueuse dans AquaMetric.</p>
-    <p>Les comptes rendus officiels détaillés peuvent apporter un <b>signal tactique faible (15 %)</b> uniquement lorsque l'action de la joueuse est explicitement décrite.</p>
-    <p>La <b>lecture de jeu</b> est une note séparée : elle n'est jamais déduite du nombre de buts et reste non évaluée quand la couverture tactique est insuffisante.</p>
-    <p class="muted">{{ e.physical_note }}</p>
-  </section>
+<div class="recruitment-summary">
+  <div class="metric-card"><small>Note globale</small><strong>{{ e.overall if e.overall is not none else '—' }}{% if e.overall is not none %}/100{% endif %}</strong><p>Classement principal</p></div>
+  <div class="metric-card"><small>Étoiles</small><strong class="recruitment-stars">{{ e.star_text }}</strong><p>{{ e.stars }}/5 · niveau synthétique</p></div>
+  <div class="metric-card"><small>Lecture de jeu</small><strong>{{ e.game_reading.score if e.game_reading.score is not none else '—' }}{% if e.game_reading.score is not none %}/100{% endif %}</strong><p>{{ e.game_reading.label }}</p></div>
+  <div class="metric-card"><small>Confiance</small><strong>{{ (e.confidence_score*100)|round|int }}%</strong><p>{{ e.confidence_label }}</p></div>
 </div>
 
-<section class="panel">
-  <div class="section-head"><div><span class="eyebrow">🧠 LECTURE DE JEU</span><h2>{% if e.game_reading.score is not none %}{{ e.game_reading.score }}/100 · {{ e.game_reading.label }}{% else %}Non évaluée{% endif %}</h2><p class="muted">Choix, compréhension tactique, anticipation, transition et gestion des moments du match. Pondération adaptée au poste.</p></div><span class="pill">{{ e.game_reading.confidence_label }}{% if e.game_reading.confidence_score %} · {{ (e.game_reading.confidence_score*100)|round|int }}%{% endif %}</span></div>
-  <p>{{ e.game_reading.summary }}</p>
-  <div class="metric-cards">
-    {% for name, value in e.game_reading.components.items() %}
-      <div class="metric-card"><small>{{ name|replace('_',' ')|title }}</small><strong>{{ value if value is not none else '—' }}</strong><p>{% if value is not none %}/100{% else %}non couvert{% endif %}</p></div>
-    {% endfor %}
-  </div>
-  <p class="muted">Couverture utile : {{ (e.game_reading.coverage*100)|round|int }}%. {% if e.game_reading.sources %}Sources : {{ e.game_reading.sources|join(' · ') }}.{% endif %}</p>
-</section>
+<nav class="recruitment-dossier-nav" aria-label="Sections du dossier recrutement">
+  <a href="#evaluation">Évaluation</a><a href="#lecture">Lecture de jeu</a><a href="#analyse">Analyse multi-matchs</a><a href="#preuves">Preuves</a><a href="#contexte">Contexte prospect</a><a href="#sources">Sources</a>
+</nav>
 
-<section class="panel">
-  <div class="section-head"><div><span class="eyebrow">8 DIMENSIONS</span><h2>Profil d'évaluation</h2></div></div>
+<section id="evaluation" class="panel">
+  <div class="section-head"><div><span class="eyebrow">1 · ÉVALUATION GLOBALE</span><h2>Profil sur 8 dimensions</h2><p class="muted">Les dimensions détaillent ce qui compose le niveau de la joueuse. Elles ne sont affichées que lorsqu'une preuve exploitable existe.</p></div></div>
   <div class="public-dimensions">
   {% for name, score in e.dimensions.items() %}
     <div class="public-dimension {{ 'available' if score is not none else 'missing' }}">
@@ -62,18 +42,23 @@
   </div>
 </section>
 
-<section class="panel">
-  <span class="eyebrow">CONTEXTE PROSPECT</span><h2>Paramètres complémentaires</h2>
+<section id="lecture" class="panel">
+  <div class="section-head">
+    <div><span class="eyebrow">2 · LECTURE DE JEU</span><h2>{% if e.game_reading.score is not none %}{{ e.game_reading.score }}/100 · {{ e.game_reading.label }}{% else %}Non évaluée{% endif %}</h2><p class="muted">Choix, compréhension tactique, anticipation, transition et gestion des moments du match. La pondération s'adapte au poste.</p></div>
+    <span class="pill">Confiance {{ e.game_reading.confidence_label }}{% if e.game_reading.confidence_score %} · {{ (e.game_reading.confidence_score*100)|round|int }}%{% endif %}</span>
+  </div>
+  <p>{{ e.game_reading.summary }}</p>
   <div class="metric-cards">
-    {% for name, value in e.context_components.items() %}
-    <div class="metric-card"><small>{{ name|replace('_',' ')|title }}</small><strong>{{ value if value is not none else '—' }}</strong><p>{% if value is not none %}/100{% else %}preuve insuffisante{% endif %}</p></div>
+    {% for name, value in e.game_reading.components.items() %}
+    <div class="metric-card"><small>{{ name|replace('_',' ')|title }}</small><strong>{{ value if value is not none else '—' }}</strong><p>{% if value is not none %}/100{% else %}non couvert{% endif %}</p></div>
     {% endfor %}
   </div>
+  <p class="muted">Couverture utile : {{ (e.game_reading.coverage*100)|round|int }}%. {% if e.game_reading.sources %}Sources : {{ e.game_reading.sources|join(' · ') }}.{% endif %}</p>
 </section>
 
 {% if e.deep_review %}
-<section class="panel">
-  <div class="section-head"><div><span class="eyebrow">ANALYSE POUSSÉE MULTI-MATCHS</span><h2>Lecture tactique et comportementale</h2><p class="muted">Analyse fondée sur les actions explicitement décrites dans les rapports officiels et reliée aux vidéos officielles lorsqu'elles existent. Une vidéo non taggée n'est pas comptée comme analyse visuelle.</p></div><span class="pill">{{ e.deep_review.evidence_count }} matchs/rapports</span></div>
+<section id="analyse" class="panel">
+  <div class="section-head"><div><span class="eyebrow">3 · ANALYSE MULTI-MATCHS</span><h2>Ce que la joueuse montre réellement en match</h2><p class="muted">Lecture tactique et comportementale fondée sur les actions explicitement documentées. Une vidéo non taggée reste une source à consulter, pas une analyse visuelle validée.</p></div><span class="pill">{{ e.deep_review.evidence_count }} matchs/rapports</span></div>
   <p>{{ e.deep_review.summary }}</p>
   <div class="profile-dashboard-grid">
     <div class="notice"><b>Forces observées</b><ul>{% for item in e.deep_review.strengths %}<li>{{ item }}</li>{% endfor %}</ul></div>
@@ -81,32 +66,43 @@
   </div>
   <div class="evaluation-grid">
     {% for item in e.deep_review.evidence %}
-    <article class="evaluation-card">
-      <h3>{{ item.title }}</h3>
-      <p>{{ item.observations }}</p>
-      <div style="display:flex;gap:.75rem;flex-wrap:wrap">
-        <a class="mini-link" href="{{ item.report_url }}" target="_blank" rel="noopener">Rapport officiel →</a>
-        {% if item.video_url %}<a class="mini-link" href="{{ item.video_url }}" target="_blank" rel="noopener">Vidéo officielle →</a>{% endif %}
-      </div>
-    </article>
+    <article class="evaluation-card"><h3>{{ item.title }}</h3><p>{{ item.observations }}</p><div style="display:flex;gap:.75rem;flex-wrap:wrap"><a class="mini-link" href="{{ item.report_url }}" target="_blank" rel="noopener">Rapport officiel →</a>{% if item.video_url %}<a class="mini-link" href="{{ item.video_url }}" target="_blank" rel="noopener">Vidéo officielle →</a>{% endif %}</div></article>
     {% endfor %}
   </div>
-  <p class="muted">Statut vidéo : {{ e.deep_review.video_status }}</p>
 </section>
 {% endif %}
 
+<section id="preuves" class="panel">
+  <div class="section-head"><div><span class="eyebrow">4 · NIVEAU DE PREUVE</span><h2>Ce qui alimente réellement les notes</h2><p class="muted">La confiance dépend de la quantité et surtout de la qualité des données disponibles.</p></div></div>
+  <div class="recruitment-evidence-grid">
+    <div><small>Dossiers recrutement</small><b>{{ e.scouting_records }}</b></div>
+    <div><small>Matchs publics documentés</small><b>{{ e.public_matches }}</b></div>
+    <div><small>Matchs vidéo réellement analysés</small><b>{{ e.video_analyzed_matches }}</b></div>
+    <div><small>Observations de tirs</small><b>{{ e.shot_observations }}</b></div>
+  </div>
+  <div class="notice compact" style="margin-top:14px"><b>Règle de prudence</b><p>Une vidéo simplement disponible ne donne aucun point. Les comptes rendus officiels détaillés peuvent seulement apporter un signal tactique faible lorsqu'une action de la joueuse est explicitement décrite. {{ e.physical_note }}</p></div>
+</section>
+
+<section id="contexte" class="panel">
+  <span class="eyebrow">5 · CONTEXTE PROSPECT</span><h2>Signaux complémentaires de recrutement</h2>
+  <p class="muted">Ces indicateurs complètent l'évaluation sans remplacer l'analyse du jeu.</p>
+  <div class="metric-cards">
+    {% for name, value in e.context_components.items() %}
+    <div class="metric-card"><small>{{ name|replace('_',' ')|title }}</small><strong>{{ value if value is not none else '—' }}</strong><p>{% if value is not none %}/100{% else %}preuve insuffisante{% endif %}</p></div>
+    {% endfor %}
+  </div>
+</section>
+
 {% if e.official_video_sources %}
 <section class="panel">
-  <div class="section-head"><div><span class="eyebrow">VIDÉOS OFFICIELLES</span><h2>Matchs disponibles pour approfondir l'analyse</h2><p class="muted">Ces liens sont des sources vidéo. Ils ne modifient la note qu'après analyse/tagging attribuable.</p></div><span class="pill">{{ e.official_video_sources|length }} vidéos</span></div>
-  <div class="evaluation-grid">
-    {% for item in e.official_video_sources %}<article class="evaluation-card"><h3>{{ item.label }}</h3><a class="mini-link" href="{{ item.url }}" target="_blank" rel="noopener">Ouvrir la vidéo World Aquatics →</a></article>{% endfor %}
-  </div>
+  <div class="section-head"><div><span class="eyebrow">VIDÉOS À APPROFONDIR</span><h2>Matchs officiels disponibles</h2><p class="muted">Ces liens servent de matière pour une future analyse détaillée ; leur simple présence ne modifie pas la note.</p></div><span class="pill">{{ e.official_video_sources|length }} vidéos</span></div>
+  <div class="evaluation-grid">{% for item in e.official_video_sources %}<article class="evaluation-card"><h3>{{ item.label }}</h3><a class="mini-link" href="{{ item.url }}" target="_blank" rel="noopener">Ouvrir la vidéo World Aquatics →</a></article>{% endfor %}</div>
 </section>
 {% endif %}
 
 {% if e.source_urls %}
-<section class="panel"><span class="eyebrow">SOURCES STATISTIQUES</span><h2>Rapports utilisés</h2><div class="source-list">{% for url in e.source_urls %}<a class="mini-link" href="{{ url }}" target="_blank" rel="noopener">Source officielle {{ loop.index }} →</a>{% endfor %}</div></section>
+<section id="sources" class="panel"><span class="eyebrow">6 · SOURCES</span><h2>Rapports et références utilisés</h2><div class="source-list">{% for url in e.source_urls %}<a class="mini-link" href="{{ url }}" target="_blank" rel="noopener">Source officielle {{ loop.index }} →</a>{% endfor %}</div></section>
 {% endif %}
 
-<section class="panel"><div class="section-head"><div><span class="eyebrow">DOSSIER COMPLET</span><h2>Carrière, matchs, tirs et historique</h2></div><a class="btn secondary small" href="/profiles/players/{{ profile.id }}">Ouvrir la fiche joueuse complète →</a></div></section>
+<section class="panel"><div class="section-head"><div><span class="eyebrow">DOSSIER COMPLET</span><h2>Carrière, matchs, tirs et historique</h2></div><div class="actions compact"><a class="btn secondary small" href="/scouting?kind=national_team&eu=1">← Revenir au vivier</a><a class="btn secondary small" href="/profiles/players/{{ profile.id }}">Fiche joueuse complète →</a></div></div></section>
 {% endblock %}

@@ -1,43 +1,146 @@
 {% extends "base.html" %}{% block content %}
-<section class="page-head scout-hero"><div><span class="eyebrow" data-i18n="scout.center">SCOUTING CENTER</span><h1 data-i18n="scout.title">Teams, opponents and player dossiers</h1><p data-i18n="scout.intro">Explore French Elite clubs and international selections. Current rosters, historical rosters and provisional research are never mixed silently.</p></div><div class="trust-badge"><b>{{teams|length}}</b> <span data-i18n="scout.teams_loaded">teams loaded</span></div></section>
-<div class="section-tabs simple-tabs"><a class="{% if selected_kind=='club' %}active{% endif %}" href="/scouting?kind=club" data-i18n="scout.clubs">French / club teams</a><a id="national-scout-tab" class="{% if selected_kind=='national_team' %}active{% endif %}" href="/scouting?kind=national_team" data-i18n="scout.national">National teams</a><a id="eu-youth-scout-tab" href="/scouting?kind=national_team&eu=1">🇪🇺 EU youth 2026</a><a class="{% if selected_kind not in ['club','national_team'] %}active{% endif %}" href="/scouting?kind=all" data-i18n="scout.all">All teams</a></div>
+<style>
+.recruitment-kpis,.recruitment-score-grid{display:grid;gap:12px}.recruitment-kpis{grid-template-columns:repeat(4,minmax(0,1fr));margin:16px 0 20px}.recruitment-score-grid{grid-template-columns:repeat(4,minmax(0,1fr));margin:.6rem 0}.recruitment-kpis .metric-card,.recruitment-score-grid .metric-card{padding:14px;min-height:96px}.recruitment-kpis strong,.recruitment-score-grid strong{font-size:1.3rem}.recruitment-card-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.recruitment-card-head h3{margin:.1rem 0}.recruitment-explain{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}.recruitment-directory{margin-top:22px}.recruitment-card-score{font-size:1.25rem}.recruitment-stars{letter-spacing:.06em;color:var(--accent2)}.recruitment-section-note{margin:0 0 16px}.recruitment-toolbar{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}.recruitment-toolbar .section-tabs{margin:0}.recruitment-score-label{color:var(--muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.06em}.recruitment-eu-card .scout-player-main{width:100%}
+@media(max-width:950px){.recruitment-kpis,.recruitment-score-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.recruitment-explain{grid-template-columns:1fr}}
+@media(max-width:560px){.recruitment-kpis,.recruitment-score-grid{grid-template-columns:1fr}.recruitment-card-head{display:grid}}
+</style>
 
-<div id="eu-youth-note" class="team-explore-note" hidden><b>EU youth 2026:</b> classement transversal U16, U18 et U20 par note d'évaluation /100, étoiles et note séparée de lecture de jeu /100. La note combine plusieurs familles de preuves et reste réduite vers 50 lorsque la couverture est faible. Une vidéo disponible n'ajoute aucun point tant qu'elle n'a pas été réellement analysée/taggée.</div>
-
-<section id="eu-ranking-panel" class="panel" hidden>
-  <div class="section-head"><div><span class="eyebrow">EU YOUTH · PROSPECT RATING V4.2</span><h2>Classement des joueuses par note d'évaluation</h2><p class="muted">Attaque, défense, décision, tactique, transition, discipline, technique, impact, régularité, niveau de compétition, matchs clés, progression, qualité des preuves et lecture de jeu.</p></div><span id="eu-ranking-count" class="pill">—</span></div>
-  <div class="section-tabs simple-tabs" id="eu-age-tabs"><button type="button" class="active" data-age="all">Toutes</button><button type="button" data-age="U16">U16</button><button type="button" data-age="U18">U18</button><button type="button" data-age="U20">U20</button></div>
-  <div id="eu-ranking-grid" class="scout-player-grid"><div class="empty-state"><b>Calcul du classement…</b></div></div>
-  <div class="notice compact"><b>Lecture de jeu ≠ nombre de buts</b><p>La note de lecture de jeu est séparée de la note globale. Elle privilégie les choix, la compréhension tactique, l'anticipation, la transition et la gestion des moments sous pression. Si la couverture est insuffisante, elle reste non évaluée.</p></div>
+<section class="page-head scout-hero">
+  <div>
+    <span class="eyebrow">RECRUTEMENT</span>
+    <h1>Identifier, comparer et suivre les joueuses</h1>
+    <p>Un espace unique pour le vivier de prospects, les équipes et sélections, les dossiers joueuses, les mouvements et les recherches à approfondir.</p>
+  </div>
+  <div class="trust-badge"><b>{{ teams|length }}</b><span>dossiers chargés</span></div>
 </section>
 
-<div class="team-explore-note"><span data-i18n="scout.examples">Examples available:</span> <b>Granville</b> · <b>Lille</b> · <b>Bordeaux</b> · <b>Nice</b> · <b>Taverny</b> · <b>Toulon</b> · <b>Choisy</b> · <b>Paris</b> · <b>Marseille</b> · <b>Grand Nancy</b> · <b>France</b> · <b>Spain</b> · <b>USA</b> · U16 · U18 · U20</div>
-<div class="scout-grid">{% for t in teams %}<a class="scout-card" data-eu-youth="{{ '1' if t.external_key.startswith('eu-youth-2026-') else '0' }}" href="/scouting/{{ t.id }}"><div class="scout-top"><span>{{ t.country }}</span><span>{{ t.age_group }}</span></div><h3>{{ t.name }}</h3><p>{{ t.competition }}</p><div class="roster-state {{ 'good' if 'confirmed' in t.roster_status or 'completed' in t.roster_status else 'warn' }}">{{ t.roster_status|replace('_',' ') }}</div><small>{{ t.source_note }}</small><div class="card-arrow"><span data-i18n="scout.open_team">Open team file</span> →</div></a>{% endfor %}</div>
-<section class="panel request-panel"><div><span class="eyebrow" data-i18n="scout.missing">MISSING DATA</span><h2 data-i18n="scout.request_title">Request another player, club or roster</h2><p class="muted" data-i18n="scout.request_help">The request queues research; it never creates fabricated statistics.</p></div><form method="post" action="/scouting/request" class="request-form"><label><span data-i18n="scout.type">Type</span><select name="request_type"><option value="team" data-i18n="scout.team_club">Team / club</option><option value="player" data-i18n="scout.player">Player</option><option value="national_team" data-i18n="scout.national_team">National team</option><option value="competition" data-i18n="scout.competition">Competition</option></select></label><label><span data-i18n="scout.name">Name</span><input name="query" placeholder="Olympic Nice women roster 2026-27" required></label><label><span data-i18n="scout.source_hint">Official/source link if known</span><input name="source_hint" placeholder="Optional"></label><button class="btn" data-i18n="scout.queue">Queue research</button></form></section>
+<div class="recruitment-kpis">
+  <div class="metric-card"><small>1 · Identifier</small><strong>Vivier</strong><p>Repérer les profils à potentiel et les joueuses à suivre.</p></div>
+  <div class="metric-card"><small>2 · Évaluer</small><strong>/100 + ★</strong><p>Comparer niveau global, lecture de jeu et confiance de l'évaluation.</p></div>
+  <div class="metric-card"><small>3 · Comprendre</small><strong>Multi-matchs</strong><p>Relier statistiques, contexte, tactique et vidéo réellement analysée.</p></div>
+  <div class="metric-card"><small>4 · Suivre</small><strong>Dossier</strong><p>Conserver sources, mouvements, staff, matchs et signaux d'évolution.</p></div>
+</div>
+
+<div class="section-tabs simple-tabs" id="recruitment-tabs">
+  <a class="{% if selected_kind not in ['club','national_team'] %}active{% endif %}" href="/scouting?kind=all">Tous les dossiers</a>
+  <a class="{% if selected_kind=='club' %}active{% endif %}" href="/scouting?kind=club">Clubs</a>
+  <a id="national-scout-tab" class="{% if selected_kind=='national_team' %}active{% endif %}" href="/scouting?kind=national_team">Sélections nationales</a>
+  <a id="eu-youth-scout-tab" href="/scouting?kind=national_team&eu=1">Vivier UE 2026</a>
+</div>
+
+<section id="eu-ranking-panel" class="panel" hidden>
+  <div class="section-head">
+    <div>
+      <span class="eyebrow">VIVIER UE 2026</span>
+      <h2>Classement des prospects U16 · U18 · U20</h2>
+      <p class="muted">Le classement est déterminé par la note globale. La lecture de jeu est indépendante, les étoiles donnent une lecture rapide du niveau et la confiance indique la solidité des preuves.</p>
+    </div>
+    <span id="eu-ranking-count" class="pill">—</span>
+  </div>
+
+  <div class="recruitment-toolbar">
+    <div class="section-tabs simple-tabs" id="eu-age-tabs">
+      <button type="button" class="active" data-age="all">Toutes</button>
+      <button type="button" data-age="U16">U16</button>
+      <button type="button" data-age="U18">U18</button>
+      <button type="button" data-age="U20">U20</button>
+    </div>
+  </div>
+
+  <div id="eu-ranking-grid" class="scout-player-grid"><div class="empty-state"><b>Calcul du classement…</b></div></div>
+
+  <div class="recruitment-explain">
+    <div class="notice compact"><b>Ordre de lecture</b><p><b>Note globale</b> = performance générale. <b>Étoiles</b> = niveau synthétique. <b>Lecture de jeu</b> = intelligence tactique séparée. <b>Confiance</b> = robustesse de l'échantillon.</p></div>
+    <div class="notice compact"><b>Règle vidéo</b><p>Une vidéo simplement disponible ne donne aucun bonus. Elle ne devient une preuve vidéo qu'après analyse et attribution réelle des actions à la joueuse.</p></div>
+  </div>
+</section>
+
+<section class="panel recruitment-directory">
+  <div class="section-head">
+    <div>
+      <span class="eyebrow" id="directory-eyebrow">DOSSIERS RECRUTEMENT</span>
+      <h2 id="directory-title">Équipes et sélections suivies</h2>
+      <p class="muted" id="directory-help">Ouvrez un dossier pour retrouver l'effectif, les profils joueuses, les sources, les mouvements, le staff et les matchs associés.</p>
+    </div>
+    <span class="pill">{{ teams|length }} dossiers</span>
+  </div>
+
+  <div class="scout-grid">
+    {% for t in teams %}
+    <a class="scout-card" data-eu-youth="{{ '1' if t.external_key.startswith('eu-youth-2026-') else '0' }}" href="/scouting/{{ t.id }}">
+      <div class="scout-top"><span>{{ t.country }}</span><span>{{ t.age_group }}</span></div>
+      <h3>{{ t.name }}</h3>
+      <p>{{ t.competition }}</p>
+      <div class="roster-state {{ 'good' if 'confirmed' in t.roster_status or 'completed' in t.roster_status else 'warn' }}">{{ t.roster_status|replace('_',' ') }}</div>
+      <small>{{ t.source_note }}</small>
+      <div class="card-arrow"><span>Ouvrir le dossier recrutement</span> →</div>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="panel request-panel">
+  <div>
+    <span class="eyebrow">RECHERCHE À AJOUTER</span>
+    <h2>Ajouter une joueuse, une équipe ou une compétition au recrutement</h2>
+    <p class="muted">La demande crée une recherche à documenter. Elle ne fabrique jamais de statistiques manquantes.</p>
+  </div>
+  <form method="post" action="/scouting/request" class="request-form">
+    <label><span>Type de recherche</span><select name="request_type"><option value="player">Joueuse</option><option value="team">Club</option><option value="national_team">Sélection nationale</option><option value="competition">Compétition</option></select></label>
+    <label><span>Nom</span><input name="query" placeholder="Nom de la joueuse, du club ou de la sélection" required></label>
+    <label><span>Source officielle si connue</span><input name="source_hint" placeholder="Optionnel"></label>
+    <button class="btn">Ajouter à la recherche</button>
+  </form>
+</section>
+
 <script>
 (function(){
   const params=new URLSearchParams(window.location.search);
-  if(params.get('eu')!=='1') return;
+  const euMode=params.get('eu')==='1';
+  if(!euMode) return;
+
   document.querySelectorAll('.scout-card[data-eu-youth="0"]').forEach(el=>el.hidden=true);
-  const note=document.getElementById('eu-youth-note'); if(note) note.hidden=false;
   const panel=document.getElementById('eu-ranking-panel'); if(panel) panel.hidden=false;
   const national=document.getElementById('national-scout-tab'); if(national) national.classList.remove('active');
   const eu=document.getElementById('eu-youth-scout-tab'); if(eu) eu.classList.add('active');
+  const title=document.getElementById('directory-title'); if(title) title.textContent='Sélections représentées dans le vivier UE 2026';
+  const eyebrow=document.getElementById('directory-eyebrow'); if(eyebrow) eyebrow.textContent='DOSSIERS PAR SÉLECTION';
+  const help=document.getElementById('directory-help'); if(help) help.textContent='Ces dossiers regroupent les joueuses évaluées par pays et catégorie. Le classement prospect ci-dessus reste la vue de recrutement principale.';
 
   const grid=document.getElementById('eu-ranking-grid');
   const count=document.getElementById('eu-ranking-count');
   const tabs=document.getElementById('eu-age-tabs');
   const esc=(s)=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const score=(v)=>v==null?'—':v+'/100';
+
   const load=async(age)=>{
     grid.innerHTML='<div class="empty-state"><b>Calcul du classement…</b></div>';
     try{
       const r=await fetch('/api/scouting/eu-youth-ranking?age='+encodeURIComponent(age),{credentials:'same-origin'});
       if(!r.ok) throw new Error('ranking unavailable');
-      const d=await r.json(); count.textContent=d.count+' joueuses';
+      const d=await r.json();
+      count.textContent=d.count+' joueuses';
       if(!d.players.length){grid.innerHTML='<div class="empty-state"><b>Aucune évaluation disponible</b></div>';return;}
-      grid.innerHTML=d.players.map(p=>{const gr=p.game_reading||{};const grScore=gr.score==null?'—':gr.score+'/100';return `<a class="scout-player-card" href="/prospects/${p.profile_id}"><div class="scout-player-cap">#${p.rank}</div><div class="scout-player-main"><h3>${esc(p.name)}</h3><div class="scout-player-meta"><span>${esc(p.countries.join(', '))}</span><span>${esc(p.age_groups.join(' / '))}</span><span>${esc(p.band)}</span></div><div style="display:flex;gap:.75rem;align-items:baseline;flex-wrap:wrap;margin:.35rem 0"><strong style="font-size:1.3rem">${p.overall==null?'—':p.overall+'/100'}</strong><span style="letter-spacing:.06em">${esc(p.star_text)} · ${p.stars}/5</span><span>🧠 Lecture ${grScore}</span></div><small>${esc(p.confidence_label)} · ${Math.round(p.confidence_score*100)}% confiance · ${p.evidence_count} preuves · ${p.video_analyzed_matches} match(s) vidéo/taggé(s)${gr.confidence_label?' · lecture '+esc(gr.confidence_label.toLowerCase()):''}</small></div><div class="profile-open"><span>Fiche prospect</span><b>→</b></div></a>`;}).join('');
-    }catch(err){grid.innerHTML='<div class="empty-state"><b>Classement momentanément indisponible</b><p>Les dossiers d’équipes restent accessibles ci-dessous.</p></div>';}
+      grid.innerHTML=d.players.map(p=>{
+        const gr=p.game_reading||{};
+        const conf=Math.round((p.confidence_score||0)*100);
+        return `<a class="scout-player-card recruitment-eu-card" href="/prospects/${p.profile_id}">
+          <div class="scout-player-cap">#${p.rank}</div>
+          <div class="scout-player-main">
+            <div class="recruitment-card-head"><div><h3>${esc(p.name)}</h3><div class="scout-player-meta"><span>${esc((p.countries||[]).join(', '))}</span><span>${esc((p.age_groups||[]).join(' / '))}</span><span>${esc(p.band)}</span></div></div><div class="profile-open"><span>Voir la fiche</span><b>→</b></div></div>
+            <div class="recruitment-score-grid">
+              <div class="metric-card"><span class="recruitment-score-label">Note globale</span><strong class="recruitment-card-score">${score(p.overall)}</strong><p>Classement principal</p></div>
+              <div class="metric-card"><span class="recruitment-score-label">Étoiles</span><strong class="recruitment-stars">${esc(p.star_text)}</strong><p>${p.stars}/5</p></div>
+              <div class="metric-card"><span class="recruitment-score-label">Lecture de jeu</span><strong>${score(gr.score)}</strong><p>${esc(gr.label||'Non évaluée')}</p></div>
+              <div class="metric-card"><span class="recruitment-score-label">Confiance</span><strong>${conf}%</strong><p>${esc(p.confidence_label||'—')} · ${p.evidence_count||0} preuves</p></div>
+            </div>
+            <small>${p.video_analyzed_matches||0} match(s) vidéo réellement analysé(s)/taggé(s) · ${p.covered_dimensions||0}/8 dimensions couvertes</small>
+          </div>
+        </a>`;
+      }).join('');
+    }catch(err){grid.innerHTML='<div class="empty-state"><b>Classement momentanément indisponible</b><p>Les dossiers de recrutement restent accessibles ci-dessous.</p></div>';}
   };
+
   tabs.addEventListener('click',e=>{const b=e.target.closest('button[data-age]');if(!b)return;tabs.querySelectorAll('button').forEach(x=>x.classList.toggle('active',x===b));load(b.dataset.age);});
   load('all');
 })();
