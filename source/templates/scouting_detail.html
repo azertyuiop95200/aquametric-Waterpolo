@@ -1,12 +1,71 @@
 {% extends "base.html" %}{% block content %}
-<section class="page-head scout-detail-hero"><div><span class="eyebrow">{{ scout_team.team_type|replace('_',' ') }} · {{ scout_team.country }}</span><h1>{{ scout_team.name }}</h1><p>{{ scout_team.competition }} · {{ scout_team.season_label }}</p></div><div class="trust-badge">{{ scout_team.roster_status|replace('_',' ') }}</div></section>
-<div class="scout-detail-grid"><section class="panel"><span class="eyebrow" data-i18n="scout.roster">ROSTER</span><h2 data-i18n="scout.players_title">Player dossiers in this scouting file</h2><p class="muted" data-i18n="scout.players_help">Every player name opens a dossier. Historical evidence and current-season confirmation stay visibly separate.</p>{% if players %}<div class="scout-player-grid">{% for p in players %}<a class="scout-player-card" href="/intelligence/player?name={{p.name|urlencode}}" aria-label="Open profile {{p.name}}"><div class="scout-player-cap">#{{ p.cap_number if p.cap_number is not none else '—' }}</div><div class="scout-player-main"><h3>{{ p.name }}</h3><div class="scout-player-meta"><span>{{ p.birth_year or '—' }}</span><span>{{ p.nationality or '—' }}</span><span>{{ p.role }}</span></div><small>{{ p.current_status|replace('_',' ') }}</small>{% if p.note %}<p class="muted scout-player-note">{{ p.note }}</p>{% endif %}</div><div class="profile-open"><span data-i18n="scout.open_profile">Open dossier</span><b>→</b></div></a>{% endfor %}</div>{% else %}<div class="empty-state"><b data-i18n="scout.roster_pending">Roster confirmation pending</b><p data-i18n="scout.roster_pending_help">The team stays empty until a sufficiently reliable player list is available.</p></div>{% endif %}</section>
-<aside class="panel source-card"><span class="eyebrow" data-i18n="scout.evidence_state">EVIDENCE STATE</span><h3>{{ scout_team.roster_status|replace('_',' ') }}</h3><p>{{ scout_team.source_note }}</p><div class="notice"><b data-i18n="scout.auto_watch">Automatic roster watch</b><p data-i18n="scout.auto_watch_help">The page uses the latest validated roster evidence stored by AquaMetric. Unknown information stays marked unknown.</p></div><a class="btn secondary small" href="{{ scout_team.source_url }}" target="_blank" rel="noopener" data-i18n="scout.open_source">Open federation/team source</a></aside></div>
-<section class="panel"><div class="section-head"><div><span class="eyebrow" data-i18n="scout.movements">MERCATO / ROSTER CHANGES</span><h2 data-i18n="scout.movements_title">Confirmed and reported movements</h2></div><a class="mini-link" href="/transfer-watch" data-i18n="scout.full_market">Full transfer timeline →</a></div><div id="movement-grid" class="evaluation-grid" data-team-id="{{scout_team.id}}"><div class="empty-state"><b data-i18n="scout.checking_movements">Checking attached movement evidence…</b></div></div></section>
-<section class="panel"><div class="section-head"><div><span class="eyebrow" data-i18n="scout.staff">COACH / STAFF</span><h2 data-i18n="scout.staff_title">Coaching intelligence</h2></div><a class="mini-link" href="/coaches" data-i18n="scout.all_coaches">All coaches →</a></div><div id="coach-grid" class="evaluation-grid" data-team-id="{{scout_team.id}}"><div class="empty-state"><b data-i18n="scout.loading_coach">Loading verified coach records…</b></div></div></section>
-{% if fixtures %}<section class="panel"><span class="eyebrow">2026–27</span><h2 data-i18n="scout.fixtures">Official fixtures involving this team</h2><div class="fixture-list">{% for f in fixtures %}<article class="fixture-row"><div><small>{{ f.start_text }}</small><b>{{ f.home_team }}</b><span>vs</span><b>{{ f.away_team }}</b></div><span class="source-pill">FFN</span></article>{% endfor %}</div></section>{% endif %}
+<section class="page-head scout-detail-hero">
+  <div>
+    <span class="eyebrow">DOSSIER RECRUTEMENT · {{ scout_team.team_type|replace('_',' ') }} · {{ scout_team.country }}</span>
+    <h1>{{ scout_team.name }}</h1>
+    <p>{{ scout_team.competition }} · {{ scout_team.season_label }}</p>
+  </div>
+  <div class="trust-badge">{{ scout_team.roster_status|replace('_',' ') }}</div>
+</section>
+
+<div class="scout-detail-grid">
+  <section class="panel">
+    <span class="eyebrow">1 · EFFECTIF & PROFILS</span>
+    <h2>Joueuses rattachées à ce dossier</h2>
+    <p class="muted">Chaque joueuse ouvre sa fiche individuelle. Les informations confirmées, historiques et encore incomplètes restent distinguées.</p>
+    {% if players %}
+    <div class="scout-player-grid">
+      {% for p in players %}
+      <a class="scout-player-card" href="/intelligence/player?name={{p.name|urlencode}}" aria-label="Ouvrir le profil {{p.name}}">
+        <div class="scout-player-cap">#{{ p.cap_number if p.cap_number is not none else '—' }}</div>
+        <div class="scout-player-main">
+          <h3>{{ p.name }}</h3>
+          <div class="scout-player-meta"><span>{{ p.birth_year or '—' }}</span><span>{{ p.nationality or '—' }}</span><span>{{ p.role }}</span></div>
+          <small>{{ p.current_status|replace('_',' ') }}</small>
+          {% if p.note %}<p class="muted scout-player-note">{{ p.note }}</p>{% endif %}
+        </div>
+        <div class="profile-open"><span>Ouvrir la fiche joueuse</span><b>→</b></div>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state"><b>Effectif en attente de confirmation</b><p>Le dossier reste vide tant qu'une liste de joueuses suffisamment fiable n'est pas disponible.</p></div>
+    {% endif %}
+  </section>
+
+  <aside class="panel source-card">
+    <span class="eyebrow">2 · FIABILITÉ DU DOSSIER</span>
+    <h3>{{ scout_team.roster_status|replace('_',' ') }}</h3>
+    <p>{{ scout_team.source_note }}</p>
+    <div class="notice"><b>Principe de recrutement</b><p>Les informations non confirmées restent explicitement marquées comme telles. L'absence de donnée n'est jamais interprétée comme une preuve négative.</p></div>
+    <a class="btn secondary small" href="{{ scout_team.source_url }}" target="_blank" rel="noopener">Ouvrir la source officielle</a>
+  </aside>
+</div>
+
+<section class="panel">
+  <div class="section-head"><div><span class="eyebrow">3 · MOUVEMENTS</span><h2>Arrivées, départs et signaux mercato</h2><p class="muted">Les mouvements sont séparés entre confirmations et informations encore rapportées.</p></div><a class="mini-link" href="/transfer-watch">Voir toute la veille mercato →</a></div>
+  <div id="movement-grid" class="evaluation-grid" data-team-id="{{scout_team.id}}"><div class="empty-state"><b>Vérification des mouvements associés…</b></div></div>
+</section>
+
+<section class="panel">
+  <div class="section-head"><div><span class="eyebrow">4 · ENCADREMENT</span><h2>Coach et staff</h2><p class="muted">Le contexte sportif et le staff sont conservés dans le dossier pour mieux interpréter le rôle et la progression des joueuses.</p></div><a class="mini-link" href="/coaches">Tous les coachs →</a></div>
+  <div id="coach-grid" class="evaluation-grid" data-team-id="{{scout_team.id}}"><div class="empty-state"><b>Chargement des informations staff…</b></div></div>
+</section>
+
+{% if fixtures %}
+<section class="panel">
+  <span class="eyebrow">5 · CALENDRIER</span>
+  <h2>Matchs officiels associés à l'équipe</h2>
+  <div class="fixture-list">{% for f in fixtures %}<article class="fixture-row"><div><small>{{ f.start_text }}</small><b>{{ f.home_team }}</b><span>vs</span><b>{{ f.away_team }}</b></div><span class="source-pill">FFN</span></article>{% endfor %}</div>
+</section>
+{% endif %}
+
+<section class="panel">
+  <div class="section-head"><div><span class="eyebrow">DOSSIER RECRUTEMENT</span><h2>Revenir au vivier et aux autres équipes</h2></div><a class="btn secondary small" href="/scouting">← Revenir à Recrutement</a></div>
+</section>
+
 <script>
-(async function(){const box=document.getElementById('coach-grid');if(!box)return;try{const r=await fetch('/api/scouting/'+box.dataset.teamId+'/coaches',{credentials:'same-origin'});const d=await r.json();if(!d.coaches||!d.coaches.length){box.innerHTML='<div class="empty-state"><b>Coach not confirmed</b><p>No sufficiently reliable coach assignment is stored yet.</p></div>';return;}box.innerHTML=d.coaches.map(c=>`<article class="evaluation-card"><div class="evaluation-top"><div><a class="profile-link" href="${c.profile_url}"><b>${c.name}</b></a><small>${c.role} · ${c.season}</small></div><span class="trust-badge">${Math.round(c.confidence*100)}%</span></div><p>${c.status.replaceAll('_',' ')}</p><small>${c.source_tier}</small></article>`).join('');}catch(e){box.innerHTML='<div class="empty-state"><b>Coach data unavailable</b></div>';}})();
-(async function(){const box=document.getElementById('movement-grid');if(!box)return;try{const r=await fetch('/api/scouting/'+box.dataset.teamId+'/transfers',{credentials:'same-origin'});const d=await r.json();if(!d.movements||!d.movements.length){box.innerHTML='<div class="empty-state"><b>No attached transfer movement yet</b><p>No signal is linked to this exact team yet; that does not prove there were no changes.</p></div>';return;}box.innerHTML=d.movements.map(m=>`<article class="evaluation-card"><div class="evaluation-top"><div><a class="profile-link" href="${m.profile_url}"><b>${m.player}</b></a><small>${m.date} · ${m.direction}</small></div><span class="trust-badge">${Math.round(m.confidence*100)}%</span></div><p>${m.from} → ${m.to}</p><small>${m.status.replaceAll('_',' ')} · ${m.source_tier}</small></article>`).join('');}catch(e){box.innerHTML='<div class="empty-state"><b>Movement data unavailable</b></div>';}})();
+(async function(){const box=document.getElementById('coach-grid');if(!box)return;try{const r=await fetch('/api/scouting/'+box.dataset.teamId+'/coaches',{credentials:'same-origin'});const d=await r.json();if(!d.coaches||!d.coaches.length){box.innerHTML='<div class="empty-state"><b>Coach non confirmé</b><p>Aucune affectation suffisamment fiable n’est enregistrée pour le moment.</p></div>';return;}box.innerHTML=d.coaches.map(c=>`<article class="evaluation-card"><div class="evaluation-top"><div><a class="profile-link" href="${c.profile_url}"><b>${c.name}</b></a><small>${c.role} · ${c.season}</small></div><span class="trust-badge">${Math.round(c.confidence*100)}%</span></div><p>${c.status.replaceAll('_',' ')}</p><small>${c.source_tier}</small></article>`).join('');}catch(e){box.innerHTML='<div class="empty-state"><b>Données staff indisponibles</b></div>';}})();
+(async function(){const box=document.getElementById('movement-grid');if(!box)return;try{const r=await fetch('/api/scouting/'+box.dataset.teamId+'/transfers',{credentials:'same-origin'});const d=await r.json();if(!d.movements||!d.movements.length){box.innerHTML='<div class="empty-state"><b>Aucun mouvement associé pour le moment</b><p>Cela ne signifie pas qu’aucun changement n’a eu lieu.</p></div>';return;}box.innerHTML=d.movements.map(m=>`<article class="evaluation-card"><div class="evaluation-top"><div><a class="profile-link" href="${m.profile_url}"><b>${m.player}</b></a><small>${m.date} · ${m.direction==='arrival'?'arrivée':'départ'}</small></div><span class="trust-badge">${Math.round(m.confidence*100)}%</span></div><p>${m.from} → ${m.to}</p><small>${m.status.replaceAll('_',' ')} · ${m.source_tier}</small></article>`).join('');}catch(e){box.innerHTML='<div class="empty-state"><b>Données mercato indisponibles</b></div>';}})();
 </script>
 {% endblock %}
