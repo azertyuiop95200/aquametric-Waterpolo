@@ -8,6 +8,13 @@ on:
       - 'Dockerfile'
       - 'render.yaml'
       - '.github/workflows/v121-mobile-regression.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'source/**'
+      - 'Dockerfile'
+      - 'render.yaml'
+      - '.github/workflows/v121-mobile-regression.yml'
   workflow_dispatch:
 
 permissions:
@@ -107,8 +114,9 @@ jobs:
             const teamCards=page.locator('.scout-card'); assert(await teamCards.count()>=8,'scouting team choice is too narrow');
             const lille=teamCards.filter({hasText:'Lille'}).first(); assert(await lille.count()===1,'Lille team card missing');
             await lille.click(); await page.waitForLoadState('networkidle');
-            const playerCards=page.locator('.scout-player-card'); assert(await playerCards.count()>0,'scouting players are not rendered as dossier links');
-            const href=await playerCards.first().getAttribute('href'); assert(href&&href.includes('/intelligence/player?name='),'scouting player is not linked to dossier');
+            const playerCards=page.locator('.scout-player-card'); assert(await playerCards.count()>0,'scouting players are not rendered');
+            const dossierLinks=playerCards.locator('a[href*="/intelligence/player?name="]');
+            assert(await dossierLinks.count()>0,'scouting player is not linked to canonical dossier resolver');
             await page.goto(base+'/intelligence/player?name=Cecilia%20Nardini',{waitUntil:'networkidle'});
             assert(page.url().includes('/profiles/players/'),'player resolver did not open canonical profile');
             assert(await page.locator('.career-panel').count()===1,'career panel missing from player dossier');
