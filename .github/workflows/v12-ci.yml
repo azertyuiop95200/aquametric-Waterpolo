@@ -6,6 +6,11 @@ on:
     paths:
       - 'source/**'
       - '.github/workflows/v12-ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'source/**'
+      - '.github/workflows/v12-ci.yml'
   workflow_dispatch:
 
 permissions:
