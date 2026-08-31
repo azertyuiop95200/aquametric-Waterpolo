@@ -52,7 +52,7 @@
     {% if players %}
     <div class="scout-player-rich-grid" data-safe-resolver-prefix="/intelligence/player?name=">
       {% for p in players %}
-      <article class="scout-player-rich">
+      <article class="scout-player-card scout-player-rich">
         <div class="scout-player-rich-head">
           <div class="scout-player-rich-title">
             <div class="scout-player-cap">#{{ p.cap_number if p.cap_number is not none else '—' }}</div>
