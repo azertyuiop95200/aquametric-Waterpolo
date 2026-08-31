@@ -83,7 +83,7 @@ def test_analysis_library_is_operational_not_reference_demo_only():
     assert workspace.status_code == 200
     for expected in (
         "RAPID LONG-VIDEO PIPELINE", "Passes décisives", "Ballons touchés en pointe",
-        "Possession & décision", "Supériorité / infériorité", "Gardienne", "Physique & nage",
+        "Possession", "Supériorité / infériorité", "Gardienne", "Physique",
         "Cartes de tirs, cage 3×3 et préférences", "Évaluation 8 dimensions",
         "Attaque", "Défense", "Décision", "Tactique", "Transition", "Discipline", "Technique", "Impact",
         "Une case vide signifie",
@@ -118,5 +118,6 @@ def test_reference_detail_exposes_all_supported_official_player_columns():
     page = client.get(f"/analysis-library/{item_id}")
     assert page.status_code == 200
     assert "Player stats" in page.text
+    assert "Tactical notes" in page.text
     for label in ("Buts", "Tirs", "% tir", "Assists", "Steals", "Exclusions", "Arrêts", "Qualité source"):
         assert label in page.text
