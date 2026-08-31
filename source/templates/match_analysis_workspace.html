@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.analysis-workspace{display:grid;gap:18px}.analysis-hero{display:grid;grid-template-columns:1.35fr .65fr;gap:18px;align-items:stretch}
+.analysis-hero>div,.analysis-panel{border:1px solid var(--border,#294754);border-radius:22px;background:var(--panel,#0b202b);padding:20px}
+.analysis-score{font-size:clamp(30px,5vw,56px);line-height:1;margin:.2em 0}.analysis-kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.analysis-kpi{padding:14px;border-radius:16px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)}.analysis-kpi b{display:block;font-size:24px}
+.analysis-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.analysis-actions label{display:flex;gap:7px;align-items:center}
+.analysis-tabs{display:flex;gap:8px;overflow:auto;position:sticky;top:58px;z-index:8;padding:8px 0;background:var(--bg,#06131b)}
+.analysis-tabs a{white-space:nowrap;text-decoration:none;padding:8px 12px;border-radius:999px;border:1px solid var(--border,#294754)}
+.metric-family{margin-top:14px}.metric-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:8px}
+.metric-cell{padding:12px;border:1px solid rgba(255,255,255,.08);border-radius:14px;background:rgba(255,255,255,.025)}.metric-cell span{display:block;font-size:12px;opacity:.72}.metric-cell b{font-size:21px}
+.split-stats{display:grid;grid-template-columns:1fr 1fr;gap:14px}.data-missing{opacity:.55}.wide-table{overflow:auto}.wide-table table{width:100%;border-collapse:collapse;min-width:1050px}
+.wide-table th,.wide-table td{padding:10px;border-bottom:1px solid rgba(255,255,255,.08);text-align:left;white-space:nowrap}.wide-table th{font-size:12px;opacity:.7}
+.timeline-row{display:grid;grid-template-columns:80px 180px 90px 1fr;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.07)}
+.coverage-note{padding:12px 14px;border-left:3px solid #63d2ed;background:rgba(99,210,237,.08);border-radius:0 12px 12px 0}
+@media(max-width:850px){.analysis-hero,.split-stats{grid-template-columns:1fr}.timeline-row{grid-template-columns:70px 1fr}.timeline-row span:nth-child(3),.timeline-row span:nth-child(4){grid-column:2}}
+</style>
+
+<div class="analysis-workspace">
+<section class="analysis-hero">
+  <div>
+    <span class="eyebrow">MATCH INTELLIGENCE · WORKSPACE RÉEL</span>
+    <h1 class="analysis-score">{{ match.team.name }} <span>vs</span> {{ match.opponent }}</h1>
+    <p>{{ match.competition or "Compétition non renseignée" }} · {{ match.match_date or "date non renseignée" }}</p>
+    <div class="analysis-actions">
+      {% if match.video_source == "upload" and match.video_path %}
+      <form method="post" action="/match-analysis/{{ match.id }}/rapid-run">
+        <label><input type="checkbox" name="include_audio" value="1"> ajouter le scan audio (plus lent)</label>
+        <button class="btn primary" type="submit">⚡ Analyser la vidéo longue</button>
+      </form>
+      {% else %}
+      <a class="btn" href="/matches/{{ match.id }}">Ajouter / gérer la vidéo</a>
+      <small>Le traitement autonome complet utilise une vidéo téléversée et détenue. Les liens tiers restent en lecture/référence.</small>
+      {% endif %}
+      <a class="btn" href="/matches/{{ match.id }}/intelligence">Intelligence tactique</a>
+      <a class="btn" href="/matches/{{ match.id }}/report">Rapport</a>
+    </div>
+  </div>
+  <div>
+    <div class="analysis-kpis">
+      <div class="analysis-kpi"><b>{{ statistics.coverage.event_rows }}</b><span>événements enregistrés</span></div>
+      <div class="analysis-kpi"><b>{{ statistics.coverage.confirmed_rows }}</b><span>événements confirmés</span></div>
+      <div class="analysis-kpi"><b>{{ vision.sample_count if vision else "—" }}</b><span>échantillons vidéo</span></div>
+      <div class="analysis-kpi"><b>{{ candidates|length }}</b><span>moments candidats</span></div>
+    </div>
+    {% if job %}<p><b>Dernier traitement :</b> {{ job.status|replace("_"," ") }} · {{ job.progress }}%</p><small>{{ job.message }}</small>{% endif %}
+  </div>
+</section>
+
+<nav class="analysis-tabs">
+  <a href="#team">Équipe</a><a href="#players">Joueuses</a><a href="#video">Vidéo rapide</a>
+  <a href="#phases">Phases</a><a href="#tactics">Tactique</a><a href="#quality">Qualité des données</a>
+</nav>
+
+<section class="analysis-panel" id="team">
+  <span class="eyebrow">STATISTIQUES MATCH</span><h2>Toutes les familles de statistiques</h2>
+  <p class="coverage-note">{{ statistics.coverage.note }}</p>
+  <div class="split-stats">
+    {% for side_label, values in [(match.team.name, statistics["for"]), (match.opponent, statistics["against"])] %}
+    <div>
+      <h3>{{ side_label }}</h3>
+      {% for family_key, family_label, metrics in statistics.catalog %}
+      <div class="metric-family">
+        <b>{{ family_label }}</b>
+        <div class="metric-grid">
+          {% for metric_key, metric_label in metrics %}
+          {% set value = values.get(metric_key) %}
+          <div class="metric-cell {% if value is none %}data-missing{% endif %}">
+            <span>{{ metric_label }}</span>
+            <b>{% if value is not none %}{{ value }}{% if "%" in metric_label or "Efficacité" in metric_label %}%{% endif %}{% else %}—{% endif %}</b>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="analysis-panel" id="players">
+  <span class="eyebrow">PLAYER MATCH DATA</span><h2>Détail joueuse par joueuse</h2>
+  <div class="wide-table"><table>
+    <thead><tr><th>#</th><th>Joueuse</th><th>Rôle</th><th>Buts</th><th>Tirs</th><th>% tir</th><th>Assists</th><th>Passes clés</th><th>Touches</th><th>Pointe</th><th>Duels G/P</th><th>Steals</th><th>Contres</th><th>Récup.</th><th>Excl. +/−</th><th>Repli rapide/tardif</th><th>Arrêts</th><th>Événements</th></tr></thead>
+    <tbody>
+    {% for row in statistics.players %}
+      {% set v=row.values %}
+      <tr>
+        <td>{{ row.cap_number if row.cap_number is not none else "—" }}</td>
+        <td><a href="/intelligence/player?name={{ row.name|urlencode }}">{{ row.name }}</a></td>
+        <td>{{ row.role }}</td>
+        <td>{{ v.get("goals","—") }}</td><td>{{ v.get("shots","—") }}</td><td>{{ v.get("shot_efficiency","—") }}{% if v.get("shot_efficiency") is not none %}%{% endif %}</td>
+        <td>{{ v.get("assists","—") }}</td><td>{{ v.get("key_passes","—") }}</td><td>{{ v.get("touches","—") }}</td><td>{{ v.get("centre_touches","—") }}</td>
+        <td>{{ v.get("duels_won","—") }}/{{ v.get("duels_lost","—") }}</td><td>{{ v.get("steals","—") }}</td><td>{{ v.get("blocks","—") }}</td><td>{{ v.get("recoveries","—") }}</td>
+        <td>{{ v.get("exclusions_earned","—") }}/{{ v.get("exclusions_committed","—") }}</td><td>{{ v.get("fast_recovery","—") }}/{{ v.get("late_recovery","—") }}</td>
+        <td>{{ v.get("saves","—") }}</td><td>{{ row.events }}</td>
+      </tr>
+    {% else %}<tr><td colspan="18">Aucune joueuse dans l'effectif de travail.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+  <h3>Évaluation 8 dimensions</h3>
+  <div class="metric-grid">
+  {% for r in player_evaluations %}
+    <article class="metric-cell"><span>{{ r.player.name }}</span><b>{{ r.rating if r.rating is not none else "—" }}</b><small>{{ r.confidence }} · {{ r.events }} événements</small></article>
+  {% endfor %}
+  </div>
+</section>
+
+<section class="analysis-panel" id="video">
+  <span class="eyebrow">RAPID LONG-VIDEO PIPELINE</span><h2>Analyse longue sans décoder chaque frame</h2>
+  <p>Le mode rapide répartit environ 180 lectures visuelles sur toute la durée, limite l'OCR scoreboard à 48 observations et ne lance l'audio complet que sur demande. Cela permet de trier rapidement 60–120 minutes de vidéo avant l'analyse fine.</p>
+  <div class="analysis-kpis">
+    <div class="analysis-kpi"><b>{{ "%.1f"|format(auto_summary.get("duration_minutes",0)) if auto_summary else "—" }}</b><span>minutes vidéo</span></div>
+    <div class="analysis-kpi"><b>{{ auto_summary.get("visual_samples","—") }}</b><span>échantillons visuels</span></div>
+    <div class="analysis-kpi"><b>{{ auto_summary.get("scoreboard_observations","—") }}</b><span>observations OCR</span></div>
+    <div class="analysis-kpi"><b>{{ auto_summary.get("audio_scan","—") }}</b><span>scan audio</span></div>
+  </div>
+  {% if candidates %}
+  <h3>Timeline des moments à revoir</h3>
+  {% for c in candidates %}
+  <div class="timeline-row"><b>{{ "%02d:%02d"|format((c.second//60)|int,(c.second%60)|int) }}</b><span>{{ c.event_type|replace("_"," ") }}</span><span>{{ c.confidence_label }}</span><span>{{ c.summary }}</span></div>
+  {% endfor %}
+  {% else %}<p class="coverage-note">Aucun candidat automatique enregistré pour ce match. Lance l'analyse vidéo rapide ou utilise les événements vérifiés.</p>{% endif %}
+</section>
+
+<section class="analysis-panel" id="phases">
+  <span class="eyebrow">PHASES & CONTEXTE</span><h2>Répartition des événements validés</h2>
+  <div class="metric-grid">
+    {% for phase, count in statistics.phases.items() %}<div class="metric-cell"><span>{{ phase|replace("_"," ") }}</span><b>{{ count }}</b></div>
+    {% else %}<div class="metric-cell data-missing"><span>Phases</span><b>—</b><small>pas encore de tags de phase</small></div>{% endfor %}
+    {% for period in periods %}<div class="metric-cell"><span>Q{{ period.period }} observé</span><b>{{ period.confidence }}</b><small>{{ period.evidence_count }} preuves OCR</small></div>{% endfor %}
+  </div>
+</section>
+
+<section class="analysis-panel" id="tactics">
+  <span class="eyebrow">TACTICAL INTELLIGENCE</span><h2>Lecture tactique liée à ce match</h2>
+  {% if tactical_report.headline %}<h3>{{ tactical_report.headline }}</h3>{% endif %}
+  {% if tactical_report.executive_summary %}<p>{{ tactical_report.executive_summary }}</p>{% endif %}
+  <a class="btn" href="/matches/{{ match.id }}/intelligence">Ouvrir l'analyse tactique complète et les séquences →</a>
+</section>
+
+<section class="analysis-panel" id="quality">
+  <span class="eyebrow">EVIDENCE FIRST</span><h2>Couverture & limites visibles</h2>
+  <div class="metric-grid">
+    <div class="metric-cell"><span>Niveau</span><b>{{ statistics.coverage.level|replace("_"," ") }}</b></div>
+    <div class="metric-cell"><span>Joueuses avec données match</span><b>{{ statistics.coverage.player_rows_with_evidence }}/{{ statistics.coverage.player_rows_total }}</b></div>
+    <div class="metric-cell"><span>OCR</span><b>{{ "prêt" if tesseract_ready else "indisponible" }}</b></div>
+    <div class="metric-cell"><span>Vision</span><b>{{ vision.engine_version if vision else "non lancée" }}</b></div>
+  </div>
+  {% for limitation in auto_limitations %}<p class="coverage-note">{{ limitation }}</p>{% endfor %}
+  <p class="coverage-note">Cartes de tirs terrain/cage, côté préféré, possession, passes complètes, métriques physiques et attribution automatique joueuse/ballon sont affichées uniquement lorsqu'une preuve correspondante existe. Elles ne sont jamais simulées pour remplir une case.</p>
+</section>
+</div>
+{% endblock %}
