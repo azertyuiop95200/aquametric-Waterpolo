@@ -5,7 +5,7 @@
 </style>
 <section class="page-head match-library-hero"><div><span class="eyebrow">{{ item.competition }} · {{ item.season }}</span><h1>{{ item.team_a }} <span class="score-inline">{{ item.score_a if item.score_a is not none else "—" }}–{{ item.score_b if item.score_b is not none else "—" }}</span> {{ item.team_b }}</h1><p>{{ item.tactical_summary }}</p></div>{% if item.video_url %}<a class="btn" href="{{ item.video_url }}" target="_blank" rel="noopener">Open official video</a>{% endif %}</section>
 <div class="quarter-strip">{% for q in quarters %}<div><span>Q{{ loop.index }}</span><b>{{ q[0] }}–{{ q[1] }}</b></div>{% endfor %}</div>
-<div class="section-tabs" data-tabs data-drag-scroll><button class="active" data-tab="overview">Équipes</button><button data-tab="players">Player stats · Joueuses</button><button data-tab="tactics">Tactique</button><button data-tab="sources">Sources</button></div>
+<div class="section-tabs" data-tabs data-drag-scroll><button class="active" data-tab="overview">Équipes</button><button data-tab="players">Player stats · Joueuses</button><button data-tab="tactics">Tactical notes · Tactique</button><button data-tab="sources">Sources</button></div>
 
 <section data-panel="overview" class="tab-panel active">
   <div class="notice"><b>Données officielles de référence</b><span>Ces valeurs proviennent du rapport source. Une case absente reste absente : AquaMetric ne complète pas artificiellement une statistique non publiée.</span></div>
