@@ -50,7 +50,7 @@
     <h2>Joueuses rattachées à ce dossier</h2>
     <p class="muted">Chaque carte est une vue compacte de la Fiche joueuse. Ouvrez-la pour retrouver le dossier complet, le détail match par match, la carrière, les sources, les cartes de tirs et l'historique des analyses.</p>
     {% if players %}
-    <div class="scout-player-rich-grid">
+    <div class="scout-player-rich-grid" data-safe-resolver-prefix="/intelligence/player?name=">
       {% for p in players %}
       <article class="scout-player-rich">
         <div class="scout-player-rich-head">
