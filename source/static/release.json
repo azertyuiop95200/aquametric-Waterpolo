@@ -1,8 +1,8 @@
 {
-  "release": "AquaMetric V12.3 Player Evaluation + Tactique & Connaissance Hub",
-  "marker": "AQUAMETRIC_V12_3_PLAYER_EVAL_2026_08_28",
-  "date": "2026-08-29",
-  "deployment_refresh": "2026-08-29T22:00:00+02:00",
+  "release": "AquaMetric V12.4 Operational Match Intelligence + Rapid Long-Video Analysis",
+  "marker": "AQUAMETRIC_V12_4_MATCH_INTELLIGENCE_2026_08_31",
+  "date": "2026-08-31",
+  "deployment_refresh": "2026-08-31T22:00:00+02:00",
   "validated_features": [
     "languages_en_fr_it_es_ru",
     "linked_player_profiles",
@@ -19,6 +19,16 @@
     "tactics_decision_branches",
     "elite_video_analysis_entry",
     "shot_preferences_min_sample",
+    "operational_match_analysis_library",
+    "rapid_long_video_sparse_analysis",
+    "bounded_scoreboard_ocr",
+    "optional_whistle_audio_scan",
+    "evidence_aware_complete_match_statistics",
+    "match_player_statistics",
+    "candidate_video_timeline",
+    "match_tactical_intelligence",
+    "shot_map_schema_with_visible_missing_evidence",
+    "explicit_missing_data_no_fabrication",
     "security_headers"
   ]
 }
