@@ -1,6 +1,44 @@
 {% extends "base.html" %}{% block content %}
-<section class="page-head"><div><span class="eyebrow" data-i18n="library.eyebrow">REFERENCE MATCH LIBRARY</span><h1 data-i18n="library.title">Official match reference archive</h1><p data-i18n="library.intro">This page contains shared reference matches. Your own successive analysis runs are stored separately so they are never confused with public benchmark data.</p></div><a class="btn" href="/analysis-history"><span data-i18n="library.my_history">My saved analyses</span> →</a></section>
-<div class="notice library-separation"><b data-i18n="library.separation_title">Two separate spaces</b><span data-i18n="library.separation_text">Reference library = sourced external matches. My analyses = your matches, Vision passes, autonomous passes and reports.</span></div>
-<form class="filter-bar" method="get"><select name="competition"><option value="" data-i18n="library.all_competitions">All competitions</option>{% for c in competitions %}<option {% if c==selected_competition %}selected{% endif %}>{{ c }}</option>{% endfor %}</select><input name="team" value="{{ selected_team }}" data-i18n-placeholder="library.team_placeholder" placeholder="Team / nation"><button class="btn small" data-i18n="library.filter">Filter</button></form>
-<div class="library-grid">{% for item in items %}<a class="library-card" href="/analysis-library/{{ item.id }}"><div class="library-top"><span>{{ item.entity_type|replace('_',' ')|title }}</span><span>{{ item.season }}</span></div><h3>{{ item.team_a }} <strong>{{ item.score_a if item.score_a is not none else '—' }}–{{ item.score_b if item.score_b is not none else '—' }}</strong> {{ item.team_b }}</h3><p>{{ item.competition }}</p><div class="confidence-row"><span class="status-chip good">{{ item.analysis_status|replace('_',' ') }}</span><span>{{ item.video_kind|replace('_',' ') }}</span></div></a>{% else %}<div class="panel empty-state"><b data-i18n="library.empty">No reference match matches these filters.</b></div>{% endfor %}</div>
+<style>
+.analysis-library-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}.analysis-live-card{display:block;text-decoration:none;border:1px solid var(--border,#294754);border-radius:20px;padding:18px;background:var(--panel,#0b202b)}
+.analysis-live-card h3{margin:6px 0}.analysis-live-top,.analysis-live-meta{display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap}.analysis-live-meta{font-size:12px;opacity:.8;margin-top:12px}
+.section-separator{margin:34px 0 14px}.pipeline-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:16px 0}.pipeline-strip div{padding:12px;border-radius:14px;border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.03)}
+@media(max-width:700px){.pipeline-strip{grid-template-columns:1fr 1fr}}
+</style>
+<section class="page-head">
+  <div><span class="eyebrow">MATCH ANALYSIS LIBRARY</span><h1>Bibliothèque d'analyse opérationnelle</h1>
+  <p>Les matchs de ton espace de travail, leurs traitements vidéo, statistiques, joueuses, phases tactiques et preuves sont regroupés ici. L'archive externe officielle reste séparée en dessous.</p></div>
+  <a class="btn" href="/matches/new">+ Nouveau match à analyser</a>
+</section>
+
+<div class="notice library-separation"><b>Analyse réelle, pas vitrine démo</b><span>Une statistique n'est affichée que si elle est prouvée par un événement validé, un rapport officiel ou une sortie automatique clairement marquée comme candidate.</span></div>
+<div class="pipeline-strip"><div><b>1 · Vidéo longue</b><small>échantillonnage visuel borné</small></div><div><b>2 · Scoreboard</b><small>OCR sparse, périodes, score</small></div><div><b>3 · Événements</b><small>timeline + validation</small></div><div><b>4 · Intelligence</b><small>stats, joueuses, phases, tactique</small></div></div>
+
+<form class="filter-bar" method="get"><select name="competition"><option value="">Toutes compétitions</option>{% for c in competitions %}<option {% if c==selected_competition %}selected{% endif %}>{{ c }}</option>{% endfor %}</select><input name="team" value="{{ selected_team }}" placeholder="Équipe / nation"><button class="btn small">Filtrer</button></form>
+
+<h2>Mes matchs analysés</h2>
+<div class="analysis-library-grid">
+{% for row in workspace_rows|default([]) %}
+  {% set m=row.match %}
+  <a class="analysis-live-card" href="/match-analysis/{{ m.id }}">
+    <div class="analysis-live-top"><span>{{ m.competition or "Match" }}</span><span>{{ m.match_date or "date —" }}</span></div>
+    <h3>{{ m.team.name }} <strong>vs</strong> {{ m.opponent }}</h3>
+    <p>{% if row.job %}{{ row.job.status|replace("_"," ") }} · {{ row.job.progress }}%{% else %}prêt pour analyse{% endif %}</p>
+    <div class="analysis-live-meta">
+      <span>{{ row.events_count }} événements</span><span>{{ row.media_count }} preuves média</span>
+      <span>{{ row.vision.sample_count if row.vision else 0 }} samples vidéo</span>
+      <span>{{ row.auto_summary.get("action_candidates",0) if row.auto_summary else 0 }} candidats auto</span>
+    </div>
+  </a>
+{% else %}
+  <div class="panel empty-state"><b>Aucun match dans ton espace.</b><p>Ajoute un match et une vidéo pour lancer le pipeline d'analyse longue.</p><a class="btn primary" href="/matches/new">Créer le premier match</a></div>
+{% endfor %}
+</div>
+
+<div class="section-separator"><span class="eyebrow">OFFICIAL REFERENCE ARCHIVE</span><h2>Matchs externes sourcés</h2><p>Ils servent de références et de données officielles. Ils ne sont jamais confondus avec tes propres traitements vidéo.</p></div>
+<div class="library-grid">{% for item in items %}
+  <a class="library-card" href="/analysis-library/{{ item.id }}"><div class="library-top"><span>{{ item.entity_type|replace('_',' ')|title }}</span><span>{{ item.season }}</span></div>
+  <h3>{{ item.team_a }} <strong>{{ item.score_a if item.score_a is not none else '—' }}–{{ item.score_b if item.score_b is not none else '—' }}</strong> {{ item.team_b }}</h3>
+  <p>{{ item.competition }}</p><div class="confidence-row"><span class="status-chip good">{{ item.analysis_status|replace('_',' ') }}</span><span>{{ item.video_kind|replace('_',' ') }}</span></div></a>
+{% else %}<div class="panel empty-state"><b>Aucun match de référence pour ces filtres.</b></div>{% endfor %}</div>
 {% endblock %}
