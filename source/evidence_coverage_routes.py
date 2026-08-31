@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from db import get_db
 from models import User
 from services.team_evidence_coverage import team_evidence_coverage, coverage_totals
+from analysis_match_routes import router as analysis_match_router
 
 BASE_DIR = Path(__file__).resolve().parent
 TEMPLATES = Jinja2Templates(directory=BASE_DIR / "templates")
@@ -64,3 +65,10 @@ def evidence_coverage_api(request: Request, db: Session = Depends(get_db)):
             for r in rows
         ],
     }
+
+
+# Install the universal match-analysis routes here so they are registered by
+# extensions.py before main.py's legacy "My team only" routes. FastAPI resolves
+# the first matching route, which keeps backward compatibility while widening
+# the Analyse workspace to the full AquaMetric team catalogue.
+router.include_router(analysis_match_router)
