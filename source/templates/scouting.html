@@ -1,25 +1,46 @@
 {% extends "base.html" %}{% block content %}
 <style>
-.recruitment-kpis,.recruitment-score-grid{display:grid;gap:12px}.recruitment-kpis{grid-template-columns:repeat(4,minmax(0,1fr));margin:16px 0 20px}.recruitment-score-grid{grid-template-columns:repeat(4,minmax(0,1fr));margin:.6rem 0}.recruitment-kpis .metric-card,.recruitment-score-grid .metric-card{padding:14px;min-height:96px}.recruitment-kpis strong,.recruitment-score-grid strong{font-size:1.3rem}.recruitment-card-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.recruitment-card-head h3{margin:.1rem 0}.recruitment-explain{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}.recruitment-directory{margin-top:22px}.recruitment-card-score{font-size:1.25rem}.recruitment-stars{letter-spacing:.06em;color:var(--accent2)}.recruitment-section-note{margin:0 0 16px}.recruitment-toolbar{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}.recruitment-toolbar .section-tabs{margin:0}.recruitment-score-label{color:var(--muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.06em}.recruitment-eu-card .scout-player-main{width:100%}
-@media(max-width:950px){.recruitment-kpis,.recruitment-score-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.recruitment-explain{grid-template-columns:1fr}}
-@media(max-width:560px){.recruitment-kpis,.recruitment-score-grid{grid-template-columns:1fr}.recruitment-card-head{display:grid}}
+.recruitment-kpis,.recruitment-score-grid{display:grid;gap:12px}.recruitment-kpis{grid-template-columns:repeat(4,minmax(0,1fr));margin:16px 0 20px}.recruitment-score-grid{grid-template-columns:repeat(4,minmax(0,1fr));margin:.6rem 0}.recruitment-kpis .metric-card,.recruitment-score-grid .metric-card{padding:14px;min-height:96px}.recruitment-kpis strong,.recruitment-score-grid strong{font-size:1.3rem}.recruitment-card-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.recruitment-card-head h3{margin:.1rem 0}.recruitment-explain{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}.recruitment-directory{margin-top:22px}.recruitment-card-score{font-size:1.25rem}.recruitment-stars{letter-spacing:.06em;color:var(--accent2)}.recruitment-section-note{margin:0 0 16px}.recruitment-toolbar{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}.recruitment-toolbar .section-tabs{margin:0}.recruitment-score-label{color:var(--muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.06em}.recruitment-eu-card .scout-player-main{width:100%}.resource-backbone{margin:0 0 22px}.resource-backbone-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:14px}.resource-backbone-card{display:block;padding:14px;border:1px solid var(--line);border-radius:16px;background:var(--panel2);text-decoration:none;color:inherit}.resource-backbone-card b{display:block;margin:4px 0}.resource-backbone-card small{color:var(--muted)}
+@media(max-width:950px){.recruitment-kpis,.recruitment-score-grid,.resource-backbone-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.recruitment-explain{grid-template-columns:1fr}}
+@media(max-width:560px){.recruitment-kpis,.recruitment-score-grid,.resource-backbone-grid{grid-template-columns:1fr}.recruitment-card-head{display:grid}}
 </style>
 
 <section class="page-head scout-hero">
   <div>
-    <span class="eyebrow">RECRUTEMENT</span>
-    <h1>Identifier, comparer et suivre les joueuses</h1>
-    <p>Un espace unique pour le vivier de prospects, les équipes et sélections, les dossiers joueuses, les mouvements et les recherches à approfondir.</p>
+    <span class="eyebrow">SCOUTING · RECRUTEMENT · INTELLIGENCE JOUEUSES</span>
+    <h1>Identifier, comparer et comprendre les joueuses en profondeur</h1>
+    <p>Chaque dossier Scouting réutilise désormais le même socle que la Fiche joueuse : identité, carrière, sources, matchs, statistiques documentées, vidéo attribuée, tirs localisés, mouvements, couverture et confiance.</p>
   </div>
   <div class="trust-badge"><b>{{ teams|length }}</b><span>dossiers chargés</span></div>
 </section>
 
 <div class="recruitment-kpis">
-  <div class="metric-card"><small>1 · Identifier</small><strong>Vivier</strong><p>Repérer les profils à potentiel et les joueuses à suivre.</p></div>
-  <div class="metric-card"><small>2 · Évaluer</small><strong>/100 + ★</strong><p>Comparer niveau global, lecture de jeu et confiance de l'évaluation.</p></div>
-  <div class="metric-card"><small>3 · Comprendre</small><strong>Multi-matchs</strong><p>Relier statistiques, contexte, tactique et vidéo réellement analysée.</p></div>
-  <div class="metric-card"><small>4 · Suivre</small><strong>Dossier</strong><p>Conserver sources, mouvements, staff, matchs et signaux d'évolution.</p></div>
+  <div class="metric-card"><small>1 · Identifier</small><strong>Vivier</strong><p>Repérer les profils à potentiel et les joueuses à suivre dans tous les dossiers disponibles.</p></div>
+  <div class="metric-card"><small>2 · Évaluer</small><strong>/100 + preuves</strong><p>Comparer uniquement ce que l'échantillon permet réellement de noter, avec confiance et couverture visibles.</p></div>
+  <div class="metric-card"><small>3 · Comprendre</small><strong>Multi-matchs</strong><p>Relier statistiques, contexte, tactique, cartes de tirs et vidéo réellement analysée.</p></div>
+  <div class="metric-card"><small>4 · Suivre</small><strong>Dossier vivant</strong><p>Conserver parcours, sources, mouvements, staff, matchs et signaux d'évolution sans perdre l'historique.</p></div>
 </div>
+
+<section class="panel resource-backbone">
+  <div class="section-head">
+    <div>
+      <span class="eyebrow">SOCLE COMMUN À TOUT SCOUTING</span>
+      <h2>Les mêmes ressources doivent suivre la joueuse partout</h2>
+      <p class="muted">Une joueuse ne redevient jamais une simple ligne de roster lorsqu'elle est déjà documentée ailleurs dans AquaMetric. Les vues Scouting réutilisent le registre canonique et montrent aussi les lacunes de couverture.</p>
+    </div>
+    <span class="pill">evidence-first</span>
+  </div>
+  <div class="resource-backbone-grid">
+    <a class="resource-backbone-card" href="/evidence-coverage"><small>Audit</small><b>Couverture des preuves</b><span>Voir quelles équipes et joueuses disposent de matchs, statistiques et sources exploitables.</span></a>
+    <a class="resource-backbone-card" href="/analysis-history"><small>Historique</small><b>Analyses multi-matchs</b><span>Retrouver les analyses déjà produites et suivre l'évolution de l'échantillon.</span></a>
+    <a class="resource-backbone-card" href="/transfer-watch"><small>Parcours</small><b>Mouvements & mercato</b><span>Relier arrivées, départs et signaux de transfert aux dossiers individuels.</span></a>
+    <a class="resource-backbone-card" href="/coaches"><small>Contexte</small><b>Coach & environnement</b><span>Interpréter le rôle d'une joueuse avec le staff et le contexte sportif documenté.</span></a>
+  </div>
+  <div class="recruitment-explain">
+    <div class="notice compact"><b>Pas de statistique inventée</b><p>Une absence de donnée reste une absence. Elle n'est ni convertie en zéro sportif, ni complétée par réputation ou intuition.</p></div>
+    <div class="notice compact"><b>La couverture n'est pas le niveau</b><p>Un pourcentage de couverture mesure la richesse des preuves disponibles. Il ne dit pas si une joueuse est forte ou faible.</p></div>
+  </div>
+</section>
 
 <div class="section-tabs simple-tabs" id="recruitment-tabs">
   <a class="{% if selected_kind not in ['club','national_team'] %}active{% endif %}" href="/scouting?kind=all">Tous les dossiers</a>
@@ -58,9 +79,9 @@
 <section class="panel recruitment-directory">
   <div class="section-head">
     <div>
-      <span class="eyebrow" id="directory-eyebrow">DOSSIERS RECRUTEMENT</span>
+      <span class="eyebrow" id="directory-eyebrow">DOSSIERS SCOUTING</span>
       <h2 id="directory-title">Équipes et sélections suivies</h2>
-      <p class="muted" id="directory-help">Ouvrez un dossier pour retrouver l'effectif, les profils joueuses, les sources, les mouvements, le staff et les matchs associés.</p>
+      <p class="muted" id="directory-help">Ouvrez un dossier pour retrouver l'effectif enrichi : profils canoniques, sources, matchs, statistiques disponibles, couverture, tirs, vidéo, mouvements, staff et calendrier.</p>
     </div>
     <span class="pill">{{ teams|length }} dossiers</span>
   </div>
@@ -73,7 +94,7 @@
       <p>{{ t.competition }}</p>
       <div class="roster-state {{ 'good' if 'confirmed' in t.roster_status or 'completed' in t.roster_status else 'warn' }}">{{ t.roster_status|replace('_',' ') }}</div>
       <small>{{ t.source_note }}</small>
-      <div class="card-arrow"><span>Ouvrir le dossier recrutement</span> →</div>
+      <div class="card-arrow"><span>Ouvrir le dossier Scouting enrichi</span> →</div>
     </a>
     {% endfor %}
   </div>
@@ -82,7 +103,7 @@
 <section class="panel request-panel">
   <div>
     <span class="eyebrow">RECHERCHE À AJOUTER</span>
-    <h2>Ajouter une joueuse, une équipe ou une compétition au recrutement</h2>
+    <h2>Ajouter une joueuse, une équipe ou une compétition au Scouting</h2>
     <p class="muted">La demande crée une recherche à documenter. Elle ne fabrique jamais de statistiques manquantes.</p>
   </div>
   <form method="post" action="/scouting/request" class="request-form">
@@ -105,7 +126,7 @@
   const eu=document.getElementById('eu-youth-scout-tab'); if(eu) eu.classList.add('active');
   const title=document.getElementById('directory-title'); if(title) title.textContent='Sélections représentées dans le vivier UE 2026';
   const eyebrow=document.getElementById('directory-eyebrow'); if(eyebrow) eyebrow.textContent='DOSSIERS PAR SÉLECTION';
-  const help=document.getElementById('directory-help'); if(help) help.textContent='Ces dossiers regroupent les joueuses évaluées par pays et catégorie. Le classement prospect ci-dessus reste la vue de recrutement principale.';
+  const help=document.getElementById('directory-help'); if(help) help.textContent='Ces dossiers regroupent les joueuses évaluées par pays et catégorie et réutilisent les ressources de leurs profils individuels. Le classement prospect ci-dessus reste la vue de recrutement principale.';
 
   const grid=document.getElementById('eu-ranking-grid');
   const count=document.getElementById('eu-ranking-count');
