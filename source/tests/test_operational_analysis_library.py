@@ -53,11 +53,19 @@ def test_full_match_statistics_are_evidence_aware_and_derived():
         stats = build_match_statistics(match)
         assert stats["for"]["goals"] == 1
         assert stats["for"]["shots"] == 2
+        assert stats["for"]["shots_off_target"] == 1
         assert stats["for"]["shot_efficiency"] == 50.0
         assert stats["for"]["assists"] == 1
         assert stats["for"]["duel_win_rate"] == 100.0
         assert "restart_time" not in stats["for"]  # unavailable must not become a fake zero
         assert stats["coverage"]["confirmed_rows"] == 4
+        family_labels = {family[1] for family in stats["catalog"]}
+        for label in (
+            "Attaque & finition", "Possession & décision", "Pointe & duels", "Défense",
+            "Transition", "Supériorité / infériorité", "Gardienne", "Physique & nage",
+            "Carte de tirs & préférences",
+        ):
+            assert label in family_labels
     finally:
         db.close()
 
@@ -73,12 +81,14 @@ def test_analysis_library_is_operational_not_reference_demo_only():
 
     workspace = client.get(f"/match-analysis/{match_id}")
     assert workspace.status_code == 200
-    assert "RAPID LONG-VIDEO PIPELINE" in workspace.text
-    assert "Passes décisives" in workspace.text
-    assert "Ballons touchés en pointe" in workspace.text
-    assert "Supériorité / infériorité" in workspace.text
-    assert "Gardienne" in workspace.text
-    assert "Une case vide signifie" in workspace.text
+    for expected in (
+        "RAPID LONG-VIDEO PIPELINE", "Passes décisives", "Ballons touchés en pointe",
+        "Possession & décision", "Supériorité / infériorité", "Gardienne", "Physique & nage",
+        "Cartes de tirs, cage 3×3 et préférences", "Évaluation 8 dimensions",
+        "Attaque", "Défense", "Décision", "Tactique", "Transition", "Discipline", "Technique", "Impact",
+        "Une case vide signifie",
+    ):
+        assert expected in workspace.text
 
 
 def test_rapid_run_requires_owned_uploaded_video():
@@ -86,6 +96,14 @@ def test_rapid_run_requires_owned_uploaded_video():
     response = client.post(f"/match-analysis/{match_id}/rapid-run", data={}, follow_redirects=False)
     assert response.status_code == 400
     assert "vidéo détenue et téléversée" in response.text
+
+
+def test_rapid_pipeline_is_bounded_for_long_videos():
+    from services.rapid_match_analysis import run_rapid_analysis
+    defaults = run_rapid_analysis.__kwdefaults__
+    assert defaults["include_audio"] is False
+    assert defaults["visual_samples"] == 180
+    assert defaults["ocr_samples"] == 48
 
 
 def test_reference_detail_exposes_all_supported_official_player_columns():
@@ -99,5 +117,6 @@ def test_reference_detail_exposes_all_supported_official_player_columns():
         db.close()
     page = client.get(f"/analysis-library/{item_id}")
     assert page.status_code == 200
+    assert "Player stats" in page.text
     for label in ("Buts", "Tirs", "% tir", "Assists", "Steals", "Exclusions", "Arrêts", "Qualité source"):
         assert label in page.text
