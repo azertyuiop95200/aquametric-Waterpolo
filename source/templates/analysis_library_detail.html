@@ -1,10 +1,40 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="page-head match-library-hero"><div><span class="eyebrow">{{ item.competition }} · {{ item.season }}</span><h1>{{ item.team_a }} <span class="score-inline">{{ item.score_a }}–{{ item.score_b }}</span> {{ item.team_b }}</h1><p>{{ item.tactical_summary }}</p></div>{% if item.video_url %}<a class="btn" href="{{ item.video_url }}" target="_blank" rel="noopener">Open official video</a>{% endif %}</section>
+<style>
+.ref-stat-wrap{overflow:auto}.ref-stat-wrap table{width:100%;min-width:900px;border-collapse:collapse}.ref-stat-wrap th,.ref-stat-wrap td{padding:10px;border-bottom:1px solid rgba(255,255,255,.08);text-align:left;white-space:nowrap}.ref-stat-wrap th{font-size:12px;opacity:.7}.evidence-note{font-size:12px;opacity:.72;max-width:280px;white-space:normal!important}
+</style>
+<section class="page-head match-library-hero"><div><span class="eyebrow">{{ item.competition }} · {{ item.season }}</span><h1>{{ item.team_a }} <span class="score-inline">{{ item.score_a if item.score_a is not none else "—" }}–{{ item.score_b if item.score_b is not none else "—" }}</span> {{ item.team_b }}</h1><p>{{ item.tactical_summary }}</p></div>{% if item.video_url %}<a class="btn" href="{{ item.video_url }}" target="_blank" rel="noopener">Open official video</a>{% endif %}</section>
 <div class="quarter-strip">{% for q in quarters %}<div><span>Q{{ loop.index }}</span><b>{{ q[0] }}–{{ q[1] }}</b></div>{% endfor %}</div>
-<div class="section-tabs" data-tabs data-drag-scroll><button class="active" data-tab="overview">Overview</button><button data-tab="players">Player stats</button><button data-tab="tactics">Tactical notes</button><button data-tab="sources">Sources</button></div>
-<section data-panel="overview" class="tab-panel active"><div class="compare-grid">{% for team, vals in team_stats.items() %}<article class="compare-card"><h3>{{ team }}</h3>{% for k,v in vals.items() %}<div><span>{{ k|replace('_',' ')|title }}</span><b>{{ v }}</b></div>{% endfor %}</article>{% endfor %}</div></section>
-<section data-panel="players" class="tab-panel"><div class="team-stat-tabs">{% for team, rows in teams.items() %}<article class="player-stat-team"><h2>{{ team }}</h2><div class="stat-table"><div class="stat-head"><span>Player</span><span>Goals</span><span>Saves</span><span>Evidence</span></div>{% for p in rows %}<div class="stat-row"><a class="strong-link" href="/intelligence/player?name={{p.player_name|urlencode}}">{{ p.player_name }} <small>→ profile</small></a><span>{{ p.goals if p.goals is not none else '—' }}</span><span>{{ p.saves if p.saves is not none else '—' }}</span><small>{{ p.note }}</small></div>{% endfor %}</div></article>{% endfor %}</div></section>
-<section data-panel="tactics" class="tab-panel"><article class="analysis-callout"><span class="eyebrow">EVIDENCE-BASED MATCH NOTE</span><h2>{{ item.tactical_summary }}</h2><p>Only facts available in the official report are treated as verified. Future computer-vision metrics will sit beside these values with their own confidence level instead of replacing them.</p></article></section>
-<section data-panel="sources" class="tab-panel"><div class="source-box"><b>Official report</b><a href="{{ item.official_source_url }}" target="_blank" rel="noopener">{{ item.official_source_url }}</a><small>Player rows shown above are deliberately limited to statistics explicitly supported by the official report.</small></div></section>
+<div class="section-tabs" data-tabs data-drag-scroll><button class="active" data-tab="overview">Équipes</button><button data-tab="players">Joueuses</button><button data-tab="tactics">Tactique</button><button data-tab="sources">Sources</button></div>
+
+<section data-panel="overview" class="tab-panel active">
+  <div class="notice"><b>Données officielles de référence</b><span>Ces valeurs proviennent du rapport source. Une case absente reste absente : AquaMetric ne complète pas artificiellement une statistique non publiée.</span></div>
+  <div class="compare-grid">{% for team, vals in team_stats.items() %}<article class="compare-card"><h3>{{ team }}</h3>{% for k,v in vals.items() %}<div><span>{{ k|replace('_',' ')|title }}</span><b>{{ v }}</b></div>{% endfor %}</article>{% endfor %}</div>
+</section>
+
+<section data-panel="players" class="tab-panel">
+{% for team, rows in teams.items() %}
+  <article class="player-stat-team"><h2>{{ team }}</h2>
+  <div class="ref-stat-wrap"><table>
+    <thead><tr><th>Joueuse</th><th>Buts</th><th>Tirs</th><th>% tir</th><th>Assists</th><th>Steals</th><th>Exclusions</th><th>Arrêts</th><th>Qualité source</th><th>Preuve / note</th></tr></thead>
+    <tbody>{% for p in rows %}{% set n=normalized_stats.get(p.id,{}) %}
+      <tr>
+        <td><a class="strong-link" href="/intelligence/player?name={{p.player_name|urlencode}}">{{ p.player_name }} <small>→ profil</small></a></td>
+        <td>{{ n.get("goals") if n.get("goals") is not none else "—" }}</td>
+        <td>{{ n.get("shots") if n.get("shots") is not none else "—" }}</td>
+        <td>{{ n.get("shot_efficiency") if n.get("shot_efficiency") is not none else "—" }}{% if n.get("shot_efficiency") is not none %}%{% endif %}</td>
+        <td>{{ n.get("assists") if n.get("assists") is not none else "—" }}</td>
+        <td>{{ n.get("steals") if n.get("steals") is not none else "—" }}</td>
+        <td>{{ n.get("exclusions") if n.get("exclusions") is not none else "—" }}</td>
+        <td>{{ n.get("saves") if n.get("saves") is not none else "—" }}</td>
+        <td>{{ n.get("source_quality","—")|replace("_"," ") }}</td>
+        <td class="evidence-note">{{ n.get("note","") or "—" }}</td>
+      </tr>
+    {% endfor %}</tbody>
+  </table></div></article>
+{% endfor %}
+</section>
+
+<section data-panel="tactics" class="tab-panel"><article class="analysis-callout"><span class="eyebrow">EVIDENCE-BASED MATCH NOTE</span><h2>{{ item.tactical_summary }}</h2><p>La tactique de référence n'est considérée certaine que lorsqu'elle est soutenue par les données ou la vidéo disponible. Pour une analyse vidéo longue propriétaire, utilise la bibliothèque opérationnelle et son workspace de match.</p></article></section>
+<section data-panel="sources" class="tab-panel"><div class="source-box"><b>Rapport officiel</b><a href="{{ item.official_source_url }}" target="_blank" rel="noopener">{{ item.official_source_url }}</a><small>Les statistiques joueuses ci-dessus utilisent toutes les colonnes actuellement prouvées par le rapport officiel : buts, tirs, efficacité dérivée, assists, steals, exclusions et arrêts.</small></div></section>
 {% endblock %}
