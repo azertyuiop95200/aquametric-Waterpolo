@@ -52,8 +52,6 @@ class AquaMetricSecurityMiddleware(BaseHTTPMiddleware):
         if status_code >= 400:
             q.append(time.monotonic())
         elif status_code < 400:
-            # A successful authentication/registration proves this client can
-            # complete the flow, so stale failures should not lock it out.
             q.clear()
 
     @staticmethod
@@ -62,9 +60,6 @@ class AquaMetricSecurityMiddleware(BaseHTTPMiddleware):
             return True
         origin = request.headers.get("origin")
         if not origin:
-            # SameSite=Lax session cookies already prevent ordinary cross-site form
-            # posts from carrying the authenticated session. API/test clients may
-            # legitimately omit Origin, so absence alone is not rejected.
             return True
         try:
             parsed = urlparse(origin)
@@ -108,3 +103,8 @@ class AquaMetricSecurityMiddleware(BaseHTTPMiddleware):
 
 def install_security(app):
     app.add_middleware(AquaMetricSecurityMiddleware)
+    # Register the operational match-analysis workspace before the legacy library
+    # routes are declared in main.py. FastAPI resolves the first matching route,
+    # so this upgrades /analysis-library in place without rewriting the application.
+    from rapid_analysis_routes import router as rapid_analysis_router
+    app.include_router(rapid_analysis_router)
