@@ -1,4 +1,6 @@
 from collections import Counter, defaultdict
+import re
+import unicodedata
 from urllib.parse import quote_plus
 
 from sqlalchemy import select
@@ -33,6 +35,13 @@ METRIC_LABELS = {
     "exclusion_earned": "Exclusions obtenues",
     "penalty_earned": "Penalties obtenus",
 }
+
+
+def _name_key(value: str) -> str:
+    """Normalize roster/profile spellings without changing the displayed identity."""
+    normalized = unicodedata.normalize("NFKD", value or "")
+    ascii_text = "".join(ch for ch in normalized if not unicodedata.combining(ch))
+    return re.sub(r"[^a-z0-9]+", " ", ascii_text.casefold()).strip()
 
 
 def _confidence_label(score: float) -> str:
@@ -100,11 +109,16 @@ def scouting_player_resources(db, scouting_team_id: int) -> list[dict]:
     if not roster:
         return []
 
-    names = [row.name for row in roster]
-    profiles = db.scalars(
-        select(PlayerIntelligenceProfile).where(PlayerIntelligenceProfile.canonical_name.in_(names))
-    ).all()
-    profile_by_name = {p.canonical_name.casefold(): p for p in profiles}
+    roster_keys = {_name_key(row.name) for row in roster}
+
+    # The registry is intentionally canonical. Resolve in Python with an accent/
+    # punctuation-insensitive key so scouting aliases do not silently lose the
+    # richer dossier (e.g. Rozic/Rožić variants).
+    profiles = [
+        p for p in db.scalars(select(PlayerIntelligenceProfile)).all()
+        if _name_key(p.canonical_name) in roster_keys
+    ]
+    profile_by_name = {_name_key(p.canonical_name): p for p in profiles}
     profile_ids = [p.id for p in profiles]
 
     sources_by_profile = defaultdict(list)
@@ -119,8 +133,10 @@ def scouting_player_resources(db, scouting_team_id: int) -> list[dict]:
             shots_by_profile[row.profile_id].append(row)
 
     transfers_by_name = defaultdict(list)
-    for row in db.scalars(select(TransferSignal).where(TransferSignal.player_name.in_(names))).all():
-        transfers_by_name[row.player_name.casefold()].append(row)
+    for row in db.scalars(select(TransferSignal)).all():
+        key = _name_key(row.player_name)
+        if key in roster_keys:
+            transfers_by_name[key].append(row)
 
     all_match_ids = {
         metric.library_match_id
@@ -137,12 +153,13 @@ def scouting_player_resources(db, scouting_team_id: int) -> list[dict]:
 
     cards = []
     for roster_player in roster:
-        profile = profile_by_name.get(roster_player.name.casefold())
+        key = _name_key(roster_player.name)
+        profile = profile_by_name.get(key)
         sources = sources_by_profile.get(profile.id, []) if profile else []
         metrics = metrics_by_profile.get(profile.id, []) if profile else []
         shots = shots_by_profile.get(profile.id, []) if profile else []
         transfers = sorted(
-            transfers_by_name.get(roster_player.name.casefold(), []),
+            transfers_by_name.get(key, []),
             key=lambda row: (row.published_date or "", row.id),
             reverse=True,
         )
@@ -164,11 +181,11 @@ def scouting_player_resources(db, scouting_team_id: int) -> list[dict]:
         shot = _shot_summary(shots)
         video_sources = [s for s in sources if "video" in (s.source_type or "").lower()]
         video_metrics = [m for m in metrics if "video" in (m.provenance or "").lower()]
-        career_sources = [
+        pathway_sources = [
             s for s in sources
             if s.source_type in {
-                "club_announcement", "primary_profile", "media_transfer", "federation_roster",
-                "official_competition", "roster",
+                "club_announcement", "media_transfer", "official_competition",
+                "federation_roster", "historical_roster",
             }
         ]
 
@@ -179,7 +196,7 @@ def scouting_player_resources(db, scouting_team_id: int) -> list[dict]:
             "statistiques": bool(performance_match_ids),
             "tirs localisés": shot["located"] >= 3,
             "vidéo attribuée": bool(video_sources or video_metrics),
-            "carrière / parcours": len(evidence_seasons) >= 2 or bool(career_sources),
+            "carrière / parcours": len(evidence_seasons) >= 2 or bool(pathway_sources) or bool(transfers),
             "mouvements": bool(transfers),
         }
         coverage_score = round(sum(coverage_dimensions.values()) / len(coverage_dimensions) * 100)
@@ -195,7 +212,7 @@ def scouting_player_resources(db, scouting_team_id: int) -> list[dict]:
             "current_status": roster_player.current_status,
             "note": roster_player.note,
             "profile": profile,
-            "profile_url": f"/intelligence/player?name={quote_plus(roster_player.name)}",
+            "profile_url": f"/intelligence/player?name={quote_plus(profile.canonical_name if profile else roster_player.name)}",
             "confidence": confidence,
             "confidence_label": _confidence_label(confidence),
             "coverage_score": coverage_score,
