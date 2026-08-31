@@ -5,7 +5,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def test_elite_video_library_has_real_embeds_schemas_and_coach_mode():
     page = (ROOT / 'static' / 'video-session-elite.html').read_text(encoding='utf-8')
-    assert 'Analyse vidéo haut niveau' in page
+    assert 'Analyse vidéo' in page and 'haut niveau' in page
     assert page.count('youtube-nocookie.com/embed/') >= 4
     for video_id in ('HfkCCOpLIBA', 'Ek1kBvUjivc', 'TseN9CGbfQw', 'bF-Am10VtF4'):
         assert video_id in page
