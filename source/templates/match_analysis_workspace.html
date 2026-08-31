@@ -9,12 +9,15 @@
 .analysis-tabs{display:flex;gap:8px;overflow:auto;position:sticky;top:58px;z-index:8;padding:8px 0;background:var(--bg,#06131b)}
 .analysis-tabs a{white-space:nowrap;text-decoration:none;padding:8px 12px;border-radius:999px;border:1px solid var(--border,#294754)}
 .metric-family{margin-top:14px}.metric-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:8px}
-.metric-cell{padding:12px;border:1px solid rgba(255,255,255,.08);border-radius:14px;background:rgba(255,255,255,.025)}.metric-cell span{display:block;font-size:12px;opacity:.72}.metric-cell b{font-size:21px}
-.split-stats{display:grid;grid-template-columns:1fr 1fr;gap:14px}.data-missing{opacity:.55}.wide-table{overflow:auto}.wide-table table{width:100%;border-collapse:collapse;min-width:1050px}
+.metric-cell{padding:12px;border:1px solid rgba(255,255,255,.08);border-radius:14px;background:rgba(255,255,255,.025)}.metric-cell span{display:block;font-size:12px;opacity:.72}.metric-cell b{font-size:21px}.metric-cell small{display:block;margin-top:4px;opacity:.68}
+.split-stats{display:grid;grid-template-columns:1fr 1fr;gap:14px}.data-missing{opacity:.55}.wide-table{overflow:auto}.wide-table table{width:100%;border-collapse:collapse;min-width:1200px}
 .wide-table th,.wide-table td{padding:10px;border-bottom:1px solid rgba(255,255,255,.08);text-align:left;white-space:nowrap}.wide-table th{font-size:12px;opacity:.7}
 .timeline-row{display:grid;grid-template-columns:80px 180px 90px 1fr;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.07)}
 .coverage-note{padding:12px 14px;border-left:3px solid #63d2ed;background:rgba(99,210,237,.08);border-radius:0 12px 12px 0}
-@media(max-width:850px){.analysis-hero,.split-stats{grid-template-columns:1fr}.timeline-row{grid-template-columns:70px 1fr}.timeline-row span:nth-child(3),.timeline-row span:nth-child(4){grid-column:2}}
+.dimension-row{display:grid;grid-template-columns:repeat(8,minmax(82px,1fr));gap:6px;margin-top:10px}.dimension-row div{padding:8px;border-radius:10px;background:rgba(255,255,255,.035);text-align:center}.dimension-row small{display:block;opacity:.65}.dimension-row b{font-size:16px}
+.tactical-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px}.tactical-note{margin-top:10px;padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,.08)}
+.shot-map-shell{display:grid;grid-template-columns:1.25fr .75fr;gap:12px}.shot-map-empty{min-height:170px;display:grid;place-items:center;text-align:center;border:1px dashed rgba(255,255,255,.22);border-radius:16px;padding:18px;background:rgba(255,255,255,.02)}
+@media(max-width:850px){.analysis-hero,.split-stats,.shot-map-shell{grid-template-columns:1fr}.timeline-row{grid-template-columns:70px 1fr}.timeline-row span:nth-child(3),.timeline-row span:nth-child(4){grid-column:2}.dimension-row{grid-template-columns:repeat(2,1fr)}}
 </style>
 
 <div class="analysis-workspace">
@@ -49,7 +52,7 @@
 </section>
 
 <nav class="analysis-tabs">
-  <a href="#team">Équipe</a><a href="#players">Joueuses</a><a href="#video">Vidéo rapide</a>
+  <a href="#team">Équipe</a><a href="#players">Joueuses</a><a href="#shotmaps">Cartes de tirs</a><a href="#video">Vidéo rapide</a>
   <a href="#phases">Phases</a><a href="#tactics">Tactique</a><a href="#quality">Qualité des données</a>
 </nav>
 
@@ -85,7 +88,7 @@
     <thead><tr><th>#</th><th>Joueuse</th><th>Rôle</th><th>Buts</th><th>Tirs</th><th>% tir</th><th>Assists</th><th>Passes clés</th><th>Touches</th><th>Pointe</th><th>Duels G/P</th><th>Steals</th><th>Contres</th><th>Récup.</th><th>Excl. +/−</th><th>Repli rapide/tardif</th><th>Arrêts</th><th>Événements</th></tr></thead>
     <tbody>
     {% for row in statistics.players %}
-      {% set v=row.values %}
+      {% set v=row["values"] %}
       <tr>
         <td>{{ row.cap_number if row.cap_number is not none else "—" }}</td>
         <td><a href="/intelligence/player?name={{ row.name|urlencode }}">{{ row.name }}</a></td>
@@ -100,11 +103,27 @@
     </tbody>
   </table></div>
   <h3>Évaluation 8 dimensions</h3>
-  <div class="metric-grid">
   {% for r in player_evaluations %}
-    <article class="metric-cell"><span>{{ r.player.name }}</span><b>{{ r.rating if r.rating is not none else "—" }}</b><small>{{ r.confidence }} · {{ r.events }} événements</small></article>
-  {% endfor %}
+    {% set dims=r.detail.get("dimensions", {}) %}
+    <article class="metric-cell" style="margin-top:10px">
+      <span>{{ r.player.name }} · {{ r.confidence }} · {{ r.events }} événements</span>
+      <b>{{ r.rating if r.rating is not none else "—" }}</b>
+      <div class="dimension-row">
+        {% for key,label in [("attack","Attaque"),("defence","Défense"),("decision","Décision"),("tactics","Tactique"),("transition","Transition"),("discipline","Discipline"),("technique","Technique"),("impact","Impact")] %}
+        <div><small>{{ label }}</small><b>{{ dims.get(key) if dims.get(key) is not none else "—" }}</b></div>
+        {% endfor %}
+      </div>
+    </article>
+  {% else %}<p class="coverage-note">Aucune évaluation joueuse disponible.</p>{% endfor %}
+</section>
+
+<section class="analysis-panel" id="shotmaps">
+  <span class="eyebrow">SHOT INTELLIGENCE</span><h2>Cartes de tirs, cage 3×3 et préférences</h2>
+  <div class="shot-map-shell">
+    <div class="shot-map-empty"><div><b>Carte bassin</b><p>Origine du tir, contexte, résultat et densité par zone dès que les coordonnées de tir sont vérifiées pour ce match.</p></div></div>
+    <div class="shot-map-empty"><div><b>Cage 3×3</b><p>Répartition buts / arrêts / contres par zone de cage, côté préféré et efficacité par zone avec taille d'échantillon.</p></div></div>
   </div>
+  <p class="coverage-note">Le modèle de données actuel conserve déjà les observations de tirs sourcées sur les profils et matchs de référence. Pour un match vidéo de travail, AquaMetric n'invente pas de coordonnées : cette vue reste vide tant que les tirs ne sont pas attribués et positionnés par une preuve ou un modèle validé.</p>
 </section>
 
 <section class="analysis-panel" id="video">
@@ -135,8 +154,13 @@
 
 <section class="analysis-panel" id="tactics">
   <span class="eyebrow">TACTICAL INTELLIGENCE</span><h2>Lecture tactique liée à ce match</h2>
-  {% if tactical_report.headline %}<h3>{{ tactical_report.headline }}</h3>{% endif %}
-  {% if tactical_report.executive_summary %}<p>{{ tactical_report.executive_summary }}</p>{% endif %}
+  <div class="tactical-kpis">
+    {% for headline in tactical_report.get("headline", []) %}
+    <div class="metric-cell"><span>{{ headline.get("label") }}</span><b>{{ headline.get("value") }}</b><small>{{ headline.get("detail") }}</small></div>
+    {% else %}<div class="metric-cell data-missing"><span>KPIs tactiques</span><b>—</b><small>volume de tags insuffisant</small></div>{% endfor %}
+  </div>
+  {% for remark in tactical_report.get("remarks", []) %}<article class="tactical-note"><h3>{{ remark.get("title") }}</h3><p>{{ remark.get("text") }}</p><small>{{ remark.get("evidence") }}</small></article>{% endfor %}
+  <p class="coverage-note">Confiance tactique : {{ tactical_report.get("confidence", "—") }}. Les formes 4-2, 3-3, press, M-zone ou drop ne sont affirmées que si le tracking ou le tagging les prouve.</p>
   <a class="btn" href="/matches/{{ match.id }}/intelligence">Ouvrir l'analyse tactique complète et les séquences →</a>
 </section>
 
@@ -149,7 +173,7 @@
     <div class="metric-cell"><span>Vision</span><b>{{ vision.engine_version if vision else "non lancée" }}</b></div>
   </div>
   {% for limitation in auto_limitations %}<p class="coverage-note">{{ limitation }}</p>{% endfor %}
-  <p class="coverage-note">Cartes de tirs terrain/cage, côté préféré, possession, passes complètes, métriques physiques et attribution automatique joueuse/ballon sont affichées uniquement lorsqu'une preuve correspondante existe. Elles ne sont jamais simulées pour remplir une case.</p>
+  <p class="coverage-note">Possession, passes, duels, cartes de tirs, physique, gardienne, discipline et décisions restent disponibles dans le schéma de chaque match. Une valeur n'apparaît que lorsqu'elle est prouvée par le tagging, une source officielle ou un moteur automatique validé.</p>
 </section>
 </div>
 {% endblock %}
