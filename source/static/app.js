@@ -1,3 +1,7 @@
+if(location.pathname==='/tactical-chess'){
+  location.replace('/knowledge');
+}
+
 function seekMatchVideo(seconds){
   const localVideo=document.getElementById('video');
   if(localVideo){localVideo.currentTime=seconds;localVideo.play().catch(()=>{});return;}
@@ -67,17 +71,3 @@ document.querySelectorAll(dragSelectors).forEach(el=>{
   const end=e=>{if(!active)return;active=false;el.classList.remove('dragging');try{el.releasePointerCapture?.(e.pointerId);}catch(_){}};
   el.addEventListener('pointerup',end);el.addEventListener('pointercancel',end);el.addEventListener('lostpointercapture',()=>{active=false;el.classList.remove('dragging');});
 });
-
-// Premium video-analysis entry point: keep it visible where coaches are most likely to look for tactics.
-if(['/knowledge','/tactical-chess'].includes(location.pathname)){
-  const elite=document.createElement('a');
-  elite.href='/static/video-session-elite.html?v=20260901-1';
-  elite.className='elite-video-quick-access';
-  elite.innerHTML='<span aria-hidden="true">▶</span><strong>Analyse vidéo élite</strong><small>matchs + schémas + lecture</small>';
-  elite.setAttribute('aria-label','Ouvrir Analyse vidéo élite');
-  Object.assign(elite.style,{position:'fixed',right:'18px',bottom:'18px',zIndex:'9999',display:'grid',gridTemplateColumns:'32px auto',columnGap:'10px',alignItems:'center',padding:'12px 16px',borderRadius:'16px',border:'1px solid rgba(99,210,237,.55)',background:'rgba(5,24,34,.96)',boxShadow:'0 14px 42px rgba(0,0,0,.35)',color:'#e8faff',textDecoration:'none',backdropFilter:'blur(12px)',maxWidth:'260px'});
-  elite.querySelector('span').style.cssText='grid-row:1/3;width:32px;height:32px;display:grid;place-items:center;border-radius:50%;background:#39c6e6;color:#04202a;font-size:14px';
-  elite.querySelector('strong').style.cssText='font-size:14px;line-height:1.15';
-  elite.querySelector('small').style.cssText='font-size:11px;color:#9ec8d3;line-height:1.2;margin-top:3px';
-  document.body.appendChild(elite);
-}
