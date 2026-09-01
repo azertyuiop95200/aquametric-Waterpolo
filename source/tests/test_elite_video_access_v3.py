@@ -16,14 +16,14 @@ def test_primary_navigation_has_one_tactics_hub_only():
     assert '/static/app.js?v=2026.09.01.2' in base
 
 
-def test_knowledge_embeds_video_excerpts_in_the_hub():
+def test_video_coach_room_is_embedded_in_the_hub():
     knowledge = read("templates/knowledge.html")
-    assert 'id="video"' in knowledge
-    assert "youtube-nocookie.com/embed/HfkCCOpLIBA?start=" in knowledge
-    assert "youtube-nocookie.com/embed/Ek1kBvUjivc?start=" in knowledge
-    assert "youtube-nocookie.com/embed/TseN9CGbfQw?start=" in knowledge
-    assert "youtube-nocookie.com/embed/bF-Am10VtF4?start=" in knowledge
-    assert "Les extraits sont dans le site" in knowledge
+    assert 'id="coach"' in knowledge
+    for video_id in ("HfkCCOpLIBA", "Ek1kBvUjivc", "TseN9CGbfQw", "bF-Am10VtF4"):
+        assert f"youtube-nocookie.com/embed/{video_id}" in knowledge
+    assert "Séance vidéo coach" in knowledge
+    assert "Stop avant décision" in knowledge
+    assert "reconstructions pédagogiques" in knowledge
 
 
 def test_reference_wings_are_high_near_two_to_three_metres():
@@ -33,13 +33,14 @@ def test_reference_wings_are_high_near_two_to_three_metres():
     assert '(258,76,"O5")' in knowledge
     assert '(96,128,"O2")' in knowledge
     assert '(204,128,"O4")' in knowledge
-    assert "O1/O5 restent hautes sur les ailes" in knowledge
+    assert "O1/O5 hautes" in knowledge
 
 
-def test_legacy_tactical_and_video_pages_converge_to_hub():
+def test_legacy_tactical_route_converges_without_separate_navigation():
     app = read("static/app.js")
     film_room = read("static/video-session-elite.html")
     assert "location.pathname==='/tactical-chess'" in app
     assert "location.replace('/knowledge')" in app
     assert "elite-video-quick-access" not in app
-    assert "location.replace('/knowledge#video')" in film_room
+    assert "Tactique & Connaissance" in film_room
+    assert 'href="/knowledge#coach"' in film_room

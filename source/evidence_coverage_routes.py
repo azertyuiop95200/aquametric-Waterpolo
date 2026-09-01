@@ -11,6 +11,7 @@ from models import User, ScoutingTeam, OfficialFixture
 from services.team_evidence_coverage import team_evidence_coverage, coverage_totals
 from services.scouting_player_resources import scouting_player_resources, scouting_team_resource_summary
 from analysis_match_routes import router as analysis_match_router
+from analysis_library_routes_v2 import router as analysis_library_router
 
 BASE_DIR = Path(__file__).resolve().parent
 TEMPLATES = Jinja2Templates(directory=BASE_DIR / "templates")
@@ -112,10 +113,9 @@ def enriched_scouting_detail(team_id: int, request: Request, db: Session = Depen
     )
 
 
-# Install the universal match-analysis routes here so they are registered by
-# extensions.py before main.py's legacy "My team only" routes. FastAPI resolves
-# the first matching route, which keeps backward compatibility while widening
-# the Analyse workspace to the full AquaMetric team catalogue. The enriched
-# Scouting route above uses the same precedence rule to replace the legacy
-# lightweight roster view without deleting it.
+# Install enriched routes before main.py's legacy routes. FastAPI resolves the
+# first matching route, so the operational match library keeps private workspace
+# analysis + official evidence while the universal match-analysis routes stay
+# available to the full AquaMetric team catalogue.
+router.include_router(analysis_library_router)
 router.include_router(analysis_match_router)
