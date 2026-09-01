@@ -21,6 +21,8 @@ from services.rapid_match_analysis import run_rapid_analysis, RapidAnalysisError
 from services.tactical_engine import analyze_match_tactics
 from services.ratings import calculate_player_rating
 from services.scoreboard_ocr import tesseract_available
+from services.video import youtube_embed
+from analysis_library_routes_v2 import _quarter_review
 
 BASE_DIR = Path(__file__).resolve().parent
 UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", BASE_DIR / "uploads"))
@@ -77,11 +79,14 @@ def operational_analysis_library(
         workspace_rows.append({
             "match": match,
             "job": latest_job,
+            "latest_job": latest_job,
             "vision": latest_vision,
+            "latest_vision": latest_vision,
             "auto": latest_auto,
             "auto_summary": summary,
             "events_count": events_count,
             "media_count": media_count,
+            "has_owned_video": bool(match.video_path),
         })
 
     ref_stmt = select(MatchLibraryItem).order_by(MatchLibraryItem.season.desc(), MatchLibraryItem.id.desc())
@@ -116,12 +121,24 @@ def operational_reference_detail(item_id: int, request: Request, db: Session = D
     teams = {}
     normalized_stats = {}
     for row in rows:
-        teams.setdefault(row.team_name, []).append(row)
+        teams.setdefault(row.team_name or "Équipe non précisée", []).append(row)
         normalized_stats[row.id] = reference_player_stat_payload(row)
+
+    quarters = _json(item.quarter_scores_json, [])
+    raw_team_stats = _json(item.team_stats_json, {})
+    evidence_meta = raw_team_stats.get("_aquametric", {}) if isinstance(raw_team_stats, dict) else {}
+    team_stats = {
+        key: value for key, value in raw_team_stats.items()
+        if key != "_aquametric" and isinstance(value, dict)
+    } if isinstance(raw_team_stats, dict) else {}
+    quarter_review = _quarter_review(quarters)
+    embed_url = youtube_embed(item.video_url) if item.video_url else ""
+
     return TEMPLATES.TemplateResponse(request, "analysis_library_detail.html", {
         "request": request, "user": user, "app_name": "AquaMetric",
         "item": item, "stats": rows, "teams": teams, "normalized_stats": normalized_stats,
-        "team_stats": _json(item.team_stats_json, {}), "quarters": _json(item.quarter_scores_json, []),
+        "team_stats": team_stats, "quarters": quarters, "quarter_review": quarter_review,
+        "evidence_meta": evidence_meta, "embed_url": embed_url,
     })
 
 
