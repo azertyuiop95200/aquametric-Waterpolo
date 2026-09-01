@@ -71,7 +71,7 @@ document.querySelectorAll(dragSelectors).forEach(el=>{
 // Premium video-analysis entry point: keep it visible where coaches are most likely to look for tactics.
 if(['/knowledge','/tactical-chess'].includes(location.pathname)){
   const elite=document.createElement('a');
-  elite.href='/static/video-session-elite.html';
+  elite.href='/static/video-session-elite.html?v=20260901-1';
   elite.className='elite-video-quick-access';
   elite.innerHTML='<span aria-hidden="true">▶</span><strong>Analyse vidéo élite</strong><small>matchs + schémas + lecture</small>';
   elite.setAttribute('aria-label','Ouvrir Analyse vidéo élite');
