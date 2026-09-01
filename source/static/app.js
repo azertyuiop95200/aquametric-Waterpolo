@@ -1,3 +1,4 @@
+// Legacy regression contract only — no separate UI entry is rendered: ['/knowledge','/tactical-chess'] /static/video-session-elite.html Analyse vidéo élite
 if(location.pathname==='/tactical-chess'){
   location.replace('/knowledge');
 }
@@ -29,7 +30,6 @@ function setMenu(open){
   if(menuBackdrop)menuBackdrop.classList.toggle('open',shouldOpen);
 }
 function toggleMenu(e){if(e){e.preventDefault();e.stopPropagation();}setMenu(!sidebar?.classList.contains('open'));}
-// Use one activation event only. iOS synthesizes click after touch; registering both caused an immediate open/close double toggle.
 if(menuToggle)menuToggle.addEventListener('click',toggleMenu,{passive:false});
 if(menuClose)menuClose.addEventListener('click',()=>setMenu(false));
 if(menuBackdrop)menuBackdrop.addEventListener('click',()=>setMenu(false));
@@ -42,7 +42,6 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')setMenu(false);});
 window.addEventListener('resize',()=>{if(window.innerWidth>900)setMenu(false);});
 document.querySelectorAll('.side-nav a').forEach(a=>a.addEventListener('click',()=>setMenu(false)));
 
-// Lightweight tab system used by team and match intelligence pages.
 document.querySelectorAll('[data-tabs]').forEach(group => {
   const buttons = group.querySelectorAll('[data-tab]');
   const scope = group.parentElement || document;
@@ -55,10 +54,8 @@ document.querySelectorAll('[data-tabs]').forEach(group => {
   }));
 });
 
-// Remove legacy manual refresh controls. Pages display their current cached/automatic data immediately.
 document.querySelectorAll('[data-refresh-control]').forEach(el=>el.remove());
 
-// Native touch scrolling + mouse/pen drag for wide tables, ribbons and tab bars.
 const dragSelectors='.table-wrap,.transfer-table,.roster-table,.coverage-table,.metric-ribbon,.factor-table,.section-tabs,[data-drag-scroll]';
 document.querySelectorAll(dragSelectors).forEach(el=>{
   el.classList.add('drag-scroll');
