@@ -1,44 +1,24 @@
 {% extends "base.html" %}{% block content %}
 <style>
-.analysis-library-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}.analysis-live-card{display:block;text-decoration:none;border:1px solid var(--border,#294754);border-radius:20px;padding:18px;background:var(--panel,#0b202b)}
-.analysis-live-card h3{margin:6px 0}.analysis-live-top,.analysis-live-meta{display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap}.analysis-live-meta{font-size:12px;opacity:.8;margin-top:12px}
-.section-separator{margin:34px 0 14px}.pipeline-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:16px 0}.pipeline-strip div{padding:12px;border-radius:14px;border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.03)}
-@media(max-width:700px){.pipeline-strip{grid-template-columns:1fr 1fr}}
+.ml{--line:#285264;--panel:#0a202a;--muted:#9fbcc6;--cyan:#63d2ed}.ml *{box-sizing:border-box}.ml-hero{padding:28px;border:1px solid var(--line);border-radius:25px;background:linear-gradient(135deg,#0d2936,#071820);display:flex;justify-content:space-between;gap:22px;align-items:end}.ml-hero h1{font-size:clamp(34px,5vw,58px);line-height:1;margin:.15em 0}.ml-hero p{max-width:850px;color:#bfd3da}.ml-kpis{display:flex;gap:8px;flex-wrap:wrap}.ml-kpis span{padding:9px 12px;border:1px solid #315466;border-radius:999px;background:#0b202a}.pipeline{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:16px 0}.pipeline div{padding:12px;border-radius:14px;border:1px solid var(--line);background:#0b202a}.pipeline b{display:block}.pipeline small{color:var(--muted)}.review-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:14px}.review-card{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:22px;background:linear-gradient(180deg,#0b202b,#081a23);overflow:hidden;text-decoration:none;color:inherit}.review-video{aspect-ratio:16/9;background:#06131b;display:grid;place-items:center;position:relative;overflow:hidden}.review-video iframe{width:100%;height:100%;border:0}.review-no-video{padding:28px;text-align:center;color:#a9c4cd}.review-no-video b{display:block;color:#eaf7fa;font-size:20px}.review-body{padding:18px;display:grid;gap:10px}.review-top{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:#9fc0ca}.review-card h3{font-size:22px;line-height:1.12;margin:0}.score{color:#fff}.review-summary{color:#b8ced5;margin:0}.quarter-flow{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}.quarter-flow div{padding:8px;border-radius:11px;background:#0d2a35;border:1px solid #315466;text-align:center}.quarter-flow b{display:block}.quarter-flow small{color:#9dbcc5}.review-tags{display:flex;gap:6px;flex-wrap:wrap}.review-tags span{font-size:11px;padding:5px 7px;border:1px solid #315466;border-radius:999px;color:#bfe0e8}.review-cta{margin-top:auto;padding:12px 18px;border-top:1px solid #244653;color:#7edcf0;font-weight:800}.workspace-card{border:1px solid var(--line);border-radius:19px;padding:16px;background:#0b202a}.workspace-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}.section-head{display:flex;justify-content:space-between;gap:18px;align-items:end;margin:30px 0 12px}.section-head h2{font-size:30px;margin:4px 0}.section-head p{max-width:720px;color:var(--muted);margin:0}.filter-bar{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}.filter-bar input,.filter-bar select{min-height:42px}.evidence-note{padding:14px;border-left:3px solid var(--cyan);background:#0d2935;border-radius:0 14px 14px 0;color:#bcd4dc}@media(max-width:800px){.ml-hero{display:block}.pipeline{grid-template-columns:1fr 1fr}.section-head{display:block}}@media(max-width:500px){.pipeline{grid-template-columns:1fr}.review-grid{grid-template-columns:1fr}}
 </style>
-<section class="page-head">
-  <div><span class="eyebrow">MATCH ANALYSIS LIBRARY</span><h1>Bibliothèque d'analyse opérationnelle</h1>
-  <p>Les matchs de ton espace de travail, leurs traitements vidéo, statistiques, joueuses, phases tactiques et preuves sont regroupés ici. L'archive externe officielle reste séparée en dessous.</p></div>
-  <a class="btn" href="/matches/new">+ Nouveau match à analyser</a>
-</section>
-
-<div class="notice library-separation"><b>Analyse réelle, pas vitrine démo</b><span>Une statistique n'est affichée que si elle est prouvée par un événement validé, un rapport officiel ou une sortie automatique clairement marquée comme candidate.</span></div>
-<div class="pipeline-strip"><div><b>1 · Vidéo longue</b><small>échantillonnage visuel borné</small></div><div><b>2 · Scoreboard</b><small>OCR sparse, périodes, score</small></div><div><b>3 · Événements</b><small>timeline + validation</small></div><div><b>4 · Intelligence</b><small>stats, joueuses, phases, tactique</small></div></div>
+<div class="ml">
+<section class="ml-hero"><div><span class="eyebrow">MATCH FILM & ANALYSIS LIBRARY</span><h1>Bibliothèque d’analyse de match</h1><p>Chaque match devient un dossier coach : vidéo intégrée lorsqu’un replay officiel est embarquable, lecture des quarts-temps, bascules du match, statistiques prouvées, questions vidéo et plan de séance. Les matchs sans replay ne reçoivent pas de fausses séquences : ils sont travaillés à partir des preuves officielles disponibles.</p></div><div class="ml-kpis"><span><b>{{ items|length }}</b> matchs de référence</span><span>revue coach match par match</span></div></section>
+<div class="pipeline"><div><b>1 · Contexte</b><small>score, compétition, enjeu</small></div><div><b>2 · Vidéo</b><small>replay intégré si vérifié</small></div><div><b>3 · Bascule</b><small>quart / run décisif</small></div><div><b>4 · Lecture</b><small>stat + tactique prouvée</small></div><div><b>5 · Terrain</b><small>question + exercice</small></div></div>
+<div class="evidence-note"><b>Règle de preuve :</b> une donnée officielle reste une donnée officielle ; une reconstruction pédagogique reste étiquetée comme telle. AquaMetric ne transforme pas un résumé de match en fausse analyse image par image.</div>
 
 <form class="filter-bar" method="get"><select name="competition"><option value="">Toutes compétitions</option>{% for c in competitions %}<option {% if c==selected_competition %}selected{% endif %}>{{ c }}</option>{% endfor %}</select><input name="team" value="{{ selected_team }}" placeholder="Équipe / nation"><button class="btn small">Filtrer</button></form>
 
-<h2>Mes matchs analysés</h2>
-<div class="analysis-library-grid">
-{% for row in workspace_rows|default([]) %}
-  {% set m=row.match %}
-  <a class="analysis-live-card" href="/match-analysis/{{ m.id }}">
-    <div class="analysis-live-top"><span>{{ m.competition or "Match" }}</span><span>{{ m.match_date or "date —" }}</span></div>
-    <h3>{{ m.team.name }} <strong>vs</strong> {{ m.opponent }}</h3>
-    <p>{% if row.job %}{{ row.job.status|replace("_"," ") }} · {{ row.job.progress }}%{% else %}prêt pour analyse{% endif %}</p>
-    <div class="analysis-live-meta">
-      <span>{{ row.events_count }} événements</span><span>{{ row.media_count }} preuves média</span>
-      <span>{{ row.vision.sample_count if row.vision else 0 }} samples vidéo</span>
-      <span>{{ row.auto_summary.get("action_candidates",0) if row.auto_summary else 0 }} candidats auto</span>
-    </div>
-  </a>
-{% else %}
-  <div class="panel empty-state"><b>Aucun match dans ton espace.</b><p>Ajoute un match et une vidéo pour lancer le pipeline d'analyse longue.</p><a class="btn primary" href="/matches/new">Créer le premier match</a></div>
-{% endfor %}
-</div>
+{% if workspace_rows|default([]) %}<div class="section-head"><div><span class="eyebrow">TES VIDÉOS</span><h2>Matchs du workspace</h2></div><p>Ici les captures et clips réels peuvent être générés car la vidéo appartient au workspace ou a été importée par l’utilisateur.</p></div><div class="workspace-grid">{% for row in workspace_rows %}{% set m=row.match %}<a class="workspace-card" href="/match-analysis/{{m.id}}"><b>{{m.team.name}} vs {{m.opponent}}</b><p>{{row.events_count}} événements · {{row.media_count}} preuves média</p><span>Ouvrir l’analyse complète →</span></a>{% endfor %}</div>{% endif %}
 
-<div class="section-separator"><span class="eyebrow">OFFICIAL REFERENCE ARCHIVE</span><h2>Matchs externes sourcés</h2><p>Ils servent de références et de données officielles. Ils ne sont jamais confondus avec tes propres traitements vidéo.</p></div>
-<div class="library-grid">{% for item in items %}
-  <a class="library-card" href="/analysis-library/{{ item.id }}"><div class="library-top"><span>{{ item.entity_type|replace('_',' ')|title }}</span><span>{{ item.season }}</span></div>
-  <h3>{{ item.team_a }} <strong>{{ item.score_a if item.score_a is not none else '—' }}–{{ item.score_b if item.score_b is not none else '—' }}</strong> {{ item.team_b }}</h3>
-  <p>{{ item.competition }}</p><div class="confidence-row"><span class="status-chip good">{{ item.analysis_status|replace('_',' ') }}</span><span>{{ item.video_kind|replace('_',' ') }}</span></div></a>
-{% else %}<div class="panel empty-state"><b>Aucun match de référence pour ces filtres.</b></div>{% endfor %}</div>
+<div class="section-head"><div><span class="eyebrow">REVUE COMPLÈTE</span><h2>Chaque match repassé individuellement</h2></div><p>Les six dossiers actuels ont une lecture coach spécifique. Les matchs avec vidéo peuvent être projetés directement ; les autres sont explicitement marqués « preuve statistique / rapport ».</p></div>
+<div class="review-grid">{% for item in items %}<a class="review-card" href="/analysis-library/{{item.id}}">
+  <div class="review-video">
+  {% if item.external_key == 'EA-CLW-2024-FINAL-SABA-OLY' %}<iframe loading="lazy" src="https://www.youtube-nocookie.com/embed/pIJu8tQT7-I?rel=0&playsinline=1" title="Sabadell Olympiacos 2024" allowfullscreen></iframe>
+  {% elif item.external_key == 'WA-U20W-2025-SF-ESP-GRE' %}<iframe loading="lazy" src="https://www.youtube-nocookie.com/embed/bF-Am10VtF4?rel=0&playsinline=1" title="Espagne Grèce U20 2025" allowfullscreen></iframe>
+  {% elif item.external_key == 'WA-U20W-2025-F-USA-ESP' %}<iframe loading="lazy" src="https://www.youtube-nocookie.com/embed/TnZjH0VeCsQ?rel=0&playsinline=1" title="USA Espagne U20 femmes 2025" allowfullscreen></iframe>
+  {% else %}<div class="review-no-video"><b>Rapport officiel</b><span>Pas de replay intégrable vérifié dans la bibliothèque actuelle</span></div>{% endif %}
+  </div><div class="review-body"><div class="review-top"><span>{{item.competition}}</span><span>{{item.season}}</span></div><h3>{{item.team_a}} <span class="score">{{item.score_a if item.score_a is not none else '—'}}–{{item.score_b if item.score_b is not none else '—'}}</span> {{item.team_b}}</h3><p class="review-summary">{{item.tactical_summary}}</p>
+  {% set qs = item.quarter_scores_json|default('') %}<div class="review-tags"><span>{{item.analysis_status|replace('_',' ')}}</span><span>{{item.video_kind|replace('_',' ')}}</span><span>dossier coach</span></div></div><div class="review-cta">Voir vidéo, bascules, images pédagogiques et séance →</div></a>{% else %}<div class="panel empty-state"><b>Aucun match de référence pour ces filtres.</b></div>{% endfor %}</div>
+</div>
 {% endblock %}
