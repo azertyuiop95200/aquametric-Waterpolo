@@ -1,23 +1,207 @@
 {% extends "base.html" %}{% block content %}
-<section class="page-head sim-hero"><div><span class="eyebrow">MATCH SIMULATION · REALISM LAYER</span><h1>Project the match — respect the level gap</h1><p>Competition class, roster availability, goalkeeper, transition, special teams, depth, form, rest and tactical style influence the scenario engine. Tactics cannot erase a major level gap.</p></div><span class="pill">Exploratory · not a betting model</span></section>
-<form class="panel sim-form-v11" method="get" action="/simulation">
-<label>Team A<select name="team_a">{% for name in teams %}<option {{ 'selected' if name==result.team_a else '' }}>{{ name }}</option>{% endfor %}</select></label>
-<label>Plan A<select name="tactic_a">{% for x in ['balanced','transition','centre_pressure','zone_plus_focus','defence_first'] %}<option value="{{ x }}" {{ 'selected' if x==tactic_a else '' }}>{{ x|replace('_',' ') }}</option>{% endfor %}</select></label>
-<label>Availability A<input type="number" min="50" max="100" name="availability_a" value="{{ availability_a }}"></label>
-<label>Form A<input type="number" min="30" max="70" name="form_a" value="{{ form_a }}"></label>
-<label>Rest A<input type="number" min="0" max="7" name="rest_a" value="{{ rest_a }}"></label>
-<span class="sim-vs">VS</span>
-<label>Team B<select name="team_b">{% for name in teams %}<option {{ 'selected' if name==result.team_b else '' }}>{{ name }}</option>{% endfor %}</select></label>
-<label>Plan B<select name="tactic_b">{% for x in ['balanced','transition','centre_pressure','zone_plus_focus','defence_first'] %}<option value="{{ x }}" {{ 'selected' if x==tactic_b else '' }}>{{ x|replace('_',' ') }}</option>{% endfor %}</select></label>
-<label>Availability B<input type="number" min="50" max="100" name="availability_b" value="{{ availability_b }}"></label>
-<label>Form B<input type="number" min="30" max="70" name="form_b" value="{{ form_b }}"></label>
-<label>Rest B<input type="number" min="0" max="7" name="rest_b" value="{{ rest_b }}"></label>
-<label>Venue<select name="venue"><option value="neutral" {{ 'selected' if venue=='neutral' else '' }}>Neutral</option><option value="team_a_home" {{ 'selected' if venue=='team_a_home' else '' }}>Team A home</option><option value="team_b_home" {{ 'selected' if venue=='team_b_home' else '' }}>Team B home</option></select></label>
-<button class="btn" type="submit">Run {{ result.n }} scenarios</button></form>
-<div class="simulation-score"><section class="sim-team"><small>{{ result.team_a }}</small><b>{{ result.avg_a }}</b><span>{{ result.win_a }}% scenario wins</span><em>model strength {{ result.strength_a }}</em></section><div class="sim-middle"><span>projected average</span><strong>–</strong><small>coverage {{ result.coverage }}%</small><small>class gap {{ result.class_gap }}</small></div><section class="sim-team"><small>{{ result.team_b }}</small><b>{{ result.avg_b }}</b><span>{{ result.win_b }}% scenario wins</span><em>model strength {{ result.strength_b }}</em></section></div>
-{% if result.cross_level %}<div class="notice danger-box"><b>Reality check</b><p>Cross-level comparison: this is not a normal peer-level fixture. Competition hierarchy dominates the forecast; tactical choices only make limited adjustments.</p></div>{% endif %}
-<div class="kpi-grid four"><div class="kpi"><span>Team A win</span><b>{{ result.win_a }}%</b></div><div class="kpi"><span>Draw</span><b>{{ result.draw }}%</b></div><div class="kpi"><span>Team B win</span><b>{{ result.win_b }}%</b></div><div class="kpi"><span>80% goal-diff interval</span><b>{{ result.diff_interval[0] }}…{{ result.diff_interval[1] }}</b></div></div>
-<section class="panel"><div class="section-title"><div><span class="eyebrow">WHY THE MODEL MOVED</span><h2>Factor breakdown</h2></div><span class="pill">Internal priors ≠ official rankings</span></div><div class="factor-table"><div class="factor-row head"><b>Factor</b><b>{{ result.team_a }}</b><b>{{ result.team_b }}</b><b>relative edge</b></div>{% for row in result.factor_rows %}<div class="factor-row"><span>{{ row[0] }}</span><b>{{ row[1] }}</b><b>{{ row[2] }}</b><span>{{ row[3] }}</span></div>{% endfor %}</div></section>
-<div class="two-col"><section class="panel"><span class="eyebrow">DATA STATUS</span><h2>{{ result.team_a }}</h2><p><b>{{ result.roster_status_a }}</b></p><p class="muted">{{ teams[result.team_a].note }}</p><small class="muted">{{ result.recruitment_note_a }}</small></section><section class="panel"><span class="eyebrow">DATA STATUS</span><h2>{{ result.team_b }}</h2><p><b>{{ result.roster_status_b }}</b></p><p class="muted">{{ teams[result.team_b].note }}</p><small class="muted">{{ result.recruitment_note_b }}</small></section></div>
-<div class="notice warning"><b>What this forecast means</b><p>{{ result.disclaimer }}</p><p>When current compositions are not confirmed, the model uses a provisional club/team prior and widens uncertainty. Once official rosters and current match data arrive, those replace the provisional values.</p></div>
+<style>
+.sim-manager-grid{display:grid;gap:16px}.sim-team-pick{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:14px;align-items:end}
+.sim-team-pick .vs{padding-bottom:12px;font-weight:800;color:var(--muted,#718096)}.sim-auto-badge{display:inline-flex;gap:7px;align-items:center;font-size:.78rem;font-weight:800;letter-spacing:.04em}
+.sim-auto-badge:before{content:"";width:8px;height:8px;border-radius:50%;background:#24a148}.sim-absence-grid,.sim-auto-grid,.sim-result-grid,.sim-season-grid{display:grid;gap:14px;grid-template-columns:repeat(2,minmax(0,1fr))}
+.sim-input-row{display:flex;gap:8px}.sim-input-row input{min-width:0;flex:1}.sim-chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.sim-chip{border:1px solid var(--border,#d9e1ea);border-radius:999px;padding:7px 10px;background:transparent;cursor:pointer}
+.sim-auto-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:12px}.sim-metric{border:1px solid var(--border,#d9e1ea);border-radius:12px;padding:10px}.sim-metric span{display:block;font-size:.75rem;color:var(--muted,#718096)}.sim-metric b{font-size:1.05rem}
+.sim-scoreboard{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:14px;align-items:center;text-align:center}.sim-score-team b{display:block;font-size:2.7rem;line-height:1}.sim-score-team strong{display:block;margin-top:7px}.sim-score-mid{font-weight:900;font-size:1.5rem}
+.sim-prob-track{height:16px;display:flex;overflow:hidden;border-radius:999px;background:#e7edf4;margin-top:16px}.sim-prob-a{background:var(--accent,#0067c5)}.sim-prob-d{background:#9aa7b4}.sim-prob-b{background:#35495e}
+.sim-prob-labels{display:flex;justify-content:space-between;gap:10px;font-size:.8rem;margin-top:6px}.sim-factor-row{display:grid;grid-template-columns:1.5fr 1fr 1fr .8fr;gap:8px;padding:9px 0;border-bottom:1px solid var(--border,#e5e9ef);align-items:center}.sim-factor-row.head{font-size:.78rem;color:var(--muted,#718096);font-weight:800}
+.sim-list{display:grid;gap:7px}.sim-list-row{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border,#e5e9ef)}.sim-roster{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.sim-player{border:1px solid var(--border,#d9e1ea);border-radius:10px;padding:9px}.sim-player.absent{opacity:.48;text-decoration:line-through}.sim-player small{display:block;color:var(--muted,#718096)}
+.sim-scenario{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.sim-scenario>div{border:1px solid var(--border,#d9e1ea);border-radius:12px;padding:12px;text-align:center}.sim-scenario b{display:block;font-size:1.4rem}.sim-status{font-size:.8rem;font-weight:800;border-radius:999px;padding:5px 9px;border:1px solid var(--border,#d9e1ea)}
+@media(max-width:760px){.sim-team-pick{grid-template-columns:1fr}.sim-team-pick .vs{padding:0;text-align:center}.sim-absence-grid,.sim-auto-grid,.sim-result-grid,.sim-season-grid{grid-template-columns:1fr}.sim-auto-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.sim-factor-row{grid-template-columns:1.4fr .8fr .8fr}.sim-factor-row>*:last-child{display:none}.sim-roster{grid-template-columns:1fr}.sim-score-team b{font-size:2.15rem}}
+</style>
+
+<section class="page-head sim-hero">
+  <div>
+    <span class="eyebrow">SIMULATION · MANAGER PRÉDICTIF</span>
+    <h1>Le moteur calcule tout. Tu indiques seulement les absences.</h1>
+    <p>Forme, fatigue, repos, niveau, gardienne, supériorité/infériorité, profondeur, contexte et plan tactique sont dérivés automatiquement des résultats et des données disponibles.</p>
+  </div>
+  <span class="pill sim-auto-badge">AUTO · {{ result.n }} simulations</span>
+</section>
+
+<form id="simForm" class="sim-manager-grid" method="get" action="/simulation">
+  <section class="panel">
+    <div class="sim-team-pick">
+      <label>Équipe A
+        <select id="teamA" name="team_a">{% for name in teams %}<option value="{{ name }}" {{ 'selected' if name==result.team_a else '' }}>{{ name }}</option>{% endfor %}</select>
+      </label>
+      <span class="vs">VS</span>
+      <label>Équipe B
+        <select id="teamB" name="team_b">{% for name in teams %}<option value="{{ name }}" {{ 'selected' if name==result.team_b else '' }}>{{ name }}</option>{% endfor %}</select>
+      </label>
+    </div>
+    <input id="availabilityA" type="hidden" name="availability_a" value="{{ result.auto_inputs.availability_a }}">
+    <input id="availabilityB" type="hidden" name="availability_b" value="{{ result.auto_inputs.availability_b }}">
+    <input id="absencesAHidden" type="hidden" name="absences_a" value="">
+    <input id="absencesBHidden" type="hidden" name="absences_b" value="">
+  </section>
+
+  <section class="sim-absence-grid">
+    <div class="panel">
+      <span class="eyebrow">SEULE SAISIE MANUELLE</span><h2>Absences · <span id="absenceTitleA">{{ result.team_a }}</span></h2>
+      <p class="muted">Ajoute uniquement les joueuses indisponibles. Leur impact dépend automatiquement du poste et des données documentées.</p>
+      <div class="sim-input-row"><input id="absenceA" list="rosterAList" autocomplete="off" placeholder="Nom de la joueuse absente"><button id="addA" class="btn secondary" type="button">Ajouter</button></div>
+      <datalist id="rosterAList"></datalist><div id="chipsA" class="sim-chips"></div><small id="absenceImpactA" class="muted"></small>
+    </div>
+    <div class="panel">
+      <span class="eyebrow">SEULE SAISIE MANUELLE</span><h2>Absences · <span id="absenceTitleB">{{ result.team_b }}</span></h2>
+      <p class="muted">Une absence connue peut être confirmée ici. Le moteur recalcule ensuite force, rotation et probabilités.</p>
+      <div class="sim-input-row"><input id="absenceB" list="rosterBList" autocomplete="off" placeholder="Nom de la joueuse absente"><button id="addB" class="btn secondary" type="button">Ajouter</button></div>
+      <datalist id="rosterBList"></datalist><div id="chipsB" class="sim-chips"></div><small id="absenceImpactB" class="muted"></small>
+    </div>
+  </section>
+
+  <div><button class="btn" type="submit">Recalculer la projection complète</button></div>
+</form>
+
+<section class="panel">
+  <div class="section-title"><div><span class="eyebrow">ENTRÉES AUTOMATIQUES</span><h2>État réel estimé des équipes</h2></div><span class="pill">aucun curseur manuel</span></div>
+  <div class="sim-auto-grid">
+    {% for side, team, profile in [('A', result.team_a, teams[result.team_a]), ('B', result.team_b, teams[result.team_b])] %}
+    <article>
+      <div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><strong>{{ team }}</strong><span class="sim-status">{{ result['data_status_' ~ (side|lower)] }}</span></div>
+      <div class="sim-auto-metrics">
+        <div class="sim-metric"><span>Forme récente</span><b>{{ result.auto_inputs['form_' ~ (side|lower)]|round(0)|int }}/100</b></div>
+        <div class="sim-metric"><span>Fatigue</span><b>{{ result.auto_inputs['fatigue_' ~ (side|lower)]|round(0)|int }}/100</b></div>
+        <div class="sim-metric"><span>Repos</span><b>{{ result.auto_inputs['rest_' ~ (side|lower)] }} j</b></div>
+        <div class="sim-metric"><span>Couverture</span><b>{{ (profile.coverage * 100)|round(0)|int }}%</b></div>
+        <div class="sim-metric"><span>Attaque</span><b>{{ profile.attack|round(0)|int }}</b></div>
+        <div class="sim-metric"><span>Défense</span><b>{{ profile.defence|round(0)|int }}</b></div>
+        <div class="sim-metric"><span>Gardienne</span><b>{{ profile.goalkeeper|round(0)|int }}</b></div>
+        <div class="sim-metric"><span>Zone +</span><b>{{ profile.extra_player|round(0)|int }}</b></div>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+  {% if result.context %}
+  <div class="notice" style="margin-top:14px"><b>Contexte détecté automatiquement</b><p>{{ result.context.competition or 'Compétition à confirmer' }} · {{ result.context.date or 'date à confirmer' }} · lieu: {{ result.auto_inputs.venue|replace('_',' ') }}.</p></div>
+  {% else %}
+  <div class="notice warning" style="margin-top:14px"><b>Contexte de prochaine rencontre non identifié</b><p>Le moteur conserve un contexte neutre et élargit l'incertitude au lieu d'inventer une date ou un lieu.</p></div>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <div class="section-title"><div><span class="eyebrow">25K MONTE-CARLO + ENSEMBLE</span><h2>Pronostic central</h2></div><span class="pill">confiance {{ result.confidence }}/100</span></div>
+  <div class="sim-scoreboard">
+    <div class="sim-score-team"><small>{{ result.team_a }}</small><b>{{ result.avg_a }}</b><strong>{{ result.win_a }}% victoire</strong><span class="muted">force {{ result.strength_a }}</span></div>
+    <div class="sim-score-mid">—</div>
+    <div class="sim-score-team"><small>{{ result.team_b }}</small><b>{{ result.avg_b }}</b><strong>{{ result.win_b }}% victoire</strong><span class="muted">force {{ result.strength_b }}</span></div>
+  </div>
+  <div class="sim-prob-track" aria-label="Distribution victoire nul défaite"><div class="sim-prob-a" style="width:{{ result.win_a }}%"></div><div class="sim-prob-d" style="width:{{ result.draw }}%"></div><div class="sim-prob-b" style="width:{{ result.win_b }}%"></div></div>
+  <div class="sim-prob-labels"><span>A {{ result.win_a }}%</span><span>Nul {{ result.draw }}%</span><span>B {{ result.win_b }}%</span></div>
+  {% if result.cross_level %}<div class="notice danger-box"><b>Écart de niveau majeur</b><p>La hiérarchie de compétition domine. Le moteur empêche qu'un simple ajustement tactique efface artificiellement cet écart.</p></div>{% endif %}
+</section>
+
+<div class="sim-result-grid">
+  <section class="panel">
+    <span class="eyebrow">SCÉNARIOS</span><h2>Pessimiste · central · optimiste</h2>
+    <div class="sim-scenario">
+      <div><span class="muted">P10</span><b>{{ '%+d'|format(result.scenarios.pessimistic_a) }}</b><small>écart A</small></div>
+      <div><span class="muted">P50</span><b>{{ '%+d'|format(result.scenarios.central_a) }}</b><small>écart A</small></div>
+      <div><span class="muted">P90</span><b>{{ '%+d'|format(result.scenarios.optimistic_a) }}</b><small>écart A</small></div>
+    </div>
+    <p class="muted">{{ result.scenarios.label }}</p>
+  </section>
+  <section class="panel">
+    <span class="eyebrow">SCORES LES PLUS PROBABLES</span><h2>Distribution</h2>
+    <div class="sim-list">{% for item in result.top_scores[:6] %}<div class="sim-list-row"><b>{{ item.score }}</b><span>{{ item.probability }}%</span><small class="muted">{{ item.count }} scénarios</small></div>{% endfor %}</div>
+  </section>
+</div>
+
+<section class="panel">
+  <div class="section-title"><div><span class="eyebrow">PLAN MANAGER</span><h2>Tactique recommandée automatiquement</h2></div><span class="pill">lecture du matchup</span></div>
+  <div class="two-col">
+    <div><b>{{ result.team_a }}</b><h3>{{ result.tactic_a|replace('_',' ')|title }}</h3><p class="muted">Déterminé par le profil attaque/défense, transition, centre, zone +/− et le profil adverse.</p></div>
+    <div><b>{{ result.team_b }}</b><h3>{{ result.tactic_b|replace('_',' ')|title }}</h3><p class="muted">Aucun plan tactique n'est choisi manuellement dans le mode pronostic principal.</p></div>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="section-title"><div><span class="eyebrow">POURQUOI LE MODÈLE BOUGE</span><h2>Facteurs de projection</h2></div><span class="pill">données + estimations séparées</span></div>
+  <div class="sim-factor-row head"><span>Facteur</span><span>{{ result.team_a }}</span><span>{{ result.team_b }}</span><span>écart</span></div>
+  {% for row in result.factor_rows %}<div class="sim-factor-row"><span>{{ row[0] }}</span><b>{{ row[1] }}</b><b>{{ row[2] }}</b><span>{{ row[3] }}</span></div>{% endfor %}
+</section>
+
+<div class="sim-result-grid">
+  {% for side, team, results, roster in [('A',result.team_a,result.recent_results_a,result.roster_a),('B',result.team_b,result.recent_results_b,result.roster_b)] %}
+  <section class="panel">
+    <span class="eyebrow">FORME CALCULÉE</span><h2>{{ team }} · derniers résultats</h2>
+    {% if results %}<div class="sim-list">{% for game in results[:6] %}<div class="sim-list-row"><span>{{ game.opponent }}</span><b>{{ game.gf }}–{{ game.ga }}</b><small class="muted">{{ game.result }} · {{ game.competition }}</small></div>{% endfor %}</div>{% else %}<p class="muted">Échantillon récent public insuffisant : le prior historique reste utilisé avec davantage d'incertitude.</p>{% endif %}
+    <h3 style="margin-top:18px">Rotation probable / connue</h3>
+    {% if roster %}<div id="roster{{ side }}" class="sim-roster">{% for p in roster[:14] %}<div class="sim-player" data-player="{{ p.name }}"><b>{{ p.name }}</b><small>{{ p.role }} · impact {{ p.impact }}</small></div>{% endfor %}</div>{% else %}<p class="muted">Effectif actuel incomplet : ébauche provisoire du club utilisée, sans inventer de joueuses.</p>{% endif %}
+  </section>
+  {% endfor %}
+</div>
+
+<section class="panel">
+  <div class="section-title"><div><span class="eyebrow">PROJECTION COMPÉTITION</span><h2>Classement, playoffs et titre</h2></div><span class="pill">Monte-Carlo saison</span></div>
+  <div class="sim-season-grid">
+    {% for team, season in [(result.team_a,result.season_a),(result.team_b,result.season_b)] %}
+    <article><h3>{{ team }}</h3>
+      {% if season.available %}
+      <div class="sim-auto-metrics">
+        <div class="sim-metric"><span>Titre</span><b>{{ season.title }}%</b></div><div class="sim-metric"><span>Top 3</span><b>{{ season.top3 }}%</b></div>
+        <div class="sim-metric"><span>Playoffs</span><b>{{ season.playoffs }}%</b></div><div class="sim-metric"><span>Maintien</span><b>{{ season.survival }}%</b></div>
+        <div class="sim-metric"><span>Rang moyen</span><b>{{ season.average_rank }}</b></div><div class="sim-metric"><span>Simulations</span><b>{{ season.simulations }}</b></div>
+      </div>
+      {% else %}<p class="muted">{{ season.reason }}</p>{% endif %}
+    </article>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="panel">
+  <div class="section-title"><div><span class="eyebrow">CALIBRATION</span><h2>Contrôle rétrospectif</h2></div><span class="pill">{{ result.validation.sample }} matchs</span></div>
+  <p>{{ result.validation.label }}{% if result.validation.direction_accuracy is not none %} · précision directionnelle {{ result.validation.direction_accuracy }}%{% endif %}</p>
+</section>
+
+<div class="notice warning"><b>Lecture responsable de la projection</b><p>{{ result.disclaimer }}</p><p><b>{{ result.team_a }} :</b> {{ result.data_status_a }} · {{ result.roster_status_a }}. <b>{{ result.team_b }} :</b> {{ result.data_status_b }} · {{ result.roster_status_b }}.</p></div>
+
+<script>
+(() => {
+  const root = document.getElementById('simForm'); if (!root || root.dataset.ready) return; root.dataset.ready='1';
+  const profiles = {{ teams|tojson }};
+  const params = new URLSearchParams(window.location.search);
+  const normalise = s => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();
+  const state = {
+    A: (params.get('absences_a') || '').split('|').map(x=>x.trim()).filter(Boolean),
+    B: (params.get('absences_b') || '').split('|').map(x=>x.trim()).filter(Boolean)
+  };
+  const el = id => document.getElementById(id);
+  const findProfile = name => profiles[name] || Object.values(profiles).find(p => normalise(p.name || '')===normalise(name)) || {};
+  const rosterFor = side => {
+    const name = el('team'+side).value, p=findProfile(name);
+    return Array.isArray(p.roster_players) ? p.roster_players : [];
+  };
+  function render(side){
+    const teamName=el('team'+side).value, roster=rosterFor(side), datalist=el('roster'+side+'List');
+    el('absenceTitle'+side).textContent=teamName;
+    datalist.innerHTML=''; roster.forEach(p=>{const o=document.createElement('option');o.value=p.name;datalist.appendChild(o);});
+    const chips=el('chips'+side); chips.innerHTML='';
+    state[side].forEach((name,i)=>{const b=document.createElement('button');b.type='button';b.className='sim-chip';b.textContent=name+' ×';b.addEventListener('click',()=>{state[side].splice(i,1);render(side);});chips.appendChild(b);});
+    let impact=0;
+    state[side].forEach(name=>{const player=roster.find(p=>normalise(p.name)===normalise(name));impact += player ? Number(player.impact||1.6) : 1.6;});
+    const availability=Math.max(50,Math.min(100,Math.round(100-impact*3)));
+    el('availability'+side).value=String(availability);
+    el('absences'+side+'Hidden').value=state[side].join('|');
+    el('absenceImpact'+side).textContent=state[side].length ? `${state[side].length} absence(s) · disponibilité recalculée ${availability}%` : 'Aucune absence ajoutée · disponibilité 100%.';
+    const rosterBox=el('roster'+side); if(rosterBox){rosterBox.querySelectorAll('[data-player]').forEach(node=>node.classList.toggle('absent',state[side].some(x=>normalise(x)===normalise(node.dataset.player))));}
+  }
+  function add(side){
+    const input=el('absence'+side), value=input.value.trim(); if(!value) return;
+    if(!state[side].some(x=>normalise(x)===normalise(value))) state[side].push(value);
+    input.value=''; render(side); input.focus();
+  }
+  ['A','B'].forEach(side=>{
+    el('add'+side).addEventListener('click',()=>add(side));
+    el('absence'+side).addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();add(side);}});
+    el('team'+side).addEventListener('change',()=>{state[side]=[];render(side);});
+    render(side);
+  });
+  root.addEventListener('submit',()=>{render('A');render('B');});
+})();
+</script>
 {% endblock %}
