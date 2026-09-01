@@ -30,5 +30,7 @@ services:
         value: "1"
       - key: TACTICS_HUB_RELEASE
         value: "2026-08-29-v2"
+      - key: SIMULATION_MANAGER_RELEASE
+        value: "2026-09-01-v1"
       - key: SECRET_KEY
         generateValue: true
