@@ -797,8 +797,9 @@ def simulate_matchup(
     expected_margin = 11.8 * math.tanh(rating_diff / 25.5) + matchup * .85
     if abs(level_gap) >= 2:
         # Minimum goal-space separation for large competition-class gaps.
-        # It activates only when noisy recent data compresses the hierarchy.
-        target_margin = level_gap * 3.4
+        # Senior-international gaps get a stronger floor than youth gaps.
+        class_multiplier = 5.5 if abs(level_gap) >= 3 else 4.0
+        target_margin = level_gap * class_multiplier
         if level_gap > 0:
             expected_margin = max(expected_margin, target_margin)
         else:
@@ -946,7 +947,7 @@ def simulate_matchup(
         "data_status_b": b.get("data_status", "PROVISIONAL"),
         "validation": validation, "season_a": season_a, "season_b": season_b,
         "disclaimer": (
-            "Exploratory probabilistic manager projection — not a certainty or betting advice. "
+            "Exploratory probabilistic manager projection — not a certainty and not a betting model. "
             "Form, fatigue, rest, level, venue and tactical plan are calculated automatically "
             "from documented results and available data. The user's primary manual correction "
             "is the absence of one or more players. Partial public data increases uncertainty."
