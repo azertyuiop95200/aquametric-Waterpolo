@@ -125,7 +125,7 @@ def _clamp(value, low, high):
 def _norm(value):
     text = unicodedata.normalize("NFD", str(value or ""))
     text = "".join(ch for ch in text if unicodedata.category(ch) != "Mn")
-    for token in ("water-polo", "water polo", "wp", "women", "feminin", "feminine", "senior", "club"):
+    for token in ("water-polo", "water polo", "wp", "women", "feminin", "feminine", "club"):
         text = text.lower().replace(token, " ")
     return " ".join(text.lower().replace("—", " ").replace("-", " ").split())
 
@@ -134,7 +134,11 @@ def _same_team(a, b):
     na, nb = _norm(a), _norm(b)
     if not na or not nb:
         return False
-    return na == nb or (len(na) >= 5 and na in nb) or (len(nb) >= 5 and nb in na)
+    if na == nb:
+        return True
+    # Only accept substring aliases when both labels are specific enough.
+    # This prevents e.g. "France Senior" from matching "France U20".
+    return min(len(na), len(nb)) >= 8 and (na in nb or nb in na)
 
 
 def _parse_date(value):
@@ -390,7 +394,12 @@ def _derive_profile(db, team_name, prior):
     stats = _team_stats(db, team_name)
     roster = _roster_info(db, team_name)
     next_match_rows = [x for x in _safe_query_all(db, OfficialFixture) if (x.home_score is None or x.away_score is None) and (_same_team(x.home_team, team_name) or _same_team(x.away_team, team_name))]
-    next_match_rows.sort(key=lambda x: _parse_date(x.start_text) or datetime.max)
+    def _upcoming_key(row):
+        dt = _parse_date(row.start_text)
+        if dt is not None and getattr(dt, "tzinfo", None) is not None:
+            dt = dt.replace(tzinfo=None)
+        return dt or datetime.max
+    next_match_rows.sort(key=_upcoming_key)
     next_date = next_match_rows[0].start_text if next_match_rows else None
     rest, fatigue = _rest_and_fatigue(results, next_date)
 
