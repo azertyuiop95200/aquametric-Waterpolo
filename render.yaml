@@ -4,6 +4,7 @@ services:
     runtime: docker
     plan: free
     region: frankfurt
+    repo: https://github.com/azertyuiop95200/aquametric-Waterpolo.git
     branch: main
     healthCheckPath: /health
     # Deploy each main commit immediately. Live verification runs after CI and
