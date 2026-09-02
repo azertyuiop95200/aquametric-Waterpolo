@@ -32,5 +32,7 @@ services:
         value: "2026-08-29-v2"
       - key: SIMULATION_MANAGER_RELEASE
         value: "2026-09-01-v1"
+      - key: COACH_FILM_ROOM_MATCH_LIBRARY_RELEASE
+        value: "2026-09-03-v1"
       - key: SECRET_KEY
         generateValue: true
