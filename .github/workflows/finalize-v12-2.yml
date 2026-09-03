@@ -1,0 +1,90 @@
+name: Finalize AquaMetric V12.2
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/finalize-v12-2.yml'
+      - 'source/scripts/apply_v12_2_patch.py'
+      - 'source/performance_routes.py'
+      - 'source/services/performance_intelligence.py'
+      - 'source/tests/test_v12_2_performance.py'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  integrate-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply V12.2 integration patch
+        run: python source/scripts/apply_v12_2_patch.py
+
+      - name: Publish integrated source
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add source
+          if git diff --cached --quiet; then
+            echo 'V12.2 source already integrated.'
+          else
+            git commit -m 'Integrate AquaMetric V12.2 performance media [skip ci]'
+            git push
+          fi
+
+      - name: Install media dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg tesseract-ocr
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r source/requirements.txt
+
+      - name: Run full test suite
+        working-directory: source
+        env:
+          PYTHONPATH: .
+          DATABASE_URL: sqlite:////tmp/aquametric_v122_ci.db
+          UPLOAD_DIR: /tmp/aquametric_v122_uploads
+          EVIDENCE_DIR: /tmp/aquametric_v122_evidence
+          SECRET_KEY: v122-ci-secret-key-only
+          COOKIE_SECURE: '0'
+          WEB_DEMO_MODE: '0'
+        run: python -m pytest -q
+
+      - name: Smoke test performance media routes
+        working-directory: source
+        env:
+          PYTHONPATH: .
+          DATABASE_URL: sqlite:////tmp/aquametric_v122_smoke.db
+          UPLOAD_DIR: /tmp/aquametric_v122_uploads_smoke
+          EVIDENCE_DIR: /tmp/aquametric_v122_evidence_smoke
+          SECRET_KEY: v122-smoke-secret-key-only
+          COOKIE_SECURE: '0'
+          WEB_DEMO_MODE: '0'
+        run: |
+          python - <<'PY'
+          from fastapi.testclient import TestClient
+          from main import app
+          paths = {getattr(r, 'path', None) for r in app.routes}
+          assert '/api/matches/{match_id}/performance' in paths
+          assert '/matches/{match_id}/intelligence' in paths
+          c = TestClient(app)
+          r = c.get('/health')
+          assert r.status_code == 200
+          assert r.headers.get('x-content-type-options') == 'nosniff'
+          print('AquaMetric V12.2 routes + security: OK')
+          PY
