@@ -21,6 +21,13 @@ def test_new_analysis_page_exposes_direct_url_analysis_action():
     assert "même minimum Ultimate Analyst" in html
 
 
+def test_existing_remote_match_gets_ultimate_url_entry():
+    js = (ROOT / "static" / "app.js").read_text(encoding="utf-8")
+    assert "addUrlAnalysisEntry" in js
+    assert "/url-analysis/start" in js
+    assert "Analyser l’URL · Ultimate Analyst" in js
+
+
 def test_url_result_contains_minimum_ultimate_contract():
     html = (ROOT / "templates" / "url_analysis.html").read_text(encoding="utf-8")
     for needle in [
@@ -45,3 +52,4 @@ def test_url_route_uses_same_ultimate_engine_as_uploaded_analysis():
     assert "ultimate_event_report(events" in src
     assert "framework_ready" in src
     assert "Third-party pixels are not copied" in src
+    assert "manual_url_review" in src
