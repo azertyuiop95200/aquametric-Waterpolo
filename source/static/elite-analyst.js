@@ -1,0 +1,36 @@
+(()=>{
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pct=v=>v==null?'—':`${v}%`;
+const num=v=>v==null?'—':v;
+const metric=(label,value,source='calculé')=>`<div class="ea-kpi"><small>${esc(label)}</small><strong>${esc(value)}</strong><em>${esc(source)}</em></div>`;
+const timing=(label,value,samples)=>`<div class="ea-time ${value==null?'ea-unavailable':''}"><b>${value==null?'—':`${esc(value)} s`}</b><span>${esc(label)}</span><small>${samples?`${samples} séquence(s)`:'donnée insuffisante'}</small></div>`;
+function addKnowledgeCTA(){
+ if(location.pathname!='/knowledge')return;
+ const hero=document.querySelector('.tkh-hero'); if(!hero||document.getElementById('elite-analyst-cta'))return;
+ const a=document.createElement('a');a.id='elite-analyst-cta';a.className='ea-lab-cta';a.href='/static/elite-analyst-lab.html';a.innerHTML='<strong>▶ Salle vidéo & Analyst Lab</strong><span>Nationales, vidéo coach, métriques avancées, postes, transition, pertes de possession et comparatifs haut niveau.</span>';hero.insertAdjacentElement('afterend',a);
+}
+function statCells(s){return [
+ ['Tirs',s.shots],['Cadrés',s.shots_on_target],['Non cadrés',s.shots_off_target],['Bloqués',s.shots_blocked],['Précision tir',pct(s.shot_accuracy_pct)],['Efficacité buts',pct(s.scoring_efficiency_pct)],
+ ['Passes réussies',s.passes_completed],['Passes ratées',s.passes_failed],['% passes',pct(s.pass_completion_pct)],['Pertes',s.turnovers]
+]}
+function renderMatchEngineer(d,root){
+ const t=d.team_performance||{},s=t.statboard||{},o=t.opponent_statboard||{},loss=t.loss_breakdown||{rows:[]},tt=t.transition_timing||{};
+ const box=document.createElement('section');box.className='engineer-lab';box.id='engineer-performance-lab';
+ const rows=statCells(s).map(([l,v])=>metric(l,v,'événements validés')).join('');
+ const losses=(loss.rows||[]).length?(loss.rows.map(x=>`<div class="ea-loss"><b><span>${esc(x.label)}</span><span>${esc(x.share)}%</span></b><small>${esc(x.count)} perte(s) · part des pertes classées</small><div class="ea-bar ea-bad"><i style="width:${Math.min(100,x.share||0)}%"></i></div></div>`).join('')):'<p class="muted">Aucune cause de perte suffisamment taguée.</p>';
+ const samples=tt.samples||{};
+ box.innerHTML=`<div class="ea-hero"><div><span class="eyebrow">ANALYST ENGINEER · MATCH</span><h2>Tableau de contrôle équipe + joueuses</h2><p>Mesure, calcul et qualitatif sont séparés. Aucun sprint, aucune vitesse de tir et aucun pourcentage ne sont inventés si le dénominateur ou l'étalonnage manque.</p><div class="ea-source-legend"><span class="ea-measured">● mesuré / tagué</span><span class="ea-derived">● calculé</span><span class="ea-qualitative">● qualitatif coach</span></div></div><div class="ea-badges"><div class="ea-badge"><b>${esc(t.confidence_label||'—')}</b><small>confiance</small></div><div class="ea-badge"><b>${esc(t.event_count||0)}</b><small>événements</small></div></div></div>
+ <div class="ea-section"><div class="ea-section-head"><div><h3>Tir, passe, possession</h3><p>Statistiques de l'équipe observée. Les tirs cadrés incluent buts + tirs cadrés tagués.</p></div></div><div class="ea-kpis">${rows}</div></div>
+ <div class="ea-section"><div class="ea-section-head"><div><h3>Pourquoi la possession est perdue ?</h3><p>Répartition par cause, avec pourcentage sur les pertes classées. À utiliser avec la vidéo pour distinguer erreur technique, mauvaise lecture et risque tactique assumé.</p></div></div><div class="ea-loss-grid">${losses}</div></div>
+ <div class="ea-section"><div class="ea-section-head"><div><h3>Temps d'exécution des transitions</h3><p>Défense→attaque et attaque→défense à partir des timestamps. Valeurs absolues de sprint/tir uniquement si explicitement mesurées.</p></div></div><div class="ea-timing">${timing('Défense → 1re passe',tt.defence_to_attack_first_pass_s,samples.d2o_first_pass)}${timing('Défense → tir',tt.defence_to_attack_shot_s,samples.d2o_shot)}${timing('Attaque → structure défensive',tt.attack_to_defence_shape_s,samples.o2d_shape)}</div><div class="ea-mini-grid" style="margin-top:9px">${Object.entries(tt.measured||{}).map(([k,v])=>`<div class="ea-mini ${v.samples?'':'ea-unavailable'}"><b>${v.avg==null?'—':esc(v.avg)}</b><small>${esc(k.replaceAll('_',' '))} · ${esc(v.samples)} mesure(s)</small></div>`).join('')}</div></div>
+ <div class="ea-section"><div class="ea-section-head"><div><h3>Comparaison brute équipe / adversaire</h3><p>Seulement les événements possédant une perspective explicite dans l'analyse.</p></div></div><div class="ea-table-wrap"><table class="ea-table"><thead><tr><th>Métrique</th><th>${esc(d.match?.team||'Équipe')}</th><th>${esc(d.match?.opponent||'Adversaire')}</th></tr></thead><tbody>${[['Tirs','shots'],['Buts','goals'],['% efficacité','scoring_efficiency_pct'],['Passes complètes','passes_completed'],['% passes','pass_completion_pct'],['Pertes','turnovers'],['Interceptions','interceptions'],['Récupérations','recoveries'],['Blocs','blocks']].map(([l,k])=>`<tr><td>${esc(l)}</td><td>${k.includes('pct')?pct(s[k]):num(s[k])}</td><td>${k.includes('pct')?pct(o[k]):num(o[k])}</td></tr>`).join('')}</tbody></table></div></div>
+ <div class="ea-section"><div class="ea-section-head"><div><h3>Analyse individuelle par poste</h3><p>La statistique répond à « quoi ? » ; la checklist poste répond à « comment et pourquoi ? ».</p></div></div><div>${(d.players||[]).map(player=>{const b=player.breakdown||{},ps=b.statboard||{},tr=b.transition_timing||{};return `<article class="ea-player"><div class="ea-player-top"><div><h4>#${esc(player.cap||'—')} ${esc(player.name)}</h4><small>${esc(player.role||'Poste à confirmer')} · ${esc(player.confidence||'—')}</small></div><a href="${esc(player.profile_url)}">fiche joueuse →</a></div><div class="ea-player-kpis"><div><b>${esc(ps.goals||0)}/${esc(ps.shots||0)}</b><small>buts / tirs</small></div><div><b>${pct(ps.shot_accuracy_pct)}</b><small>cadrés</small></div><div><b>${pct(ps.scoring_efficiency_pct)}</b><small>efficacité</small></div><div><b>${pct(ps.pass_completion_pct)}</b><small>passes réussies</small></div><div><b>${esc(ps.turnovers||0)}</b><small>pertes</small></div><div><b>${tr.defence_to_attack_first_pass_s==null?'—':`${esc(tr.defence_to_attack_first_pass_s)}s`}</b><small>D→A 1re passe</small></div></div><div class="ea-checks">${(b.qualitative_checklist||[]).map(x=>`<div class="ea-check">${esc(x)}</div>`).join('')}</div>${(b.loss_breakdown?.rows||[]).length?`<div class="ea-source-legend">${b.loss_breakdown.rows.map(x=>`<span>${esc(x.label)} ${esc(x.share)}%</span>`).join('')}</div>`:''}</article>`}).join('')}</div></div>`;
+ root.insertAdjacentElement('afterend',box);
+}
+async function initMatch(){
+ const root=document.getElementById('performance-intelligence'); if(!root||document.getElementById('engineer-performance-lab'))return;
+ const id=root.dataset.matchId; if(!id)return;
+ try{const r=await fetch(`/api/matches/${id}/performance`,{credentials:'same-origin'});if(!r.ok)return;renderMatchEngineer(await r.json(),root);}catch(_){ }
+}
+addKnowledgeCTA();initMatch();
+})();
