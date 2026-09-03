@@ -68,3 +68,12 @@ document.querySelectorAll(dragSelectors).forEach(el=>{
   const end=e=>{if(!active)return;active=false;el.classList.remove('dragging');try{el.releasePointerCapture?.(e.pointerId);}catch(_){}};
   el.addEventListener('pointerup',end);el.addEventListener('pointercancel',end);el.addEventListener('lostpointercapture',()=>{active=false;el.classList.remove('dragging');});
 });
+
+// Extension dictionaries are loaded after the core i18n scripts have initialized.
+window.addEventListener('DOMContentLoaded',()=>{
+  if(document.querySelector('script[data-aquametric-i18n-v125]'))return;
+  const script=document.createElement('script');
+  script.src='/static/i18n-v125.js?v=12.5.0';
+  script.dataset.aquametricI18nV125='1';
+  document.body.appendChild(script);
+});
