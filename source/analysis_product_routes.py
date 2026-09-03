@@ -6,10 +6,11 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from db import get_db
-from models import Match, User
+from models import Club, Match, Team, User
 from services.analysis_product import (
     analysis_snapshot,
     build_analysis_zip,
@@ -17,6 +18,7 @@ from services.analysis_product import (
     run_product_analysis,
 )
 from services.rapid_match_analysis import RapidAnalysisError
+from services.video import is_http_url, youtube_embed
 from analysis_library_product_routes import router as analysis_library_product_router
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -43,6 +45,55 @@ def _owned_match(match_id: int, request: Request, db: Session):
     return user, match
 
 
+def _url_team(db: Session, user: User, team_name: str, competition: str) -> Team:
+    name = (team_name or "").strip()[:160]
+    if not name:
+        raise HTTPException(status_code=400, detail="Team is required.")
+    team = db.scalar(select(Team).where(Team.owner_id == user.id, func.lower(Team.name) == name.lower()))
+    if team:
+        return team
+    club = db.scalar(select(Club).where(Club.owner_id == user.id, func.lower(Club.name) == name.lower()))
+    if not club:
+        club = Club(
+            name=name, country="Analysis", division=(competition or "Video analysis")[:120],
+            category="Women", owner_id=user.id,
+        )
+        db.add(club); db.flush()
+    team = Team(name=name, club_id=club.id, owner_id=user.id, category="Women")
+    db.add(team); db.flush()
+    return team
+
+
+@router.post("/analysis/url/create")
+def create_real_url_analysis(
+    request: Request,
+    team_name: str = Form(""),
+    opponent: str = Form(...),
+    competition: str = Form(""),
+    match_date: str = Form(""),
+    video_url: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    """Create a URL match and immediately build the real available result, not a framework page."""
+    user = _user(request, db)
+    video_url = (video_url or "").strip()
+    if not video_url or not is_http_url(video_url):
+        raise HTTPException(status_code=400, detail="A valid http/https video URL is required.")
+    opponent = (opponent or "").strip()[:160]
+    if not opponent:
+        raise HTTPException(status_code=400, detail="Opponent is required.")
+    team = _url_team(db, user, team_name, competition)
+    match = Match(
+        owner_id=user.id, team_id=team.id, opponent=opponent,
+        competition=(competition or "")[:160], match_date=(match_date or "")[:32],
+        video_source="youtube" if youtube_embed(video_url) else "url",
+        video_url=video_url, video_path="", status="url_analysis_created",
+    )
+    db.add(match); db.commit(); db.refresh(match)
+    run_product_analysis(db, match, UPLOAD_DIR, EVIDENCE_DIR)
+    return RedirectResponse(f"/matches/{match.id}/analysis/result", status_code=303)
+
+
 @router.post("/matches/{match_id}/analysis/start")
 def start_real_analysis(
     match_id: int,
@@ -62,6 +113,15 @@ def start_real_analysis(
         )
     except RapidAnalysisError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return RedirectResponse(f"/matches/{match_id}/analysis/result", status_code=303)
+
+
+@router.post("/matches/{match_id}/url-analysis/start")
+def start_real_url_analysis(match_id: int, request: Request, db: Session = Depends(get_db)):
+    _, match = _owned_match(match_id, request, db)
+    if not match.video_url:
+        raise HTTPException(status_code=400, detail="This analysis mode requires a video URL.")
+    run_product_analysis(db, match, UPLOAD_DIR, EVIDENCE_DIR)
     return RedirectResponse(f"/matches/{match_id}/analysis/result", status_code=303)
 
 
