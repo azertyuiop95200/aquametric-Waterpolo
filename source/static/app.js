@@ -69,6 +69,27 @@ document.querySelectorAll(dragSelectors).forEach(el=>{
   el.addEventListener('pointerup',end);el.addEventListener('pointercancel',end);el.addEventListener('lostpointercapture',()=>{active=false;el.classList.remove('dragging');});
 });
 
+// Existing remote-URL matches get the same Ultimate Analyst entry point as
+// the dedicated "Analyze from URL" creation path. This is injected only when
+// the match workspace actually contains a remote provider video.
+(function addUrlAnalysisEntry(){
+  const matchPath=location.pathname.match(/^\/matches\/(\d+)\/?$/);
+  if(!matchPath)return;
+  const panel=document.querySelector('.video-panel');
+  if(!panel||document.getElementById('url-analysis-entry'))return;
+  const remoteVideo=panel.querySelector('iframe#yt')||panel.querySelector('a[href^="http"]');
+  const localVideo=panel.querySelector('video#video');
+  if(!remoteVideo||localVideo)return;
+  const form=document.createElement('form');
+  form.id='url-analysis-entry';
+  form.method='post';
+  form.action=`/matches/${matchPath[1]}/url-analysis/start`;
+  form.style.margin='12px 0';
+  form.innerHTML='<button class="btn intelligence-cta" type="submit">Analyser l’URL · Ultimate Analyst</button><small style="display:block;margin-top:6px">Même grille minimum que l’upload : tirs, passes, pertes, possessions, transitions, phases, décisions et joueuses.</small>';
+  const anchor=panel.querySelector('.video-wrap')||remoteVideo.parentElement||panel.firstElementChild;
+  anchor?.insertAdjacentElement('afterend',form);
+})();
+
 // Extension dictionaries are loaded after the core i18n scripts have initialized.
 window.addEventListener('DOMContentLoaded',()=>{
   if(document.querySelector('script[data-aquametric-i18n-v125]'))return;

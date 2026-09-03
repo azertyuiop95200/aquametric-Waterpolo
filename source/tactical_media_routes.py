@@ -254,6 +254,8 @@ def build_tactical_study_pack(match_id: int, request: Request, db: Session = Dep
     db.commit()
     return RedirectResponse(f"/matches/{match_id}/intelligence#video-review", status_code=303)
 
-# V12.2 team/player performance intelligence API.
+# V12.2 team/player performance intelligence API and Ultimate URL parity.
 from performance_routes import router as performance_router
+from url_analysis_routes import router as url_analysis_router
 router.include_router(performance_router)
+router.include_router(url_analysis_router)
