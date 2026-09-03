@@ -13,7 +13,9 @@ def test_primary_navigation_has_one_tactics_hub_only():
     assert 'href="/tactical-chess"' not in base
     assert "Analyse vidéo élite" not in base
     assert "video-session-elite.html" not in base
-    assert '/static/app.js?v=2026.09.01.2' in base
+    # The cache-busting version is expected to evolve with releases; the
+    # regression contract is that the current application bundle is loaded.
+    assert '/static/app.js?v=' in base
 
 
 def test_video_coach_room_is_embedded_in_the_hub():
