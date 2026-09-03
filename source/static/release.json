@@ -1,8 +1,8 @@
 {
-  "release": "AquaMetric V12.4 Operational Match Intelligence + Rapid Long-Video Analysis",
-  "marker": "AQUAMETRIC_V12_4_MATCH_INTELLIGENCE_2026_08_31",
-  "date": "2026-08-31",
-  "deployment_refresh": "2026-08-31T22:00:00+02:00",
+  "release": "AquaMetric V12.6 Women Scorer Standings",
+  "marker": "AQUAMETRIC_V12_6_WOMEN_SCORERS_2026_09_03",
+  "date": "2026-09-03",
+  "deployment_refresh": "2026-09-03T21:30:00+02:00",
   "validated_features": [
     "languages_en_fr_it_es_ru",
     "linked_player_profiles",
@@ -28,6 +28,12 @@
     "candidate_video_timeline",
     "match_tactical_intelligence",
     "shot_map_schema_with_visible_missing_evidence",
+    "women_scorer_standings_current_n1_n2_n3",
+    "france_women_elite_and_n1_scorer_tracking",
+    "followed_women_elite_championship_scorer_tracking",
+    "scorer_goals_matches_and_goals_per_match",
+    "scorer_penalty_columns_when_officially_available",
+    "scorer_profile_links_and_source_provenance",
     "explicit_missing_data_no_fabrication",
     "security_headers"
   ]
