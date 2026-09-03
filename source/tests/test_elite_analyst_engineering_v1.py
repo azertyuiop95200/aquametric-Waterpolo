@@ -64,7 +64,7 @@ def test_player_breakdown_has_position_specific_qualitative_layer():
     wing = player_match_breakdown([ev(1, "pass_complete")], detail, role="Wing")
     keeper = player_match_breakdown([ev(1, "save")], detail, role="Goalkeeper")
     assert wing["position_family"] == "wing"
-    assert any("2–3 m" in x for x in wing["qualitative_checklist"])
+    assert any("Hauteur réelle" in x and "largeur" in x for x in wing["qualitative_checklist"])
     assert keeper["position_family"] == "goalkeeper"
     assert any("première passe" in x.lower() for x in keeper["qualitative_checklist"])
 
@@ -76,6 +76,7 @@ def test_elite_analyst_lab_covers_priority_national_programmes_and_rankings():
     assert "a5Ja269h5G8" in html
     assert "VvuJSTuuUI8" in html
     assert "mesuré" in html and "calculé" in html and "qualitatif" in html
+    assert "2–3 m" in html
 
 
 def test_base_loads_engineering_assets():
