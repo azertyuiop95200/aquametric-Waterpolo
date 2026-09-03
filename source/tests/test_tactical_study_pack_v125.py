@@ -1,7 +1,8 @@
+import inspect
 from pathlib import Path
 
 from main import app
-from tactical_media_routes import sequence_review
+from tactical_media_routes import build_tactical_study_pack, sequence_review
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -42,16 +43,20 @@ def test_tactical_sequence_review_is_phase_specific_and_evidence_bound():
 
 
 def test_third_party_video_copying_is_not_enabled():
-    routes = read("tactical_media_routes.py")
-    assert 'match.video_source == "upload"' in routes
-    assert "timestamped_video_url" in routes
-    assert 'artifact_type="bookmark"' in routes
-    assert "create_clip(source_path" in routes
-    # Local file generation must sit inside the user-upload branch; external
-    # sources are represented as bookmarks/timestamps rather than downloads.
-    external_branch = routes.split("elif match.video_url:", 1)[1]
+    source = inspect.getsource(build_tactical_study_pack)
+    assert 'match.video_source == "upload"' in source
+    assert "create_clip(source_path" in source
+    assert "create_screenshot(source_path" in source
+    assert "elif match.video_url:" in source
+
+    # Only the user-upload branch is allowed to generate local media files.
+    # The third-party/YouTube branch must stop before the final no-video else.
+    external_branch = source.split("elif match.video_url:", 1)[1].rsplit("else:", 1)[0]
     assert "create_clip(" not in external_branch
     assert "create_screenshot(" not in external_branch
+    assert 'artifact_type="bookmark"' in external_branch
+    assert "timestamped_video_url" in external_branch
+    assert "is_downloadable=False" in external_branch
 
 
 def test_five_locales_cover_video_review_controls():
