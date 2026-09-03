@@ -103,8 +103,12 @@ class AquaMetricSecurityMiddleware(BaseHTTPMiddleware):
 
 def install_security(app):
     app.add_middleware(AquaMetricSecurityMiddleware)
-    # Register the operational match-analysis workspace before the legacy library
-    # routes are declared in main.py. FastAPI resolves the first matching route,
-    # so this upgrades /analysis-library in place without rewriting the application.
+
+    # Operational routes are registered before their legacy equivalents in main.py.
+    # FastAPI resolves the first matching route, so this upgrades the existing URLs
+    # without a risky rewrite of the large application module.
     from rapid_analysis_routes import router as rapid_analysis_router
+    from scorer_routes import router as scorer_router
+
     app.include_router(rapid_analysis_router)
+    app.include_router(scorer_router)
