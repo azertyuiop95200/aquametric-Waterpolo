@@ -110,10 +110,25 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add source
           if git diff --cached --quiet; then
-            echo 'V12 integration already present.'
-          else
-            # Do not use [skip ci]: Render may be configured to deploy only after
-            # GitHub checks pass, and a skipped commit has zero checks.
-            git commit -m 'Integrate AquaMetric V12 source after validation'
-            git push
+            echo 'V12.5 integration already present on this checkout.'
+            exit 0
           fi
+
+          git commit -m 'Integrate AquaMetric V12.5 source after validation'
+
+          # Other AquaMetric workflows can legitimately advance main while this
+          # relatively long FFmpeg/Tesseract test job is running. Rebase the
+          # already validated patch onto the newest main instead of force-pushing
+          # or overwriting unrelated work. A real conflict fails safely.
+          for attempt in 1 2 3; do
+            echo "Publish attempt ${attempt}/3"
+            git fetch origin main
+            git rebase origin/main
+            if git push origin HEAD:main; then
+              echo 'Validated V12.5 source published.'
+              exit 0
+            fi
+            sleep 2
+          done
+          echo 'Could not publish after three non-fast-forward retries.' >&2
+          exit 1
