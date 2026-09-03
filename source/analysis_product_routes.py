@@ -64,6 +64,16 @@ def _url_team(db: Session, user: User, team_name: str, competition: str) -> Team
     return team
 
 
+def _template_side(report: dict) -> dict:
+    view = dict(report)
+    view["phases"] = {"rows": list(report.get("phases", []) or [])}
+    possessions = dict(report.get("possessions", {}) or {})
+    if not possessions.get("available"):
+        possessions["reason"] = possessions.get("note") or "Les identifiants de possession manquent encore."
+    view["possessions"] = possessions
+    return view
+
+
 @router.post("/analysis/url/create")
 def create_real_url_analysis(
     request: Request,
@@ -129,6 +139,8 @@ def start_real_url_analysis(match_id: int, request: Request, db: Session = Depen
 def analysis_result(match_id: int, request: Request, db: Session = Depends(get_db)):
     user, match = _owned_match(match_id, request, db)
     snapshot = analysis_snapshot(db, match)
+    team_report = _template_side(snapshot["ultimate"]["team"])
+    opponent_report = _template_side(snapshot["ultimate"]["opponent"])
     return TEMPLATES.TemplateResponse(
         request,
         "analysis_result.html",
@@ -139,8 +151,8 @@ def analysis_result(match_id: int, request: Request, db: Session = Depends(get_d
             "match": match,
             "snapshot": snapshot,
             "ultimate": snapshot["ultimate"],
-            "team_report": snapshot["ultimate"]["team"],
-            "opponent_report": snapshot["ultimate"]["opponent"],
+            "team_report": team_report,
+            "opponent_report": opponent_report,
             "automatic": snapshot["automatic"],
             "vision": snapshot["vision"],
             "reference": snapshot["reference"],
