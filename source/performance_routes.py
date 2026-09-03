@@ -11,8 +11,16 @@ from services.performance_intelligence import team_performance_report, player_ma
 from services.ultimate_analytics import ultimate_match_report, ultimate_event_report
 from services.ratings import calculate_player_rating
 from services.video import youtube_embed
+from analysis_product_routes import router as analysis_product_router
+from tactical_media_routes import router as tactical_media_router
 
 router = APIRouter()
+
+# extensions.py imports tactical_media_routes before this module and then includes that
+# router into the FastAPI app. Adding the product routes here ensures the real
+# /analysis/start endpoint is installed before main.py later declares its historical
+# placeholder route, so the actual analysis pipeline wins route matching.
+tactical_media_router.include_router(analysis_product_router)
 
 
 def _user(request: Request, db: Session):
