@@ -1,14 +1,21 @@
 {% extends 'base.html' %}{% block content %}
+<style>
+.ranking-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.ranking-panel{margin-top:14px;padding-top:14px;border-top:1px solid var(--line,#294754)}
+.scorer-head{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;flex-wrap:wrap}.scorer-season-tabs{display:flex;gap:7px;flex-wrap:wrap;margin:12px 0}.scorer-season-tabs button{border-radius:999px}
+.scorer-table-wrap{overflow:auto}.scorer-table{width:100%;border-collapse:collapse;min-width:820px}.scorer-table th,.scorer-table td{padding:10px;border-bottom:1px solid rgba(255,255,255,.08);text-align:left;white-space:nowrap}.scorer-table th{font-size:12px;opacity:.72}.scorer-table td:nth-child(1){font-weight:900}.scorer-table td:nth-child(4){font-size:18px;font-weight:900}.scorer-player{font-weight:800;text-decoration:none}.scorer-source{font-size:11px;opacity:.68}.coverage-chip{display:inline-flex;align-items:center;padding:5px 9px;border-radius:999px;font-size:11px;border:1px solid rgba(255,255,255,.12)}.coverage-chip.official{background:rgba(85,214,146,.1)}.coverage-chip.partial{background:rgba(255,190,80,.1)}.coverage-chip.awaiting{opacity:.65}.ranking-empty{padding:16px;border:1px dashed rgba(255,255,255,.16);border-radius:14px}.championship-subtitle{margin-top:4px;font-size:12px;opacity:.72}
+@media(max-width:720px){.ranking-actions{justify-content:flex-start}.scorer-head{display:block}.scorer-season-tabs{overflow:auto;flex-wrap:nowrap;padding-bottom:3px}}
+</style>
+
 <div class="page-head">
   <div>
-    <span class="eyebrow">RÉSULTATS</span>
+    <span class="eyebrow">RÉSULTATS · CLASSEMENTS · BUTEUSES</span>
     <h1>Résultats & classements</h1>
-    <p>Les matchs sont regroupés par championnat et filtrés automatiquement sur aujourd’hui, la semaine ou le mois. Les classements proviennent du cache officiel AquaMetric et évoluent avec les mises à jour des résultats.</p>
+    <p>Chaque championnat regroupe désormais son calendrier, le classement des équipes et le classement des buteuses. Les buteuses sont conservées sur la saison en cours, N-1, N-2 et N-3.</p>
   </div>
 </div>
 
 <div class="data-banner">
-  <div><span class="status-dot"></span><div><b>Mise à jour automatique</b><small>Écran actualisé toutes les 5 min · flux officiels contrôlés automatiquement côté serveur.</small></div></div>
+  <div><span class="status-dot"></span><div><b>Mise à jour automatique</b><small>Écran actualisé toutes les 5 min · données officielles et historiques recalculées à partir des preuves disponibles.</small></div></div>
   <a href="/calendar">Calendrier complet →</a>
 </div>
 
@@ -22,23 +29,24 @@
     <button class="ghost small" type="button" data-results-period="week" aria-pressed="false">Cette semaine</button>
     <button class="ghost small" type="button" data-results-period="month" aria-pressed="false">Ce mois-ci</button>
   </div>
-  <p class="muted">Le classement de chaque championnat reste accessible même lorsqu’aucun match n’est programmé sur la période sélectionnée. Avant la première journée, les équipes engagées sont affichées à 0 point, 0 journée et 0 de différence de buts.</p>
+  <p class="muted">Les classements restent accessibles même lorsqu’aucun match n’est programmé. Les buteuses ne sont jamais complétées avec des valeurs inventées : un classement incomplet est marqué « partiel » ou « en attente ».</p>
 </section>
 
 <section class="panel">
   <div class="section-head">
     <div><span class="eyebrow">FÉMININ</span><h2>Championnats suivis</h2></div>
-    <span class="pill">6 pays</span>
+    <span class="pill">7 championnats · 6 pays</span>
   </div>
   <div class="actions-row" aria-label="Championnats féminins suivis">
-    <a class="ghost small" href="#women-italie">🇮🇹 Italie</a>
-    <a class="ghost small" href="#women-france">🇫🇷 France</a>
-    <a class="ghost small" href="#women-allemagne">🇩🇪 Allemagne</a>
-    <a class="ghost small" href="#women-espagne">🇪🇸 Espagne</a>
-    <a class="ghost small" href="#women-hongrie">🇭🇺 Hongrie</a>
-    <a class="ghost small" href="#women-russie">🇷🇺 Russie</a>
+    <a class="ghost small" href="#women-france-elite">🇫🇷 France · Élite</a>
+    <a class="ghost small" href="#women-france-n1">🇫🇷 France · N1</a>
+    <a class="ghost small" href="#women-italie">🇮🇹 Italie · Élite</a>
+    <a class="ghost small" href="#women-allemagne">🇩🇪 Allemagne · Élite</a>
+    <a class="ghost small" href="#women-espagne">🇪🇸 Espagne · Élite</a>
+    <a class="ghost small" href="#women-hongrie">🇭🇺 Hongrie · Élite</a>
+    <a class="ghost small" href="#women-russie">🇷🇺 Russie · Élite</a>
   </div>
-  <p class="muted">Ces six championnats féminins restent proposés même avant le premier match. Dès qu’un calendrier ou classement officiel correspondant est détecté, le bloc est alimenté automatiquement.</p>
+  <p class="muted">France : N1 Féminine + Élite Féminine. International : division féminine élite de chaque championnat suivi. {{ scorer_policy|default('Saison en cours + N-1 + N-2 + N-3.') }}</p>
 </section>
 
 <div id="results-groups"><section class="panel empty-state"><b>Chargement des résultats officiels…</b></section></div>
@@ -74,39 +82,104 @@
 {% endif %}
 </div>
 
+<div id="scorer-templates" hidden>
+{% for group in scorer_groups|default([]) %}
+  <template data-scorer-template data-competition="{{group.competition|e}}" data-aliases="{{group.aliases|join('||')|e}}" data-country="{{group.country|e}}" data-level="{{group.level|e}}">
+    <div class="scorer-ranking">
+      <div class="scorer-head">
+        <div><span class="eyebrow">CLASSEMENT BUTEUSES</span><h3>{{group.country}} · {{group.competition}}</h3><p class="championship-subtitle">{{group.level}} féminin · saison en cours + 3 saisons archivées</p></div>
+      </div>
+      <div class="scorer-season-tabs" role="tablist" aria-label="Saisons du classement buteuses">
+        {% for season in group.seasons %}
+        <button type="button" class="{% if loop.first %}btn{% else %}ghost{% endif %} small" data-scorer-season-button="{{season.season}}" aria-pressed="{{ 'true' if loop.first else 'false' }}">{{season.relative}} · {{season.season}}</button>
+        {% endfor %}
+      </div>
+      {% for season in group.seasons %}
+      <section data-scorer-season-panel="{{season.season}}" {% if not loop.first %}hidden{% endif %}>
+        <div class="section-head">
+          <div><b>{{season.relative}} · {{season.season}}</b><small>{{season.coverage_text}}</small></div>
+          <span class="coverage-chip {{season.coverage}}">{{ 'Officiel' if season.coverage=='official' else ('Partiel' if season.coverage=='partial' else 'En attente') }}</span>
+        </div>
+        {% if season.rows %}
+        <div class="scorer-table-wrap" data-drag-scroll>
+          <table class="scorer-table">
+            <thead><tr><th>#</th><th>Joueuse</th><th>Club</th><th>Buts</th><th>MJ</th><th>Buts/match</th><th>Pen.</th><th>Hors pen.</th><th>Source</th></tr></thead>
+            <tbody>
+            {% for row in season.rows %}
+              <tr>
+                <td>{{row.position}}</td>
+                <td><a class="scorer-player" href="/intelligence/player?name={{row.player_name|urlencode}}">{{row.player_name}}</a></td>
+                <td>{{row.team_name or '—'}}</td>
+                <td>{{row.goals}}</td>
+                <td>{{row.matches_played if row.matches_played is not none else '—'}}</td>
+                <td>{{'%.2f'|format(row.goals_per_match) if row.goals_per_match is not none else '—'}}</td>
+                <td>{{row.penalties if row.penalties is not none else '—'}}</td>
+                <td>{{row.non_penalty_goals if row.non_penalty_goals is not none else '—'}}</td>
+                <td>{% if row.source_url %}<a class="scorer-source" href="{{row.source_url}}" target="_blank" rel="noopener">preuve ↗</a>{% else %}<span class="scorer-source">{{row.source_quality|replace('_',' ')}}</span>{% endif %}</td>
+              </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="ranking-empty"><b>Classement buteuses en attente</b><p class="muted">Le championnat est suivi, mais aucune publication officielle complète n’est encore enregistrée pour cette saison. AquaMetric n’invente pas de total.</p></div>
+        {% endif %}
+      </section>
+      {% endfor %}
+    </div>
+  </template>
+{% endfor %}
+</div>
+
 <script>
 (()=>{
   const container=document.getElementById('results-groups');
   const title=document.getElementById('results-period-title');
   const count=document.getElementById('results-match-count');
   const buttons=[...document.querySelectorAll('[data-results-period]')];
+  const normalize=value=>(value||'').toLocaleLowerCase('fr').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[—-]/g,' ').replace(/\s+/g,' ').trim();
+
   const standings=new Map(
     [...document.querySelectorAll('template[data-standing-template]')].map(t=>[t.dataset.competition,t])
   );
+  const scorerTemplates=[...document.querySelectorAll('template[data-scorer-template]')].map(t=>({
+    template:t,
+    competition:t.dataset.competition,
+    aliases:(t.dataset.aliases||'').split('||').filter(Boolean)
+  }));
+  const scorerTemplateFor=competition=>{
+    const needle=normalize(competition);
+    return scorerTemplates.find(entry=>{
+      if(normalize(entry.competition)===needle)return true;
+      return entry.aliases.some(alias=>{
+        const a=normalize(alias);
+        return a && (needle.includes(a)||a.includes(needle));
+      });
+    })?.template||null;
+  };
+
   const featuredWomen=[
-    {country:'Italie',id:'women-italie',fallback:'Championnat féminin — Italie',aliases:['italie','italy','italia','serie a1 femminile','a1 femminile']},
-    {country:'France',id:'women-france',fallback:'Championnat féminin — France',aliases:['france','élite féminine','elite feminine','elite femmes','pro a feminine']},
-    {country:'Allemagne',id:'women-allemagne',fallback:'Championnat féminin — Allemagne',aliases:['allemagne','germany','deutschland','bundesliga frauen','bundesliga women','dwl']},
-    {country:'Espagne',id:'women-espagne',fallback:'Championnat féminin — Espagne',aliases:['espagne','spain','españa','division de honor femenina','división de honor femenina']},
-    {country:'Hongrie',id:'women-hongrie',fallback:'Championnat féminin — Hongrie',aliases:['hongrie','hungary','magyar','ob i női','ob i noi','noi ob i']},
-    {country:'Russie',id:'women-russie',fallback:'Championnat féminin — Russie',aliases:['russie','russia','россия','женщины','women championship russia','russian women']}
+    {country:'France',level:'Élite',id:'women-france-elite',fallback:'Elite Féminine',aliases:['elite feminine','élite féminine','ff natation elite feminine','elite femmes','pro a feminine']},
+    {country:'France',level:'N1',id:'women-france-n1',fallback:'N1 Féminine',aliases:['n1 feminine','n1 féminine','nationale 1 feminine','nationale 1 féminine','national 1 women']},
+    {country:'Italie',level:'Élite',id:'women-italie',fallback:'Serie A1 Femminile',aliases:['italie','italy','italia','serie a1 femminile','a1 femminile']},
+    {country:'Allemagne',level:'Élite',id:'women-allemagne',fallback:'Bundesliga Frauen',aliases:['allemagne','germany','deutschland','bundesliga frauen','bundesliga women','dwl']},
+    {country:'Espagne',level:'Élite',id:'women-espagne',fallback:'División de Honor Femenina',aliases:['espagne','spain','españa','division de honor femenina','división de honor femenina']},
+    {country:'Hongrie',level:'Élite',id:'women-hongrie',fallback:'OB I Női',aliases:['hongrie','hungary','magyar','ob i női','ob i noi','noi ob i']},
+    {country:'Russie',level:'Élite',id:'women-russie',fallback:"Russian Women's Championship",aliases:['russie','russia','россия','женщины','women championship russia','russian women']}
   ];
   let fixturesByCompetition=new Map();
   let teamsByCompetition=new Map();
   let championshipMeta=new Map();
   let featuredCompetitionById=new Map();
 
-  const normalize=value=>(value||'').toLocaleLowerCase('fr').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-
   const featuredForCompetition=competition=>{
     const haystack=normalize(`${competition} ${championshipMeta.get(competition)||''}`);
-    return featuredWomen.find(item=>
-      competition===item.fallback || item.aliases.some(alias=>haystack.includes(normalize(alias)))
-    );
+    return featuredWomen.find(item=>item.aliases.some(alias=>haystack.includes(normalize(alias))));
   };
 
   const resolveFeaturedCompetitions=()=>{
-    const existing=new Set([...fixturesByCompetition.keys(),...standings.keys(),...teamsByCompetition.keys()]);
+    const scorerNames=scorerTemplates.map(entry=>entry.competition);
+    const existing=new Set([...fixturesByCompetition.keys(),...standings.keys(),...teamsByCompetition.keys(),...scorerNames]);
     featuredCompetitionById=new Map();
     featuredWomen.forEach(item=>{
       const match=[...existing].find(name=>{
@@ -115,7 +188,7 @@
       });
       const competition=match||item.fallback;
       featuredCompetitionById.set(item.id,competition);
-      if(!championshipMeta.has(competition))championshipMeta.set(competition,`${item.country} · Féminin`);
+      if(!championshipMeta.has(competition))championshipMeta.set(competition,`${item.country} · ${item.level} féminin`);
       if(!fixturesByCompetition.has(competition))fixturesByCompetition.set(competition,[]);
       if(!teamsByCompetition.has(competition))teamsByCompetition.set(competition,new Set());
     });
@@ -130,10 +203,7 @@
   const fixtureTeams=row=>{
     const label=row.querySelector('b');
     if(!label)return [];
-    const textParts=[...label.childNodes]
-      .filter(node=>node.nodeType===Node.TEXT_NODE)
-      .map(node=>node.textContent.trim())
-      .filter(Boolean);
+    const textParts=[...label.childNodes].filter(node=>node.nodeType===Node.TEXT_NODE).map(node=>node.textContent.trim()).filter(Boolean);
     if(textParts.length<2)return [];
     return [textParts[0],textParts[textParts.length-1]];
   };
@@ -144,17 +214,9 @@
     const values=['—',team,'0','0','0','0','0','0','0'];
     values.forEach((value,index)=>{
       const td=document.createElement('td');
-      if(index===1){
-        const b=document.createElement('b');
-        b.textContent=value;
-        td.appendChild(b);
-      }else if(index===2){
-        const strong=document.createElement('strong');
-        strong.textContent=value;
-        td.appendChild(strong);
-      }else{
-        td.textContent=value;
-      }
+      if(index===1){const b=document.createElement('b');b.textContent=value;td.appendChild(b);}
+      else if(index===2){const strong=document.createElement('strong');strong.textContent=value;td.appendChild(strong);}
+      else td.textContent=value;
       tr.appendChild(td);
     });
     return tr;
@@ -165,202 +227,117 @@
     const official=standings.get(competition);
     const wrapper=document.createElement('div');
     let table;
-
-    if(official){
-      wrapper.appendChild(official.content.cloneNode(true));
-      table=wrapper.querySelector('table.standings');
-    }else{
-      const tableWrap=document.createElement('div');
-      tableWrap.className='table-wrap';
-      tableWrap.dataset.dragScroll='';
-      table=document.createElement('table');
-      table.className='standings';
-      const header=document.createElement('tr');
-      ['#','Équipe','Pts','J','V','D','BP','BC','Diff'].forEach(label=>{
-        const th=document.createElement('th');
-        th.textContent=label;
-        header.appendChild(th);
-      });
-      table.appendChild(header);
-      tableWrap.appendChild(table);
-      wrapper.appendChild(tableWrap);
+    if(official){wrapper.appendChild(official.content.cloneNode(true));table=wrapper.querySelector('table.standings');}
+    else{
+      const tableWrap=document.createElement('div');tableWrap.className='table-wrap';tableWrap.dataset.dragScroll='';
+      table=document.createElement('table');table.className='standings';
+      const header=document.createElement('tr');['#','Équipe','Pts','J','V','D','BP','BC','Diff'].forEach(label=>{const th=document.createElement('th');th.textContent=label;header.appendChild(th);});
+      table.appendChild(header);tableWrap.appendChild(table);wrapper.appendChild(tableWrap);
     }
-
-    if(table && engaged.length){
-      const existing=new Set(
-        [...table.querySelectorAll('tr')].slice(1)
-          .map(row=>row.querySelector('td:nth-child(2)')?.textContent.trim())
-          .filter(Boolean)
-      );
-      engaged.forEach(team=>{
-        if(!existing.has(team))table.appendChild(createZeroRow(team));
-      });
+    if(table&&engaged.length){
+      const existing=new Set([...table.querySelectorAll('tr')].slice(1).map(row=>row.querySelector('td:nth-child(2)')?.textContent.trim()).filter(Boolean));
+      engaged.forEach(team=>{if(!existing.has(team))table.appendChild(createZeroRow(team));});
     }
-
-    if(!official && engaged.length){
-      const note=document.createElement('p');
-      note.className='muted';
-      note.textContent='Classement officiel en attente · équipes engagées affichées à zéro avant la première journée.';
-      wrapper.appendChild(note);
-    }else if(official && wrapper.querySelector('[data-provisional="true"]')){
-      const note=document.createElement('p');
-      note.className='muted';
-      note.textContent='Les équipes engagées absentes du classement officiel sont conservées provisoirement à zéro.';
-      wrapper.appendChild(note);
-    }
+    if(!official&&engaged.length){const note=document.createElement('p');note.className='muted';note.textContent='Classement officiel en attente · équipes engagées affichées à zéro avant la première journée.';wrapper.appendChild(note);}
+    else if(official&&wrapper.querySelector('[data-provisional="true"]')){const note=document.createElement('p');note.className='muted';note.textContent='Les équipes engagées absentes du classement officiel sont conservées provisoirement à zéro.';wrapper.appendChild(note);}
     return wrapper;
   };
 
+  const wireScorerSeasons=wrapper=>{
+    const seasonButtons=[...wrapper.querySelectorAll('[data-scorer-season-button]')];
+    const seasonPanels=[...wrapper.querySelectorAll('[data-scorer-season-panel]')];
+    seasonButtons.forEach(btn=>btn.addEventListener('click',()=>{
+      const season=btn.dataset.scorerSeasonButton;
+      seasonButtons.forEach(other=>{
+        const active=other===btn;
+        other.setAttribute('aria-pressed',String(active));
+        other.classList.toggle('btn',active);other.classList.toggle('ghost',!active);
+      });
+      seasonPanels.forEach(panel=>panel.hidden=panel.dataset.scorerSeasonPanel!==season);
+    }));
+  };
+
   const rangeFor=period=>{
-    const now=new Date();
-    let start,end,label;
+    const now=new Date();let start,end,label;
     if(period==='week'){
-      const offset=(now.getDay()+6)%7;
-      start=new Date(now.getFullYear(),now.getMonth(),now.getDate()-offset);
-      end=new Date(start); end.setDate(end.getDate()+7);
-      label='Cette semaine';
+      const offset=(now.getDay()+6)%7;start=new Date(now.getFullYear(),now.getMonth(),now.getDate()-offset);end=new Date(start);end.setDate(end.getDate()+7);label='Cette semaine';
     }else if(period==='month'){
-      start=new Date(now.getFullYear(),now.getMonth(),1);
-      end=new Date(now.getFullYear(),now.getMonth()+1,1);
-      label='Ce mois-ci';
+      start=new Date(now.getFullYear(),now.getMonth(),1);end=new Date(now.getFullYear(),now.getMonth()+1,1);label='Ce mois-ci';
     }else{
-      start=new Date(now.getFullYear(),now.getMonth(),now.getDate());
-      end=new Date(start); end.setDate(end.getDate()+1);
-      label='Aujourd’hui';
+      start=new Date(now.getFullYear(),now.getMonth(),now.getDate());end=new Date(start);end.setDate(end.getDate()+1);label='Aujourd’hui';
     }
     return {start,end,label};
   };
 
   const setButtonState=period=>{
-    buttons.forEach(btn=>{
-      const active=btn.dataset.resultsPeriod===period;
-      btn.setAttribute('aria-pressed',String(active));
-      btn.classList.toggle('btn',active);
-      btn.classList.toggle('ghost',!active);
-    });
+    buttons.forEach(btn=>{const active=btn.dataset.resultsPeriod===period;btn.setAttribute('aria-pressed',String(active));btn.classList.toggle('btn',active);btn.classList.toggle('ghost',!active);});
   };
 
   const buildCard=(competition,periodRange)=>{
-    const panel=document.createElement('section');
-    panel.className='panel championship-panel';
-    const featured=featuredForCompetition(competition);
-    if(featured)panel.id=featured.id;
-
-    const head=document.createElement('div');
-    head.className='section-head';
-    const left=document.createElement('div');
-    const eyebrow=document.createElement('span');
-    eyebrow.className='eyebrow';
-    const meta=championshipMeta.get(competition)||standings.get(competition)?.dataset.meta||'Championnat';
-    eyebrow.textContent=featured?`${featured.country} · Féminin`:meta;
-    const h2=document.createElement('h2');
-    h2.textContent=competition||'Championnat';
-    left.append(eyebrow,h2);
+    const panel=document.createElement('section');panel.className='panel championship-panel';
+    const featured=featuredForCompetition(competition);if(featured)panel.id=featured.id;
+    const head=document.createElement('div');head.className='section-head';
+    const left=document.createElement('div');const eyebrow=document.createElement('span');eyebrow.className='eyebrow';
+    const meta=championshipMeta.get(competition)||standings.get(competition)?.dataset.meta||'Championnat féminin';
+    eyebrow.textContent=featured?`${featured.country} · ${featured.level} féminin`:meta;
+    const h2=document.createElement('h2');h2.textContent=competition||'Championnat';left.append(eyebrow,h2);
 
     const hasEngagedTeams=(teamsByCompetition.get(competition)?.size||0)>0;
-    const hasRanking=standings.has(competition)||hasEngagedTeams;
-    const rankingButton=document.createElement('button');
-    rankingButton.type='button';
-    rankingButton.className='btn small';
-    rankingButton.textContent=hasRanking?'Voir le classement':'Classement en attente';
-    rankingButton.disabled=!hasRanking;
-    head.append(left,rankingButton);
-    panel.append(head);
+    const hasTeamRanking=standings.has(competition)||hasEngagedTeams;
+    const scorerTemplate=scorerTemplateFor(competition);
+    const actions=document.createElement('div');actions.className='ranking-actions';
+    const teamButton=document.createElement('button');teamButton.type='button';teamButton.className='ghost small';teamButton.textContent=hasTeamRanking?'Classement équipes':'Équipes · en attente';teamButton.disabled=!hasTeamRanking;
+    actions.appendChild(teamButton);
+    if(scorerTemplate){const scorerButton=document.createElement('button');scorerButton.type='button';scorerButton.className='btn small';scorerButton.textContent='Classement buteuses';actions.appendChild(scorerButton);panel.dataset.hasScorers='true';panel._scorerButton=scorerButton;}
+    head.append(left,actions);panel.append(head);
 
-    const rows=(fixturesByCompetition.get(competition)||[])
-      .filter(item=>item.date && item.date>=periodRange.start && item.date<periodRange.end)
-      .sort((a,b)=>b.date-a.date);
-
-    const list=document.createElement('div');
-    list.className='championship-calendar';
-    if(rows.length){
-      rows.forEach(item=>list.appendChild(item.row.cloneNode(true)));
-    }else{
-      const empty=document.createElement('p');
-      empty.className='muted';
-      empty.textContent=featured && !(fixturesByCompetition.get(competition)||[]).length
-        ? 'Calendrier officiel en attente. Ce championnat reste suivi dans AquaMetric.'
-        : 'Aucun match sur cette période.';
-      list.appendChild(empty);
-    }
+    const rows=(fixturesByCompetition.get(competition)||[]).filter(item=>item.date&&item.date>=periodRange.start&&item.date<periodRange.end).sort((a,b)=>b.date-a.date);
+    const list=document.createElement('div');list.className='championship-calendar';
+    if(rows.length)rows.forEach(item=>list.appendChild(item.row.cloneNode(true)));
+    else{const empty=document.createElement('p');empty.className='muted';empty.textContent=featured&&!(fixturesByCompetition.get(competition)||[]).length?'Calendrier officiel en attente. Ce championnat reste suivi dans AquaMetric.':'Aucun match sur cette période.';list.appendChild(empty);}
     panel.append(list);
 
-    if(hasRanking){
-      const ranking=createStandingsBlock(competition);
-      ranking.hidden=true;
-      rankingButton.addEventListener('click',()=>{
-        ranking.hidden=!ranking.hidden;
-        rankingButton.textContent=ranking.hidden?'Voir le classement':'Masquer le classement';
-      });
-      panel.append(ranking);
-    }
+    let teamRanking=null;let scorerRanking=null;
+    if(hasTeamRanking){teamRanking=createStandingsBlock(competition);teamRanking.classList.add('ranking-panel');teamRanking.hidden=true;panel.appendChild(teamRanking);}
+    if(scorerTemplate){scorerRanking=document.createElement('div');scorerRanking.className='ranking-panel';scorerRanking.appendChild(scorerTemplate.content.cloneNode(true));wireScorerSeasons(scorerRanking);panel.appendChild(scorerRanking);}
+
+    const activate=kind=>{
+      if(teamRanking)teamRanking.hidden=kind!=='team';
+      if(scorerRanking)scorerRanking.hidden=kind!=='scorers';
+      teamButton.classList.toggle('btn',kind==='team');teamButton.classList.toggle('ghost',kind!=='team');
+      if(panel._scorerButton){panel._scorerButton.classList.toggle('btn',kind==='scorers');panel._scorerButton.classList.toggle('ghost',kind!=='scorers');}
+    };
+    teamButton.addEventListener('click',()=>activate(teamRanking&&!teamRanking.hidden?'none':'team'));
+    if(panel._scorerButton)panel._scorerButton.addEventListener('click',()=>activate(scorerRanking&&!scorerRanking.hidden?'none':'scorers'));
+    if(scorerRanking)activate('scorers');else activate('none');
     return {panel,matchCount:rows.length,featured:!!featured};
   };
 
   const renderPeriod=period=>{
-    const valid=['day','week','month'].includes(period)?period:'day';
-    const range=rangeFor(valid);
-    title.textContent=range.label;
-    setButtonState(valid);
-    const params=new URLSearchParams(location.search);
-    params.set('period',valid);
-    history.replaceState(null,'',`${location.pathname}?${params.toString()}`);
-
-    resolveFeaturedCompetitions();
-    container.replaceChildren();
-    const names=new Set([...fixturesByCompetition.keys(),...standings.keys(),...teamsByCompetition.keys(),...featuredCompetitionById.values()]);
+    const valid=['day','week','month'].includes(period)?period:'day';const range=rangeFor(valid);title.textContent=range.label;setButtonState(valid);
+    const params=new URLSearchParams(location.search);params.set('period',valid);history.replaceState(null,'',`${location.pathname}?${params.toString()}`);
+    resolveFeaturedCompetitions();container.replaceChildren();
+    const names=new Set([...fixturesByCompetition.keys(),...standings.keys(),...teamsByCompetition.keys(),...scorerTemplates.map(entry=>entry.competition),...featuredCompetitionById.values()]);
     const featuredNames=new Set(featuredCompetitionById.values());
-    const ordered=[
-      ...featuredWomen.map(item=>featuredCompetitionById.get(item.id)).filter(Boolean),
-      ...[...names].filter(name=>!featuredNames.has(name)).sort((a,b)=>a.localeCompare(b,'fr'))
-    ];
-    let total=0;
-    [...new Set(ordered)].forEach(name=>{
-      const built=buildCard(name,range);
-      total+=built.matchCount;
-      container.appendChild(built.panel);
-    });
+    const ordered=[...featuredWomen.map(item=>featuredCompetitionById.get(item.id)).filter(Boolean),...[...names].filter(name=>!featuredNames.has(name)).sort((a,b)=>a.localeCompare(b,'fr'))];
+    let total=0;[...new Set(ordered)].forEach(name=>{const built=buildCard(name,range);total+=built.matchCount;container.appendChild(built.panel);});
     count.textContent=`${total} match${total===1?'':'s'}`;
   };
 
   const load=()=>{
-    fetch('/calendar',{credentials:'same-origin'})
-      .then(r=>{if(!r.ok)throw new Error('calendar');return r.text();})
-      .then(html=>{
-        const doc=new DOMParser().parseFromString(html,'text/html');
-        fixturesByCompetition=new Map();
-        teamsByCompetition=new Map();
-        championshipMeta=new Map();
-        doc.querySelectorAll('.championship-panel[data-competition]').forEach(section=>{
-          const competition=section.dataset.competition||'Championnat';
-          const meta=section.querySelector('.section-head .eyebrow')?.textContent.trim()||'Championnat';
-          championshipMeta.set(competition,meta);
-          const teams=new Set();
-          const items=[...section.querySelectorAll('.championship-calendar .fixture-row')].map(row=>{
-            fixtureTeams(row).forEach(team=>teams.add(team));
-            return {
-              row,
-              date:parseFixtureDate(row.querySelector('time')?.textContent)
-            };
-          });
-          fixturesByCompetition.set(competition,items);
-          teamsByCompetition.set(competition,teams);
-        });
-        const initial=new URLSearchParams(location.search).get('period')||'day';
-        renderPeriod(initial);
-      })
-      .catch(()=>{
-        fixturesByCompetition=new Map();
-        teamsByCompetition=new Map();
-        championshipMeta=new Map();
-        const initial=new URLSearchParams(location.search).get('period')||'day';
-        renderPeriod(initial);
+    fetch('/calendar',{credentials:'same-origin'}).then(r=>{if(!r.ok)throw new Error('calendar');return r.text();}).then(html=>{
+      const doc=new DOMParser().parseFromString(html,'text/html');fixturesByCompetition=new Map();teamsByCompetition=new Map();championshipMeta=new Map();
+      doc.querySelectorAll('.championship-panel[data-competition]').forEach(section=>{
+        const competition=section.dataset.competition||'Championnat';const meta=section.querySelector('.section-head .eyebrow')?.textContent.trim()||'Championnat';championshipMeta.set(competition,meta);
+        const teams=new Set();const items=[...section.querySelectorAll('.championship-calendar .fixture-row')].map(row=>{fixtureTeams(row).forEach(team=>teams.add(team));return {row,date:parseFixtureDate(row.querySelector('time')?.textContent)};});
+        fixturesByCompetition.set(competition,items);teamsByCompetition.set(competition,teams);
       });
+      renderPeriod(new URLSearchParams(location.search).get('period')||'day');
+    }).catch(()=>{fixturesByCompetition=new Map();teamsByCompetition=new Map();championshipMeta=new Map();renderPeriod(new URLSearchParams(location.search).get('period')||'day');});
   };
 
   buttons.forEach(btn=>btn.addEventListener('click',()=>renderPeriod(btn.dataset.resultsPeriod)));
-  load();
-  setInterval(()=>location.reload(),5*60*1000);
+  load();setInterval(()=>location.reload(),5*60*1000);
 })();
 </script>
 {% endblock %}
