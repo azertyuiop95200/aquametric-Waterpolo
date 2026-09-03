@@ -79,6 +79,15 @@ def test_elite_analyst_lab_covers_priority_national_programmes_and_rankings():
     assert "2–3 m" in html
 
 
+def test_video_atlas_embeds_eight_elite_matches_and_coach_frames():
+    html = (ROOT / "static" / "elite-video-atlas.html").read_text(encoding="utf-8")
+    for youtube_id in ["a5Ja269h5G8", "VvuJSTuuUI8", "fWFM4kB8nvw", "bF-Am10VtF4", "HfkCCOpLIBA", "Ek1kBvUjivc", "TseN9CGbfQw", "Z-8PwbnKBWU"]:
+        assert youtube_id in html
+    assert "8 matchs pour une vraie séance vidéo" in html
+    assert "reconstructions pédagogiques" in html
+    assert "T−3" in html and "T+1" in html
+
+
 def test_base_loads_engineering_assets():
     base = (ROOT / "templates" / "base.html").read_text(encoding="utf-8")
     assert "/static/elite-analyst.css?v=2026.09.03.1" in base
