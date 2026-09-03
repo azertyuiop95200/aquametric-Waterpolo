@@ -28,6 +28,12 @@ from services.public_match_ratings import public_profile_evaluations
 from evidence_coverage_routes import router as evidence_coverage_router
 from tactical_media_routes import router as tactical_media_router, enrich_sequence_cards, build_tactical_study_pack
 from performance_routes import match_performance_api
+from url_analysis_routes import (
+    create_url_analysis,
+    start_url_analysis,
+    add_url_analysis_event,
+    url_analysis_result,
+)
 
 BASE_DIR = Path(__file__).resolve().parent
 TEMPLATES = Jinja2Templates(directory=BASE_DIR / "templates")
@@ -312,32 +318,40 @@ def install_extensions(app):
     app.include_router(router)
     app.include_router(evidence_coverage_router)
     app.include_router(tactical_media_router)
+
     # Defensive explicit registration: nested APIRouter additions made after an
     # include_router() call are not copied into the already-built FastAPI app.
+    def has_route(path, method):
+        return any(
+            getattr(route, "path", None) == path
+            and method in (getattr(route, "methods", set()) or set())
+            for route in app.routes
+        )
+
     performance_path = "/api/matches/{match_id}/performance"
-    if not any(
-        getattr(route, "path", None) == performance_path
-        and "GET" in (getattr(route, "methods", set()) or set())
-        for route in app.routes
-    ):
-        app.add_api_route(
-            performance_path,
-            match_performance_api,
-            methods=["GET"],
-            name="match_performance_api",
-        )
+    if not has_route(performance_path, "GET"):
+        app.add_api_route(performance_path, match_performance_api, methods=["GET"], name="match_performance_api")
+
     tactical_study_path = "/matches/{match_id}/intelligence/study-pack"
-    if not any(
-        getattr(route, "path", None) == tactical_study_path
-        and "POST" in (getattr(route, "methods", set()) or set())
-        for route in app.routes
-    ):
-        app.add_api_route(
-            tactical_study_path,
-            build_tactical_study_pack,
-            methods=["POST"],
-            name="build_tactical_study_pack",
-        )
+    if not has_route(tactical_study_path, "POST"):
+        app.add_api_route(tactical_study_path, build_tactical_study_pack, methods=["POST"], name="build_tactical_study_pack")
+
+    # URL analysis parity is registered explicitly at the application boundary,
+    # so CI, local FastAPI and Render all expose the exact same endpoints.
+    url_registrations = [
+        ("/analysis/url/create", create_url_analysis, "POST", None),
+        ("/matches/{match_id}/url-analysis/start", start_url_analysis, "POST", None),
+        ("/matches/{match_id}/url-analysis/events", add_url_analysis_event, "POST", None),
+        ("/matches/{match_id}/url-analysis", url_analysis_result, "GET", HTMLResponse),
+    ]
+    for path, endpoint, method, response_class in url_registrations:
+        if has_route(path, method):
+            continue
+        kwargs = {"methods": [method]}
+        if response_class is not None:
+            kwargs["response_class"] = response_class
+        app.add_api_route(path, endpoint, **kwargs)
+
     existing = {getattr(route, "path", None) for route in app.routes}
     registrations = [
         ("/matches/{match_id}/intelligence", match_intelligence_page, HTMLResponse),
