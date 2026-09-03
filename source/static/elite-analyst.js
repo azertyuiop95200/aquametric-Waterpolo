@@ -9,10 +9,7 @@ function addKnowledgeCTA(){
  const hero=document.querySelector('.tkh-hero'); if(!hero||document.getElementById('elite-analyst-cta'))return;
  const a=document.createElement('a');a.id='elite-analyst-cta';a.className='ea-lab-cta';a.href='/static/elite-analyst-lab.html';a.innerHTML='<strong>▶ Salle vidéo & Analyst Lab</strong><span>Nationales, vidéo coach, métriques avancées, postes, transition, pertes de possession et comparatifs haut niveau.</span>';hero.insertAdjacentElement('afterend',a);
 }
-function statCells(s){return [
- ['Tirs',s.shots],['Cadrés',s.shots_on_target],['Non cadrés',s.shots_off_target],['Bloqués',s.shots_blocked],['Précision tir',pct(s.shot_accuracy_pct)],['Efficacité buts',pct(s.scoring_efficiency_pct)],
- ['Passes réussies',s.passes_completed],['Passes ratées',s.passes_failed],['% passes',pct(s.pass_completion_pct)],['Pertes',s.turnovers]
-]}
+function statCells(s){return [['Tirs',s.shots],['Cadrés',s.shots_on_target],['Non cadrés',s.shots_off_target],['Bloqués',s.shots_blocked],['Précision tir',pct(s.shot_accuracy_pct)],['Efficacité buts',pct(s.scoring_efficiency_pct)],['Passes réussies',s.passes_completed],['Passes ratées',s.passes_failed],['% passes',pct(s.pass_completion_pct)],['Pertes',s.turnovers]]}
 function renderMatchEngineer(d,root){
  const t=d.team_performance||{},s=t.statboard||{},o=t.opponent_statboard||{},loss=t.loss_breakdown||{rows:[]},tt=t.transition_timing||{};
  const box=document.createElement('section');box.className='engineer-lab';box.id='engineer-performance-lab';
@@ -27,10 +24,14 @@ function renderMatchEngineer(d,root){
  <div class="ea-section"><div class="ea-section-head"><div><h3>Analyse individuelle par poste</h3><p>La statistique répond à « quoi ? » ; la checklist poste répond à « comment et pourquoi ? ».</p></div></div><div>${(d.players||[]).map(player=>{const b=player.breakdown||{},ps=b.statboard||{},tr=b.transition_timing||{};return `<article class="ea-player"><div class="ea-player-top"><div><h4>#${esc(player.cap||'—')} ${esc(player.name)}</h4><small>${esc(player.role||'Poste à confirmer')} · ${esc(player.confidence||'—')}</small></div><a href="${esc(player.profile_url)}">fiche joueuse →</a></div><div class="ea-player-kpis"><div><b>${esc(ps.goals||0)}/${esc(ps.shots||0)}</b><small>buts / tirs</small></div><div><b>${pct(ps.shot_accuracy_pct)}</b><small>cadrés</small></div><div><b>${pct(ps.scoring_efficiency_pct)}</b><small>efficacité</small></div><div><b>${pct(ps.pass_completion_pct)}</b><small>passes réussies</small></div><div><b>${esc(ps.turnovers||0)}</b><small>pertes</small></div><div><b>${tr.defence_to_attack_first_pass_s==null?'—':`${esc(tr.defence_to_attack_first_pass_s)}s`}</b><small>D→A 1re passe</small></div></div><div class="ea-checks">${(b.qualitative_checklist||[]).map(x=>`<div class="ea-check">${esc(x)}</div>`).join('')}</div>${(b.loss_breakdown?.rows||[]).length?`<div class="ea-source-legend">${b.loss_breakdown.rows.map(x=>`<span>${esc(x.label)} ${esc(x.share)}%</span>`).join('')}</div>`:''}</article>`}).join('')}</div></div>`;
  root.insertAdjacentElement('afterend',box);
 }
-async function initMatch(){
- const root=document.getElementById('performance-intelligence'); if(!root||document.getElementById('engineer-performance-lab'))return;
- const id=root.dataset.matchId; if(!id)return;
- try{const r=await fetch(`/api/matches/${id}/performance`,{credentials:'same-origin'});if(!r.ok)return;renderMatchEngineer(await r.json(),root);}catch(_){ }
+function enhanceLibrary(){
+ if(!/^\/analysis-library\/\d+\/?$/.test(location.pathname)||document.getElementById('library-engineering-contract'))return;
+ const playerTable=document.querySelector('.players'); const anchor=playerTable?.closest('.section')||document.querySelector('.section'); if(!anchor)return;
+ const sec=document.createElement('section');sec.className='section engineer-lab';sec.id='library-engineering-contract';
+ sec.innerHTML=`<div class="ea-section"><div class="ea-section-head"><div><span class="eyebrow">ENGINEERING EVIDENCE CONTRACT</span><h3>Match revu avec la même grille que les vidéos privées</h3><p>Une source officielle peut publier buts/tirs sans publier les passes, pertes ou temps de transition. AquaMetric affiche alors « — » au lieu de fabriquer un zéro.</p></div><a href="/static/elite-analyst-lab.html">ouvrir la méthode complète →</a></div><div class="ea-table-wrap"><table class="ea-table"><thead><tr><th>Bloc</th><th>À extraire sur chaque replay</th><th>Statut si absent de la source</th><th>Qualitatif à documenter</th></tr></thead><tbody><tr><td>Tir</td><td>cadré / non cadré / bloqué / but / % efficacité / vitesse si calibrée</td><td>non mesuré</td><td>sélection, gardienne déplacée, bras fort, chrono</td></tr><tr><td>Passe</td><td>réussie / ratée / % / entrée centre / +1 / +2</td><td>non mesuré</td><td>scan, fixation, orientation et timing</td></tr><tr><td>Possession</td><td>turnover + cause + zone + pression + % par cause</td><td>non mesuré</td><td>technique vs lecture vs risque tactique</td></tr><tr><td>D→A</td><td>récupération→1re passe / tir / sprint</td><td>non chronométré</td><td>couloirs, fixation, trailer, décision</td></tr><tr><td>A→D</td><td>perte/tir→safety / structure / switch</td><td>non chronométré</td><td>premier mouvement, axe, centre, communication</td></tr><tr><td>Poste</td><td>rôle individuel + répétitions</td><td>à confirmer vidéo</td><td>checklist spécifique gardienne/centre/CB/aile/flat/pointe</td></tr></tbody></table></div></div>`;
+ anchor.insertAdjacentElement('beforebegin',sec);
+ const a=document.createElement('a');a.className='ea-lab-cta';a.href='/static/elite-analyst-lab.html';a.innerHTML='<strong>▶ Comparer avec France · Russie · Israël · Top 12</strong><span>Film Room, standards par poste et dictionnaire métrique complet.</span>';sec.insertAdjacentElement('afterend',a);
 }
-addKnowledgeCTA();initMatch();
+async function initMatch(){const root=document.getElementById('performance-intelligence');if(!root||document.getElementById('engineer-performance-lab'))return;const id=root.dataset.matchId;if(!id)return;try{const r=await fetch(`/api/matches/${id}/performance`,{credentials:'same-origin'});if(!r.ok)return;renderMatchEngineer(await r.json(),root)}catch(_){}}
+addKnowledgeCTA();enhanceLibrary();initMatch();
 })();
