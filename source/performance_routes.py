@@ -8,6 +8,7 @@ from db import get_db
 from models import Match, User, PlayerIntelligenceProfile, VisionAnalysis
 from services.advanced_metrics import shot_map_summary
 from services.performance_intelligence import team_performance_report, player_match_breakdown, shot_preference_summary
+from services.ultimate_analytics import ultimate_match_report, ultimate_event_report
 from services.ratings import calculate_player_rating
 from services.video import youtube_embed
 
@@ -30,6 +31,7 @@ def match_performance_api(match_id: int, request: Request, db: Session = Depends
         raise HTTPException(404)
 
     team_report = team_performance_report(match)
+    ultimate = ultimate_match_report(match)
     players = []
     for player in match.team.players:
         events = [e for e in match.events if e.player_id == player.id]
@@ -56,6 +58,7 @@ def match_performance_api(match_id: int, request: Request, db: Session = Depends
             "strengths": detail.get("strengths", []),
             "improvements": detail.get("improvements", []),
             "breakdown": player_match_breakdown(events, detail, role=player.primary_role or ""),
+            "ultimate": ultimate_event_report(events, "for"),
             "shot_preference": shot_pref,
         })
 
@@ -98,11 +101,14 @@ def match_performance_api(match_id: int, request: Request, db: Session = Depends
     return {
         "match": {"id": match.id, "team": match.team.name, "opponent": match.opponent, "competition": match.competition or ""},
         "team_performance": team_report,
+        "ultimate": ultimate,
         "players": players,
         "video": video,
         "media": media,
         "policy": {
             "physical_tracking": "Absolute sprint/shot-speed values are shown only when a calibrated measurement is explicitly tagged.",
+            "possession": "Exact possession rates require possession=ID tags; otherwise AquaMetric shows only terminal-action proxies.",
             "third_party_video": "Third-party video remains embedded/timestamp-linked; AquaMetric does not copy it.",
+            "qualitative": "Coach findings are evidence-linked hypotheses and must be checked against video before being treated as causal conclusions.",
         },
     }
