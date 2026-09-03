@@ -31,5 +31,60 @@
 
 <section class="panel"><div class="section-head"><div><span class="eyebrow">KEY SEQUENCES</span><h2>Replay the tactical moments</h2></div><span class="pill">{{sequences|length}} sequences</span></div><div class="sequence-list">{% for s in sequences %}<article class="sequence-row"><div class="sequence-time"><b>{{'%02d:%02d' % ((s.start//60)|int,(s.start%60)|int)}}</b><small>{{s.phase|replace('_',' ')|title}}</small></div><div><b>{{s.goals_for}} goal(s) · {{s.shots_for}} shot(s) · {{s.passes}} pass tags</b><p>{{s.duration}}s · losses {{s.losses_for}} · opponent shots {{s.shots_against}}</p></div><div>{% if s.open_url %}<a class="btn secondary small" href="{{s.open_url}}" {% if s.open_url.startswith('http') %}target="_blank" rel="noopener"{% endif %}>Open moment</a>{% else %}<span class="pill">No clip yet</span>{% endif %}</div></article>{% else %}<p class="muted">No phase sequences have been identified yet.</p>{% endfor %}</div></section>
 
+
+<section class="panel performance-intelligence" id="performance-intelligence" data-match-id="{{match.id}}">
+  <div class="section-head"><div><span class="eyebrow">TEAM + INDIVIDUAL PERFORMANCE</span><h2>Technical, tactical and individual match intelligence</h2><p class="muted">Scores below use only evidence attached to this match. Missing dimensions stay unavailable.</p></div><div id="team-performance-score" class="performance-total">—<small>/100 team</small></div></div>
+  <div id="team-performance-dimensions" class="performance-dimensions"><div class="empty-state"><b>Loading performance evidence…</b></div></div>
+  <div class="performance-columns"><div><h3>Evidence-supported strengths</h3><div id="team-strengths" class="compact-insights"></div></div><div><h3>Priority review areas</h3><div id="team-reviews" class="compact-insights"></div></div></div>
+</section>
+
+<section class="panel integrated-media" id="integrated-media">
+  <div class="section-head"><div><span class="eyebrow">INTEGRATED VIDEO + IMAGES</span><h2>Match film, tactical clips and key frames</h2><p class="muted">Uploaded video is played inside AquaMetric. YouTube remains embedded from the provider. Third-party media is not copied.</p></div></div>
+  <div id="main-match-media" class="main-match-media"><div class="empty-state"><b>Loading match media…</b></div></div>
+  <div id="match-media-gallery" class="integrated-media-grid"></div>
+</section>
+
+<section class="panel"><div class="section-head"><div><span class="eyebrow">PLAYER PERFORMANCE LAB</span><h2>Match-by-match technical and tactical detail</h2></div><span class="pill">rating-v3 + evidence map</span></div>
+  <div id="player-performance-lab" class="player-performance-lab"><div class="empty-state"><b>Loading individual evidence…</b></div></div>
+</section>
+
 <section class="panel limitations"><span class="eyebrow">DATA LIMITS</span><h2>What AquaMetric is not claiming</h2>{% for x in report.limitations %}<p>• {{x}}</p>{% endfor %}<p>• Physical scores are intentionally unavailable until calibrated player tracking supports them.</p></section>
+
+<script>
+(async function(){
+  const root=document.getElementById('performance-intelligence'); if(!root)return;
+  const matchId=root.dataset.matchId;
+  const esc=(v)=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const bar=(label,score,evidence,available=true)=>`<div class="performance-dimension ${available?'':'unavailable'}"><div><b>${esc(label)}</b><small>${esc(evidence)}</small></div><div class="bar"><i style="width:${available?score:0}%"></i></div><strong>${available?esc(score):'—'}</strong></div>`;
+  try{
+    const r=await fetch(`/api/matches/${matchId}/performance`,{credentials:'same-origin'}); if(!r.ok)throw new Error('performance '+r.status); const d=await r.json();
+    const t=d.team_performance;
+    document.getElementById('team-performance-score').innerHTML=`${t.overall??'—'}<small>/100 team · ${esc(t.confidence_label)}</small>`;
+    document.getElementById('team-performance-dimensions').innerHTML=t.dimensions.map(x=>bar(x.label,x.score,x.evidence,x.available)).join('');
+    const insight=(x,empty)=>x.length?x.map(v=>`<div class="compact-insight"><b>${esc(v.label)}</b><span>${esc(v.score)}/100</span><p>${esc(v.evidence)}</p></div>`).join(''):`<p class="muted">${empty}</p>`;
+    document.getElementById('team-strengths').innerHTML=insight(t.strengths,'No strong conclusion yet from the current sample.');
+    document.getElementById('team-reviews').innerHTML=insight(t.reviews,'No low dimension is asserted from the current sample.');
+
+    const media=document.getElementById('main-match-media');
+    if(d.video.local_url){media.innerHTML=`<video controls playsinline preload="metadata" src="${esc(d.video.local_url)}"></video>`;}
+    else if(d.video.embed_url){media.innerHTML=`<div class="video-wrap"><iframe id="yt-performance" src="${esc(d.video.embed_url)}?enablejsapi=1" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>`;}
+    else if(d.video.external_url){media.innerHTML=`<a class="video-bookmark" href="${esc(d.video.external_url)}" target="_blank" rel="noopener"><b>▶</b><span>Open the provider video</span></a>`;}
+    else{media.innerHTML='<div class="empty-state"><b>No match video attached yet</b><p>Add an owned video upload or a lawful video link from the match workspace.</p></div>';}
+    const gallery=document.getElementById('match-media-gallery');
+    const visible=d.media.filter(x=>['clip','screenshot','contact_sheet'].includes(x.type));
+    gallery.innerHTML=visible.length?visible.map(x=>`<article class="integrated-media-card"><div class="integrated-media-preview">${x.type==='clip'?`<video controls playsinline preload="metadata" src="${esc(x.url)}"></video>`:`<a href="${esc(x.url)}" target="_blank"><img src="${esc(x.url)}" loading="lazy" alt="${esc(x.title)}"></a>`}</div><div><b>${esc(x.title||x.type)}</b><small>${Math.floor(x.second/60).toString().padStart(2,'0')}:${Math.floor(x.second%60).toString().padStart(2,'0')} · ${esc(x.analysis_type||'evidence')}</small><p>${esc(x.note||'')}</p></div></article>`).join(''):'<p class="muted">No generated key frames or clips yet. Use the tactical study pack on an uploaded match to generate them.</p>';
+
+    const lab=document.getElementById('player-performance-lab');
+    lab.innerHTML=d.players.map(p=>{
+      const dims=p.dimensions||{}; const pref=p.shot_preference||{}; const cards=(p.breakdown?.cards||[]).map(c=>`<div class="player-micro-kpi"><b>${esc(c.value)}</b><span>${esc(c.label)}</span><small>${esc(c.detail)}</small></div>`).join('');
+      const phaseEntries=Object.entries(p.breakdown?.phases||{}); const phases=phaseEntries.length?phaseEntries.map(([k,v])=>`<span class="chip">${esc(k.replaceAll('_',' '))}: ${esc(v)}</span>`).join(''):'<span class="muted">No explicit phase attribution yet.</span>';
+      return `<article class="player-performance-card"><div class="evaluation-top"><div><a class="profile-link" href="${esc(p.profile_url)}"><h3>#${p.cap??'—'} ${esc(p.name)}</h3></a><small>${esc(p.role)} · ${esc(p.confidence||'INSUFFICIENT DATA')}</small></div><div class="evaluation-score">${p.rating??'—'}${p.rating!=null?'<span>/100</span>':''}</div></div><div class="player-micro-grid">${cards}</div><div class="triad"><div>${bar('Technique',dims.technique,'execution from tagged actions',p.rating!=null)}</div><div>${bar('Tactics',dims.tactics,'phase/context decisions',p.rating!=null)}</div><div>${bar('Decision',dims.decision,'choices around tagged actions',p.rating!=null)}</div></div><div class="player-evidence-footer"><div><b>Phase involvement</b><div class="tag-cloud">${phases}</div></div><div><b>Shooting preference</b><p>${pref.available?`${esc(pref.origin)} · ${esc(pref.target)} · ${esc(pref.count)} located shots`:'Not enough reliable located shots yet.'}</p></div></div><a class="mini-link" href="${esc(p.profile_url)}">Open complete player file →</a></article>`;
+    }).join('')||'<div class="empty-state"><b>No players in this match roster.</b></div>';
+  }catch(e){
+    document.getElementById('team-performance-dimensions').innerHTML='<div class="empty-state"><b>Performance intelligence unavailable</b><p>The underlying match page remains usable.</p></div>';
+    document.getElementById('player-performance-lab').innerHTML='<div class="empty-state"><b>Individual performance data unavailable</b></div>';
+  }
+})();
+</script>
+
 {% endblock %}
