@@ -28,7 +28,7 @@ def test_existing_remote_match_gets_ultimate_url_entry():
     assert "Analyser l’URL · Ultimate Analyst" in js
 
 
-def test_url_result_contains_minimum_ultimate_contract():
+def test_url_result_contains_minimum_ultimate_contract_and_structured_tagging():
     html = (ROOT / "templates" / "url_analysis.html").read_text(encoding="utf-8")
     for needle in [
         "MINIMUM GARANTI", "Tir, passe, possession", "PERTES DE POSSESSION",
@@ -36,7 +36,9 @@ def test_url_result_contains_minimum_ultimate_contract():
         "Data Coverage", "Readiness",
     ]:
         assert needle in html
-    assert "youtube" not in html.lower() or "embed" in html.lower()
+    assert 'action="/matches/{{match.id}}/url-analysis/events"' in html
+    for field in ["period", "possession", "zone", "pressure", "decision", "cause", "pass_type", "shot_type", "hand", "distance_m", "shot_speed_kmh", "release_time_s"]:
+        assert f'name="{field}"' in html
     assert "AquaMetric ne copie pas la vidéo tierce" in html
 
 
