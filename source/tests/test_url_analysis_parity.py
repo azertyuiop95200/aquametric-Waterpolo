@@ -5,21 +5,9 @@ from jinja2 import Environment, FileSystemLoader
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def _route_paths(routes):
-    paths = set()
-    for route in routes:
-        path = getattr(route, "path", None)
-        if path:
-            paths.add(path)
-        nested = getattr(route, "routes", None)
-        if nested:
-            paths.update(_route_paths(nested))
-    return paths
-
-
-def test_url_analysis_routes_are_nested_in_installed_performance_router():
-    from tactical_media_routes import router
-    paths = _route_paths(router.routes)
+def test_url_analysis_routes_are_installed_on_fastapi_app():
+    from main import app
+    paths = {getattr(route, "path", None) for route in app.routes}
     assert "/analysis/url/create" in paths
     assert "/matches/{match_id}/url-analysis/start" in paths
     assert "/matches/{match_id}/url-analysis/events" in paths
