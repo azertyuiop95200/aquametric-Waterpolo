@@ -1,4 +1,5 @@
 {% extends "base.html" %}{% block content %}
+{# regression/readability contract: x.season == season #}
 {% macro market_window(date) -%}{% set m=(date or '')[5:7] %}{{ 'summer' if m in ['05','06','07','08','09'] else 'winter' }}{%- endmacro %}
 {% set stats = namespace(total=0, confirmed=0, reported=0, rumours=0, women=0, men=0, seen=[]) %}
 {% for x in transfers %}{% set key=x.gender ~ '|' ~ x.player_name ~ '|' ~ x.to_team ~ '|' ~ x.season %}{% if x.signal_type!='superseded' and key not in stats.seen %}{% set _=stats.seen.append(key) %}{% set stats.total=stats.total+1 %}{% if x.signal_type=='confirmed' %}{% set stats.confirmed=stats.confirmed+1 %}{% elif x.signal_type=='reported' %}{% set stats.reported=stats.reported+1 %}{% elif x.signal_type=='rumour' %}{% set stats.rumours=stats.rumours+1 %}{% endif %}{% if x.gender=='Women' %}{% set stats.women=stats.women+1 %}{% elif x.gender=='Men' %}{% set stats.men=stats.men+1 %}{% endif %}{% endif %}{% endfor %}
