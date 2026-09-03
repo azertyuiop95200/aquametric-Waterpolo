@@ -17,12 +17,14 @@ from services.analysis_product import (
     run_product_analysis,
 )
 from services.rapid_match_analysis import RapidAnalysisError
+from analysis_library_product_routes import router as analysis_library_product_router
 
 BASE_DIR = Path(__file__).resolve().parent
 UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", BASE_DIR / "uploads"))
 EVIDENCE_DIR = Path(os.getenv("EVIDENCE_DIR", BASE_DIR / "evidence"))
 TEMPLATES = Jinja2Templates(directory=BASE_DIR / "templates")
 router = APIRouter()
+router.include_router(analysis_library_product_router)
 
 
 def _user(request: Request, db: Session):
