@@ -112,10 +112,3 @@ def match_performance_api(match_id: int, request: Request, db: Session = Depends
             "qualitative": "Coach findings are evidence-linked hypotheses and must be checked against video before being treated as causal conclusions.",
         },
     }
-
-
-# URL sources use the same Ultimate Analyst contract as uploaded matches.
-# Registering the nested router here keeps the URL result path inside the
-# already-installed tactical/performance extension tree.
-from url_analysis_routes import router as url_analysis_router
-router.include_router(url_analysis_router)
