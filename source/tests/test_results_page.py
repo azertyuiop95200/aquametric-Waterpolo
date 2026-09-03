@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from main import app
 
 
-def test_results_page_surfaces_six_womens_championships():
+def test_results_page_surfaces_followed_womens_championships():
     client = TestClient(app)
     email = f"results-{uuid.uuid4().hex}@example.com"
     response = client.post(
@@ -22,16 +22,21 @@ def test_results_page_surfaces_six_womens_championships():
     assert "Championnats suivis" in page.text
 
     expected = {
-        "women-italie": "Italie",
-        "women-france": "France",
-        "women-allemagne": "Allemagne",
-        "women-espagne": "Espagne",
-        "women-hongrie": "Hongrie",
-        "women-russie": "Russie",
+        "women-france-elite": "France · Élite",
+        "women-france-n1": "France · N1",
+        "women-italie": "Italie · Élite",
+        "women-allemagne": "Allemagne · Élite",
+        "women-espagne": "Espagne · Élite",
+        "women-hongrie": "Hongrie · Élite",
+        "women-russie": "Russie · Élite",
     }
-    for anchor, country in expected.items():
+    for anchor, label in expected.items():
         assert f'href="#{anchor}"' in page.text
-        assert country in page.text
+        assert label in page.text
+
+    assert "Classement buteuses" in page.text
+    assert "Saison en cours" in page.text
+    assert "N-1" in page.text and "N-2" in page.text and "N-3" in page.text
 
 
 def test_results_mobile_order_rule_is_present():
