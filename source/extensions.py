@@ -26,7 +26,7 @@ from services.elite_match_evidence import seed_elite_match_evidence
 from services.granville_match_evidence import seed_granville_match_evidence
 from services.public_match_ratings import public_profile_evaluations
 from evidence_coverage_routes import router as evidence_coverage_router
-from tactical_media_routes import router as tactical_media_router, enrich_sequence_cards
+from tactical_media_routes import router as tactical_media_router, enrich_sequence_cards, build_tactical_study_pack
 
 BASE_DIR = Path(__file__).resolve().parent
 TEMPLATES = Jinja2Templates(directory=BASE_DIR / "templates")
@@ -311,6 +311,18 @@ def install_extensions(app):
     app.include_router(router)
     app.include_router(evidence_coverage_router)
     app.include_router(tactical_media_router)
+    tactical_study_path = "/matches/{match_id}/intelligence/study-pack"
+    if not any(
+        getattr(route, "path", None) == tactical_study_path
+        and "POST" in (getattr(route, "methods", set()) or set())
+        for route in app.routes
+    ):
+        app.add_api_route(
+            tactical_study_path,
+            build_tactical_study_pack,
+            methods=["POST"],
+            name="build_tactical_study_pack",
+        )
     existing = {getattr(route, "path", None) for route in app.routes}
     registrations = [
         ("/matches/{match_id}/intelligence", match_intelligence_page, HTMLResponse),
