@@ -6,6 +6,8 @@ on:
     paths:
       - '.github/workflows/finalize-v12-2.yml'
       - 'source/scripts/apply_v12_2_patch.py'
+      - 'source/scripts/wire_v12_2_route.py'
+      - 'source/extensions.py'
       - 'source/performance_routes.py'
       - 'source/services/performance_intelligence.py'
       - 'source/tests/test_v12_2_performance.py'
@@ -23,8 +25,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Apply V12.2 integration patch
-        run: python source/scripts/apply_v12_2_patch.py
+      - name: Apply V12.2 integration patches
+        run: |
+          python source/scripts/apply_v12_2_patch.py
+          python source/scripts/wire_v12_2_route.py
 
       - name: Publish integrated source
         run: |
@@ -34,7 +38,7 @@ jobs:
           if git diff --cached --quiet; then
             echo 'V12.2 source already integrated.'
           else
-            git commit -m 'Integrate AquaMetric V12.2 performance media [skip ci]'
+            git commit -m 'Integrate AquaMetric V12.2 performance media route [skip ci]'
             git push
           fi
 
@@ -86,5 +90,6 @@ jobs:
           r = c.get('/health')
           assert r.status_code == 200
           assert r.headers.get('x-content-type-options') == 'nosniff'
+          assert r.headers.get('content-security-policy')
           print('AquaMetric V12.2 routes + security: OK')
           PY
