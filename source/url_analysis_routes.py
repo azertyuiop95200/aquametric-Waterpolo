@@ -2,17 +2,17 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from db import get_db
-from models import AnalysisJob, Match, User
+from models import AnalysisJob, Club, Match, Team, User
 from services.performance_intelligence import team_performance_report
 from services.ultimate_analytics import ultimate_event_report, ultimate_match_report
-from services.video import youtube_embed
+from services.video import is_http_url, youtube_embed
 
 BASE_DIR = Path(__file__).resolve().parent
 TEMPLATES = Jinja2Templates(directory=BASE_DIR / "templates")
@@ -44,17 +44,35 @@ def _match(match_id: int, user: User, db: Session) -> Match:
     return match
 
 
-@router.post("/matches/{match_id}/url-analysis/start")
-def start_url_analysis(match_id: int, request: Request, db: Session = Depends(get_db)):
-    """Generate the complete Ultimate Analyst result shell for a remote URL.
+def _analysis_team(db: Session, user: User, team_name: str, competition: str = "") -> Team:
+    name = (team_name or "").strip()[:160]
+    if not name:
+        raise HTTPException(400, detail="Team is required.")
+    team = db.scalar(
+        select(Team).where(Team.owner_id == user.id, func.lower(Team.name) == name.lower())
+    )
+    if team:
+        return team
+    club = db.scalar(
+        select(Club).where(Club.owner_id == user.id, func.lower(Club.name) == name.lower())
+    )
+    if not club:
+        club = Club(
+            name=name,
+            country="Analysis",
+            division=(competition or "Video analysis")[:120],
+            category="Women",
+            owner_id=user.id,
+        )
+        db.add(club)
+        db.flush()
+    team = Team(name=name, club_id=club.id, owner_id=user.id, category="Women")
+    db.add(team)
+    db.flush()
+    return team
 
-    Third-party video is never copied. The result is populated immediately from
-    every verified event already attached to the match, while unsupported metrics
-    remain explicitly unavailable instead of being fabricated.
-    """
-    user = _user(request, db)
-    match = _match(match_id, user, db)
 
+def _mark_framework_ready(match: Match, db: Session) -> AnalysisJob:
     existing = db.scalar(
         select(AnalysisJob)
         .where(AnalysisJob.match_id == match.id, AnalysisJob.stage == "ultimate_url_analysis")
@@ -69,16 +87,61 @@ def start_url_analysis(match_id: int, request: Request, db: Session = Depends(ge
         existing.status = "framework_ready"
         existing.progress = 100
         existing.message = message
-        job = existing
-    else:
-        job = AnalysisJob(
-            match_id=match.id,
-            stage="ultimate_url_analysis",
-            progress=100,
-            status="framework_ready",
-            message=message,
-        )
-        db.add(job)
+        return existing
+    job = AnalysisJob(
+        match_id=match.id,
+        stage="ultimate_url_analysis",
+        progress=100,
+        status="framework_ready",
+        message=message,
+    )
+    db.add(job)
+    return job
+
+
+@router.post("/analysis/url/create")
+def create_url_analysis(
+    request: Request,
+    team_name: str = Form(""),
+    opponent: str = Form(...),
+    competition: str = Form(""),
+    match_date: str = Form(""),
+    video_url: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    """One-click 'analyze from URL' path from the new-match form."""
+    user = _user(request, db)
+    video_url = (video_url or "").strip()
+    if not video_url or not is_http_url(video_url):
+        raise HTTPException(400, detail="A valid http/https video URL is required.")
+    team = _analysis_team(db, user, team_name, competition)
+    opponent = (opponent or "").strip()[:160]
+    if not opponent:
+        raise HTTPException(400, detail="Opponent is required.")
+    match = Match(
+        owner_id=user.id,
+        team_id=team.id,
+        opponent=opponent,
+        competition=(competition or "")[:160],
+        match_date=(match_date or "")[:32],
+        video_source="youtube" if youtube_embed(video_url) else "url",
+        video_url=video_url,
+        video_path="",
+        status="url_analysis_ready",
+    )
+    db.add(match)
+    db.flush()
+    _mark_framework_ready(match, db)
+    db.commit()
+    return RedirectResponse(f"/matches/{match.id}/url-analysis", status_code=303)
+
+
+@router.post("/matches/{match_id}/url-analysis/start")
+def start_url_analysis(match_id: int, request: Request, db: Session = Depends(get_db)):
+    """Generate the complete Ultimate Analyst result shell for an existing remote URL match."""
+    user = _user(request, db)
+    match = _match(match_id, user, db)
+    _mark_framework_ready(match, db)
     match.status = "url_analysis_ready"
     db.commit()
     return RedirectResponse(f"/matches/{match.id}/url-analysis", status_code=303)
