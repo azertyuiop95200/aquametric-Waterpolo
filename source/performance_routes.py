@@ -55,7 +55,7 @@ def match_performance_api(match_id: int, request: Request, db: Session = Depends
             "dimensions": detail.get("dimensions", {}),
             "strengths": detail.get("strengths", []),
             "improvements": detail.get("improvements", []),
-            "breakdown": player_match_breakdown(events, detail),
+            "breakdown": player_match_breakdown(events, detail, role=player.primary_role or ""),
             "shot_preference": shot_pref,
         })
 
@@ -102,7 +102,7 @@ def match_performance_api(match_id: int, request: Request, db: Session = Depends
         "video": video,
         "media": media,
         "policy": {
-            "physical_tracking": "Unavailable until calibrated player tracking is reliable.",
+            "physical_tracking": "Absolute sprint/shot-speed values are shown only when a calibrated measurement is explicitly tagged.",
             "third_party_video": "Third-party video remains embedded/timestamp-linked; AquaMetric does not copy it.",
         },
     }
