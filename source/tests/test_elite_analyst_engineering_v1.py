@@ -79,18 +79,13 @@ def test_elite_analyst_lab_covers_priority_national_programmes_and_rankings():
     assert "2–3 m" in html
 
 
-def test_video_atlas_embeds_eight_elite_matches_and_full_6v6_personnel():
+def test_old_generic_video_atlas_is_retired_in_favour_of_evidence_based_film_room():
     html = (ROOT / "static" / "elite-video-atlas.html").read_text(encoding="utf-8")
-    for youtube_id in ["a5Ja269h5G8", "VvuJSTuuUI8", "fWFM4kB8nvw", "bF-Am10VtF4", "HfkCCOpLIBA", "Ek1kBvUjivc", "TseN9CGbfQw", "Z-8PwbnKBWU"]:
-        assert youtube_id in html
-    assert "8 matchs pour une vraie séance vidéo" in html
-    assert "reconstructions pédagogiques" in html
-    assert "T−3" in html and "T+1" in html
-    assert "2026-09-04-full-7v7" in html
-    assert "6 défenseures X1–X6" in html
-    for defender in ["X1", "X2", "X3", "X4", "X5", "X6"]:
-        assert defender in html
-    assert 'data-defenders="6"' in html
+    assert "/analysis-library#filmroom" in html
+    assert "L’ancien atlas a été retiré" in html
+    assert "trois croquis génériques" in html
+    assert "reconstructions pédagogiques" not in html
+    assert "data-defenders" not in html
 
 
 def test_tactical_board_audit_corrects_special_teams_and_displays_personnel():
