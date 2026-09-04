@@ -28,6 +28,7 @@ from services.public_match_ratings import public_profile_evaluations
 from evidence_coverage_routes import router as evidence_coverage_router
 from tactical_media_routes import router as tactical_media_router, enrich_sequence_cards, build_tactical_study_pack
 from performance_routes import match_performance_api
+from priority_analysis_routes import install_priority_analysis_routes
 from url_analysis_routes import (
     create_url_analysis,
     start_url_analysis,
@@ -315,6 +316,10 @@ def install_extensions(app):
     blocked_docs = {"/docs", "/redoc", "/openapi.json"}
     app.router.routes[:] = [route for route in app.router.routes if getattr(route, "path", None) not in blocked_docs]
 
+    # These product endpoints must be direct app routes. They are installed here,
+    # before main.py declares its historical compatibility endpoints.
+    install_priority_analysis_routes(app)
+
     app.include_router(router)
     app.include_router(evidence_coverage_router)
     app.include_router(tactical_media_router)
@@ -336,8 +341,9 @@ def install_extensions(app):
     if not has_route(tactical_study_path, "POST"):
         app.add_api_route(tactical_study_path, build_tactical_study_pack, methods=["POST"], name="build_tactical_study_pack")
 
-    # URL analysis parity is registered explicitly at the application boundary,
-    # so CI, local FastAPI and Render all expose the exact same endpoints.
+    # Keep the URL review/event endpoints that are not part of the result-first
+    # product surface. Product create/start routes above make the legacy create/start
+    # registrations skip automatically through has_route().
     url_registrations = [
         ("/analysis/url/create", create_url_analysis, "POST", None),
         ("/matches/{match_id}/url-analysis/start", start_url_analysis, "POST", None),

@@ -12,6 +12,7 @@ from models import Match, MediaArtifact, User
 from services.media import MediaGenerationError, create_clip, create_screenshot
 from services.tactical_engine import analyze_match_tactics
 from services.video import timestamped_video_url
+from services.analysis_product import youtube_segment_embed
 
 BASE_DIR = Path(__file__).resolve().parent
 UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", BASE_DIR / "uploads"))
@@ -117,24 +118,37 @@ def sequence_review(seq: dict) -> dict:
     }
 
 
+def sequence_timing(seq: dict) -> dict:
+    start = max(0.0, float(seq.get("start", 0) or 0))
+    duration = max(1.0, float(seq.get("duration", 0) or 0))
+    first_shot = seq.get("time_to_first_shot")
+    focus_offset = float(first_shot) if first_shot is not None else min(3.0, duration * 0.45)
+    focus = start + max(0.5, min(duration, focus_offset))
+    review_end = start + min(duration, 12.0)
+    if review_end <= start:
+        review_end = start + 1.0
+    return {"start": start, "duration": duration, "focus": focus, "review_end": review_end}
+
+
 def enrich_sequence_cards(match: Match, report: dict, artifacts: list[MediaArtifact]) -> list[dict]:
     cards = []
     for seq in report.get("sequences", []):
-        start = float(seq.get("start", 0))
-        near = [a for a in artifacts if abs(float(a.second or 0) - start) <= 8]
-        near.sort(key=lambda a: (0 if a.source == "tactical_study_pack" else 1, abs(float(a.second or 0) - start), a.id or 0))
-        clip = next((a for a in near if a.artifact_type == "clip"), None)
-        screenshot = next((a for a in near if a.artifact_type == "screenshot"), None)
-        bookmark = next((a for a in near if a.external_url), None)
+        timing = sequence_timing(seq)
+        focus = timing["focus"]
+        exact = [
+            a for a in artifacts
+            if str(a.source or "").startswith("tactical_study_pack_exact")
+            and abs(float(a.second or 0) - focus) <= 1.0
+        ]
+        exact.sort(key=lambda a: (abs(float(a.second or 0) - focus), a.id or 0))
+        clip = next((a for a in exact if a.artifact_type == "clip"), None)
+        screenshot = next((a for a in exact if a.artifact_type == "screenshot"), None)
+        bookmark = next((a for a in exact if a.artifact_type == "bookmark" and a.external_url), None)
         clip_url = f"/matches/{match.id}/evidence/{clip.id}" if clip and clip.file_path else ""
         screenshot_url = f"/matches/{match.id}/evidence/{screenshot.id}" if screenshot and screenshot.file_path else ""
-        open_url = ""
-        if clip_url:
-            open_url = clip_url
-        elif bookmark:
-            open_url = bookmark.external_url
-        elif match.video_url:
-            open_url = timestamped_video_url(match.video_url, start)
+        open_url = clip_url or (bookmark.external_url if bookmark else "")
+        if not open_url and match.video_url:
+            open_url = timestamped_video_url(match.video_url, timing["start"])
         cards.append({
             **seq,
             "review": sequence_review(seq),
@@ -143,15 +157,19 @@ def enrich_sequence_cards(match: Match, report: dict, artifacts: list[MediaArtif
             "clip_url": clip_url,
             "screenshot_url": screenshot_url,
             "open_url": open_url,
+            "focus_second": focus,
+            "review_start": timing["start"],
+            "review_end": timing["review_end"],
+            "segment_embed": youtube_segment_embed(match.video_url, timing["start"], timing["review_end"]) if match.video_url else "",
         })
     return cards
 
 
-def _already_exists(match: Match, artifact_type: str, second: float) -> bool:
+def _already_exists(match: Match, artifact_type: str, focus_second: float) -> bool:
     return any(
-        a.source == "tactical_study_pack"
+        str(a.source or "").startswith("tactical_study_pack_exact")
         and a.artifact_type == artifact_type
-        and abs(float(a.second or 0) - second) <= 0.75
+        and abs(float(a.second or 0) - focus_second) <= 0.75
         for a in match.media_artifacts
     )
 
@@ -171,83 +189,66 @@ def build_tactical_study_pack(match_id: int, request: Request, db: Session = Dep
     if not sequences:
         return RedirectResponse(f"/matches/{match_id}/intelligence#video-review", status_code=303)
 
-    created = 0
     if match.video_source == "upload" and match.video_path:
         source_path = UPLOAD_DIR / Path(match.video_path).name
         if not source_path.exists():
             raise HTTPException(404, detail="Uploaded source video is missing.")
         for seq in sequences:
-            start = float(seq.get("start", 0))
-            duration = max(1.0, float(seq.get("duration", 0) or 0))
-            first_shot = seq.get("time_to_first_shot")
-            focus_offset = float(first_shot) if first_shot is not None else min(3.0, duration * 0.45)
-            focus_second = start + max(1.0, min(5.0, focus_offset))
+            timing = sequence_timing(seq)
+            focus_second = timing["focus"]
             label = (seq.get("phase") or "tactical").replace("_", " ").title()
             review = sequence_review(seq)
-            note = f"{review['tempo']}. {review['outcome']}. À observer: {review['watch']}"
+            note = (
+                f"Focus exact {focus_second:.1f}s dans la séquence {timing['start']:.1f}–{timing['review_end']:.1f}s. "
+                f"{review['tempo']}. {review['outcome']}. À observer: {review['watch']}"
+            )
+            before = max(0.5, min(4.0, focus_second - timing["start"]))
+            after = max(1.0, min(6.0, timing["review_end"] - focus_second))
 
-            if not _already_exists(match, "clip", start):
+            if not _already_exists(match, "clip", focus_second):
                 try:
-                    generated = create_clip(source_path, EVIDENCE_DIR, focus_second, before=2.0, after=4.5)
+                    generated = create_clip(source_path, EVIDENCE_DIR, focus_second, before=before, after=after)
                     db.add(MediaArtifact(
-                        match_id=match.id,
-                        artifact_type="clip",
-                        analysis_type="tactic",
-                        title=f"{label} · micro-extrait",
-                        note=note[:1000],
-                        second=start,
-                        start_second=generated.start_second,
-                        end_second=generated.end_second,
-                        file_path=generated.filename,
-                        mime_type=generated.mime_type,
-                        is_downloadable=True,
-                        source="tactical_study_pack",
+                        match_id=match.id, artifact_type="clip", analysis_type="tactic",
+                        title=f"{label} · micro-extrait exact", note=note[:1000],
+                        second=focus_second, start_second=generated.start_second, end_second=generated.end_second,
+                        file_path=generated.filename, mime_type=generated.mime_type,
+                        is_downloadable=True, source="tactical_study_pack_exact",
                     ))
-                    created += 1
                 except MediaGenerationError:
                     pass
 
-            if not _already_exists(match, "screenshot", start):
+            if not _already_exists(match, "screenshot", focus_second):
                 try:
                     generated = create_screenshot(source_path, EVIDENCE_DIR, focus_second)
                     db.add(MediaArtifact(
-                        match_id=match.id,
-                        artifact_type="screenshot",
-                        analysis_type="tactic",
-                        title=f"{label} · image clé",
-                        note=note[:1000],
-                        second=start,
-                        start_second=generated.start_second,
-                        end_second=generated.end_second,
-                        file_path=generated.filename,
-                        mime_type=generated.mime_type,
-                        is_downloadable=True,
-                        source="tactical_study_pack",
+                        match_id=match.id, artifact_type="screenshot", analysis_type="tactic",
+                        title=f"{label} · image clé exacte", note=note[:1000],
+                        second=focus_second, start_second=focus_second, end_second=focus_second,
+                        file_path=generated.filename, mime_type=generated.mime_type,
+                        is_downloadable=True, source="tactical_study_pack_exact",
                     ))
-                    created += 1
                 except MediaGenerationError:
                     pass
     elif match.video_url:
         for seq in sequences:
-            start = float(seq.get("start", 0))
-            if _already_exists(match, "bookmark", start):
+            timing = sequence_timing(seq)
+            focus_second = timing["focus"]
+            if _already_exists(match, "bookmark", focus_second):
                 continue
             label = (seq.get("phase") or "tactical").replace("_", " ").title()
             review = sequence_review(seq)
             db.add(MediaArtifact(
-                match_id=match.id,
-                artifact_type="bookmark",
-                analysis_type="tactic",
-                title=f"{label} · repère vidéo",
-                note=f"{review['tempo']}. {review['outcome']}."[:1000],
-                second=start,
-                start_second=start,
-                end_second=start,
-                external_url=timestamped_video_url(match.video_url, start),
-                is_downloadable=False,
-                source="tactical_study_pack",
+                match_id=match.id, artifact_type="bookmark", analysis_type="tactic",
+                title=f"{label} · séquence exacte",
+                note=(
+                    f"Fenêtre vidéo {timing['start']:.1f}–{timing['review_end']:.1f}s, focus {focus_second:.1f}s. "
+                    f"{review['tempo']}. {review['outcome']}."
+                )[:1000],
+                second=focus_second, start_second=timing["start"], end_second=timing["review_end"],
+                external_url=timestamped_video_url(match.video_url, timing["start"]),
+                is_downloadable=False, source="tactical_study_pack_exact_url",
             ))
-            created += 1
     else:
         raise HTTPException(400, detail="This match has no video source.")
 

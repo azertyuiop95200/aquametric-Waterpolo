@@ -61,85 +61,23 @@ def operational_analysis_library(
     team: str = "",
     db: Session = Depends(get_db),
 ):
-    user = _user(request, db)
-    stmt = select(Match).where(Match.owner_id == user.id).order_by(Match.created_at.desc(), Match.id.desc())
-    workspace_matches = db.scalars(stmt).all()
-    workspace_rows = []
-    for match in workspace_matches:
-        if team and team.lower() not in f"{match.team.name} {match.opponent}".lower():
-            continue
-        if competition and competition.lower() not in (match.competition or "").lower():
-            continue
-        latest_job = _latest(db, AnalysisJob, match.id, AnalysisJob.created_at)
-        latest_vision = _latest(db, VisionAnalysis, match.id, VisionAnalysis.created_at)
-        latest_auto = _latest(db, AutonomousAnalysis, match.id, AutonomousAnalysis.created_at)
-        events_count = db.scalar(select(func.count(Event.id)).where(Event.match_id == match.id)) or 0
-        media_count = db.scalar(select(func.count(MediaArtifact.id)).where(MediaArtifact.match_id == match.id)) or 0
-        summary = _json(latest_auto.summary_json, {}) if latest_auto else {}
-        workspace_rows.append({
-            "match": match,
-            "job": latest_job,
-            "latest_job": latest_job,
-            "vision": latest_vision,
-            "latest_vision": latest_vision,
-            "auto": latest_auto,
-            "auto_summary": summary,
-            "events_count": events_count,
-            "media_count": media_count,
-            "has_owned_video": bool(match.video_path),
-        })
+    """Compatibility route: the Ultimate product owns the library presentation.
 
-    ref_stmt = select(MatchLibraryItem).order_by(MatchLibraryItem.season.desc(), MatchLibraryItem.id.desc())
-    if competition:
-        ref_stmt = ref_stmt.where(MatchLibraryItem.competition.contains(competition))
-    if team:
-        ref_stmt = ref_stmt.where((MatchLibraryItem.team_a.contains(team)) | (MatchLibraryItem.team_b.contains(team)))
-    items = db.scalars(ref_stmt).all()
-    competitions = sorted({
-        x.competition for x in db.scalars(select(MatchLibraryItem)).all() if x.competition
-    } | {
-        x.competition for x in workspace_matches if x.competition
-    })
-    return TEMPLATES.TemplateResponse(request, "analysis_library.html", {
-        "request": request, "user": user, "app_name": "AquaMetric",
-        "workspace_rows": workspace_rows, "items": items, "competitions": competitions,
-        "selected_competition": competition, "selected_team": team,
-    })
+    Some nested FastAPI routers still reach this historical endpoint before a
+    direct app route. Delegating here guarantees the same evidence-rich context
+    and template regardless of which compatible route FastAPI resolves first.
+    """
+    from analysis_library_product_routes import ultimate_analysis_library
+
+    return ultimate_analysis_library(request=request, competition=competition, team=team, db=db)
 
 
 @router.get("/analysis-library/{item_id}", response_class=HTMLResponse)
 def operational_reference_detail(item_id: int, request: Request, db: Session = Depends(get_db)):
-    user = _user(request, db)
-    item = db.get(MatchLibraryItem, item_id)
-    if not item:
-        raise HTTPException(404, detail="Library match not found")
-    rows = db.scalars(
-        select(LibraryPlayerMatchStat)
-        .where(LibraryPlayerMatchStat.library_match_id == item.id)
-        .order_by(LibraryPlayerMatchStat.team_name, LibraryPlayerMatchStat.player_name)
-    ).all()
-    teams = {}
-    normalized_stats = {}
-    for row in rows:
-        teams.setdefault(row.team_name or "Équipe non précisée", []).append(row)
-        normalized_stats[row.id] = reference_player_stat_payload(row)
+    """Compatibility route for old library detail links."""
+    from analysis_library_product_routes import published_ultimate_detail
 
-    quarters = _json(item.quarter_scores_json, [])
-    raw_team_stats = _json(item.team_stats_json, {})
-    evidence_meta = raw_team_stats.get("_aquametric", {}) if isinstance(raw_team_stats, dict) else {}
-    team_stats = {
-        key: value for key, value in raw_team_stats.items()
-        if key != "_aquametric" and isinstance(value, dict)
-    } if isinstance(raw_team_stats, dict) else {}
-    quarter_review = _quarter_review(quarters)
-    embed_url = youtube_embed(item.video_url) if item.video_url else ""
-
-    return TEMPLATES.TemplateResponse(request, "analysis_library_detail.html", {
-        "request": request, "user": user, "app_name": "AquaMetric",
-        "item": item, "stats": rows, "teams": teams, "normalized_stats": normalized_stats,
-        "team_stats": team_stats, "quarters": quarters, "quarter_review": quarter_review,
-        "evidence_meta": evidence_meta, "embed_url": embed_url,
-    })
+    return published_ultimate_detail(item_id=item_id, request=request, db=db)
 
 
 @router.get("/match-analysis/{match_id}", response_class=HTMLResponse)
