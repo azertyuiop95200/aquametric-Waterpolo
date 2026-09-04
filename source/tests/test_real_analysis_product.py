@@ -63,6 +63,7 @@ def test_result_template_is_result_first_playable_and_zip_enabled():
     assert "s.clip_url" in source
     assert "s.segment_embed" in source
     assert "s.screenshot_urls" in source
+    assert '_analysis_research_context.html' in source
 
 
 def test_library_template_exposes_real_results_and_embedded_replays():
@@ -99,9 +100,31 @@ def test_zip_contract_contains_all_analysis_folders_and_deep_manifest():
     assert '"vision_peak"' in deep
     assert '"active_window"' in deep
 
+    research = (ROOT / "services" / "analysis_research_context.py").read_text(encoding="utf-8")
+    assert "research_context.json" in research
+    assert "official_reference_catalog.json" in research
+    assert "team_roster.csv" in research
+    assert "related_fixtures.csv" in research
 
-def test_export_route_materializes_many_clips_before_zip():
+
+def test_export_route_materializes_every_catalogued_local_clip_before_zip():
     source = (ROOT / "analysis_product_routes.py").read_text(encoding="utf-8")
-    assert "max_targets=72, max_clips=64" in source
+    assert "max_targets=72, max_clips=72" in source
     assert "max_image_targets=72" in source
     assert "append_sequence_manifest" in source
+    assert "append_research_to_zip" in source
+
+
+def test_complete_runner_doubles_visual_density_and_maxes_ocr():
+    source = (ROOT / "services" / "complete_analysis_runner.py").read_text(encoding="utf-8")
+    assert "visual_samples=360" in source
+    assert "ocr_samples=96" in source
+    assert "max_candidates=28" in source
+
+
+def test_scoreboard_candidates_are_focused_inside_score_change_window():
+    source = (ROOT / "services" / "autonomous_engine.py").read_text(encoding="utf-8")
+    assert "_best_visual_focus" in source
+    assert "bracket_start_second" in source
+    assert "visual_focus_second" in source
+    assert "score_change_window" in source
