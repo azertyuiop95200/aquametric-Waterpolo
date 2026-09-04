@@ -79,16 +79,37 @@ def test_elite_analyst_lab_covers_priority_national_programmes_and_rankings():
     assert "2–3 m" in html
 
 
-def test_video_atlas_embeds_eight_elite_matches_and_coach_frames():
+def test_video_atlas_embeds_eight_elite_matches_and_full_6v6_personnel():
     html = (ROOT / "static" / "elite-video-atlas.html").read_text(encoding="utf-8")
     for youtube_id in ["a5Ja269h5G8", "VvuJSTuuUI8", "fWFM4kB8nvw", "bF-Am10VtF4", "HfkCCOpLIBA", "Ek1kBvUjivc", "TseN9CGbfQw", "Z-8PwbnKBWU"]:
         assert youtube_id in html
     assert "8 matchs pour une vraie séance vidéo" in html
     assert "reconstructions pédagogiques" in html
     assert "T−3" in html and "T+1" in html
+    assert "2026-09-04-full-7v7" in html
+    assert "6 défenseures X1–X6" in html
+    for defender in ["X1", "X2", "X3", "X4", "X5", "X6"]:
+        assert defender in html
+    assert 'data-defenders="6"' in html
 
 
-def test_base_loads_engineering_assets():
+def test_tactical_board_audit_corrects_special_teams_and_displays_personnel():
+    js = (ROOT / "static" / "tactical-board-audit.js").read_text(encoding="utf-8")
+    assert "board-personnel" in js
+    assert "X6" in js
+    assert "expectedDefenders='5'" in js
+    assert "circle.d" in js
+
+
+def test_v127_release_marker_is_explicit():
+    release = (ROOT / "static" / "release.json").read_text(encoding="utf-8")
+    assert "AQUAMETRIC_V12_7_ULTIMATE_VISUAL_ANALYSIS_2026_09_04" in release
+    assert "up_to_72_evidence_sequences" in release
+    assert "complete_analysis_zip_export" in release
+
+
+def test_base_loads_engineering_and_tactical_audit_assets():
     base = (ROOT / "templates" / "base.html").read_text(encoding="utf-8")
     assert "/static/elite-analyst.css?v=2026.09.03.1" in base
     assert "/static/elite-analyst.js?v=2026.09.03.1" in base
+    assert "/static/tactical-board-audit.js?v=2026.09.04.1" in base
