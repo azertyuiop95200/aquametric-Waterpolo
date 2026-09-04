@@ -1,5 +1,11 @@
 (()=>{
-  document.documentElement.dataset.aquametricProductRelease='2026-09-04-premium-v3';
+  document.documentElement.dataset.aquametricProductRelease='2026-09-04-premium-v4';
+  const directMatch=location.pathname.match(/^\/matches\/(\d+)\/?$/);
+  if(directMatch&&!new URLSearchParams(location.search).has('workspace')){
+    fetch(`/api/premium/matches/${directMatch[1]}/status`,{credentials:'same-origin'}).then(r=>r.ok?r.json():null).then(d=>{
+      if(d&&d.analysis_flow&&d.result_url) location.replace(d.result_url);
+    }).catch(()=>{});
+  }
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const hostLabel=(href)=>{try{const u=new URL(href,location.href);return u.hostname.replace(/^www\./,'')}catch{return 'source'}};
   const val=(v,suffix='')=>v===null||v===undefined||v===''?'—':`${v}${suffix}`;
