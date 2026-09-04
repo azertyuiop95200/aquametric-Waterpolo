@@ -59,7 +59,7 @@ def test_premium_public_detail_is_not_three_line_summary():
 def test_global_product_design_and_match_brief_are_loaded():
     base = (ROOT / "templates" / "base.html").read_text(encoding="utf-8")
     assert "/static/premium-product.css?v=2026.09.04.1" in base
-    assert "/static/premium-product.js?v=2026.09.04.1" in base
+    assert "/static/premium-product.js?v=2026.09.04.4" in base
     js = (ROOT / "static" / "premium-product.js").read_text(encoding="utf-8")
     assert "/api/premium/matches/" in js
     assert "Executive Coach Brief" in js
