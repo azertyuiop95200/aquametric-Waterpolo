@@ -104,11 +104,13 @@ class AquaMetricSecurityMiddleware(BaseHTTPMiddleware):
 def install_security(app):
     app.add_middleware(AquaMetricSecurityMiddleware)
 
-    # Operational routes are registered before their legacy equivalents in main.py.
-    # FastAPI resolves the first matching route, so this upgrades the existing URLs
-    # without a risky rewrite of the large application module.
+    # Operational and premium product routes are registered before historical
+    # compatibility endpoints in main.py. FastAPI resolves the first matching
+    # route, so this is the safest way to upgrade existing public URLs.
     from rapid_analysis_routes import router as rapid_analysis_router
     from scorer_routes import router as scorer_router
+    from premium_product_routes import router as premium_product_router
 
     app.include_router(rapid_analysis_router)
     app.include_router(scorer_router)
+    app.include_router(premium_product_router)
