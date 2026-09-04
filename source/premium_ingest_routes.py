@@ -6,10 +6,11 @@ from pathlib import Path
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import RedirectResponse
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from db import SessionLocal, get_db
-from models import Match, Team, User
+from models import Club, Match, ScoutingTeam, Team, User
 from services.analysis_product import run_product_analysis
 from services.complete_analysis_runner import run_complete_analysis
 from services.deep_analysis_sequences import materialize_deep_sequence_pack
@@ -33,6 +34,38 @@ def _user(request: Request, db: Session):
 
 def _clean(value: str, length: int = 160):
     return (value or "").strip()[:length]
+
+
+def _resolve_team(db: Session, user: User, team_id: int | None, team_name: str):
+    """Resolve both legacy per-user team ids and the universal catalogue selector.
+
+    Catalogue teams are materialised as a private workspace team for the user so
+    match events, players and analysis remain isolated from other accounts.
+    """
+    if team_id:
+        team = db.get(Team, team_id)
+        if team and team.owner_id == user.id:
+            return team
+        raise HTTPException(status_code=400, detail="Selected team is not available in this workspace.")
+
+    name = _clean(team_name)
+    if not name:
+        raise HTTPException(status_code=400, detail="Choose an AquaMetric team or enter a catalogue team name.")
+    existing = db.scalar(select(Team).where(Team.owner_id == user.id, func.lower(Team.name) == name.lower()))
+    if existing:
+        return existing
+
+    scouting = db.scalar(select(ScoutingTeam).where(func.lower(ScoutingTeam.name) == name.lower()))
+    country = scouting.country if scouting else "International"
+    division = scouting.competition if scouting else "AquaMetric analysis catalogue"
+    category = scouting.category if scouting and scouting.category else "Women"
+    club = db.scalar(select(Club).where(Club.owner_id == user.id, func.lower(Club.name) == name.lower()))
+    if not club:
+        club = Club(name=name, country=country or "International", division=division or "", category=category, owner_id=user.id)
+        db.add(club); db.flush()
+    team = Team(name=name, club_id=club.id, owner_id=user.id, category=category)
+    db.add(team); db.flush()
+    return team
 
 
 def _save_upload(file: UploadFile, user_id: int, team_id: int):
@@ -93,8 +126,6 @@ def _run_remote_reference(match_id: int):
             return
         match.status = "url_analysis_running"; db.commit()
         try:
-            # Remote media is evidence-safe: source metadata/bookmarks and existing
-            # tagged events are processed, but pixels are not downloaded/copied.
             run_product_analysis(db, match, UPLOAD_DIR, EVIDENCE_DIR, include_audio=False)
             materialize_deep_sequence_pack(db, match, UPLOAD_DIR, EVIDENCE_DIR, max_targets=72, max_clips=0, max_image_targets=0)
             match.status = "url_reference_ready"; db.commit()
@@ -109,7 +140,8 @@ def _run_remote_reference(match_id: int):
 def premium_create_match(
     background_tasks: BackgroundTasks,
     request: Request,
-    team_id: int = Form(...),
+    team_id: int | None = Form(None),
+    team_name: str = Form(""),
     opponent: str = Form(...),
     competition: str = Form(""),
     match_date: str = Form(""),
@@ -118,9 +150,7 @@ def premium_create_match(
     db: Session = Depends(get_db),
 ):
     user = _user(request, db)
-    team = db.get(Team, team_id)
-    if not team or team.owner_id != user.id:
-        raise HTTPException(status_code=404, detail="Team not found")
+    team = _resolve_team(db, user, team_id, team_name)
     opponent = _clean(opponent)
     if not opponent:
         raise HTTPException(status_code=400, detail="Opponent is required.")
@@ -146,4 +176,8 @@ def premium_create_match(
         background_tasks.add_task(_run_owned_video, match.id)
     elif video_url:
         background_tasks.add_task(_run_remote_reference, match.id)
-    return RedirectResponse(f"/matches/{match.id}/analysis/result", status_code=303)
+
+    # Compatibility: many internal tools parse the match id from this canonical
+    # location. The browser then auto-opens the Ultimate result via premium JS
+    # whenever analysis is queued/running/ready.
+    return RedirectResponse(f"/matches/{match.id}", status_code=303)
