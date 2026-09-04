@@ -19,15 +19,48 @@ router = APIRouter()
 TEMPLATES = Jinja2Templates(directory="templates")
 
 FILM_ROOM = [
-    {"id":"a5Ja269h5G8","title":"USA – Espagne","context":"World Cup 2026 · finale","focus":"Décision sous pression · finition · sortie gardienne · A→D"},
-    {"id":"VvuJSTuuUI8","title":"Russie – Espagne","context":"World Cup 2026 · demi-finale","focus":"Centre · continuité · late game · transition"},
-    {"id":"fWFM4kB8nvw","title":"France – Israël","context":"Senior 2026","focus":"Ailes hautes · entrée centre · sécurité de balle · repli"},
-    {"id":"bF-Am10VtF4","title":"Espagne – Grèce U20","context":"U20 · benchmark","focus":"Double scan · tempo · duel centre · 3v2"},
-    {"id":"HfkCCOpLIBA","title":"Hongrie – Espagne","context":"Mondiaux 2025 · demi-finale","focus":"Sélection de tirs · centre-back · zone→press"},
-    {"id":"Ek1kBvUjivc","title":"Grèce – USA","context":"Mondiaux 2025 · demi-finale","focus":"Hip advantage · drive · passe +1 · repli"},
-    {"id":"TseN9CGbfQw","title":"Grèce – Hongrie","context":"Mondiaux 2025","focus":"Lecture bloc · tempo · possession · late game"},
-    {"id":"Z-8PwbnKBWU","title":"Espagne – Pays-Bas","context":"Mondiaux 2025 · quart","focus":"Circulation · défense drive · gardienne · réponse après perte"},
+    {"id":"a5Ja269h5G8","title":"USA – Espagne","context":"World Cup 2026 · finale","focus":"Décision sous pression · finition · sortie gardienne · A→D","teams":["United States","Spain"]},
+    {"id":"VvuJSTuuUI8","title":"Russie – Espagne","context":"World Cup 2026 · demi-finale","focus":"Centre · continuité · late game · transition","teams":["Russia","Spain"]},
+    {"id":"fWFM4kB8nvw","title":"France – Israël","context":"Senior 2026","focus":"Ailes hautes · entrée centre · sécurité de balle · repli","teams":["France","Israel"]},
+    {"id":"bF-Am10VtF4","title":"Espagne – Grèce U20","context":"U20 · benchmark","focus":"Double scan · tempo · duel centre · 3v2","teams":["Spain","Greece"],"u20":True},
+    {"id":"HfkCCOpLIBA","title":"Hongrie – Espagne","context":"Mondiaux 2025 · demi-finale","focus":"Sélection de tirs · centre-back · zone→press","teams":["Hungary","Spain"]},
+    {"id":"Ek1kBvUjivc","title":"Grèce – USA","context":"Mondiaux 2025 · demi-finale","focus":"Hip advantage · drive · passe +1 · repli","teams":["Greece","United States"]},
+    {"id":"TseN9CGbfQw","title":"Grèce – Hongrie","context":"Mondiaux 2025","focus":"Lecture bloc · tempo · possession · late game","teams":["Greece","Hungary"]},
+    {"id":"Z-8PwbnKBWU","title":"Espagne – Pays-Bas","context":"Mondiaux 2025 · quart","focus":"Circulation · défense drive · gardienne · réponse après perte","teams":["Spain","Netherlands"]},
 ]
+
+ALIASES = {
+    "usa": "united states", "united states of america": "united states", "us": "united states",
+    "espagne": "spain", "russie": "russia", "israël": "israel", "israel": "israel",
+    "grèce": "greece", "hongrie": "hungary", "pays-bas": "netherlands", "netherlands": "netherlands",
+}
+
+
+def _norm_team(value: str) -> str:
+    key = (value or "").strip().lower()
+    return ALIASES.get(key, key)
+
+
+def _film_room_rows(db: Session):
+    library = db.scalars(select(MatchLibraryItem).order_by(MatchLibraryItem.id.desc())).all()
+    rows = []
+    for reference in FILM_ROOM:
+        wanted = {_norm_team(x) for x in reference["teams"]}
+        match = None
+        for item in library:
+            pair = {_norm_team(item.team_a), _norm_team(item.team_b)}
+            if pair != wanted:
+                continue
+            if reference.get("u20"):
+                context = f"{item.competition or ''} {item.season or ''} {item.notes_json or ''}".lower()
+                if "u20" not in context:
+                    continue
+            match = item
+            break
+        row = dict(reference)
+        row["dossier"] = build_public_match_dossier(db, match) if match else None
+        rows.append(row)
+    return rows
 
 
 def _user(request: Request, db: Session):
@@ -155,10 +188,8 @@ def premium_analysis_library(
         token = f"%{team.strip().lower()}%"
         stmt = stmt.where((func.lower(MatchLibraryItem.team_a).like(token)) | (func.lower(MatchLibraryItem.team_b).like(token)))
     items = db.scalars(stmt.limit(80)).all()
-    public_rows = []
-    for item in items:
-        dossier = build_public_match_dossier(db, item)
-        public_rows.append(dossier)
+    public_rows = [build_public_match_dossier(db, item) for item in items]
+    film_room = _film_room_rows(db)
 
     competitions = db.scalars(
         select(MatchLibraryItem.competition).where(MatchLibraryItem.competition != "").distinct().order_by(MatchLibraryItem.competition)
@@ -172,7 +203,7 @@ def premium_analysis_library(
             "request": request, "user": user, "app_name": "AquaMetric",
             "workspace_rows": workspace_rows, "public_rows": public_rows,
             "competitions": competitions, "selected_competition": competition, "selected_team": team,
-            "film_room": FILM_ROOM, "video_count": video_count, "strong_count": strong_count,
+            "film_room": film_room, "video_count": video_count, "strong_count": strong_count,
         },
     )
 
