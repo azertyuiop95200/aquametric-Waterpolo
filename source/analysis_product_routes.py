@@ -19,6 +19,7 @@ from services.analysis_product import (
     run_product_analysis,
 )
 from services.analysis_research_context import build_research_context, append_research_to_zip
+from services.complete_analysis_runner import run_complete_analysis
 from services.deep_analysis_sequences import (
     append_sequence_manifest,
     materialize_deep_sequence_pack,
@@ -62,10 +63,7 @@ def _url_team(db: Session, user: User, team_name: str, competition: str) -> Team
         return team
     club = db.scalar(select(Club).where(Club.owner_id == user.id, func.lower(Club.name) == name.lower()))
     if not club:
-        club = Club(
-            name=name, country="Analysis", division=(competition or "Video analysis")[:120],
-            category="Women", owner_id=user.id,
-        )
+        club = Club(name=name, country="Analysis", division=(competition or "Video analysis")[:120], category="Women", owner_id=user.id)
         db.add(club)
         db.flush()
     team = Team(name=name, club_id=club.id, owner_id=user.id, category="Women")
@@ -127,12 +125,12 @@ def create_real_url_analysis(
 def start_real_analysis(
     match_id: int,
     request: Request,
-    include_audio: str = Form(""),
+    include_audio: str = Form("1"),
     db: Session = Depends(get_db),
 ):
     _, match = _owned_match(match_id, request, db)
     try:
-        run_product_analysis(
+        run_complete_analysis(
             db, match, UPLOAD_DIR, EVIDENCE_DIR,
             include_audio=include_audio.lower() in {"1", "true", "on", "yes"},
         )
@@ -208,7 +206,7 @@ def export_complete_analysis(match_id: int, request: Request, db: Session = Depe
     _, match = _owned_match(match_id, request, db)
     materialize_deep_sequence_pack(
         db, match, UPLOAD_DIR, EVIDENCE_DIR,
-        max_targets=72, max_clips=64, max_image_targets=72, triple_frames=36,
+        max_targets=72, max_clips=72, max_image_targets=72, triple_frames=36,
     )
     archive = build_analysis_zip(db, match, EVIDENCE_DIR)
     root = _zip_root(match)
