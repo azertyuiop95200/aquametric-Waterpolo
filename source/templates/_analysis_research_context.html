@@ -9,7 +9,8 @@
     <div class="result-kpi"><span>Metrics adversaire</span><b>{{research.coverage.opponent_metrics}}</b></div>
     <div class="result-kpi"><span>Joueuses équipe</span><b>{{research.coverage.team_roster_players}}</b></div>
     <div class="result-kpi"><span>Joueuses adversaire</span><b>{{research.coverage.opponent_roster_players}}</b></div>
-    <div class="result-kpi"><span>Sources uniques</span><b>{{research.coverage.unique_sources}}</b></div>
+    <div class="result-kpi"><span>Sources officielles/références</span><b>{{research.coverage.official_reference_sources}}</b></div>
+    <div class="result-kpi"><span>URLs sourcées uniques</span><b>{{research.coverage.unique_sources}}</b></div>
   </div>
 
   {% if research.official_match_candidates %}
@@ -36,5 +37,7 @@
   {% endif %}
 
   {% if research.related_fixtures %}<details><summary>Afficher les matchs connexes ({{research.related_fixtures|length}})</summary><div class="wide"><table><thead><tr><th>Date</th><th>Compétition</th><th>Match</th><th>Score</th><th>Source</th></tr></thead><tbody>{% for row in research.related_fixtures %}<tr><td>{{row.start}}</td><td>{{row.competition}}</td><td>{{row.home}} – {{row.away}}</td><td>{{row.home_score if row.home_score is not none else '—'}}–{{row.away_score if row.away_score is not none else '—'}}</td><td>{% if row.source_url %}<a href="{{row.source_url}}" target="_blank" rel="noopener">ouvrir</a>{% else %}—{% endif %}</td></tr>{% endfor %}</tbody></table></div></details>{% endif %}
+
+  {% if research.official_reference_catalog %}<details><summary>Sources officielles et rapports techniques mobilisés ({{research.official_reference_catalog|length}})</summary><div class="wide"><table><thead><tr><th>Source</th><th>Portée</th><th>Utilisation</th><th>Accès</th></tr></thead><tbody>{% for row in research.official_reference_catalog %}<tr><td>{{row.name}}</td><td>{{row.get('scope',row.get('provider',''))}}</td><td>{{row.get('use',row.get('region',''))}}</td><td>{% if row.url %}<a href="{{row.url}}" target="_blank" rel="noopener">ouvrir</a>{% else %}—{% endif %}</td></tr>{% endfor %}</tbody></table></div></details>{% endif %}
   <p class="truth">{{research.contract}}</p>
 </section>
