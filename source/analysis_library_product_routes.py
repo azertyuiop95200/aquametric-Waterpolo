@@ -22,6 +22,7 @@ from models import (
     User,
     VisionAnalysis,
 )
+from analysis_library_routes_v2 import _quarter_review
 from services.analysis_product import analysis_snapshot
 from services.video import youtube_embed
 
@@ -143,6 +144,7 @@ def published_ultimate_detail(item_id: int, request: Request, db: Session = Depe
         .order_by(LibraryPlayerMatchStat.team_name, LibraryPlayerMatchStat.player_name)
     ).all()
     quarters = _json(item.quarter_scores_json, [])
+    quarter_review = _quarter_review(quarters)
     team_stats_raw = _json(item.team_stats_json, {})
     evidence_meta = team_stats_raw.get("_aquametric", {}) if isinstance(team_stats_raw, dict) else {}
     team_stats = {k: v for k, v in team_stats_raw.items() if k != "_aquametric" and isinstance(v, dict)}
@@ -154,6 +156,7 @@ def published_ultimate_detail(item_id: int, request: Request, db: Session = Depe
     return TEMPLATES.TemplateResponse(request, "analysis_library_ultimate_detail.html", {
         "request": request, "user": user, "app_name": "AquaMetric",
         "item": item, "stats": stats, "teams": teams, "quarters": quarters,
+        "quarter_review": quarter_review,
         "team_stats": team_stats, "evidence_meta": evidence_meta,
         "coverage": coverage, "embed_url": youtube_embed(item.video_url) if item.video_url else "",
     })
