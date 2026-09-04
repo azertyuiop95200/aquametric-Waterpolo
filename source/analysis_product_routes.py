@@ -18,6 +18,7 @@ from services.analysis_product import (
     build_exact_evidence_pack,
     run_product_analysis,
 )
+from services.analysis_research_context import build_research_context, append_research_to_zip
 from services.deep_analysis_sequences import (
     append_sequence_manifest,
     materialize_deep_sequence_pack,
@@ -100,7 +101,6 @@ def create_real_url_analysis(
     video_url: str = Form(...),
     db: Session = Depends(get_db),
 ):
-    """Create a URL match and immediately build the real available result, not a framework page."""
     user = _user(request, db)
     video_url = (video_url or "").strip()
     if not video_url or not is_http_url(video_url):
@@ -119,10 +119,7 @@ def create_real_url_analysis(
     db.commit()
     db.refresh(match)
     run_product_analysis(db, match, UPLOAD_DIR, EVIDENCE_DIR)
-    materialize_deep_sequence_pack(
-        db, match, UPLOAD_DIR, EVIDENCE_DIR,
-        max_targets=72, max_clips=0, max_image_targets=0,
-    )
+    materialize_deep_sequence_pack(db, match, UPLOAD_DIR, EVIDENCE_DIR, max_targets=72, max_clips=0, max_image_targets=0)
     return RedirectResponse(f"/matches/{match.id}/analysis/result", status_code=303)
 
 
@@ -133,14 +130,10 @@ def start_real_analysis(
     include_audio: str = Form(""),
     db: Session = Depends(get_db),
 ):
-    """Run the actual analysis pipeline and materialize a dense first sequence pack."""
     _, match = _owned_match(match_id, request, db)
     try:
         run_product_analysis(
-            db,
-            match,
-            UPLOAD_DIR,
-            EVIDENCE_DIR,
+            db, match, UPLOAD_DIR, EVIDENCE_DIR,
             include_audio=include_audio.lower() in {"1", "true", "on", "yes"},
         )
         materialize_deep_sequence_pack(
@@ -158,10 +151,7 @@ def start_real_url_analysis(match_id: int, request: Request, db: Session = Depen
     if not match.video_url:
         raise HTTPException(status_code=400, detail="This analysis mode requires a video URL.")
     run_product_analysis(db, match, UPLOAD_DIR, EVIDENCE_DIR)
-    materialize_deep_sequence_pack(
-        db, match, UPLOAD_DIR, EVIDENCE_DIR,
-        max_targets=72, max_clips=0, max_image_targets=0,
-    )
+    materialize_deep_sequence_pack(db, match, UPLOAD_DIR, EVIDENCE_DIR, max_targets=72, max_clips=0, max_image_targets=0)
     return RedirectResponse(f"/matches/{match_id}/analysis/result", status_code=303)
 
 
@@ -173,6 +163,7 @@ def analysis_result(match_id: int, request: Request, db: Session = Depends(get_d
     opponent_report = _template_side(snapshot["ultimate"]["opponent"])
     sequences = sequence_gallery(db, match, max_total=72)
     summary = sequence_summary(sequences)
+    research = build_research_context(db, match)
     source_embed = youtube_embed(match.video_url) if match.video_url else ""
     if not source_embed and snapshot.get("reference") and snapshot["reference"].get("video_url"):
         source_embed = youtube_embed(snapshot["reference"]["video_url"]) or ""
@@ -196,6 +187,7 @@ def analysis_result(match_id: int, request: Request, db: Session = Depends(get_d
             "sequences": sequences,
             "sequence_summary": summary,
             "source_embed": source_embed,
+            "research": research,
         },
     )
 
@@ -203,10 +195,7 @@ def analysis_result(match_id: int, request: Request, db: Session = Depends(get_d
 @router.post("/matches/{match_id}/analysis/evidence-pack")
 def regenerate_exact_evidence(match_id: int, request: Request, db: Session = Depends(get_db)):
     _, match = _owned_match(match_id, request, db)
-    build_exact_evidence_pack(
-        db, match, UPLOAD_DIR, EVIDENCE_DIR,
-        max_verified_events=32, max_candidates=24,
-    )
+    build_exact_evidence_pack(db, match, UPLOAD_DIR, EVIDENCE_DIR, max_verified_events=32, max_candidates=24)
     materialize_deep_sequence_pack(
         db, match, UPLOAD_DIR, EVIDENCE_DIR,
         max_targets=72, max_clips=48, max_image_targets=72, triple_frames=30,
@@ -217,15 +206,15 @@ def regenerate_exact_evidence(match_id: int, request: Request, db: Session = Dep
 @router.get("/matches/{match_id}/analysis/export.zip")
 def export_complete_analysis(match_id: int, request: Request, db: Session = Depends(get_db)):
     _, match = _owned_match(match_id, request, db)
-    # The ZIP request is the maximum-materialization pass: create as many exact local
-    # clips as the bounded sequence catalogue allows before archiving everything.
     materialize_deep_sequence_pack(
         db, match, UPLOAD_DIR, EVIDENCE_DIR,
         max_targets=72, max_clips=64, max_image_targets=72, triple_frames=36,
     )
     archive = build_analysis_zip(db, match, EVIDENCE_DIR)
+    root = _zip_root(match)
     cards = sequence_gallery(db, match, max_total=72)
-    append_sequence_manifest(archive, cards, _zip_root(match))
+    append_sequence_manifest(archive, cards, root)
+    append_research_to_zip(archive, build_research_context(db, match), root)
     filename = f"AquaMetric_match_{match.id}_analysis.zip"
     return StreamingResponse(
         archive,
