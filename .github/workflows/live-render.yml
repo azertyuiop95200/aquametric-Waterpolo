@@ -17,35 +17,42 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
-      - name: Wait briefly for Render and detect deployed commit
+      - name: Wait briefly for Render and detect deployed main HEAD
         id: live
         env:
-          TARGET_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          EVENT_TARGET_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
         run: |
-          set -u
+          set -euo pipefail
           base='https://aquametric-web-demo.onrender.com'
           marker='AQUAMETRIC_V12_3_PLAYER_EVAL_2026_08_28'
-          target="$TARGET_SHA"
-          echo "Target commit: $target"
+          target=$(git ls-remote "https://github.com/${GITHUB_REPOSITORY}.git" refs/heads/main | awk '{print $1}')
+          if [ -z "$target" ]; then
+            target="$EVENT_TARGET_SHA"
+          fi
+          echo "Event target: $EVENT_TARGET_SHA"
+          echo "Current main HEAD target: $target"
           for i in $(seq 1 8); do
             echo "Live check $i/8"
             health=$(curl -L --max-time 30 -fsS "$base/health" 2>/dev/null || true)
             release=$(curl -L --max-time 30 -fsS "$base/static/release.json" 2>/dev/null || true)
             echo "Live health: ${health:-unavailable}"
             if [ -n "$target" ] && echo "$health" | grep -q '"ok":true' && echo "$health" | grep -q "\"git_commit\":\"$target\"" && echo "$release" | grep -q "$marker"; then
-              echo "Target commit is live on Render: $target"
+              echo "Current main HEAD is live on Render: $target"
               echo "deployed=true" >> "$GITHUB_OUTPUT"
+              echo "target_sha=$target" >> "$GITHUB_OUTPUT"
               exit 0
             fi
             sleep 15
           done
-          echo "::warning::Render has not exposed target commit $target yet; deployment verification will retry on the next workflow/schedule."
           echo "deployed=false" >> "$GITHUB_OUTPUT"
-          exit 0
+          echo "target_sha=$target" >> "$GITHUB_OUTPUT"
+          echo "::error::Render has not exposed current main HEAD $target within the verification window."
+          exit 1
 
       - name: Verify public security and V12.3 product assets
         if: ${{ steps.live.outputs.deployed == 'true' }}
         run: |
+          set -euo pipefail
           base='https://aquametric-web-demo.onrender.com'
           curl -L --max-time 30 -fsS "$base/security-status" | tee /tmp/security.json
           grep -q '"security_headers":true' /tmp/security.json
@@ -58,14 +65,32 @@ jobs:
           curl -L --max-time 30 -fsS "$base/knowledge" | grep -q 'tactic-board-card'
           curl -L --max-time 30 -fsS "$base/scouting" | grep -q 'scout-card'
 
+      - name: Verify Ultimate analysis library is actually served
+        if: ${{ steps.live.outputs.deployed == 'true' }}
+        run: |
+          set -euo pipefail
+          base='https://aquametric-web-demo.onrender.com'
+          cookie=/tmp/aquametric-analysis-cookie.txt
+          curl -L --max-time 45 -fsS -c "$cookie" -b "$cookie" "$base/demo-login" >/tmp/demo.html
+          curl -L --max-time 45 -fsS -c "$cookie" -b "$cookie" "$base/analysis-library" >/tmp/analysis-library.html
+          grep -q "Bibliothèque d'analyse opérationnelle" /tmp/analysis-library.html
+          grep -q 'Résultats réellement produits' /tmp/analysis-library.html
+          detail_path=$(grep -oE '/analysis-library/[0-9]+' /tmp/analysis-library.html | head -1 || true)
+          if [ -n "$detail_path" ]; then
+            curl -L --max-time 45 -fsS -c "$cookie" -b "$cookie" "$base$detail_path" >/tmp/analysis-detail.html
+            grep -q 'Player stats' /tmp/analysis-detail.html
+            grep -q 'Tactical notes' /tmp/analysis-detail.html
+            grep -q 'Traçabilité' /tmp/analysis-detail.html
+            grep -q 'RELECTURE QUART PAR QUART' /tmp/analysis-detail.html
+          fi
+          echo 'Ultimate analysis library is live and verified.'
+
       - name: Verify Coaches directory is actually served
         if: ${{ steps.live.outputs.deployed == 'true' }}
         run: |
           set -euo pipefail
           base='https://aquametric-web-demo.onrender.com'
           cookie=/tmp/aquametric-cookie.txt
-          # Enter the public demo workspace so /coaches is rendered with the same
-          # authenticated path used by the mobile demo.
           curl -L --max-time 45 -fsS -c "$cookie" -b "$cookie" "$base/demo-login" >/tmp/demo.html
           curl -L --max-time 45 -fsS -c "$cookie" -b "$cookie" "$base/coaches" >/tmp/coaches.html
           grep -q 'data-coach-directory-version="2026-08-28-v2"' /tmp/coaches.html
