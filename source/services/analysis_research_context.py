@@ -17,6 +17,27 @@ from models import (
     ScoutingTeam,
 )
 
+OFFICIAL_ANALYSIS_REFERENCES = [
+    {
+        "name": "World Aquatics — Water Polo Results",
+        "url": "https://www.worldaquatics.com/water-polo/results",
+        "scope": "results",
+        "use": "Calendrier/résultats officiels internationaux lorsqu'ils sont publiés.",
+    },
+    {
+        "name": "World Aquatics — Singapore 2025 Water Polo Results Report",
+        "url": "https://www.worldaquatics.com/news/4441220/inside-the-action-water-polo-performance-analysis-at-singapore-2025",
+        "scope": "performance_reference",
+        "use": "Référence de performance : possession, efficacité, tirs, tendances tactiques, contributions individuelles et gardiennes.",
+    },
+    {
+        "name": "European Aquatics — 2026 Women European Championships MIS",
+        "url": "https://europeanaquatics.org/ewpc-2026/funchal/media-center/general-information/media-guide-extended-lists-mis/",
+        "scope": "competition_mis",
+        "use": "Résultats, start lists/feuilles, classements, effectifs et documents officiels du championnat féminin 2026.",
+    },
+]
+
 
 def _key(value: str) -> str:
     value = re.sub(r"[^a-z0-9]+", " ", (value or "").lower()).strip()
@@ -52,14 +73,11 @@ def _fixture_row(row, source):
 
 
 def build_research_context(db, match) -> dict:
-    """Aggregate every already-researched, sourced database record useful to one match.
-
-    Nothing here is promoted to video truth. Fixtures, standings, season metrics and
-    roster records remain contextual evidence with their own provenance.
-    """
+    """Aggregate every sourced database record and high-value official reference useful to one match."""
     team_name = match.team.name
     opponent = match.opponent
-    sources = {row.id: row for row in db.scalars(select(OfficialDataSource)).all()}
+    source_rows = db.scalars(select(OfficialDataSource)).all()
+    sources = {row.id: row for row in source_rows}
     fixtures = db.scalars(select(OfficialFixture).order_by(OfficialFixture.updated_at.desc(), OfficialFixture.id.desc())).all()
 
     exact = []
@@ -80,7 +98,8 @@ def build_research_context(db, match) -> dict:
 
     stat_rows = db.scalars(select(OfficialTeamStat).order_by(OfficialTeamStat.updated_at.desc(), OfficialTeamStat.id.desc())).all()
     season_stats = defaultdict(list)
-    source_urls = set()
+    source_urls = {row.url for row in source_rows if row.enabled and row.url}
+    source_urls.update(item["url"] for item in OFFICIAL_ANALYSIS_REFERENCES)
     for row in stat_rows:
         side = "team" if _same(row.team_name, team_name) else "opponent" if _same(row.team_name, opponent) else ""
         if not side:
@@ -152,6 +171,16 @@ def build_research_context(db, match) -> dict:
         if row.get("source_url"):
             source_urls.add(row["source_url"])
 
+    official_catalog = [
+        {
+            "name": row.name, "provider": row.provider, "region": row.region,
+            "url": row.url, "parser_kind": row.parser_kind,
+            "enabled": bool(row.enabled), "last_success_at": row.last_success_at,
+            "records_count": row.records_count,
+        }
+        for row in source_rows if row.enabled
+    ] + OFFICIAL_ANALYSIS_REFERENCES
+
     return {
         "match": {"team": team_name, "opponent": opponent, "competition": match.competition or "", "date": match.match_date or ""},
         "official_match_candidates": exact,
@@ -160,6 +189,7 @@ def build_research_context(db, match) -> dict:
         "standings": standings,
         "rosters": rosters,
         "roster_meta": roster_meta,
+        "official_reference_catalog": official_catalog,
         "source_urls": sorted(source_urls),
         "coverage": {
             "exact_official_matches": len(exact),
@@ -169,6 +199,7 @@ def build_research_context(db, match) -> dict:
             "standing_rows": len(standings),
             "team_roster_players": len(rosters["team"]),
             "opponent_roster_players": len(rosters["opponent"]),
+            "official_reference_sources": len(official_catalog),
             "unique_sources": len(source_urls),
         },
         "contract": "Contexte sourcé : ces données enrichissent l'analyse mais ne deviennent jamais automatiquement des événements vidéo.",
@@ -189,6 +220,7 @@ def append_research_to_zip(zip_buffer: io.BytesIO, research: dict, root: str):
     with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED) as archive:
         archive.writestr(f"{root}/06_sources/research_context.json", json.dumps(research, ensure_ascii=False, indent=2, default=str))
         archive.writestr(f"{root}/06_sources/source_urls.txt", "\n".join(research.get("source_urls", [])) + "\n")
+        archive.writestr(f"{root}/06_sources/official_reference_catalog.json", json.dumps(research.get("official_reference_catalog", []), ensure_ascii=False, indent=2, default=str))
         archive.writestr(
             f"{root}/02_kpis/official_context.csv",
             _csv(
