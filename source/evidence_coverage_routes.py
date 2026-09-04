@@ -10,6 +10,7 @@ from db import get_db
 from models import User, ScoutingTeam, OfficialFixture
 from services.team_evidence_coverage import team_evidence_coverage, coverage_totals
 from services.scouting_player_resources import scouting_player_resources, scouting_team_resource_summary
+from analysis_product_routes import router as analysis_product_router
 from analysis_match_routes import router as analysis_match_router
 from analysis_library_routes_v2 import router as analysis_library_router
 
@@ -72,12 +73,7 @@ def evidence_coverage_api(request: Request, db: Session = Depends(get_db)):
 
 @router.get("/scouting/{team_id}", response_class=HTMLResponse)
 def enriched_scouting_detail(team_id: int, request: Request, db: Session = Depends(get_db)):
-    """Resource-rich Scouting dossier registered before main.py's legacy route.
-
-    The roster stays evidence-first, but every player card now reuses the same
-    canonical profile, match metrics, sources, shot observations and transfer
-    evidence that feed the unified player dossier.
-    """
+    """Resource-rich Scouting dossier registered before main.py's legacy route."""
     user = _user(request, db)
     team = db.get(ScoutingTeam, team_id)
     if not team:
@@ -113,9 +109,9 @@ def enriched_scouting_detail(team_id: int, request: Request, db: Session = Depen
     )
 
 
-# Install enriched routes before main.py's legacy routes. FastAPI resolves the
-# first matching route, so the operational match library keeps private workspace
-# analysis + official evidence while the universal match-analysis routes stay
-# available to the full AquaMetric team catalogue.
+# Route order is intentional. The real result-first analysis product must be
+# installed before both the older operational library and main.py's historical
+# placeholder routes. FastAPI resolves the first matching route.
+router.include_router(analysis_product_router)
 router.include_router(analysis_library_router)
 router.include_router(analysis_match_router)
