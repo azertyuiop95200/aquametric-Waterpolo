@@ -66,6 +66,20 @@ def test_result_template_is_result_first_playable_and_zip_enabled():
     assert '_analysis_research_context.html' in source
 
 
+def test_scoring_patterns_are_visible_and_evidence_first():
+    partial = (ROOT / "templates" / "_analysis_scoring_patterns.html").read_text(encoding="utf-8")
+    service = (ROOT / "services" / "team_scoring_patterns.py").read_text(encoding="utf-8")
+    research_partial = (ROOT / "templates" / "_analysis_research_context.html").read_text(encoding="utf-8")
+    assert "COMMENT LES ÉQUIPES MARQUENT · TENDANCES & HABITUDES" in partial
+    assert "habitudes observées" in partial
+    assert "SÉQUENCES DE BUT VÉRIFIÉES" in partial
+    assert "score seul n'est converti en cause tactique" in service
+    assert "repeated_routes" in service
+    assert "positive_habits" in service
+    assert "negative_habits" in service
+    assert '_analysis_scoring_patterns.html' in research_partial
+
+
 def test_library_template_exposes_real_results_and_embedded_replays():
     source = (ROOT / "templates" / "analysis_library.html").read_text(encoding="utf-8")
     assert "Résultats réellement produits" in source
@@ -81,7 +95,7 @@ def test_zip_contract_contains_all_analysis_folders_and_deep_manifest():
     for folder in (
         "01_report/report.html",
         "01_report/analysis.json",
-        "02_kpis/team_kpis.csv",
+        "02_kpis/{side}_kpis.csv",
         "03_events/events.csv",
         "04_sequences/auto_candidates.csv",
         "04_sequences/tactical_sequences.json",
@@ -106,6 +120,11 @@ def test_zip_contract_contains_all_analysis_folders_and_deep_manifest():
     assert "team_roster.csv" in research
     assert "related_fixtures.csv" in research
 
+    scoring = (ROOT / "services" / "team_scoring_patterns.py").read_text(encoding="utf-8")
+    assert "scoring_patterns.json" in scoring
+    assert "scoring_sequences.csv" in scoring
+    assert "team_habits.csv" in scoring
+
 
 def test_export_route_materializes_every_catalogued_local_clip_before_zip():
     source = (ROOT / "analysis_product_routes.py").read_text(encoding="utf-8")
@@ -113,6 +132,7 @@ def test_export_route_materializes_every_catalogued_local_clip_before_zip():
     assert "max_image_targets=72" in source
     assert "append_sequence_manifest" in source
     assert "append_research_to_zip" in source
+    assert "append_scoring_patterns_to_zip" in source
 
 
 def test_complete_runner_doubles_visual_density_and_maxes_ocr():
