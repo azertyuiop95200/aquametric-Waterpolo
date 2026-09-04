@@ -65,6 +65,31 @@ def _published_coverage(item, stats, team_stats, quarters):
     return {"score": score, "readiness": readiness, "signals": signals}
 
 
+def _preview_media(match, snapshot, limit: int = 4):
+    """Return only evidence media that can be played or shown without inventing a frame."""
+    rows = []
+    for a in snapshot.get("artifacts", []):
+        kind = a.get("artifact_type") or ""
+        row = {
+            "type": kind,
+            "title": a.get("title") or "Séquence",
+            "second": a.get("second") or 0,
+            "source": a.get("source") or "",
+            "local_url": "",
+            "embed_url": a.get("segment_embed") or "",
+        }
+        if kind in {"clip", "screenshot", "contact_sheet"} and a.get("id"):
+            row["local_url"] = f"/matches/{match.id}/evidence/{a['id']}"
+        elif kind == "bookmark" and row["embed_url"]:
+            pass
+        else:
+            continue
+        rows.append(row)
+        if len(rows) >= limit:
+            break
+    return rows
+
+
 @router.get("/analysis-library", response_class=HTMLResponse)
 def ultimate_analysis_library(
     request: Request,
@@ -99,6 +124,8 @@ def ultimate_analysis_library(
             "exact_count": exact_count,
             "automatic_count": len(snapshot["automatic"]["candidates"]),
             "has_owned_video": bool(match.video_source == "upload" and match.video_path),
+            "video_embed": youtube_embed(match.video_url) if match.video_url else "",
+            "preview_media": _preview_media(match, snapshot),
         })
 
     stmt = select(MatchLibraryItem).order_by(MatchLibraryItem.season.desc(), MatchLibraryItem.id.desc())
