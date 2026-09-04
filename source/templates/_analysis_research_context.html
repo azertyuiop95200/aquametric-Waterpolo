@@ -1,0 +1,40 @@
+<section class="result-panel" id="researched-data">
+  <span class="eyebrow">DONNÉES RECHERCHÉES · CONTEXTE SOURCÉ</span>
+  <h2>Tout ce que la base officielle sait déjà sur ce match</h2>
+  <p>Ces données sont croisées avec l’analyse vidéo mais gardent leur provenance. Elles enrichissent l’interprétation sans devenir artificiellement des événements vidéo.</p>
+  <div class="result-grid">
+    <div class="result-kpi"><span>Correspondances officielles</span><b>{{research.coverage.exact_official_matches}}</b></div>
+    <div class="result-kpi"><span>Matchs connexes</span><b>{{research.coverage.related_fixtures}}</b></div>
+    <div class="result-kpi"><span>Metrics équipe</span><b>{{research.coverage.team_metrics}}</b></div>
+    <div class="result-kpi"><span>Metrics adversaire</span><b>{{research.coverage.opponent_metrics}}</b></div>
+    <div class="result-kpi"><span>Joueuses équipe</span><b>{{research.coverage.team_roster_players}}</b></div>
+    <div class="result-kpi"><span>Joueuses adversaire</span><b>{{research.coverage.opponent_roster_players}}</b></div>
+    <div class="result-kpi"><span>Sources uniques</span><b>{{research.coverage.unique_sources}}</b></div>
+  </div>
+
+  {% if research.official_match_candidates %}
+  <h3>Correspondances match officielles</h3>
+  <div class="wide"><table><thead><tr><th>Date</th><th>Compétition</th><th>Match</th><th>Score</th><th>Statut</th><th>Lieu</th><th>Source</th></tr></thead><tbody>
+  {% for row in research.official_match_candidates %}<tr><td>{{row.start}}</td><td>{{row.competition}}</td><td>{{row.home}} – {{row.away}}</td><td>{{row.home_score if row.home_score is not none else '—'}}–{{row.away_score if row.away_score is not none else '—'}}</td><td>{{row.status}}</td><td>{{row.venue or '—'}}</td><td>{% if row.source_url %}<a href="{{row.source_url}}" target="_blank" rel="noopener">{{row.source_name}}</a>{% else %}{{row.source_name}}{% endif %}</td></tr>{% endfor %}
+  </tbody></table></div>
+  {% endif %}
+
+  {% if research.season_team_stats.team or research.season_team_stats.opponent %}
+  <h3>Contexte statistique officiel</h3>
+  <div class="split">
+    {% for side,label in [('team',match.team.name),('opponent',match.opponent)] %}<div><h4>{{label}}</h4><div class="result-grid">{% for row in research.season_team_stats.get(side,[]) %}<div class="result-kpi"><span>{{row.metric|replace('_',' ')}}</span><b>{{row.value}}</b><small>{{row.season}} · {{row.competition}}</small></div>{% else %}<div class="missing-box">Aucune métrique officielle de saison correspondante.</div>{% endfor %}</div></div>{% endfor %}
+  </div>
+  {% endif %}
+
+  {% if research.standings %}
+  <h3>Classement / contexte compétition</h3><div class="wide"><table><thead><tr><th>Équipe</th><th>Saison</th><th>Pos.</th><th>Pts</th><th>J</th><th>V</th><th>D</th><th>BP</th><th>BC</th><th>Diff.</th></tr></thead><tbody>{% for row in research.standings %}<tr><td>{{row.team_name}}</td><td>{{row.season}}</td><td>{{row.position}}</td><td>{{row.points}}</td><td>{{row.played}}</td><td>{{row.won}}</td><td>{{row.lost}}</td><td>{{row.goals_for}}</td><td>{{row.goals_against}}</td><td>{{row.goal_diff}}</td></tr>{% endfor %}</tbody></table></div>
+  {% endif %}
+
+  {% if research.rosters.team or research.rosters.opponent %}
+  <h3>Effectifs sourcés disponibles</h3>
+  <div class="split">{% for side,label in [('team',match.team.name),('opponent',match.opponent)] %}<div><h4>{{label}}</h4>{% if research.roster_meta.get(side) %}<p><small>{{research.roster_meta[side].season}} · {{research.roster_meta[side].status}} · {{research.roster_meta[side].competition}}</small></p>{% endif %}<div class="wide"><table><thead><tr><th>#</th><th>Joueuse</th><th>Rôle</th><th>Statut</th><th>Source</th></tr></thead><tbody>{% for p in research.rosters.get(side,[]) %}<tr><td>{{p.cap if p.cap is not none else '—'}}</td><td>{{p.name}}</td><td>{{p.role}}</td><td>{{p.status}}</td><td>{{p.source_quality}}</td></tr>{% else %}<tr><td colspan="5">Effectif non suffisamment sourcé.</td></tr>{% endfor %}</tbody></table></div></div>{% endfor %}</div>
+  {% endif %}
+
+  {% if research.related_fixtures %}<details><summary>Afficher les matchs connexes ({{research.related_fixtures|length}})</summary><div class="wide"><table><thead><tr><th>Date</th><th>Compétition</th><th>Match</th><th>Score</th><th>Source</th></tr></thead><tbody>{% for row in research.related_fixtures %}<tr><td>{{row.start}}</td><td>{{row.competition}}</td><td>{{row.home}} – {{row.away}}</td><td>{{row.home_score if row.home_score is not none else '—'}}–{{row.away_score if row.away_score is not none else '—'}}</td><td>{% if row.source_url %}<a href="{{row.source_url}}" target="_blank" rel="noopener">ouvrir</a>{% else %}—{% endif %}</td></tr>{% endfor %}</tbody></table></div></details>{% endif %}
+  <p class="truth">{{research.contract}}</p>
+</section>
