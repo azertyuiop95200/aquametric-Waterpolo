@@ -1,8 +1,16 @@
 (()=>{
-  document.documentElement.dataset.aquametricProductRelease='2026-09-04-premium-v2';
+  document.documentElement.dataset.aquametricProductRelease='2026-09-04-premium-v3';
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const hostLabel=(href)=>{try{const u=new URL(href,location.href);return u.hostname.replace(/^www\./,'')}catch{return 'source'}};
   const val=(v,suffix='')=>v===null||v===undefined||v===''?'—':`${v}${suffix}`;
+  const refreshKnowledgeLinks=()=>{
+    const lab=document.getElementById('elite-analyst-cta');
+    if(lab){lab.href='/analysis-library';lab.innerHTML='<strong>▶ Salle vidéo & Analyse Ultimate</strong><span>Résultats, vidéos, séquences, habitudes, joueuses, tendances et preuves reliées au match.</span>'}
+    const atlas=document.getElementById('elite-video-atlas-cta');
+    if(atlas){atlas.href='/analysis-library#filmroom';atlas.innerHTML='<strong>▶ Film Room élite · vidéos directement lisibles</strong><span>Références internationales + dossiers data. Les anciens croquis génériques ne sont plus utilisés comme preuves.</span>'}
+  };
+  refreshKnowledgeLinks();
+  setTimeout(refreshKnowledgeLinks,0);
   document.querySelectorAll('a[href^="http"]').forEach(a=>{
     const text=(a.textContent||'').trim();
     if((text===a.href||text.length>62)&&!a.classList.contains('btn')){a.textContent=`${hostLabel(a.href)} ↗`;a.title=a.href;a.classList.add('aq-source-link')}
