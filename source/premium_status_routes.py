@@ -1,10 +1,18 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from db import get_db
 from models import Match, User
 
 router = APIRouter()
+
+
+@router.get('/static/elite-video-atlas.html', include_in_schema=False)
+def retired_elite_video_atlas():
+    # Registered before StaticFiles, so the obsolete generic T-2/T-1/T0 page
+    # cannot be served as a match-analysis surface anymore.
+    return RedirectResponse('/analysis-library#filmroom', status_code=307, headers={'Cache-Control': 'no-store'})
 
 
 @router.get('/api/premium/matches/{match_id}/status')
