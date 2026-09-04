@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {% block content %}
 <style>
-.result-shell{display:grid;gap:18px}.result-hero,.result-panel{border:1px solid var(--border,#294754);border-radius:22px;background:var(--panel,#0b202b);padding:20px}.result-hero{display:grid;grid-template-columns:1.35fr .65fr;gap:18px}.result-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.result-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}.result-kpi{padding:14px;border:1px solid rgba(255,255,255,.09);border-radius:15px;background:rgba(255,255,255,.03)}.result-kpi span,.result-kpi small{display:block;opacity:.7}.result-kpi b{display:block;font-size:25px;margin:4px 0}.split{display:grid;grid-template-columns:1fr 1fr;gap:14px}.evidence-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(285px,1fr));gap:12px}.evidence-card{border:1px solid rgba(255,255,255,.09);border-radius:16px;overflow:hidden;background:rgba(255,255,255,.025)}.evidence-card video,.evidence-card img,.evidence-card iframe{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;border:0;background:#000}.evidence-body{padding:13px}.exact-badge{display:inline-block;padding:4px 8px;border-radius:999px;background:rgba(74,222,128,.12);border:1px solid rgba(74,222,128,.28);font-size:12px}.candidate-badge{display:inline-block;padding:4px 8px;border-radius:999px;background:rgba(250,204,21,.1);border:1px solid rgba(250,204,21,.28);font-size:12px}.missing-box{padding:14px;border:1px dashed rgba(255,255,255,.25);border-radius:14px;background:rgba(255,255,255,.02)}.finding{padding:14px;border-left:3px solid #63d2ed;background:rgba(99,210,237,.06);margin:8px 0;border-radius:0 12px 12px 0}.wide{overflow:auto}.wide table{width:100%;border-collapse:collapse;min-width:760px}.wide th,.wide td{padding:9px;border-bottom:1px solid rgba(255,255,255,.08);text-align:left}.source-box{word-break:break-word}.timeline-row{display:grid;grid-template-columns:80px 180px 120px 1fr;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.07)}
-@media(max-width:800px){.result-hero,.split{grid-template-columns:1fr}.timeline-row{grid-template-columns:70px 1fr}.timeline-row>*:nth-child(n+3){grid-column:2}}
+.result-shell{display:grid;gap:18px}.result-hero,.result-panel{border:1px solid var(--border,#294754);border-radius:22px;background:var(--panel,#0b202b);padding:20px}.result-hero{display:grid;grid-template-columns:1.35fr .65fr;gap:18px}.result-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;align-items:center}.result-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:10px}.result-kpi{padding:14px;border:1px solid rgba(255,255,255,.09);border-radius:15px;background:rgba(255,255,255,.03)}.result-kpi span,.result-kpi small{display:block;opacity:.72}.result-kpi b{display:block;font-size:24px;margin:4px 0}.split{display:grid;grid-template-columns:1fr 1fr;gap:14px}.player-shell{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(280px,.55fr);gap:14px}.main-player{border:1px solid rgba(255,255,255,.1);border-radius:18px;overflow:hidden;background:#02080c}.main-player video,.main-player iframe{display:block;width:100%;aspect-ratio:16/9;border:0;background:#000}.sequence-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:14px}.sequence-card{border:1px solid rgba(255,255,255,.1);border-radius:18px;overflow:hidden;background:rgba(255,255,255,.025);display:flex;flex-direction:column}.sequence-media{background:#000;position:relative}.sequence-media video,.sequence-media iframe{display:block;width:100%;aspect-ratio:16/9;border:0;background:#000}.sequence-body{padding:14px;display:grid;gap:8px}.sequence-body h3{margin:0;font-size:19px}.sequence-meta{display:flex;gap:6px;flex-wrap:wrap}.tag{display:inline-block;padding:4px 8px;border-radius:999px;border:1px solid rgba(99,210,237,.3);font-size:11px}.tag.verified{border-color:rgba(74,222,128,.4);background:rgba(74,222,128,.08)}.tag.automatic{border-color:rgba(250,204,21,.4);background:rgba(250,204,21,.08)}.tag.vision_peak,.tag.active_window{border-color:rgba(251,146,60,.38);background:rgba(251,146,60,.07)}.frame-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-top:7px}.frame-strip img{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:9px;background:#000}.evidence-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(285px,1fr));gap:12px}.evidence-card{border:1px solid rgba(255,255,255,.09);border-radius:16px;overflow:hidden;background:rgba(255,255,255,.025)}.evidence-card video,.evidence-card img,.evidence-card iframe{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;border:0;background:#000}.evidence-body{padding:13px}.exact-badge,.candidate-badge{display:inline-block;padding:4px 8px;border-radius:999px;font-size:12px}.exact-badge{background:rgba(74,222,128,.12);border:1px solid rgba(74,222,128,.28)}.candidate-badge{background:rgba(250,204,21,.1);border:1px solid rgba(250,204,21,.28)}.missing-box{padding:14px;border:1px dashed rgba(255,255,255,.25);border-radius:14px;background:rgba(255,255,255,.02)}.finding{padding:14px;border-left:3px solid #63d2ed;background:rgba(99,210,237,.06);margin:8px 0;border-radius:0 12px 12px 0}.wide{overflow:auto}.wide table{width:100%;border-collapse:collapse;min-width:760px}.wide th,.wide td{padding:9px;border-bottom:1px solid rgba(255,255,255,.08);text-align:left}.source-box{word-break:break-word}.timeline-row{display:grid;grid-template-columns:80px 180px 120px 1fr;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.07)}.sequence-warning{padding:10px 12px;border-left:3px solid #fb923c;background:rgba(251,146,60,.07);border-radius:0 10px 10px 0}.quarter-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}.raw-data{max-height:320px;overflow:auto;font-size:12px;white-space:pre-wrap;word-break:break-word;background:#06131b;border-radius:12px;padding:12px}
+@media(max-width:900px){.result-hero,.split,.player-shell{grid-template-columns:1fr}.timeline-row{grid-template-columns:70px 1fr}.timeline-row>*:nth-child(n+3){grid-column:2}}@media(max-width:520px){.sequence-grid{grid-template-columns:1fr}.frame-strip{grid-template-columns:1fr}}
 </style>
 
 <div class="result-shell">
@@ -13,119 +13,86 @@
     <p>{{ match.competition or "Compétition non renseignée" }} · {{ match.match_date or "date non renseignée" }}</p>
     <p><b>{{ snapshot.job.status|replace('_',' ')|title }}</b>{% if snapshot.job.message %} — {{ snapshot.job.message }}{% endif %}</p>
     <div class="result-actions">
-      <form method="post" action="/matches/{{match.id}}/analysis/start">
-        {% if match.video_source == 'upload' %}<label style="display:inline-flex;gap:6px;align-items:center;margin-right:8px"><input type="checkbox" name="include_audio" value="1"> scan sifflet</label>{% endif %}
-        <button class="btn primary" type="submit">Analyser réellement / relancer</button>
-      </form>
-      <form method="post" action="/matches/{{match.id}}/analysis/evidence-pack"><button class="btn" type="submit">Reconstruire les preuves exactes</button></form>
+      <form method="post" action="/matches/{{match.id}}/analysis/start">{% if match.video_source == 'upload' %}<label style="display:inline-flex;gap:6px;align-items:center;margin-right:8px"><input type="checkbox" name="include_audio" value="1"> scan audio/sifflet</label>{% endif %}<button class="btn primary" type="submit">Analyser complètement / relancer</button></form>
+      <form method="post" action="/matches/{{match.id}}/analysis/evidence-pack"><button class="btn" type="submit">Générer un maximum de séquences</button></form>
       <a class="btn intelligence-cta" href="/matches/{{match.id}}/analysis/export.zip">Télécharger le dossier ZIP complet</a>
-      <a class="btn secondary" href="/match-analysis/{{match.id}}">Ouvrir le workspace détaillé</a>
+      <a class="btn secondary" href="/match-analysis/{{match.id}}">Workspace détaillé</a>
     </div>
   </div>
   <div class="result-grid">
     <div class="result-kpi"><span>Couverture Ultimate</span><b>{{ team_report.coverage.score }}%</b><small>{{ team_report.coverage.readiness }}</small></div>
-    <div class="result-kpi"><span>Événements vérifiés</span><b>{{ verified_events|length }}</b><small>faits utilisés dans les KPI</small></div>
-    <div class="result-kpi"><span>Candidats automatiques</span><b>{{ automatic.candidates|length }}</b><small>séparés des faits confirmés</small></div>
-    <div class="result-kpi"><span>Preuves média indexées</span><b>{{ artifacts|length }}</b><small>clips, images ou segments</small></div>
+    <div class="result-kpi"><span>Séquences indexées</span><b>{{ sequence_summary.total }}</b><small>faits + candidats + tactique + vision</small></div>
+    <div class="result-kpi"><span>Clips téléchargeables</span><b>{{ sequence_summary.downloadable_clips }}</b><small>vidéo locale détenue uniquement</small></div>
+    <div class="result-kpi"><span>Séquences avec images</span><b>{{ sequence_summary.with_images }}</b><small>T−2 / T0 / T+2 quand générées</small></div>
   </div>
 </section>
 
-<section class="result-panel">
-  <span class="eyebrow">CE QUI A ÉTÉ RÉELLEMENT ANALYSÉ</span><h2>Sortie moteur, pas cahier des charges</h2>
-  {% if match.video_source == 'upload' %}
-  <div class="result-grid">
-    <div class="result-kpi"><span>Durée vidéo</span><b>{{ '%.1f'|format(vision.duration_seconds/60) if vision.available else '—' }} min</b><small>{{ vision.engine or 'analyse non lancée' }}</small></div>
-    <div class="result-kpi"><span>Lectures visuelles</span><b>{{ vision.sample_count if vision.available else '—' }}</b><small>échantillonnage réel de la vidéo</small></div>
-    <div class="result-kpi"><span>Temps actif estimé</span><b>{{ '%.0f'|format(vision.active_seconds) if vision.available else '—' }} s</b><small>activité visuelle, pas événement sportif inventé</small></div>
-    <div class="result-kpi"><span>Observations scoreboard</span><b>{{ automatic.summary.get('scoreboard_observations','—') }}</b><small>OCR borné</small></div>
+<section class="result-panel" id="source-player">
+  <span class="eyebrow">SOURCE VIDÉO · LECTEUR DIRECT</span><h2>Match lisible sans quitter l’analyse</h2>
+  <div class="player-shell">
+    <div class="main-player">
+      {% if match.video_source == 'upload' and match.video_path %}<video controls preload="metadata" src="/matches/{{match.id}}/video"></video>
+      {% elif source_embed %}<iframe src="{{source_embed}}" title="Replay {{match.team.name}} {{match.opponent}}" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+      {% else %}<div class="missing-box" style="margin:14px">Aucun lecteur vidéo embarquable vérifié pour ce match.</div>{% endif %}
+    </div>
+    <div>
+      <div class="result-grid">
+        <div class="result-kpi"><span>Événements vérifiés</span><b>{{ verified_events|length }}</b><small>faits utilisés dans les KPI</small></div>
+        <div class="result-kpi"><span>Candidats auto</span><b>{{ automatic.candidates|length }}</b><small>jamais confondus avec les faits</small></div>
+        <div class="result-kpi"><span>Lectures vision</span><b>{{ vision.sample_count if vision.available else '—' }}</b><small>{{ vision.engine or 'non lancé' }}</small></div>
+        <div class="result-kpi"><span>Segments externes</span><b>{{ sequence_summary.external_segments }}</b><small>fenêtres start/end</small></div>
+      </div>
+      {% if match.video_source != 'upload' %}<p class="sequence-warning"><b>Vidéo tierce :</b> le replay est directement lisible, mais le serveur ne le copie pas. Chaque action ci-dessous utilise une fenêtre temporelle bornée lorsqu’un timestamp existe. Aucune image locale n’est fabriquée.</p>{% endif %}
+    </div>
   </div>
-  {% else %}
-  <div class="missing-box"><b>Source tierce : aucune fausse capture.</b><p>Le serveur ne copie pas la vidéo distante. Les résultats utilisent les événements réellement horodatés et, quand une référence publique correspond, les données publiées. Chaque preuve vidéo affichée ci-dessous est une fenêtre temporelle précise ; si aucune preuve n'existe, aucun visuel générique n'est substitué.</p></div>
-  {% endif %}
+</section>
+
+<section class="result-panel" id="sequences">
+  <span class="eyebrow">SÉQUENCES ANALYSÉES · MAXIMUM</span><h2>Une action = son extrait, ses images et ses données</h2>
+  <p>La galerie peut réunir jusqu’à 72 moments distincts. <b>Vérifié</b> désigne un fait confirmé ; <b>automatique</b> un candidat ; <b>tactique</b> une séquence dérivée des événements tagués ; <b>vision</b> un signal visuel à contrôler.</p>
+  <div class="sequence-grid">
+  {% for s in sequences %}
+    <article class="sequence-card">
+      <div class="sequence-media">
+        {% if s.clip_url %}<video controls preload="metadata" src="{{s.clip_url}}"></video>
+        {% elif s.segment_embed %}<iframe loading="lazy" src="{{s.segment_embed}}" title="{{s.title}}" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+        {% elif s.local_segment_url %}<video controls preload="metadata" src="{{s.local_segment_url}}"></video>
+        {% else %}<div class="missing-box" style="margin:12px">Signal horodaté disponible, mais aucun média matérialisé pour cette séquence.</div>{% endif %}
+      </div>
+      <div class="sequence-body">
+        <div class="sequence-meta"><span class="tag {{s.kind}}">{{s.kind|replace('_',' ')}}</span><span class="tag">{{'%02d:%02d' % ((s.second//60)|int,(s.second%60)|int)}}</span><span class="tag">{{s.confidence_label}} · {{'%.0f'|format(s.confidence*100)}}%</span>{% if s.phase %}<span class="tag">{{s.phase|replace('_',' ')}}</span>{% endif %}</div>
+        <h3>{{s.title}}</h3><p>{{s.summary}}</p>
+        {% if s.kind in ['vision_peak','active_window'] %}<div class="sequence-warning"><b>À vérifier :</b> activité visuelle détectée, pas événement sportif confirmé.</div>{% endif %}
+        {% if s.screenshot_urls %}<div class="frame-strip">{% for image in s.screenshot_urls[:3] %}<img loading="lazy" src="{{image}}" alt="Arrêt sur image {{s.title}}">{% endfor %}</div>{% endif %}
+        {% if s.aliases %}<small>Signaux associés : {% for a in s.aliases %}{{a.title}}{% if not loop.last %} · {% endif %}{% endfor %}</small>{% endif %}
+        <small>Fenêtre : {{s.start_second|round(1)}}s → {{s.end_second|round(1)}}s · source {{s.source}}</small>
+        <div class="result-actions">{% if s.clip_url %}<a class="btn secondary" href="{{s.clip_url}}" download>Télécharger ce clip</a>{% endif %}{% if s.external_url %}<a class="btn secondary" href="{{s.external_url}}" target="_blank" rel="noopener noreferrer">Ouvrir au timestamp</a>{% endif %}</div>
+      </div>
+    </article>
+  {% else %}<div class="missing-box">Aucune séquence disponible. Lance « Analyser complètement » ; avec une vidéo locale, le moteur scanne la totalité du match puis matérialise les meilleurs moments.</div>{% endfor %}
+  </div>
 </section>
 
 <section class="result-panel">
   <span class="eyebrow">ULTIMATE ANALYST V2</span><h2>Résultats vérifiés équipe / adversaire</h2>
   <div class="split">
-    {% for label, report in [(match.team.name, team_report), (match.opponent, opponent_report)] %}
-    <div>
-      <h3>{{ label }}</h3>
-      <div class="result-grid">
-        <div class="result-kpi"><span>Buts</span><b>{{ report.basic.goals }}</b></div>
-        <div class="result-kpi"><span>Tirs</span><b>{{ report.basic.shots }}</b><small>{{ report.basic.scoring_efficiency_pct if report.basic.scoring_efficiency_pct is not none else '—' }}% conversion</small></div>
-        <div class="result-kpi"><span>Cadrage</span><b>{{ report.basic.shot_accuracy_pct if report.basic.shot_accuracy_pct is not none else '—' }}%</b></div>
-        <div class="result-kpi"><span>Passes</span><b>{{ report.basic.pass_completion_pct if report.basic.pass_completion_pct is not none else '—' }}%</b><small>{{ report.basic.passes_completed }}/{{ report.basic.pass_attempts }}</small></div>
-        <div class="result-kpi"><span>Pertes</span><b>{{ report.basic.turnovers }}</b></div>
-        <div class="result-kpi"><span>Ballons gagnés</span><b>{{ report.basic.ball_wins }}</b></div>
-        <div class="result-kpi"><span>Exclusions provoquées</span><b>{{ report.basic.exclusions_earned }}</b></div>
-        <div class="result-kpi"><span>Passes clés</span><b>{{ report.basic.key_passes }}</b></div>
-      </div>
-    </div>
-    {% endfor %}
+    {% for label, report in [(match.team.name, team_report), (match.opponent, opponent_report)] %}<div><h3>{{label}}</h3><div class="result-grid">
+      <div class="result-kpi"><span>Buts</span><b>{{report.basic.goals}}</b></div><div class="result-kpi"><span>Tirs</span><b>{{report.basic.shots}}</b><small>{{report.basic.scoring_efficiency_pct if report.basic.scoring_efficiency_pct is not none else '—'}}% conversion</small></div><div class="result-kpi"><span>Cadrage</span><b>{{report.basic.shot_accuracy_pct if report.basic.shot_accuracy_pct is not none else '—'}}%</b></div><div class="result-kpi"><span>Passes</span><b>{{report.basic.pass_completion_pct if report.basic.pass_completion_pct is not none else '—'}}%</b><small>{{report.basic.passes_completed}}/{{report.basic.pass_attempts}}</small></div><div class="result-kpi"><span>Pertes</span><b>{{report.basic.turnovers}}</b></div><div class="result-kpi"><span>Ballons gagnés</span><b>{{report.basic.ball_wins}}</b></div><div class="result-kpi"><span>Exclusions provoquées</span><b>{{report.basic.exclusions_earned}}</b></div><div class="result-kpi"><span>Passes clés</span><b>{{report.basic.key_passes}}</b></div>
+    </div></div>{% endfor %}
   </div>
-  <h3>Différentiels</h3>
-  <div class="wide"><table><thead><tr><th>Indicateur</th><th>{{match.team.name}}</th><th>{{match.opponent}}</th><th>Écart</th></tr></thead><tbody>
-  {% for row in ultimate.differentials %}<tr><td>{{row.label}}</td><td>{{row.team if row.team is not none else '—'}}</td><td>{{row.opponent if row.opponent is not none else '—'}}</td><td>{{row.delta if row.delta is not none else '—'}}</td></tr>{% endfor %}
-  </tbody></table></div>
+  <h3>Différentiels</h3><div class="wide"><table><thead><tr><th>Indicateur</th><th>{{match.team.name}}</th><th>{{match.opponent}}</th><th>Écart</th></tr></thead><tbody>{% for row in ultimate.differentials %}<tr><td>{{row.label}}</td><td>{{row.team if row.team is not none else '—'}}</td><td>{{row.opponent if row.opponent is not none else '—'}}</td><td>{{row.delta if row.delta is not none else '—'}}</td></tr>{% endfor %}</tbody></table></div>
 </section>
 
-<section class="result-panel">
-  <span class="eyebrow">ANALYSE COACH</span><h2>Constats issus des données observées</h2>
-  {% for finding in team_report.qualitative %}<article class="finding"><b>{{finding.title}}</b><p>{{finding.text}}</p><small>Preuve : {{finding.evidence}}</small></article>{% endfor %}
-  <div class="split">
-    <div><h3>Tirs</h3><p>{{team_report.shots.total}} tirs observés · {{team_report.shots.located_pct if team_report.shots.located_pct is not none else '—'}}% localisés.</p>{% for z in team_report.shots.zones[:6] %}<div class="result-kpi"><span>{{z.label}}</span><b>{{z.goals}} / {{z.shots}}</b><small>{{z.efficiency_pct if z.efficiency_pct is not none else '—'}}% efficacité</small></div>{% endfor %}</div>
-    <div><h3>Pertes</h3><p>{{team_report.losses.total}} pertes observées · {{team_report.losses.classified_pct if team_report.losses.classified_pct is not none else '—'}}% avec cause structurée.</p>{% for r in team_report.losses.reasons[:6] %}<div class="result-kpi"><span>{{r.label}}</span><b>{{r.count}}</b><small>{{r.share}}%</small></div>{% endfor %}</div>
-  </div>
-</section>
+<section class="result-panel"><span class="eyebrow">ANALYSE COACH</span><h2>Constats, tirs, pertes et contexte</h2>{% for finding in team_report.qualitative %}<article class="finding"><b>{{finding.title}}</b><p>{{finding.text}}</p><small>Preuve : {{finding.evidence}}</small></article>{% endfor %}<div class="split"><div><h3>Tirs</h3><p>{{team_report.shots.total}} tirs observés · {{team_report.shots.located_pct if team_report.shots.located_pct is not none else '—'}}% localisés.</p>{% for z in team_report.shots.zones[:8] %}<div class="result-kpi"><span>{{z.label}}</span><b>{{z.goals}} / {{z.shots}}</b><small>{{z.efficiency_pct if z.efficiency_pct is not none else '—'}}% efficacité</small></div>{% endfor %}</div><div><h3>Pertes</h3><p>{{team_report.losses.total}} pertes observées · {{team_report.losses.classified_pct if team_report.losses.classified_pct is not none else '—'}}% avec cause structurée.</p>{% for r in team_report.losses.reasons[:8] %}<div class="result-kpi"><span>{{r.label}}</span><b>{{r.count}}</b><small>{{r.share}}%</small></div>{% endfor %}</div></div></section>
 
-<section class="result-panel">
-  <span class="eyebrow">PHASES · POSSESSIONS · DÉCISIONS</span><h2>Lecture contextuelle</h2>
-  <div class="split">
-    <div><h3>Phases</h3>{% for row in team_report.phases.rows %}<div class="result-kpi"><span>{{row.label}}</span><b>{{row.events}}</b><small>{{row.goals}} buts · {{row.shots}} tirs · {{row.turnovers}} pertes</small></div>{% else %}<div class="missing-box">Aucune phase suffisamment taguée.</div>{% endfor %}</div>
-    <div><h3>Possessions</h3>{% if team_report.possessions.available %}<div class="result-kpi"><span>Possessions observées</span><b>{{team_report.possessions.possessions}}</b><small>{{team_report.possessions.mode}}</small></div><div class="result-kpi"><span>But / possession</span><b>{{team_report.possessions.goals_per_possession_pct if team_report.possessions.goals_per_possession_pct is not none else '—'}}%</b></div>{% else %}<div class="missing-box">{{team_report.possessions.get('reason','Les identifiants de possession manquent encore.')}}</div>{% endif %}
-    <h3>Décisions</h3><div class="result-kpi"><span>Décisions taguées</span><b>{{team_report.decisions.total}}</b><small>{{team_report.decisions.good_pct if team_report.decisions.good_pct is not none else '—'}}% bonnes · {{team_report.decisions.poor_pct if team_report.decisions.poor_pct is not none else '—'}}% mauvaises</small></div></div>
-  </div>
-</section>
+<section class="result-panel"><span class="eyebrow">PHASES · POSSESSIONS · DÉCISIONS</span><h2>Lecture contextuelle complète</h2><div class="split"><div><h3>Phases</h3>{% for row in team_report.phases.rows %}<div class="result-kpi"><span>{{row.label}}</span><b>{{row.events}}</b><small>{{row.goals}} buts · {{row.shots}} tirs · {{row.turnovers}} pertes</small></div>{% else %}<div class="missing-box">Aucune phase suffisamment taguée.</div>{% endfor %}</div><div><h3>Possessions</h3>{% if team_report.possessions.available %}<div class="result-kpi"><span>Possessions observées</span><b>{{team_report.possessions.possessions}}</b><small>{{team_report.possessions.mode}}</small></div><div class="result-kpi"><span>But / possession</span><b>{{team_report.possessions.goals_per_possession_pct if team_report.possessions.goals_per_possession_pct is not none else '—'}}%</b></div>{% else %}<div class="missing-box">{{team_report.possessions.reason}}</div>{% endif %}<h3>Décisions</h3><div class="result-kpi"><span>Décisions taguées</span><b>{{team_report.decisions.total}}</b><small>{{team_report.decisions.good_pct if team_report.decisions.good_pct is not none else '—'}}% bonnes · {{team_report.decisions.poor_pct if team_report.decisions.poor_pct is not none else '—'}}% mauvaises</small></div></div></div></section>
 
-<section class="result-panel">
-  <span class="eyebrow">PREUVES AUTOMATIQUES</span><h2>Moments détectés à contrôler</h2>
-  <p>Ces lignes sont volontairement séparées des événements confirmés. Elles donnent un timestamp, une confiance et la raison du signal détecté.</p>
-  {% for c in automatic.candidates %}<div class="timeline-row"><b>{{'%02d:%02d' % ((c.second//60)|int,(c.second%60)|int)}}</b><span>{{c.event_type|replace('_',' ')|title}}</span><span class="candidate-badge">{{c.confidence_label}} · {{'%.0f'|format(c.confidence*100)}}%</span><span>{{c.summary}}</span></div>{% else %}<div class="missing-box">Aucun candidat automatique disponible. Sur une vidéo téléversée, relancer l'analyse réelle pour produire le scan visuel/OCR.</div>{% endfor %}
-</section>
+<section class="result-panel"><span class="eyebrow">PREUVES AUTOMATIQUES</span><h2>Timeline des candidats à contrôler</h2>{% for c in automatic.candidates %}<div class="timeline-row"><b>{{'%02d:%02d' % ((c.second//60)|int,(c.second%60)|int)}}</b><span>{{c.event_type|replace('_',' ')|title}}</span><span class="candidate-badge">{{c.confidence_label}} · {{'%.0f'|format(c.confidence*100)}}%</span><span>{{c.summary}}</span></div>{% else %}<div class="missing-box">Aucun candidat automatique disponible.</div>{% endfor %}</section>
 
-<section class="result-panel" id="evidence">
-  <span class="eyebrow">PREUVES EXACTES</span><h2>Clip / image correspondant réellement à l'action</h2>
-  <p>Seuls les médias créés par le pipeline de correspondance exacte sont présentés ici. Les anciens embeds génériques ne sont pas utilisés comme preuve.</p>
-  <div class="evidence-grid">
-  {% set ns = namespace(count=0) %}
-  {% for a in artifacts %}{% if a.source.startswith('analysis_exact') %}{% set ns.count = ns.count + 1 %}
-    <article class="evidence-card">
-      {% if a.artifact_type == 'clip' and a.file_path %}<video controls preload="metadata" src="/matches/{{match.id}}/evidence/{{a.id}}"></video>
-      {% elif a.artifact_type == 'screenshot' and a.file_path %}<img loading="lazy" src="/matches/{{match.id}}/evidence/{{a.id}}" alt="{{a.title}}">
-      {% elif a.segment_embed %}<iframe loading="lazy" src="{{a.segment_embed}}" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
-      {% else %}<div class="missing-box" style="margin:12px">Aucune image locale disponible pour cette source tierce.</div>{% endif %}
-      <div class="evidence-body"><span class="exact-badge">preuve {{a.start_second|round(1)}}s → {{a.end_second|round(1)}}s</span><h3>{{a.title}}</h3>{% if a.note %}<p>{{a.note}}</p>{% endif %}<small>Événement central : {{a.second|round(1)}}s · {{a.source}}</small><div class="result-actions">{% if a.external_url %}<a class="btn secondary" href="{{a.external_url}}" target="_blank" rel="noopener noreferrer">Ouvrir au bon timestamp</a>{% endif %}{% if a.file_path %}<a class="btn secondary" href="/matches/{{match.id}}/evidence/{{a.id}}" target="_blank">Ouvrir le média</a>{% endif %}</div></div>
-    </article>
-  {% endif %}{% endfor %}
-  {% if ns.count == 0 %}<div class="missing-box">Aucune preuve exacte n'a encore été matérialisée. Utilise « Reconstruire les preuves exactes ». Pour une URL sans événement horodaté, AquaMetric ne fabrique volontairement aucun visuel.</div>{% endif %}
-  </div>
-</section>
+<section class="result-panel" id="evidence"><span class="eyebrow">PREUVES EXACTES</span><h2>Index historique des clips / images liés aux actions</h2><p>Les anciens embeds génériques sont exclus comme preuve. Les médias ci-dessous sont limités aux artefacts <code>analysis_exact</code>.</p><div class="evidence-grid">{% set ns = namespace(count=0) %}{% for a in artifacts %}{% if a.source.startswith('analysis_exact') %}{% set ns.count = ns.count + 1 %}<article class="evidence-card">{% if a.artifact_type == 'clip' and a.file_path %}<video controls preload="metadata" src="/matches/{{match.id}}/evidence/{{a.id}}"></video>{% elif a.artifact_type == 'screenshot' and a.file_path %}<img loading="lazy" src="/matches/{{match.id}}/evidence/{{a.id}}" alt="{{a.title}}">{% elif a.segment_embed %}<iframe loading="lazy" src="{{a.segment_embed}}" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>{% else %}<div class="missing-box" style="margin:12px">Aucune image locale disponible pour cette source tierce.</div>{% endif %}<div class="evidence-body"><span class="exact-badge">preuve {{a.start_second|round(1)}}s → {{a.end_second|round(1)}}s</span><h3>{{a.title}}</h3><p>{{a.note}}</p><small>Événement central : {{a.second|round(1)}}s · {{a.source}}</small></div></article>{% endif %}{% endfor %}{% if ns.count == 0 %}<div class="missing-box">Aucune preuve <code>analysis_exact</code> matérialisée ; la galerie profonde ci-dessus reste l’index principal.</div>{% endif %}</div></section>
 
-{% if reference %}
-<section class="result-panel">
-  <span class="eyebrow">RÉFÉRENCE PUBLIQUE CORRESPONDANTE</span><h2>{{reference.title}}</h2>
-  <div class="result-grid"><div class="result-kpi"><span>Score publié</span><b>{{reference.score_a if reference.score_a is not none else '—'}} – {{reference.score_b if reference.score_b is not none else '—'}}</b><small>{{reference.team_a}} / {{reference.team_b}}</small></div><div class="result-kpi"><span>Quarts disponibles</span><b>{{reference.quarters|length}}</b></div><div class="result-kpi"><span>Stats joueuses publiées</span><b>{{reference.players|length}}</b></div><div class="result-kpi"><span>Statut source</span><b>{{reference.analysis_status|replace('_',' ')}}</b></div></div>
-  {% if reference.players %}<div class="wide"><table><thead><tr><th>Équipe</th><th>Joueuse</th><th>Buts</th><th>Tirs</th><th>Assists</th><th>Steals</th><th>Exclusions</th><th>Arrêts</th></tr></thead><tbody>{% for p in reference.players %}<tr><td>{{p.team}}</td><td>{{p.player}}</td><td>{{p.goals if p.goals is not none else '—'}}</td><td>{{p.shots if p.shots is not none else '—'}}</td><td>{{p.assists if p.assists is not none else '—'}}</td><td>{{p.steals if p.steals is not none else '—'}}</td><td>{{p.exclusions if p.exclusions is not none else '—'}}</td><td>{{p.saves if p.saves is not none else '—'}}</td></tr>{% endfor %}</tbody></table></div>{% endif %}
-  <p class="source-box"><small>Cette référence complète les résultats publiés ; elle ne transforme pas des données publiques en événements vidéo horodatés.</small></p>
-</section>
-{% endif %}
+{% if reference %}<section class="result-panel"><span class="eyebrow">DONNÉES PUBLIQUES RECHERCHÉES</span><h2>{{reference.title}}</h2><div class="result-grid"><div class="result-kpi"><span>Score publié</span><b>{{reference.score_a if reference.score_a is not none else '—'}} – {{reference.score_b if reference.score_b is not none else '—'}}</b><small>{{reference.team_a}} / {{reference.team_b}}</small></div><div class="result-kpi"><span>Quarts</span><b>{{reference.quarters|length}}</b></div><div class="result-kpi"><span>Stats joueuses</span><b>{{reference.players|length}}</b></div><div class="result-kpi"><span>Statut</span><b>{{reference.analysis_status|replace('_',' ')}}</b></div></div>{% if reference.quarters %}<h3>Score par période</h3><div class="quarter-grid">{% for q in reference.quarters %}<div class="result-kpi"><span>Q{{loop.index}}</span><b>{{q}}</b></div>{% endfor %}</div>{% endif %}{% if reference.players %}<h3>Joueuse par joueuse</h3><div class="wide"><table><thead><tr><th>Équipe</th><th>Joueuse</th><th>Buts</th><th>Tirs</th><th>Assists</th><th>Steals</th><th>Exclusions</th><th>Arrêts</th></tr></thead><tbody>{% for p in reference.players %}<tr><td>{{p.team}}</td><td>{{p.player}}</td><td>{{p.goals if p.goals is not none else '—'}}</td><td>{{p.shots if p.shots is not none else '—'}}</td><td>{{p.assists if p.assists is not none else '—'}}</td><td>{{p.steals if p.steals is not none else '—'}}</td><td>{{p.exclusions if p.exclusions is not none else '—'}}</td><td>{{p.saves if p.saves is not none else '—'}}</td></tr>{% endfor %}</tbody></table></div>{% endif %}{% if reference.team_stats %}<h3>Données équipe publiées</h3><div class="raw-data">{{reference.team_stats}}</div>{% endif %}<div class="result-actions">{% if reference.official_source_url %}<a class="btn secondary" href="{{reference.official_source_url}}" target="_blank" rel="noopener">Source officielle</a>{% endif %}{% if reference.video_url %}<a class="btn secondary" href="{{reference.video_url}}" target="_blank" rel="noopener">Replay source</a>{% endif %}</div><p class="source-box"><small>La référence publique enrichit les résultats ; elle n’est jamais convertie artificiellement en événements vidéo horodatés.</small></p></section>{% endif %}
 
-<section class="result-panel">
-  <span class="eyebrow">QUALITÉ / LIMITES</span><h2>Ce que le résultat permet — et ce qu'il ne permet pas encore</h2>
-  <div class="result-grid">{% for key,value in team_report.coverage.components.items() %}<div class="result-kpi"><span>{{key|replace('_',' ')}}</span><b>{{value if value is not none else '—'}}{% if value is not none %}%{% endif %}</b></div>{% endfor %}</div>
-  {% if automatic.limitations %}<h3>Limites automatiques</h3><ul>{% for item in automatic.limitations %}<li>{{item}}</li>{% endfor %}</ul>{% endif %}
-  {% if vision.limitations %}<h3>Limites vision</h3><ul>{% for item in vision.limitations %}<li>{{item}}</li>{% endfor %}</ul>{% endif %}
-  <div class="missing-box"><b>Contrat de preuve :</b> {{ultimate.evidence_contract.measured}} {{ultimate.evidence_contract.derived}} {{ultimate.evidence_contract.estimated}}</div>
-</section>
+<section class="result-panel"><span class="eyebrow">QUALITÉ / LIMITES</span><h2>Couverture mesurée</h2><div class="result-grid">{% for key,value in team_report.coverage.components.items() %}<div class="result-kpi"><span>{{key|replace('_',' ')}}</span><b>{{value if value is not none else '—'}}{% if value is not none %}%{% endif %}</b></div>{% endfor %}</div>{% if automatic.limitations %}<h3>Limites automatiques</h3><ul>{% for item in automatic.limitations %}<li>{{item}}</li>{% endfor %}</ul>{% endif %}{% if vision.limitations %}<h3>Limites vision</h3><ul>{% for item in vision.limitations %}<li>{{item}}</li>{% endfor %}</ul>{% endif %}<div class="missing-box"><b>Contrat de preuve :</b> {{ultimate.evidence_contract.measured}} {{ultimate.evidence_contract.derived}} {{ultimate.evidence_contract.estimated}}</div></section>
 </div>
 {% endblock %}
