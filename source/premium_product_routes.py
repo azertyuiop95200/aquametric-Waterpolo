@@ -10,6 +10,7 @@ from db import get_db
 from models import Match, MatchLibraryItem, User
 from services.analysis_product import analysis_snapshot
 from services.deep_analysis_sequences import sequence_gallery, sequence_summary
+from services.performance_intelligence import player_match_breakdown
 from services.premium_public_analysis import build_public_match_dossier
 from services.team_scoring_patterns import build_team_scoring_patterns
 from services.video import youtube_embed
@@ -37,6 +38,14 @@ def _user(request: Request, db: Session):
     return user
 
 
+def _owned_match(match_id: int, request: Request, db: Session):
+    user = _user(request, db)
+    match = db.get(Match, match_id)
+    if not match or match.owner_id != user.id:
+        raise HTTPException(status_code=404, detail="Match not found")
+    return user, match
+
+
 def _workspace_card(db: Session, match: Match):
     snapshot = analysis_snapshot(db, match)
     report = snapshot.get("ultimate", {}).get("team", {})
@@ -58,6 +67,71 @@ def _workspace_card(db: Session, match: Match):
         "local_video": match.video_source == "upload" and bool(match.video_path),
         "verified_events": len(snapshot.get("verified_events", []) or []),
         "automatic": len(snapshot.get("automatic", {}).get("candidates", []) or []),
+    }
+
+
+@router.get("/api/premium/matches/{match_id}/brief")
+def premium_match_brief(match_id: int, request: Request, db: Session = Depends(get_db)):
+    _, match = _owned_match(match_id, request, db)
+    snapshot = analysis_snapshot(db, match)
+    scoring = build_team_scoring_patterns(db, match)
+    sequences = sequence_gallery(db, match, max_total=72)
+    players = []
+    for player in list(match.team.players or []):
+        events = [e for e in list(match.events or []) if e.player_id == player.id]
+        breakdown = player_match_breakdown(events, {"rated": False, "dimensions": {}}, role=player.primary_role)
+        board = breakdown.get("statboard", {})
+        if not events and not any(board.get(k) for k in ("goals", "shots", "passes_completed", "turnovers", "saves")):
+            continue
+        players.append({
+            "id": player.id,
+            "name": player.name,
+            "cap": player.cap_number,
+            "role": player.primary_role,
+            "event_count": len(events),
+            "position_family": breakdown.get("position_family"),
+            "statboard": board,
+            "losses": breakdown.get("loss_breakdown", {}),
+            "transition": breakdown.get("transition_timing", {}),
+            "checklist": breakdown.get("qualitative_checklist", []),
+            "phases": breakdown.get("phases", {}),
+        })
+    players.sort(key=lambda p: (-(p["statboard"].get("goals") or 0), -p["event_count"], p["name"]))
+
+    team = snapshot.get("ultimate", {}).get("team", {})
+    opponent = snapshot.get("ultimate", {}).get("opponent", {})
+    team_scoring = scoring.get("team", {}) if isinstance(scoring, dict) else {}
+    opp_scoring = scoring.get("opponent", {}) if isinstance(scoring, dict) else {}
+    return {
+        "match": {"id": match.id, "team": match.team.name, "opponent": match.opponent, "competition": match.competition, "date": match.match_date},
+        "coverage": team.get("coverage", {}),
+        "basic": team.get("basic", {}),
+        "opponent_basic": opponent.get("basic", {}),
+        "qualitative": team.get("qualitative", [])[:8],
+        "losses": team.get("losses", {}),
+        "shots": team.get("shots", {}),
+        "passes": team.get("passes", {}),
+        "phases": team.get("phases", [])[:10],
+        "periods": team.get("periods", [])[:8],
+        "decisions": team.get("decisions", {}),
+        "pressure": team.get("pressure", {}),
+        "possessions": team.get("possessions", {}),
+        "positive_habits": team_scoring.get("positive_habits", [])[:6],
+        "negative_habits": team_scoring.get("negative_habits", [])[:6],
+        "tendencies": team_scoring.get("tendencies", [])[:6],
+        "phase_scoring": team_scoring.get("phase_rows", [])[:10],
+        "top_scorers": team_scoring.get("top_scorers", [])[:8],
+        "repeated_routes": team_scoring.get("repeated_routes", [])[:8],
+        "opponent_habits": {
+            "positive": opp_scoring.get("positive_habits", [])[:4],
+            "negative": opp_scoring.get("negative_habits", [])[:4],
+            "tendencies": opp_scoring.get("tendencies", [])[:4],
+        },
+        "players": players[:18],
+        "sequences": [
+            {"second": s.get("second"), "title": s.get("title"), "kind": s.get("kind"), "confidence": s.get("confidence"), "phase": s.get("phase"), "clip_url": s.get("clip_url"), "segment_embed": s.get("segment_embed"), "screenshot_urls": s.get("screenshot_urls", [])[:3]}
+            for s in sequences[:12]
+        ],
     }
 
 
