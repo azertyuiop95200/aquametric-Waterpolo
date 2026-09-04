@@ -105,16 +105,18 @@ def install_security(app):
     app.add_middleware(AquaMetricSecurityMiddleware)
 
     # Product routes are registered before historical compatibility endpoints in
-    # main.py. FastAPI resolves the first matching route, so uploads now enter the
-    # real analysis pipeline automatically instead of landing on an empty match page.
+    # main.py. FastAPI resolves the first matching route, so uploads enter the
+    # real analysis pipeline while old internal match-id workflows stay compatible.
     from rapid_analysis_routes import router as rapid_analysis_router
     from scorer_routes import router as scorer_router
     from premium_ingest_routes import router as premium_ingest_router
+    from premium_status_routes import router as premium_status_router
     from premium_product_routes import router as premium_product_router
     from premium_national_routes import router as premium_national_router
 
     app.include_router(rapid_analysis_router)
     app.include_router(scorer_router)
     app.include_router(premium_ingest_router)
+    app.include_router(premium_status_router)
     app.include_router(premium_product_router)
     app.include_router(premium_national_router)
