@@ -1,0 +1,64 @@
+<style>
+.scoring-board{display:grid;gap:16px}.scoring-sides{display:grid;grid-template-columns:1fr 1fr;gap:14px}.scoring-side{border:1px solid rgba(255,255,255,.1);border-radius:18px;padding:16px;background:rgba(255,255,255,.025)}.habit-columns{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.habit-card{padding:12px;border-radius:14px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.025)}.habit-card.positive{border-color:rgba(74,222,128,.28);background:rgba(74,222,128,.055)}.habit-card.negative{border-color:rgba(251,113,133,.28);background:rgba(251,113,133,.055)}.habit-card.tendency{border-color:rgba(99,210,237,.28);background:rgba(99,210,237,.055)}.habit-card small{display:block;opacity:.7;margin-top:6px}.goal-route{display:grid;grid-template-columns:70px minmax(140px,.55fr) minmax(220px,1fr) auto;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.07)}.goal-route:last-child{border-bottom:0}.route-token{font-size:12px;opacity:.8}.history-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.history-card{padding:13px;border:1px solid rgba(255,255,255,.09);border-radius:14px;background:rgba(255,255,255,.02)}
+@media(max-width:900px){.scoring-sides,.habit-columns,.history-grid{grid-template-columns:1fr}.goal-route{grid-template-columns:65px 1fr}.goal-route>*:nth-child(n+3){grid-column:2}}
+</style>
+
+<section class="result-panel scoring-board" id="scoring-patterns">
+  <div>
+    <span class="eyebrow">COMMENT LES ÉQUIPES MARQUENT · TENDANCES & HABITUDES</span>
+    <h2>Voies de but, répétitions positives et signaux négatifs</h2>
+    <p>Le moteur cherche ce qui se répète : phase du but, enchaînement dans les 12 secondes précédentes, concentration du scoring, efficacité de finition, 6v5, transition, pertes, discipline et repli. Une habitude n'est affichée que lorsqu'un minimum de preuves existe.</p>
+    <p class="truth"><b>Règle de lecture :</b> {{scoring_patterns.contract}}</p>
+  </div>
+
+  <div class="scoring-sides">
+    {% for side_key in ['team','opponent'] %}{% set side=scoring_patterns[side_key] %}
+    <article class="scoring-side">
+      <span class="eyebrow">{{'ÉQUIPE' if side_key=='team' else 'ADVERSAIRE'}} · {{side.data_quality.readiness}}</span>
+      <h3>{{side.label}}</h3>
+      <div class="result-grid">
+        <div class="result-kpi"><span>Buts observés</span><b>{{side.goals}}</b><small>{{side.data_quality.phase_coverage_pct if side.data_quality.phase_coverage_pct is not none else '—'}}% avec phase</small></div>
+        <div class="result-kpi"><span>Tirs observés</span><b>{{side.shots}}</b><small>{{side.conversion_pct if side.conversion_pct is not none else '—'}}% conversion</small></div>
+        <div class="result-kpi"><span>Scorers identifiés</span><b>{{side.data_quality.identified_scorers}}</b><small>{{side.data_quality.scorer_coverage_pct if side.data_quality.scorer_coverage_pct is not none else '—'}}% des buts</small></div>
+      </div>
+
+      <h4>Buts par phase</h4>
+      {% if side.phase_rows %}<div class="wide"><table><thead><tr><th>Phase</th><th>Buts</th><th>Tirs</th><th>Part des buts</th><th>Conversion</th></tr></thead><tbody>{% for row in side.phase_rows %}<tr><td>{{row.label}}</td><td>{{row.goals}}</td><td>{{row.shots}}</td><td>{{row.goal_share_pct if row.goal_share_pct is not none else '—'}}%</td><td>{{row.conversion_pct if row.conversion_pct is not none else '—'}}%</td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="missing-box">Pas assez de buts/tirs tagués par phase pour établir la manière de marquer.</div>{% endif %}
+
+      {% if side.top_scorers %}<h4>Concentration du scoring</h4><div class="result-grid">{% for row in side.top_scorers[:5] %}<div class="result-kpi"><span>{{row.player}}</span><b>{{row.goals}}</b><small>{{row.share_pct}}% des buts identifiés</small></div>{% endfor %}</div>{% endif %}
+    </article>
+    {% endfor %}
+  </div>
+
+  <div class="scoring-sides">
+    {% for side_key in ['team','opponent'] %}{% set side=scoring_patterns[side_key] %}
+    <article class="scoring-side">
+      <h3>{{side.label}} · habitudes observées</h3>
+      <div class="habit-columns">
+        <div><h4>Positives</h4>{% for h in side.positive_habits %}<div class="habit-card positive"><b>{{h.title}}</b><p>{{h.text}}</p><small>{{h.evidence}} · {{h.strength}}</small></div>{% else %}<div class="missing-box">Pas encore assez de répétitions positives prouvées.</div>{% endfor %}</div>
+        <div><h4>À corriger</h4>{% for h in side.negative_habits %}<div class="habit-card negative"><b>{{h.title}}</b><p>{{h.text}}</p><small>{{h.evidence}} · {{h.strength}}</small></div>{% else %}<div class="missing-box">Pas encore assez de répétitions négatives prouvées.</div>{% endfor %}</div>
+        <div><h4>Tendances</h4>{% for h in side.tendencies %}<div class="habit-card tendency"><b>{{h.title}}</b><p>{{h.text}}</p><small>{{h.evidence}} · {{h.strength}}</small></div>{% else %}<div class="missing-box">Aucune tendance forte ne dépasse encore le seuil de répétition.</div>{% endfor %}</div>
+      </div>
+      {% if side.repeated_routes %}<h4>Routes de but répétées</h4>{% for r in side.repeated_routes %}<div class="finding"><b>{{r.signature}}</b><p>{{r.count}} occurrences · {{r.share_pct}}% des buts observés.</p></div>{% endfor %}{% endif %}
+    </article>
+    {% endfor %}
+  </div>
+
+  <div>
+    <span class="eyebrow">SÉQUENCES DE BUT VÉRIFIÉES</span><h3>Revoir exactement comment chaque but est construit</h3>
+    {% for side_key in ['team','opponent'] %}{% set side=scoring_patterns[side_key] %}
+      {% if side.goal_sequences %}<h4>{{side.label}}</h4>{% for g in side.goal_sequences %}<div class="goal-route"><b>{{'%02d:%02d' % ((g.second//60)|int,(g.second%60)|int)}}</b><span>{% if g.period %}Q{{g.period}} · {% endif %}{{g.scorer}}</span><span><b>{{g.phase_label}}</b><br><span class="route-token">{{g.signature}}</span></span><span>{% if g.media.url %}<a class="btn secondary" href="{{g.media.url}}" {% if g.media.kind=='external' %}target="_blank" rel="noopener"{% endif %}>Voir la séquence</a>{% else %}<span class="tag">preuve sans média</span>{% endif %}</span></div>{% endfor %}{% endif %}
+    {% endfor %}
+    {% if not scoring_patterns.team.goal_sequences and not scoring_patterns.opponent.goal_sequences %}<div class="missing-box">Les buts ne sont pas encore suffisamment horodatés/tagués. Les candidats OCR restent dans la galerie automatique et ne sont pas transformés ici en buts vérifiés.</div>{% endif %}
+  </div>
+
+  <div>
+    <span class="eyebrow">HISTORIQUE · HABITUDE OU MATCH ISOLÉ ?</span><h3>Comparer avec les matchs déjà documentés</h3>
+    <div class="history-grid">
+      <div class="history-card"><h4>{{match.team.name}} · workspace privé</h4><b>{{scoring_patterns.team_owned_history.match_count}} matchs précédents</b><p>{{scoring_patterns.team_owned_history.goals}} buts vérifiés · {{scoring_patterns.team_owned_history.losses}} pertes vérifiées.</p>{% for row in scoring_patterns.team_owned_history.goal_phase_distribution[:4] %}<small>{{row.label}} : {{row.goals}} buts · {{row.share_pct}}%</small>{% endfor %}</div>
+      <div class="history-card"><h4>{{match.team.name}} · archive publique</h4><b>{{scoring_patterns.team_public_history.match_count}} matchs documentés</b><p>{% if scoring_patterns.team_public_history.avg_goals_for is not none %}{{scoring_patterns.team_public_history.avg_goals_for}} buts/match · {{scoring_patterns.team_public_history.avg_goals_against}} encaissés/match.{% else %}Score historique insuffisant.{% endif %}</p>{% for q in scoring_patterns.team_public_history.quarter_profile %}<small>Q{{q.period}} : {{q.avg_goals}} buts de moyenne · n={{q.samples}}</small>{% endfor %}</div>
+      <div class="history-card"><h4>{{match.opponent}} · archive publique</h4><b>{{scoring_patterns.opponent_public_history.match_count}} matchs documentés</b><p>{% if scoring_patterns.opponent_public_history.avg_goals_for is not none %}{{scoring_patterns.opponent_public_history.avg_goals_for}} buts/match · {{scoring_patterns.opponent_public_history.avg_goals_against}} encaissés/match.{% else %}Score historique insuffisant.{% endif %}</p>{% for q in scoring_patterns.opponent_public_history.quarter_profile %}<small>Q{{q.period}} : {{q.avg_goals}} buts de moyenne · n={{q.samples}}</small>{% endfor %}{% if scoring_patterns.opponent_public_history.top_scorers %}<h5>Scorers récurrents publiés</h5>{% for p in scoring_patterns.opponent_public_history.top_scorers[:5] %}<small>{{p.player}} · {{p.goals}} buts dans l'échantillon</small>{% endfor %}{% endif %}</div>
+    </div>
+    <p><small>{{scoring_patterns.opponent_public_history.contract}}</small></p>
+  </div>
+</section>
