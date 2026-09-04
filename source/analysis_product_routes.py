@@ -26,6 +26,7 @@ from services.deep_analysis_sequences import (
     sequence_gallery,
     sequence_summary,
 )
+from services.team_scoring_patterns import build_team_scoring_patterns, append_scoring_patterns_to_zip
 from services.rapid_match_analysis import RapidAnalysisError
 from services.video import is_http_url, youtube_embed
 from analysis_library_product_routes import router as analysis_library_product_router
@@ -162,6 +163,7 @@ def analysis_result(match_id: int, request: Request, db: Session = Depends(get_d
     sequences = sequence_gallery(db, match, max_total=72)
     summary = sequence_summary(sequences)
     research = build_research_context(db, match)
+    scoring_patterns = build_team_scoring_patterns(db, match)
     source_embed = youtube_embed(match.video_url) if match.video_url else ""
     if not source_embed and snapshot.get("reference") and snapshot["reference"].get("video_url"):
         source_embed = youtube_embed(snapshot["reference"]["video_url"]) or ""
@@ -186,6 +188,7 @@ def analysis_result(match_id: int, request: Request, db: Session = Depends(get_d
             "sequence_summary": summary,
             "source_embed": source_embed,
             "research": research,
+            "scoring_patterns": scoring_patterns,
         },
     )
 
@@ -213,6 +216,7 @@ def export_complete_analysis(match_id: int, request: Request, db: Session = Depe
     cards = sequence_gallery(db, match, max_total=72)
     append_sequence_manifest(archive, cards, root)
     append_research_to_zip(archive, build_research_context(db, match), root)
+    append_scoring_patterns_to_zip(archive, build_team_scoring_patterns(db, match), root)
     filename = f"AquaMetric_match_{match.id}_analysis.zip"
     return StreamingResponse(
         archive,
