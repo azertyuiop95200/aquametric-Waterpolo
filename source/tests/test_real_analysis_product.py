@@ -1,5 +1,7 @@
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parents[1]
+
 
 def _routes(app, path, method):
     return [
@@ -49,25 +51,32 @@ def test_youtube_evidence_is_bounded_to_exact_window():
     assert "end=131" in value
 
 
-def test_result_template_is_result_first_and_zip_enabled():
-    source = Path("source/templates/analysis_result.html").read_text(encoding="utf-8")
+def test_result_template_is_result_first_playable_and_zip_enabled():
+    source = (ROOT / "templates" / "analysis_result.html").read_text(encoding="utf-8")
     assert "ULTIMATE MATCH ANALYSIS · RÉSULTATS" in source
     assert "Télécharger le dossier ZIP complet" in source
+    assert "SÉQUENCES ANALYSÉES · MAXIMUM" in source
+    assert "Générer un maximum de séquences" in source
     assert "PREUVES EXACTES" in source
     assert "Aucune image locale" in source
     assert "analysis_exact" in source
+    assert "s.clip_url" in source
+    assert "s.segment_embed" in source
+    assert "s.screenshot_urls" in source
 
 
-def test_library_template_exposes_real_ultimate_results():
-    source = Path("source/templates/analysis_library.html").read_text(encoding="utf-8")
+def test_library_template_exposes_real_results_and_embedded_replays():
+    source = (ROOT / "templates" / "analysis_library.html").read_text(encoding="utf-8")
     assert "Résultats réellement produits" in source
     assert "Couverture Ultimate" in source
     assert "ZIP complet" in source
-    assert "pas faux clips" in source
+    assert "Replays directement lisibles" in source
+    for video_id in ("pIJu8tQT7-I", "bF-Am10VtF4", "TnZjH0VeCsQ"):
+        assert video_id in source
 
 
-def test_zip_contract_contains_all_analysis_folders():
-    source = Path("source/services/analysis_product.py").read_text(encoding="utf-8")
+def test_zip_contract_contains_all_analysis_folders_and_deep_manifest():
+    source = (ROOT / "services" / "analysis_product.py").read_text(encoding="utf-8")
     for folder in (
         "01_report/report.html",
         "01_report/analysis.json",
@@ -82,3 +91,17 @@ def test_zip_contract_contains_all_analysis_folders():
     ):
         assert folder in source
     assert "Les vidéos tierces ne sont pas copiées" in source
+
+    deep = (ROOT / "services" / "deep_analysis_sequences.py").read_text(encoding="utf-8")
+    assert "sequence_manifest.csv" in deep
+    assert "sequence_manifest.json" in deep
+    assert "max_total: int = 72" in deep
+    assert '"vision_peak"' in deep
+    assert '"active_window"' in deep
+
+
+def test_export_route_materializes_many_clips_before_zip():
+    source = (ROOT / "analysis_product_routes.py").read_text(encoding="utf-8")
+    assert "max_targets=72, max_clips=64" in source
+    assert "max_image_targets=72" in source
+    assert "append_sequence_manifest" in source
