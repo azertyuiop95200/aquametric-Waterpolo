@@ -1,4 +1,4 @@
-name: AquaMetric V12.1 Tactical Video
+name: AquaMetric V12.2 Tactical Video
 
 on:
   push:
@@ -21,7 +21,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Apply tactical integration patch
+      - name: Apply V12.2 tactical integration patch
         run: python source/scripts/apply_v121_tactical_patch.py
 
       - name: Publish integrated source
@@ -30,9 +30,9 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add source/extensions.py
           if git diff --cached --quiet; then
-            echo 'Tactical integration already present.'
+            echo 'V12.2 tactical integration already present.'
           else
-            git commit -m 'Integrate tactical study pack routes [skip ci]'
+            git commit -m 'Integrate AquaMetric V12.2 tactical study-pack routes [skip ci]'
             git push
           fi
 
@@ -51,26 +51,26 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r source/requirements.txt
 
-      - name: Run complete test suite
+      - name: Run complete V12.2 test suite
         working-directory: source
         env:
           PYTHONPATH: .
-          DATABASE_URL: sqlite:////tmp/aquametric_v121_ci.db
-          UPLOAD_DIR: /tmp/aquametric_v121_uploads
-          EVIDENCE_DIR: /tmp/aquametric_v121_evidence
-          SECRET_KEY: v121-ci-secret-key-only
+          DATABASE_URL: sqlite:////tmp/aquametric_v122_tactical_ci.db
+          UPLOAD_DIR: /tmp/aquametric_v122_tactical_uploads
+          EVIDENCE_DIR: /tmp/aquametric_v122_tactical_evidence
+          SECRET_KEY: v122-tactical-ci-secret-key-only
           COOKIE_SECURE: '0'
           WEB_DEMO_MODE: '0'
         run: python -m pytest -q
 
-      - name: Smoke test tactical study pack route
+      - name: Smoke test V12.2 tactical study-pack route
         working-directory: source
         env:
           PYTHONPATH: .
-          DATABASE_URL: sqlite:////tmp/aquametric_v121_smoke.db
-          UPLOAD_DIR: /tmp/aquametric_v121_uploads_smoke
-          EVIDENCE_DIR: /tmp/aquametric_v121_evidence_smoke
-          SECRET_KEY: v121-smoke-secret-key-only
+          DATABASE_URL: sqlite:////tmp/aquametric_v122_tactical_smoke.db
+          UPLOAD_DIR: /tmp/aquametric_v122_tactical_uploads_smoke
+          EVIDENCE_DIR: /tmp/aquametric_v122_tactical_evidence_smoke
+          SECRET_KEY: v122-tactical-smoke-secret-key-only
           COOKIE_SECURE: '0'
           WEB_DEMO_MODE: '0'
         run: |
@@ -82,5 +82,5 @@ jobs:
           review = sequence_review({'phase':'power_play','passes':4,'shots_for':1,'goals_for':1,'losses_for':0,'goals_against':0,'time_to_first_shot':7.2})
           assert 'Zone+' in review['objective']
           assert '7.2' in review['tempo']
-          print('Tactical study-pack route and coaching review: OK')
+          print('AquaMetric V12.2 tactical study-pack route and coaching review: OK')
           PY
