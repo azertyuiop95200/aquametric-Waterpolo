@@ -1,5 +1,6 @@
 from sqlalchemy import select
 from models import PlayerIntelligenceProfile, PlayerSourceRecord, PlayerMatchMetric, FranceSquadMembership, ScoutingTeam, ScoutingPlayer
+from services.france_women_roster_update_2026 import seed_france_women_roster_update_2026
 
 FFN_2022 = "https://www.ffnatation.fr/actualites/actu-grand-public/florian-bruzzo-la-onzieme-equipe-du-monde"
 FFN_2023 = "https://www.ffnatation.fr/sites/default/files/fields/press/pdf/dp_fukuoka_2023_vf5_compressed.pdf"
@@ -25,7 +26,7 @@ FRANCE_CYCLES = [
     {
         "year": 2024, "competition": "Olympic Games — Paris", "result": "9th",
         "roster_kind": "official", "source": WA_2024,
-        "players": ["Lara Andres","Camelia Bouloukbachi","Aurélie Battu","Audrey Daule","Juliette Dhalluin","Louise Guillet","Orsolya Hertzka","Valentine Heurtaux","Pasiphaé Martineaud-Perret","Tiziana Raspo","Camille Radosavljevic","Mia Rycraw","Ema Vernoux"],
+        "players": ["Lara Andres","Camelia Bouloukbachi","Aurélie Battu","Audrey Daule","Juliette Dhalluin","Louise Guillet","Orsolya Hertzka","Valentine Heurtaux","Pasiphaé Martineaud-Peret","Tiziana Raspo","Camille Radosavljevic","Mia Rycraw","Ema Vernoux"],
         "note": "Confirmed Olympic roster."
     },
     {
@@ -107,6 +108,10 @@ def seed_france_intelligence(db):
         for metric,value,unit,conf in metrics:
             _metric_once(db,p,metric,value,unit,WA_2025_REPORT,"World Aquatics Singapore 2025 Results Report")
     db.commit()
+    # Apply the latest named French Elite women roster intelligence only after the
+    # canonical profiles have been seeded, so newer club evidence can supersede a
+    # historical club-at-event value without deleting that official history.
+    seed_france_women_roster_update_2026(db)
 
 
 def france_dashboard(db):
