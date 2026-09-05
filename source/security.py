@@ -111,7 +111,7 @@ def install_security(app):
     from scorer_routes import router as scorer_router
     from premium_ingest_routes import router as premium_ingest_router
     from premium_status_routes import router as premium_status_router
-    from premium_product_routes import router as premium_product_router
+    from premium_product_routes import router as premium_product_router, premium_match_brief
     from premium_national_routes import router as premium_national_router
 
     app.include_router(rapid_analysis_router)
@@ -120,3 +120,20 @@ def install_security(app):
     app.include_router(premium_status_router)
     app.include_router(premium_product_router)
     app.include_router(premium_national_router)
+
+    # V12.2 invariant: the Executive Coach Brief is a first-class Ultimate
+    # analysis endpoint. Keep a direct fallback because historical integration
+    # passes can rebuild/copy APIRouters and previously dropped this one route.
+    premium_brief_path = "/api/premium/matches/{match_id}/brief"
+    premium_brief_present = any(
+        getattr(route, "path", None) == premium_brief_path
+        and "GET" in (getattr(route, "methods", set()) or set())
+        for route in app.routes
+    )
+    if not premium_brief_present:
+        app.add_api_route(
+            premium_brief_path,
+            premium_match_brief,
+            methods=["GET"],
+            name="premium_match_brief",
+        )
