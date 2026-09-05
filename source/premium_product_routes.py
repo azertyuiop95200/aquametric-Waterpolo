@@ -41,6 +41,18 @@ def _norm_team(value: str) -> str:
     return ALIASES.get(key, key)
 
 
+def _item_context(item: MatchLibraryItem) -> str:
+    """Build a safe searchable context from fields that exist across old/new DBs."""
+    parts = [
+        getattr(item, "competition", "") or "",
+        getattr(item, "season", "") or "",
+        getattr(item, "source_quality", "") or "",
+        getattr(item, "official_source_name", "") or "",
+        getattr(item, "video_label", "") or "",
+    ]
+    return " ".join(str(x) for x in parts).lower()
+
+
 def _film_room_rows(db: Session):
     library = db.scalars(select(MatchLibraryItem).order_by(MatchLibraryItem.id.desc())).all()
     rows = []
@@ -51,10 +63,8 @@ def _film_room_rows(db: Session):
             pair = {_norm_team(item.team_a), _norm_team(item.team_b)}
             if pair != wanted:
                 continue
-            if reference.get("u20"):
-                context = f"{item.competition or ''} {item.season or ''} {item.notes_json or ''}".lower()
-                if "u20" not in context:
-                    continue
+            if reference.get("u20") and "u20" not in _item_context(item):
+                continue
             match = item
             break
         row = dict(reference)
