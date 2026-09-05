@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from pathlib import Path
+import copy
 import json
 
 from models import (
@@ -24,6 +25,32 @@ class RapidAnalysisError(RuntimeError):
     pass
 
 
+_TIME_KEYS = {
+    "second", "start", "end", "start_second", "end_second",
+    "bracket_start_second", "bracket_end_second", "visual_focus_second",
+    "previous_focus_second",
+}
+
+
+def _shift_times(value, offset: float):
+    """Shift absolute source-time fields in a JSON-like structure."""
+    if not offset:
+        return value
+    if isinstance(value, list):
+        return [_shift_times(item, offset) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_shift_times(item, offset) for item in value)
+    if isinstance(value, dict):
+        shifted = {}
+        for key, item in value.items():
+            if key in _TIME_KEYS and isinstance(item, (int, float)):
+                shifted[key] = float(item) + offset
+            else:
+                shifted[key] = _shift_times(item, offset)
+        return shifted
+    return value
+
+
 def run_rapid_analysis(
     db,
     match,
@@ -35,10 +62,15 @@ def run_rapid_analysis(
     ocr_samples: int = 48,
     source_kind: str = "upload",
     persist_visual_artifacts: bool = True,
+    time_offset_seconds: float = 0.0,
 ):
     source_path = Path(source_path)
     if not source_path.exists():
         raise RapidAnalysisError("Video source file is missing.")
+    try:
+        time_offset = max(0.0, float(time_offset_seconds or 0.0))
+    except (TypeError, ValueError):
+        time_offset = 0.0
 
     job = AnalysisJob(
         match_id=match.id,
@@ -60,6 +92,9 @@ def run_rapid_analysis(
         db.commit()
         raise RapidAnalysisError(str(exc)) from exc
 
+    active_windows = _shift_times(copy.deepcopy(result.active_windows), time_offset)
+    interesting_moments = _shift_times(copy.deepcopy(result.interesting_moments), time_offset)
+
     vision = VisionAnalysis(
         match_id=match.id,
         status="complete",
@@ -77,8 +112,8 @@ def run_rapid_analysis(
         avg_motion_score=result.avg_motion_score,
         scene_cut_rate=result.scene_cut_rate,
         active_seconds_estimate=result.active_seconds_estimate,
-        active_windows_json=json.dumps(result.active_windows),
-        interesting_moments_json=json.dumps(result.interesting_moments),
+        active_windows_json=json.dumps(active_windows),
+        interesting_moments_json=json.dumps(interesting_moments),
         scoreboard_candidates_json=json.dumps([asdict(c) for c in result.scoreboard_candidates]),
         # Third-party sources may be decoded transiently for derived measurements,
         # but AquaMetric does not persist or expose their contact-sheet imagery.
@@ -90,7 +125,7 @@ def run_rapid_analysis(
     for sample in result.samples:
         db.add(VisionSample(
             analysis_id=vision.id,
-            second=sample.second,
+            second=float(sample.second) + time_offset,
             pool_ratio=sample.pool_ratio,
             motion_score=sample.motion_score,
             scene_change=sample.scene_change,
@@ -140,11 +175,27 @@ def run_rapid_analysis(
             audio_state = "ffmpeg_unavailable"
     candidates.sort(key=lambda item: item.second)
 
+    if time_offset:
+        observations = _shift_times(observations, time_offset)
+        periods = _shift_times(periods, time_offset)
+        shifted_candidates = []
+        for candidate in candidates:
+            shifted_candidates.append(AutoCandidate(
+                float(candidate.second) + time_offset,
+                candidate.event_type,
+                candidate.confidence,
+                candidate.confidence_label,
+                candidate.summary,
+                _shift_times(copy.deepcopy(candidate.evidence), time_offset),
+            ))
+        candidates = shifted_candidates
+
     summary = build_auto_summary(observations, periods, candidates)
     summary.update({
         "pipeline": "rapid-long-video-v1",
         "source_kind": source_kind,
         "duration_minutes": round(result.duration_seconds / 60.0, 1),
+        "source_time_offset_seconds": round(time_offset, 3),
         "visual_samples": len(result.samples),
         "ocr_samples_cap": max(12, min(96, int(ocr_samples))),
         "scoreboard_observations": len(observations),
@@ -156,7 +207,7 @@ def run_rapid_analysis(
         "Automatic output is candidate evidence until cross-validated; it never replaces official truth.",
         "The fast pass does not yet visually resolve every player number/face or track the ball continuously.",
         "Player-level passes, shot attribution, possessions, exclusions and tactical shapes require verified tagging or dedicated models.",
-        "Cap numbers are only unique inside a team; any attributed identity must include match + side/team + cap number.",
+        "A cap number is not a player identity: opposing teams and even players on the same friendly-match roster may share a number; individual attribution requires side + visual track/player resolution.",
         "All unavailable match statistics stay visibly unavailable instead of being filled with synthetic values.",
     ]
     if source_kind != "upload":
