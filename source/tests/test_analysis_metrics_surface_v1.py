@@ -6,7 +6,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def test_ultimate_result_loads_complete_measured_analytics_surface():
     base = (ROOT / "templates" / "base.html").read_text(encoding="utf-8")
     js = (ROOT / "static" / "analysis-metrics-surface.js").read_text(encoding="utf-8")
-    assert "/static/analysis-metrics-surface.js?v=2026.09.04.1" in base
+    assert "/static/analysis-metrics-surface.js?v=12.2.0" in base
     assert "/api/matches/${m[1]}/performance" in js
     assert "DONNÉES MESURÉES & ANALYSÉES · COMPLET" in js
     assert "Toutes les données mesurées" in js
