@@ -9,6 +9,7 @@ from models import AutonomousEventCandidate, VisionSample
 from services.analysis_product import build_exact_evidence_pack
 from services.autonomous_engine import confidence_label
 from services.rapid_match_analysis import RapidAnalysisError, run_rapid_analysis
+from services.remote_video import RemoteVideoError, cleanup_remote_video, materialize_remote_video
 
 
 def _refine_score_change_focus(db, vision, autonomy) -> int:
@@ -67,21 +68,51 @@ def _refine_score_change_focus(db, vision, autonomy) -> int:
     return refined
 
 
-def run_complete_analysis(db, match, upload_dir: Path, evidence_dir: Path, *, include_audio: bool = True):
-    """Run dense Vision/OCR analysis only on an owned video uploaded to AquaMetric.
+def _run_remote_analysis(db, match, upload_dir: Path, *, include_audio: bool):
+    source_path = None
+    try:
+        source_path = materialize_remote_video(match.video_url, Path(upload_dir))
+        transient_evidence = source_path.parent / "derived"
+        transient_evidence.mkdir(parents=True, exist_ok=True)
+        result = run_rapid_analysis(
+            db,
+            match,
+            source_path,
+            transient_evidence,
+            include_audio=include_audio,
+            visual_samples=240,
+            ocr_samples=72,
+            source_kind="third_party_transient",
+            persist_visual_artifacts=False,
+        )
+        refined = _refine_score_change_focus(db, result.get("vision"), result.get("autonomy"))
+        if refined:
+            result.setdefault("summary", {})["score_change_timestamps_refined"] = refined
+        match.status = "url_video_analyzed"
+        db.commit()
+        return result
+    except RemoteVideoError as exc:
+        match.status = "url_video_extraction_failed"
+        db.commit()
+        raise RapidAnalysisError(
+            "La vidéo URL n'a pas pu être ouverte par le serveur avant l'analyse Vision/OCR. "
+            f"Détail technique: {exc}"
+        ) from exc
+    finally:
+        cleanup_remote_video(source_path)
 
-    Third-party players such as YouTube are intentionally reference-only: AquaMetric
-    embeds the source and stores timestamp/bookmark evidence, but never downloads or
-    copies those pixels on the server. This also avoids bot/cookie extraction failures.
+
+def run_complete_analysis(db, match, upload_dir: Path, evidence_dir: Path, *, include_audio: bool = True):
+    """Run bounded evidence-first Vision/OCR on uploaded or accessible URL video.
+
+    Uploaded files may generate persistent evidence media. Third-party URLs are
+    decoded only through a transient local file; AquaMetric stores derived numeric
+    measurements/candidates, not the downloaded source frames, clips or contact sheet.
     """
     if match.video_source != "upload" or not match.video_path:
         if match.video_url:
-            raise RapidAnalysisError(
-                "Cette vidéo tierce est en mode référence sécurisé : lecteur intégré + timestamps/bookmarks, "
-                "sans téléchargement serveur. Pour Vision/OCR, clips, images et mesures automatiques pixel, "
-                "téléverse le fichier vidéo que tu possèdes."
-            )
-        raise RapidAnalysisError("Aucune vidéo téléversée exploitable n'est associée à ce match.")
+            return _run_remote_analysis(db, match, Path(upload_dir), include_audio=include_audio)
+        raise RapidAnalysisError("Aucune source vidéo exploitable n'est associée à ce match.")
 
     source_path = Path(upload_dir) / Path(match.video_path).name
     result = run_rapid_analysis(
@@ -92,6 +123,8 @@ def run_complete_analysis(db, match, upload_dir: Path, evidence_dir: Path, *, in
         include_audio=include_audio,
         visual_samples=360,
         ocr_samples=96,
+        source_kind="upload",
+        persist_visual_artifacts=True,
     )
     refined = _refine_score_change_focus(db, result.get("vision"), result.get("autonomy"))
     if refined:
