@@ -1,4 +1,4 @@
-name: AquaMetric web smoke test
+name: AquaMetric V12.2 Web Smoke
 
 on:
   push:
@@ -11,7 +11,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - name: Apply idempotent V12 integration patch
+      - name: Apply idempotent V12.2 integration patch
         run: python source/scripts/apply_v12_patch.py
       - name: Build production Docker image
         run: docker build -t aquametric-smoke .
@@ -21,9 +21,9 @@ jobs:
             -e PORT=10000 \
             -e SECRET_KEY=ci-smoke-secret-not-production \
             -e COOKIE_SECURE=0 \
-            -e DATABASE_URL=sqlite:////tmp/aquametric_ci.db \
-            -e UPLOAD_DIR=/tmp/aquametric_uploads \
-            -e EVIDENCE_DIR=/tmp/aquametric_evidence \
+            -e DATABASE_URL=sqlite:////tmp/aquametric_v122_ci.db \
+            -e UPLOAD_DIR=/tmp/aquametric_v122_uploads \
+            -e EVIDENCE_DIR=/tmp/aquametric_v122_evidence \
             -p 10000:10000 aquametric-smoke
           for i in $(seq 1 30); do
             if curl -fsS http://127.0.0.1:10000/health >/dev/null; then exit 0; fi
@@ -31,8 +31,11 @@ jobs:
           done
           docker logs aquametric-smoke
           exit 1
-      - name: Check security status
+      - name: Check V12.2 release and security status
         run: |
+          curl -fsS http://127.0.0.1:10000/static/release.json | tee /tmp/release.json
+          grep -q '"product_version": "12.2.0"' /tmp/release.json
+          grep -q '"analysis_engine": "ultimate-analyst-v2.0"' /tmp/release.json
           curl -fsS -H 'Host: localhost:10000' http://127.0.0.1:10000/security-status | tee /tmp/security.json
           grep -q '"security_headers":true' /tmp/security.json
           grep -q '"api_docs_public":false' /tmp/security.json
@@ -67,7 +70,7 @@ jobs:
                   assert player['name'] in profile.text
               finally:
                   db.close()
-          print('AquaMetric secure roster/profile smoke test passed')
+          print('AquaMetric V12.2 secure roster/profile smoke test passed')
           PY
       - name: Show logs on failure
         if: failure()
