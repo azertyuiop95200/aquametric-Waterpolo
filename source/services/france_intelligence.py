@@ -26,7 +26,7 @@ FRANCE_CYCLES = [
     {
         "year": 2024, "competition": "Olympic Games — Paris", "result": "9th",
         "roster_kind": "official", "source": WA_2024,
-        "players": ["Lara Andres","Camelia Bouloukbachi","Aurélie Battu","Audrey Daule","Juliette Dhalluin","Louise Guillet","Orsolya Hertzka","Valentine Heurtaux","Pasiphaé Martineaud-Peret","Tiziana Raspo","Camille Radosavljevic","Mia Rycraw","Ema Vernoux"],
+        "players": ["Lara Andres","Camelia Bouloukbachi","Aurélie Battu","Audrey Daule","Juliette Dhalluin","Louise Guillet","Orsolya Hertzka","Valentine Heurtaux","Pasiphaé Martineaud-Perret","Tiziana Raspo","Camille Radosavljevic","Mia Rycraw","Ema Vernoux"],
         "note": "Confirmed Olympic roster."
     },
     {
