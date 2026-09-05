@@ -1,4 +1,4 @@
-name: AquaMetric V12 CI
+name: AquaMetric V12.2 CI
 
 on:
   push:
@@ -24,7 +24,7 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Apply idempotent V12 integration patch
+      - name: Apply idempotent V12.2 integration patch
         run: python source/scripts/apply_v12_patch.py
 
       - name: Install system media tools
@@ -41,39 +41,46 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r source/requirements.txt
 
-      - name: Run complete test suite
+      - name: Run complete V12.2 test suite
         working-directory: source
         env:
           PYTHONPATH: .
-          DATABASE_URL: sqlite:////tmp/aquametric_v12_ci.db
-          UPLOAD_DIR: /tmp/aquametric_v12_uploads
-          EVIDENCE_DIR: /tmp/aquametric_v12_evidence
+          DATABASE_URL: sqlite:////tmp/aquametric_v122_ci.db
+          UPLOAD_DIR: /tmp/aquametric_v122_uploads
+          EVIDENCE_DIR: /tmp/aquametric_v122_evidence
           SECRET_KEY: ci-only-secret-not-used-in-production
         run: python -m pytest -q
 
-      - name: Smoke test main pages
+      - name: Smoke test V12.2 main pages and Ultimate routes
         working-directory: source
         env:
           PYTHONPATH: .
-          DATABASE_URL: sqlite:////tmp/aquametric_v12_smoke.db
-          UPLOAD_DIR: /tmp/aquametric_v12_smoke_uploads
-          EVIDENCE_DIR: /tmp/aquametric_v12_smoke_evidence
+          DATABASE_URL: sqlite:////tmp/aquametric_v122_smoke.db
+          UPLOAD_DIR: /tmp/aquametric_v122_smoke_uploads
+          EVIDENCE_DIR: /tmp/aquametric_v122_smoke_evidence
           SECRET_KEY: ci-only-secret-not-used-in-production
         run: |
           python - <<'PY'
           from fastapi.testclient import TestClient
           from main import app
           c=TestClient(app)
-          for path in ('/','/health','/security-status'):
+          for path in ('/','/health','/security-status','/static/release.json'):
               r=c.get(path)
               print(path, r.status_code)
               assert r.status_code < 500
           paths={getattr(r,'path',None) for r in app.routes}
           assert '/matches/{match_id}/intelligence' in paths
+          assert '/matches/{match_id}/analysis/result' in paths
+          assert '/api/matches/{match_id}/performance' in paths
+          assert '/api/premium/matches/{match_id}/brief' in paths
+          assert '/analysis-library' in paths
           assert '/coach-intelligence/{coach_id}' in paths
           assert '/profiles/players/{profile_id}' in paths
           assert '/security-status' in paths
           assert '/docs' not in paths
           assert '/redoc' not in paths
           assert '/openapi.json' not in paths
+          release=c.get('/static/release.json').json()
+          assert release['product_version']=='12.2.0'
+          assert release['analysis_engine']=='ultimate-analyst-v2.0'
           PY
