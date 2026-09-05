@@ -26,7 +26,7 @@ def test_performance_api_exposes_automatic_analysis_and_measurement_matrix():
 def test_ultimate_result_loads_automatic_video_measurement_surface():
     base = (ROOT / "templates" / "base.html").read_text(encoding="utf-8")
     js = (ROOT / "static" / "automatic-video-measurements.js").read_text(encoding="utf-8")
-    assert "/static/automatic-video-measurements.js?v=2026.09.04.1" in base
+    assert "/static/automatic-video-measurements.js?v=12.2.0" in base
     assert "Matrice de mesure — ce qui est réellement disponible" in js
     assert "Mesures automatiques réellement extraites de la vidéo" in js
     assert "OCR, périodes, score et audio — sorties automatiques" in js
