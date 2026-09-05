@@ -10,7 +10,7 @@ from db import get_db
 from models import Match, MatchLibraryItem, User
 from services.analysis_product import analysis_snapshot
 from services.deep_analysis_sequences import sequence_gallery, sequence_summary
-from services.performance_intelligence import player_match_breakdown
+from services.player_premium_metrics import build_player_premium_metrics
 from services.premium_public_analysis import build_public_match_dossier
 from services.team_scoring_patterns import build_team_scoring_patterns
 from services.video import youtube_embed
@@ -42,7 +42,6 @@ def _norm_team(value: str) -> str:
 
 
 def _item_context(item: MatchLibraryItem) -> str:
-    """Build a safe searchable context from fields that exist across old/new DBs."""
     parts = [
         getattr(item, "competition", "") or "",
         getattr(item, "season", "") or "",
@@ -94,7 +93,7 @@ def _workspace_card(db: Session, match: Match):
     report = snapshot.get("ultimate", {}).get("team", {})
     basic = report.get("basic", {})
     coverage = report.get("coverage", {"score": 0, "readiness": "SPARSE"})
-    sequences = sequence_gallery(db, match, max_total=12)
+    sequences = sequence_gallery(db, match, max_total=72)
     scoring = build_team_scoring_patterns(db, match)
     source_embed = youtube_embed(match.video_url) if match.video_url else ""
     if not source_embed and snapshot.get("reference") and snapshot["reference"].get("video_url"):
@@ -104,12 +103,33 @@ def _workspace_card(db: Session, match: Match):
         "basic": basic,
         "coverage": coverage,
         "sequence_summary": sequence_summary(sequences),
-        "sequences": sequences[:4],
+        "sequences": sequences[:6],
         "scoring": scoring,
         "video_embed": source_embed,
         "local_video": match.video_source == "upload" and bool(match.video_path),
         "verified_events": len(snapshot.get("verified_events", []) or []),
         "automatic": len(snapshot.get("automatic", {}).get("candidates", []) or []),
+    }
+
+
+def _sequence_payload(card: dict) -> dict:
+    return {
+        "event_id": card.get("event_id"),
+        "second": card.get("second"),
+        "start_second": card.get("start_second"),
+        "end_second": card.get("end_second"),
+        "title": card.get("title"),
+        "summary": card.get("summary"),
+        "kind": card.get("kind"),
+        "confidence": card.get("confidence"),
+        "confidence_label": card.get("confidence_label"),
+        "phase": card.get("phase"),
+        "clip_url": card.get("clip_url"),
+        "segment_embed": card.get("segment_embed"),
+        "local_segment_url": card.get("local_segment_url"),
+        "external_url": card.get("external_url"),
+        "screenshot_urls": card.get("screenshot_urls", [])[:3],
+        "downloadable": card.get("downloadable", False),
     }
 
 
@@ -119,13 +139,32 @@ def premium_match_brief(match_id: int, request: Request, db: Session = Depends(g
     snapshot = analysis_snapshot(db, match)
     scoring = build_team_scoring_patterns(db, match)
     sequences = sequence_gallery(db, match, max_total=72)
+    sequence_by_event = {}
+    for card in sequences:
+        event_id = card.get("event_id")
+        if event_id:
+            sequence_by_event.setdefault(int(event_id), []).append(card)
+
     players = []
     for player in list(match.team.players or []):
         events = [e for e in list(match.events or []) if e.player_id == player.id]
-        breakdown = player_match_breakdown(events, {"rated": False, "dimensions": {}}, role=player.primary_role)
+        breakdown = build_player_premium_metrics(events, role=player.primary_role)
         board = breakdown.get("statboard", {})
-        if not events and not any(board.get(k) for k in ("goals", "shots", "passes_completed", "turnovers", "saves")):
+        if not events and not any(board.get(k) for k in ("goals", "shots", "passes_completed", "turnovers", "saves", "ball_touches")):
             continue
+        evidence = []
+        seen = set()
+        for event in events:
+            for card in sequence_by_event.get(int(event.id), []):
+                key = (card.get("kind"), card.get("second"))
+                if key in seen:
+                    continue
+                seen.add(key)
+                evidence.append(_sequence_payload(card))
+                if len(evidence) >= 8:
+                    break
+            if len(evidence) >= 8:
+                break
         players.append({
             "id": player.id,
             "name": player.name,
@@ -136,45 +175,55 @@ def premium_match_brief(match_id: int, request: Request, db: Session = Depends(g
             "statboard": board,
             "losses": breakdown.get("loss_breakdown", {}),
             "transition": breakdown.get("transition_timing", {}),
+            "physical": breakdown.get("physical", {}),
+            "observed_action_span": breakdown.get("observed_action_span"),
+            "measurement_contract": breakdown.get("measurement_contract", {}),
+            "measurement_tags": breakdown.get("measurement_tags", []),
             "checklist": breakdown.get("qualitative_checklist", []),
             "phases": breakdown.get("phases", {}),
+            "evidence": evidence,
         })
-    players.sort(key=lambda p: (-(p["statboard"].get("goals") or 0), -p["event_count"], p["name"]))
+    players.sort(key=lambda p: (-(p["statboard"].get("goals") or 0), -(p["statboard"].get("ball_touches") or 0), -p["event_count"], p["name"]))
 
     team = snapshot.get("ultimate", {}).get("team", {})
     opponent = snapshot.get("ultimate", {}).get("opponent", {})
     team_scoring = scoring.get("team", {}) if isinstance(scoring, dict) else {}
     opp_scoring = scoring.get("opponent", {}) if isinstance(scoring, dict) else {}
+    summary = sequence_summary(sequences)
     return {
         "match": {"id": match.id, "team": match.team.name, "opponent": match.opponent, "competition": match.competition, "date": match.match_date},
         "coverage": team.get("coverage", {}),
         "basic": team.get("basic", {}),
         "opponent_basic": opponent.get("basic", {}),
-        "qualitative": team.get("qualitative", [])[:8],
+        "qualitative": team.get("qualitative", [])[:12],
         "losses": team.get("losses", {}),
         "shots": team.get("shots", {}),
         "passes": team.get("passes", {}),
-        "phases": team.get("phases", [])[:10],
+        "phases": team.get("phases", [])[:16],
         "periods": team.get("periods", [])[:8],
         "decisions": team.get("decisions", {}),
         "pressure": team.get("pressure", {}),
         "possessions": team.get("possessions", {}),
-        "positive_habits": team_scoring.get("positive_habits", [])[:6],
-        "negative_habits": team_scoring.get("negative_habits", [])[:6],
-        "tendencies": team_scoring.get("tendencies", [])[:6],
-        "phase_scoring": team_scoring.get("phase_rows", [])[:10],
-        "top_scorers": team_scoring.get("top_scorers", [])[:8],
-        "repeated_routes": team_scoring.get("repeated_routes", [])[:8],
+        "positive_habits": team_scoring.get("positive_habits", [])[:8],
+        "negative_habits": team_scoring.get("negative_habits", [])[:8],
+        "tendencies": team_scoring.get("tendencies", [])[:8],
+        "phase_scoring": team_scoring.get("phase_rows", [])[:12],
+        "top_scorers": team_scoring.get("top_scorers", [])[:10],
+        "repeated_routes": team_scoring.get("repeated_routes", [])[:10],
         "opponent_habits": {
-            "positive": opp_scoring.get("positive_habits", [])[:4],
-            "negative": opp_scoring.get("negative_habits", [])[:4],
-            "tendencies": opp_scoring.get("tendencies", [])[:4],
+            "positive": opp_scoring.get("positive_habits", [])[:6],
+            "negative": opp_scoring.get("negative_habits", [])[:6],
+            "tendencies": opp_scoring.get("tendencies", [])[:6],
         },
-        "players": players[:18],
-        "sequences": [
-            {"second": s.get("second"), "title": s.get("title"), "kind": s.get("kind"), "confidence": s.get("confidence"), "phase": s.get("phase"), "clip_url": s.get("clip_url"), "segment_embed": s.get("segment_embed"), "screenshot_urls": s.get("screenshot_urls", [])[:3]}
-            for s in sequences[:12]
-        ],
+        "players": players[:24],
+        "sequence_summary": summary,
+        "sequences": [_sequence_payload(card) for card in sequences[:36]],
+        "evidence_contract": {
+            "max_sequences": 72,
+            "visible_wall": min(36, len(sequences)),
+            "local_video": match.video_source == "upload" and bool(match.video_path),
+            "third_party_policy": "Les sources tierces restent embarquées/horodatées ; aucune fausse capture n'est fabriquée.",
+        },
     }
 
 
