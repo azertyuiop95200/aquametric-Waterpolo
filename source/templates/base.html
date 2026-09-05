@@ -44,6 +44,7 @@
 
       <small class="nav-group-title">Analysis tools</small>
       <a class="{% if request.url.path == '/knowledge' %}active{% endif %}" href="/knowledge"><span>TK</span><b class="nav-label">Tactique & Connaissance</b></a>
+      <a class="{% if request.url.path.startswith('/analysis/video-session-elite') %}active{% endif %}" href="/analysis/video-session-elite"><span>▶</span><b class="nav-label">Séances vidéo</b></a>
       <a class="{% if request.url.path.startswith('/simulation') %}active{% endif %}" href="/simulation"><span>~</span><b class="nav-label" data-i18n="nav.simulation">Simulation</b></a>
       <a class="{% if request.url.path.startswith('/france-intelligence') %}active{% endif %}" href="/france-intelligence"><span>FR</span><b class="nav-label" data-i18n="nav.france_intel">France Intel</b></a>
 
