@@ -10,6 +10,7 @@ from db import get_db
 from models import Match, MatchLibraryItem, User
 from services.analysis_product import analysis_snapshot
 from services.deep_analysis_sequences import sequence_gallery, sequence_summary
+from services.player_deep_metrics import player_deep_metrics, team_player_totals
 from services.player_premium_metrics import build_player_premium_metrics
 from services.premium_public_analysis import build_public_match_dossier
 from services.team_scoring_patterns import build_team_scoring_patterns
@@ -88,6 +89,23 @@ def _owned_match(match_id: int, request: Request, db: Session):
     return user, match
 
 
+def _deep_workspace_players(match: Match):
+    events = list(match.events or [])
+    rows = []
+    for player in list(match.team.players or []):
+        player_events = [e for e in events if e.player_id == player.id]
+        row = player_deep_metrics(player, player_events)
+        if player_events or any(row.get(k) for k in ("touches", "goals", "shots", "passes_completed", "turnovers", "saves")):
+            rows.append(row)
+    rows.sort(key=lambda r: (-int(r.get("event_count") or 0), -int(r.get("touches") or 0), -(r.get("goals") or 0), r.get("name") or ""))
+    assigned = sum(1 for e in events if e.player_id is not None)
+    return rows, team_player_totals(rows), {
+        "assigned": assigned,
+        "total": len(events),
+        "pct": round(100.0 * assigned / len(events), 1) if events else None,
+    }
+
+
 def _workspace_card(db: Session, match: Match):
     snapshot = analysis_snapshot(db, match)
     report = snapshot.get("ultimate", {}).get("team", {})
@@ -95,9 +113,11 @@ def _workspace_card(db: Session, match: Match):
     coverage = report.get("coverage", {"score": 0, "readiness": "SPARSE"})
     sequences = sequence_gallery(db, match, max_total=72)
     scoring = build_team_scoring_patterns(db, match)
+    player_rows, player_totals, attribution = _deep_workspace_players(match)
     source_embed = youtube_embed(match.video_url) if match.video_url else ""
     if not source_embed and snapshot.get("reference") and snapshot["reference"].get("video_url"):
         source_embed = youtube_embed(snapshot["reference"]["video_url"]) or ""
+    screenshots = sum(len(card.get("screenshot_urls", []) or []) for card in sequences)
     return {
         "match": match,
         "basic": basic,
@@ -105,6 +125,10 @@ def _workspace_card(db: Session, match: Match):
         "sequence_summary": sequence_summary(sequences),
         "sequences": sequences[:6],
         "scoring": scoring,
+        "player_rows": player_rows[:6],
+        "player_totals": player_totals,
+        "attribution": attribution,
+        "screenshots": screenshots,
         "video_embed": source_embed,
         "local_video": match.video_source == "upload" and bool(match.video_path),
         "verified_events": len(snapshot.get("verified_events", []) or []),
