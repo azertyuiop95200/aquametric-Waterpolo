@@ -117,8 +117,14 @@ def create_real_url_analysis(
     db.add(match)
     db.commit()
     db.refresh(match)
-    run_product_analysis(db, match, UPLOAD_DIR, EVIDENCE_DIR)
-    materialize_deep_sequence_pack(db, match, UPLOAD_DIR, EVIDENCE_DIR, max_targets=72, max_clips=0, max_image_targets=0)
+    try:
+        run_complete_analysis(db, match, UPLOAD_DIR, EVIDENCE_DIR, include_audio=True)
+        materialize_deep_sequence_pack(
+            db, match, UPLOAD_DIR, EVIDENCE_DIR,
+            max_targets=72, max_clips=48, max_image_targets=72, triple_frames=48,
+        )
+    except RapidAnalysisError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     return RedirectResponse(f"/matches/{match.id}/analysis/result", status_code=303)
 
 
@@ -149,8 +155,14 @@ def start_real_url_analysis(match_id: int, request: Request, db: Session = Depen
     _, match = _owned_match(match_id, request, db)
     if not match.video_url:
         raise HTTPException(status_code=400, detail="This analysis mode requires a video URL.")
-    run_product_analysis(db, match, UPLOAD_DIR, EVIDENCE_DIR)
-    materialize_deep_sequence_pack(db, match, UPLOAD_DIR, EVIDENCE_DIR, max_targets=72, max_clips=0, max_image_targets=0)
+    try:
+        run_complete_analysis(db, match, UPLOAD_DIR, EVIDENCE_DIR, include_audio=True)
+        materialize_deep_sequence_pack(
+            db, match, UPLOAD_DIR, EVIDENCE_DIR,
+            max_targets=72, max_clips=48, max_image_targets=72, triple_frames=48,
+        )
+    except RapidAnalysisError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     return RedirectResponse(f"/matches/{match_id}/analysis/result", status_code=303)
 
 
