@@ -6,9 +6,9 @@ from pathlib import Path
 from sqlalchemy import select
 
 from models import AutonomousEventCandidate, VisionSample
-from services.analysis_product import build_exact_evidence_pack, run_product_analysis
+from services.analysis_product import build_exact_evidence_pack
 from services.autonomous_engine import confidence_label
-from services.rapid_match_analysis import run_rapid_analysis
+from services.rapid_match_analysis import RapidAnalysisError, run_rapid_analysis
 from services.remote_video import RemoteVideoError, cleanup_remote_video, materialize_remote_video
 
 
@@ -69,12 +69,7 @@ def _refine_score_change_focus(db, vision, autonomy) -> int:
 
 
 def _run_remote_analysis(db, match, upload_dir: Path, evidence_dir: Path, *, include_audio: bool):
-    """Analyze an accessible remote video through a transient local copy.
-
-    The downloaded file is deleted immediately after Vision/OCR finishes. Evidence
-    for third-party sources remains URL/timestamp based; AquaMetric never exposes
-    the transient source file as a downloadable artifact.
-    """
+    """Analyze an accessible remote video through a transient local copy."""
     source_path = None
     try:
         source_path = materialize_remote_video(match.video_url, Path(upload_dir))
@@ -106,30 +101,32 @@ def _run_remote_analysis(db, match, upload_dir: Path, evidence_dir: Path, *, inc
 
 
 def run_complete_analysis(db, match, upload_dir: Path, evidence_dir: Path, *, include_audio: bool = True):
-    """Use the densest CPU-safe scan available for owned or accessible video.
+    """Run actual Vision/OCR analysis for uploaded or remotely accessible video.
 
-    Uploaded videos use 360 visual samples and 96 OCR observations. Public URL
-    videos are materialized only for the duration of the analysis, scanned with a
-    bounded 240/72 pass, and then immediately deleted. If a remote host blocks
-    extraction, AquaMetric falls back to its evidence-safe URL/reference path.
+    Remote extraction failures are surfaced to the caller instead of silently
+    returning an empty 0%-coverage report.
     """
     if match.video_source != "upload" or not match.video_path:
-        if match.video_url:
-            try:
-                return _run_remote_analysis(
-                    db,
-                    match,
-                    Path(upload_dir),
-                    Path(evidence_dir),
-                    include_audio=include_audio,
-                )
-            except RemoteVideoError:
-                pass
-            except Exception:
-                # Remote providers may block server-side extraction. Keep the
-                # existing evidence-safe fallback rather than failing the result page.
-                pass
-        return run_product_analysis(db, match, upload_dir, evidence_dir, include_audio=False)
+        if not match.video_url:
+            raise RapidAnalysisError("Aucune source vidéo exploitable n'est associée à ce match.")
+        try:
+            return _run_remote_analysis(
+                db,
+                match,
+                Path(upload_dir),
+                Path(evidence_dir),
+                include_audio=include_audio,
+            )
+        except RemoteVideoError as exc:
+            match.status = "url_video_extraction_failed"
+            db.commit()
+            raise RapidAnalysisError(f"Impossible d'extraire la vidéo URL pour l'analyse: {exc}") from exc
+        except RapidAnalysisError:
+            raise
+        except Exception as exc:
+            match.status = "url_video_analysis_failed"
+            db.commit()
+            raise RapidAnalysisError(f"L'analyse vidéo URL a échoué: {exc}") from exc
 
     source_path = Path(upload_dir) / Path(match.video_path).name
     result = run_rapid_analysis(
