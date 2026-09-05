@@ -1,0 +1,86 @@
+name: AquaMetric Reference Match Video Smoke
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/reference-video-smoke.yml'
+      - 'source/services/remote_video.py'
+      - 'source/services/vision_baseline.py'
+      - 'source/services/scoreboard_ocr.py'
+      - 'source/services/autonomous_engine.py'
+      - 'source/requirements.txt'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reference-video-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install media and OCR tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg tesseract-ocr
+          python -m pip install --upgrade pip
+          pip install -r source/requirements.txt
+      - name: Extract transient 90 second reference window
+        run: |
+          set -euo pipefail
+          yt-dlp \
+            --no-playlist \
+            --no-progress \
+            --socket-timeout 30 \
+            --retries 2 \
+            --download-sections '*465-555' \
+            --force-keyframes-at-cuts \
+            --format 'best[height<=480][ext=mp4]/best[height<=480]/best' \
+            --merge-output-format mp4 \
+            --output '/tmp/aquametric_reference.%(ext)s' \
+            'https://www.youtube.com/watch?v=Guo_UU282pI'
+          ls -lh /tmp/aquametric_reference.*
+      - name: Run Vision OCR pipeline on real reference window
+        working-directory: source
+        env:
+          PYTHONPATH: .
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from services.vision_baseline import scan_local_video
+          from services.scoreboard_ocr import sample_scoreboard_observations
+          from services.autonomous_engine import infer_periods, infer_candidates, build_auto_summary
+
+          videos = [p for p in Path('/tmp').glob('aquametric_reference.*') if p.suffix.lower() in {'.mp4','.webm','.mkv','.mov','.m4v'}]
+          assert videos, 'reference video segment was not produced'
+          video = videos[0]
+          evidence = Path('/tmp/aquametric_reference_evidence')
+          result = scan_local_video(video, evidence, target_samples=60)
+          rois = [vars(x) for x in result.scoreboard_candidates]
+          observations = [o.to_dict() for o in sample_scoreboard_observations(video, rois, result.duration_seconds, max_samples=18)]
+          periods = infer_periods(observations, result.duration_seconds)
+          candidates = infer_candidates(observations, result.interesting_moments)
+          summary = build_auto_summary(observations, periods, candidates)
+          payload = {
+              'duration_seconds': round(result.duration_seconds, 2),
+              'fps': round(result.fps, 3),
+              'width': result.width,
+              'height': result.height,
+              'visual_samples': len(result.samples),
+              'active_seconds_estimate': round(result.active_seconds_estimate, 2),
+              'scoreboard_roi_candidates': len(rois),
+              'scoreboard_observations': len(observations),
+              'periods': periods,
+              'candidate_count': len(candidates),
+              'auto_summary': summary,
+          }
+          print('AQUAMETRIC_REFERENCE_RESULT=' + json.dumps(payload, ensure_ascii=False))
+          assert result.duration_seconds >= 60, payload
+          assert len(result.samples) >= 40, payload
+          PY
