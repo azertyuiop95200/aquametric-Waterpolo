@@ -11,11 +11,12 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from db import get_db
-from models import AnalysisJob, Club, Match, Team, User
+from models import Club, Match, Team, User
 from services.analysis_product import (
     analysis_snapshot,
     build_analysis_zip,
     build_exact_evidence_pack,
+    run_product_analysis,
 )
 from services.analysis_research_context import build_research_context, append_research_to_zip
 from services.complete_analysis_runner import run_complete_analysis
@@ -93,46 +94,21 @@ def _is_owned_upload(match: Match) -> bool:
     return match.video_source == "upload" and bool(match.video_path)
 
 
-def _record_failure(db: Session, match: Match, message: str) -> None:
-    """Persist an actionable failure instead of presenting unmeasured values as zeros."""
-    text = (message or "Analyse vidéo impossible.").strip()
-    match.status = "analysis_failed"
-    db.add(AnalysisJob(
-        match_id=match.id,
-        stage="video_ingest",
-        progress=0,
-        status="failed",
-        message=text[:1200],
-    ))
+def _run_reference_only(db: Session, match: Match):
+    """Build a third-party URL dossier without downloading/copying remote pixels."""
+    result = run_product_analysis(db, match, UPLOAD_DIR, EVIDENCE_DIR, include_audio=False)
+    materialize_deep_sequence_pack(
+        db,
+        match,
+        UPLOAD_DIR,
+        EVIDENCE_DIR,
+        max_targets=72,
+        max_clips=0,
+        max_image_targets=0,
+    )
+    match.status = "url_reference_ready"
     db.commit()
-
-
-def _materialize_sequences_after_analysis(db: Session, match: Match) -> None:
-    if _is_owned_upload(match):
-        materialize_deep_sequence_pack(
-            db, match, UPLOAD_DIR, EVIDENCE_DIR,
-            max_targets=72, max_clips=48, max_image_targets=72, triple_frames=48,
-        )
-    else:
-        # Third-party source pixels stay transient; only timestamp-linked candidate
-        # sequences may be indexed after the derived Vision/OCR pass.
-        materialize_deep_sequence_pack(
-            db, match, UPLOAD_DIR, EVIDENCE_DIR,
-            max_targets=72, max_clips=0, max_image_targets=0,
-        )
-
-
-def _run_match_analysis(db: Session, match: Match, *, include_audio: bool) -> bool:
-    try:
-        run_complete_analysis(
-            db, match, UPLOAD_DIR, EVIDENCE_DIR,
-            include_audio=include_audio,
-        )
-        _materialize_sequences_after_analysis(db, match)
-        return True
-    except RapidAnalysisError as exc:
-        _record_failure(db, match, str(exc))
-        return False
+    return result
 
 
 @router.post("/analysis/url/create")
@@ -154,15 +130,20 @@ def create_real_url_analysis(
         raise HTTPException(status_code=400, detail="Opponent is required.")
     team = _url_team(db, user, team_name, competition)
     match = Match(
-        owner_id=user.id, team_id=team.id, opponent=opponent,
-        competition=(competition or "")[:160], match_date=(match_date or "")[:32],
+        owner_id=user.id,
+        team_id=team.id,
+        opponent=opponent,
+        competition=(competition or "")[:160],
+        match_date=(match_date or "")[:32],
         video_source="youtube" if youtube_embed(video_url) else "url",
-        video_url=video_url, video_path="", status="url_analysis_created",
+        video_url=video_url,
+        video_path="",
+        status="url_reference_created",
     )
     db.add(match)
     db.commit()
     db.refresh(match)
-    _run_match_analysis(db, match, include_audio=False)
+    _run_reference_only(db, match)
     return RedirectResponse(f"/matches/{match.id}/analysis/result", status_code=303)
 
 
@@ -174,13 +155,31 @@ def start_real_analysis(
     db: Session = Depends(get_db),
 ):
     _, match = _owned_match(match_id, request, db)
-    if not (_is_owned_upload(match) or match.video_url):
+    if _is_owned_upload(match):
+        try:
+            run_complete_analysis(
+                db,
+                match,
+                UPLOAD_DIR,
+                EVIDENCE_DIR,
+                include_audio=include_audio.lower() in {"1", "true", "on", "yes"},
+            )
+            materialize_deep_sequence_pack(
+                db,
+                match,
+                UPLOAD_DIR,
+                EVIDENCE_DIR,
+                max_targets=72,
+                max_clips=48,
+                max_image_targets=72,
+                triple_frames=48,
+            )
+        except RapidAnalysisError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+    elif match.video_url:
+        _run_reference_only(db, match)
+    else:
         raise HTTPException(status_code=400, detail="Aucune vidéo exploitable n'est associée à ce match.")
-    _run_match_analysis(
-        db,
-        match,
-        include_audio=include_audio.lower() in {"1", "true", "on", "yes"},
-    )
     return RedirectResponse(f"/matches/{match_id}/analysis/result", status_code=303)
 
 
@@ -189,7 +188,7 @@ def start_real_url_analysis(match_id: int, request: Request, db: Session = Depen
     _, match = _owned_match(match_id, request, db)
     if not match.video_url:
         raise HTTPException(status_code=400, detail="This analysis mode requires a video URL.")
-    _run_match_analysis(db, match, include_audio=False)
+    _run_reference_only(db, match)
     return RedirectResponse(f"/matches/{match_id}/analysis/result", status_code=303)
 
 
@@ -238,13 +237,24 @@ def regenerate_exact_evidence(match_id: int, request: Request, db: Session = Dep
     build_exact_evidence_pack(db, match, UPLOAD_DIR, EVIDENCE_DIR, max_verified_events=32, max_candidates=24)
     if _is_owned_upload(match):
         materialize_deep_sequence_pack(
-            db, match, UPLOAD_DIR, EVIDENCE_DIR,
-            max_targets=72, max_clips=48, max_image_targets=72, triple_frames=48,
+            db,
+            match,
+            UPLOAD_DIR,
+            EVIDENCE_DIR,
+            max_targets=72,
+            max_clips=48,
+            max_image_targets=72,
+            triple_frames=48,
         )
     else:
         materialize_deep_sequence_pack(
-            db, match, UPLOAD_DIR, EVIDENCE_DIR,
-            max_targets=72, max_clips=0, max_image_targets=0,
+            db,
+            match,
+            UPLOAD_DIR,
+            EVIDENCE_DIR,
+            max_targets=72,
+            max_clips=0,
+            max_image_targets=0,
         )
     return RedirectResponse(f"/matches/{match_id}/analysis/result#sequences", status_code=303)
 
@@ -254,13 +264,24 @@ def export_complete_analysis(match_id: int, request: Request, db: Session = Depe
     _, match = _owned_match(match_id, request, db)
     if _is_owned_upload(match):
         materialize_deep_sequence_pack(
-            db, match, UPLOAD_DIR, EVIDENCE_DIR,
-            max_targets=72, max_clips=72, max_image_targets=72, triple_frames=48,
+            db,
+            match,
+            UPLOAD_DIR,
+            EVIDENCE_DIR,
+            max_targets=72,
+            max_clips=72,
+            max_image_targets=72,
+            triple_frames=48,
         )
     else:
         materialize_deep_sequence_pack(
-            db, match, UPLOAD_DIR, EVIDENCE_DIR,
-            max_targets=72, max_clips=0, max_image_targets=0,
+            db,
+            match,
+            UPLOAD_DIR,
+            EVIDENCE_DIR,
+            max_targets=72,
+            max_clips=0,
+            max_image_targets=0,
         )
     archive = build_analysis_zip(db, match, EVIDENCE_DIR)
     root = _zip_root(match)
