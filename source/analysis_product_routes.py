@@ -11,12 +11,11 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from db import get_db
-from models import Club, Match, Team, User
+from models import AnalysisJob, Club, Match, Team, User
 from services.analysis_product import (
     analysis_snapshot,
     build_analysis_zip,
     build_exact_evidence_pack,
-    run_product_analysis,
 )
 from services.analysis_research_context import build_research_context, append_research_to_zip
 from services.complete_analysis_runner import run_complete_analysis
@@ -94,14 +93,46 @@ def _is_owned_upload(match: Match) -> bool:
     return match.video_source == "upload" and bool(match.video_path)
 
 
-def _run_reference_only(db: Session, match: Match):
-    """Build an evidence-safe third-party URL dossier without copying remote pixels."""
-    result = run_product_analysis(db, match, UPLOAD_DIR, EVIDENCE_DIR, include_audio=False)
-    materialize_deep_sequence_pack(
-        db, match, UPLOAD_DIR, EVIDENCE_DIR,
-        max_targets=72, max_clips=0, max_image_targets=0,
-    )
-    return result
+def _record_failure(db: Session, match: Match, message: str) -> None:
+    """Persist an actionable failure instead of presenting unmeasured values as zeros."""
+    text = (message or "Analyse vidéo impossible.").strip()
+    match.status = "analysis_failed"
+    db.add(AnalysisJob(
+        match_id=match.id,
+        stage="video_ingest",
+        progress=0,
+        status="failed",
+        message=text[:1200],
+    ))
+    db.commit()
+
+
+def _materialize_sequences_after_analysis(db: Session, match: Match) -> None:
+    if _is_owned_upload(match):
+        materialize_deep_sequence_pack(
+            db, match, UPLOAD_DIR, EVIDENCE_DIR,
+            max_targets=72, max_clips=48, max_image_targets=72, triple_frames=48,
+        )
+    else:
+        # Third-party source pixels stay transient; only timestamp-linked candidate
+        # sequences may be indexed after the derived Vision/OCR pass.
+        materialize_deep_sequence_pack(
+            db, match, UPLOAD_DIR, EVIDENCE_DIR,
+            max_targets=72, max_clips=0, max_image_targets=0,
+        )
+
+
+def _run_match_analysis(db: Session, match: Match, *, include_audio: bool) -> bool:
+    try:
+        run_complete_analysis(
+            db, match, UPLOAD_DIR, EVIDENCE_DIR,
+            include_audio=include_audio,
+        )
+        _materialize_sequences_after_analysis(db, match)
+        return True
+    except RapidAnalysisError as exc:
+        _record_failure(db, match, str(exc))
+        return False
 
 
 @router.post("/analysis/url/create")
@@ -131,7 +162,7 @@ def create_real_url_analysis(
     db.add(match)
     db.commit()
     db.refresh(match)
-    _run_reference_only(db, match)
+    _run_match_analysis(db, match, include_audio=False)
     return RedirectResponse(f"/matches/{match.id}/analysis/result", status_code=303)
 
 
@@ -143,22 +174,13 @@ def start_real_analysis(
     db: Session = Depends(get_db),
 ):
     _, match = _owned_match(match_id, request, db)
-    if not _is_owned_upload(match):
-        if match.video_url:
-            _run_reference_only(db, match)
-            return RedirectResponse(f"/matches/{match_id}/analysis/result", status_code=303)
+    if not (_is_owned_upload(match) or match.video_url):
         raise HTTPException(status_code=400, detail="Aucune vidéo exploitable n'est associée à ce match.")
-    try:
-        run_complete_analysis(
-            db, match, UPLOAD_DIR, EVIDENCE_DIR,
-            include_audio=include_audio.lower() in {"1", "true", "on", "yes"},
-        )
-        materialize_deep_sequence_pack(
-            db, match, UPLOAD_DIR, EVIDENCE_DIR,
-            max_targets=72, max_clips=48, max_image_targets=72, triple_frames=48,
-        )
-    except RapidAnalysisError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    _run_match_analysis(
+        db,
+        match,
+        include_audio=include_audio.lower() in {"1", "true", "on", "yes"},
+    )
     return RedirectResponse(f"/matches/{match_id}/analysis/result", status_code=303)
 
 
@@ -167,7 +189,7 @@ def start_real_url_analysis(match_id: int, request: Request, db: Session = Depen
     _, match = _owned_match(match_id, request, db)
     if not match.video_url:
         raise HTTPException(status_code=400, detail="This analysis mode requires a video URL.")
-    _run_reference_only(db, match)
+    _run_match_analysis(db, match, include_audio=False)
     return RedirectResponse(f"/matches/{match_id}/analysis/result", status_code=303)
 
 
