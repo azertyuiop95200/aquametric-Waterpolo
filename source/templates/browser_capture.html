@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.capture-shell{max-width:980px;margin:0 auto;display:grid;gap:18px}.capture-panel{border:1px solid var(--border,#294754);border-radius:22px;background:var(--panel,#0b202b);padding:20px}.capture-grid{display:grid;grid-template-columns:1.2fr .8fr;gap:16px}.capture-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.capture-status{padding:14px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);white-space:pre-wrap}.capture-timer{font-size:34px;font-weight:800}.capture-help{opacity:.8}.capture-warning{padding:12px 14px;border-left:3px solid #fb923c;background:rgba(251,146,60,.08);border-radius:0 12px 12px 0}.capture-good{padding:12px 14px;border-left:3px solid #4ade80;background:rgba(74,222,128,.08);border-radius:0 12px 12px 0}.source-link{word-break:break-all}@media(max-width:800px){.capture-grid{grid-template-columns:1fr}}
+</style>
+<div class="capture-shell">
+  <section class="capture-panel">
+    <span class="eyebrow">ANALYSE VIDÉO · FALLBACK NAVIGATEUR</span>
+    <h1>Donner les images du match à Vision/OCR</h1>
+    <p>YouTube bloque parfois les serveurs de datacenter avant la première frame. Ce mode contourne uniquement ce problème d'accès serveur : <b>ton navigateur partage l'onglet vidéo</b>, AquaMetric enregistre temporairement ce flux, l'analyse, conserve les mesures dérivées puis supprime la capture.</p>
+    <div class="capture-warning"><b>Pour conserver les timestamps exacts :</b> ouvre la vidéo au timestamp de départ indiqué, lis-la à <b>vitesse 1×</b>, puis démarre la capture. Ne mets pas la vidéo en pause pendant l'analyse sauf si tu acceptes un décalage des timestamps.</div>
+  </section>
+
+  <section class="capture-panel capture-grid">
+    <div>
+      <h2>1. Ouvre le replay</h2>
+      <p class="source-link"><a href="{{ match.video_url }}" target="_blank" rel="noopener noreferrer">{{ match.video_url }}</a></p>
+      <p>Le moteur utilisera <b>{{ source_start_second|round(1) }} s</b> comme origine temporelle de cette capture.</p>
+      <h2>2. Partage l'onglet YouTube</h2>
+      <div class="capture-actions">
+        <button id="startCapture" class="btn primary" type="button">Partager l'onglet et enregistrer</button>
+        <button id="stopCapture" class="btn" type="button" disabled>Arrêter et analyser</button>
+        <a class="btn secondary" href="/matches/{{match.id}}/analysis/result">Retour aux résultats</a>
+      </div>
+      <p class="capture-help">Dans la fenêtre de partage du navigateur, sélectionne l'onglet contenant le match. L'audio n'est pas requis pour ce premier passage.</p>
+    </div>
+    <div>
+      <div class="capture-timer" id="captureTimer">00:00</div>
+      <div class="capture-status" id="captureStatus">Prêt. Aucune frame n'est encore envoyée.</div>
+    </div>
+  </section>
+
+  <section class="capture-panel">
+    <h2>Ce que le moteur produira</h2>
+    <div class="capture-good">Durée réellement lue · nombre d'échantillons visuels · activité · OCR scoreboard · périodes détectées · variations de score candidates · timestamps source. Les statistiques individuelles ne seront attribuées à une joueuse que si l'identité est suffisamment résolue.</div>
+    {% if roster %}
+    <h3>Roster de référence pour cette vidéo</h3>
+    <p>Les doublons de bonnet sont conservés comme ambiguïtés légitimes jusqu'à résolution visuelle.</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px">
+      {% for row in roster %}<div style="padding:10px;border:1px solid rgba(255,255,255,.09);border-radius:12px"><b>#{{row.cap_number}} {{row.player_name}}</b>{% if row.ambiguous_cap %}<small style="display:block;color:#fbbf24">numéro partagé</small>{% endif %}</div>{% endfor %}
+    </div>
+    {% endif %}
+  </section>
+</div>
+<script>
+(() => {
+  const startBtn = document.getElementById('startCapture');
+  const stopBtn = document.getElementById('stopCapture');
+  const status = document.getElementById('captureStatus');
+  const timer = document.getElementById('captureTimer');
+  const sourceStart = Number({{ source_start_second|default(0) }});
+  let stream = null;
+  let recorder = null;
+  let chunks = [];
+  let startedAt = 0;
+  let tick = null;
+
+  function setStatus(text){ status.textContent = text; }
+  function fmt(seconds){
+    seconds = Math.max(0, Math.floor(seconds));
+    const m = String(Math.floor(seconds/60)).padStart(2,'0');
+    const s = String(seconds%60).padStart(2,'0');
+    return `${m}:${s}`;
+  }
+  function updateTimer(){ timer.textContent = fmt((Date.now()-startedAt)/1000); }
+  function stopTracks(){ if(stream){ stream.getTracks().forEach(t => t.stop()); } }
+
+  startBtn.addEventListener('click', async () => {
+    try {
+      if(!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia){
+        throw new Error('Ce navigateur ne prend pas en charge le partage d’onglet vidéo.');
+      }
+      stream = await navigator.mediaDevices.getDisplayMedia({
+        video: {frameRate: {ideal: 15, max: 30}},
+        audio: false,
+      });
+      const preferred = [
+        'video/webm;codecs=vp9',
+        'video/webm;codecs=vp8',
+        'video/webm'
+      ].find(t => window.MediaRecorder && MediaRecorder.isTypeSupported(t));
+      recorder = new MediaRecorder(stream, preferred ? {mimeType: preferred} : undefined);
+      chunks = [];
+      recorder.ondataavailable = ev => { if(ev.data && ev.data.size) chunks.push(ev.data); };
+      recorder.onstop = async () => {
+        clearInterval(tick);
+        stopTracks();
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+        if(!chunks.length){ setStatus('Aucune donnée vidéo capturée.'); return; }
+        const blob = new Blob(chunks, {type: recorder.mimeType || 'video/webm'});
+        setStatus(`Capture terminée (${(blob.size/1024/1024).toFixed(1)} Mo). Envoi vers Vision/OCR…`);
+        const form = new FormData();
+        form.append('capture', blob, 'aquametric-browser-capture.webm');
+        form.append('source_start_second', String(sourceStart));
+        try {
+          const response = await fetch('/matches/{{match.id}}/analysis/browser-capture', {method:'POST', body:form});
+          const payload = await response.json().catch(() => ({}));
+          if(!response.ok){ throw new Error(payload.detail || payload.error || `HTTP ${response.status}`); }
+          setStatus(`Analyse terminée : ${payload.visual_samples ?? 0} échantillons visuels, ${payload.scoreboard_observations ?? 0} observations scoreboard, ${payload.candidates ?? 0} candidats. Redirection…`);
+          setTimeout(() => { window.location.href = payload.redirect || '/matches/{{match.id}}/analysis/result'; }, 700);
+        } catch(err){
+          setStatus(`Échec de l’analyse : ${err.message || err}`);
+        }
+      };
+      stream.getVideoTracks()[0].addEventListener('ended', () => {
+        if(recorder && recorder.state === 'recording') recorder.stop();
+      });
+      recorder.start(1000);
+      startedAt = Date.now();
+      updateTimer();
+      tick = setInterval(updateTimer, 500);
+      startBtn.disabled = true;
+      stopBtn.disabled = false;
+      setStatus('Capture active. Lis le match à vitesse 1× dans l’onglet partagé.');
+    } catch(err){
+      setStatus(`Impossible de démarrer la capture : ${err.message || err}`);
+      stopTracks();
+    }
+  });
+
+  stopBtn.addEventListener('click', () => {
+    if(recorder && recorder.state === 'recording'){
+      stopBtn.disabled = true;
+      setStatus('Finalisation de la capture…');
+      recorder.stop();
+    }
+  });
+})();
+</script>
+{% endblock %}
