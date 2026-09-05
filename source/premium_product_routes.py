@@ -200,7 +200,7 @@ def premium_match_brief(match_id: int, request: Request, db: Session = Depends(g
         "shots": team.get("shots", {}),
         "passes": team.get("passes", {}),
         "phases": team.get("phases", [])[:16],
-        "periods": team.get("periods", [])[:8],
+        "periods": list(team.get("periods", {}).values())[:8] if isinstance(team.get("periods"), dict) else team.get("periods", [])[:8],
         "decisions": team.get("decisions", {}),
         "pressure": team.get("pressure", {}),
         "possessions": team.get("possessions", {}),
