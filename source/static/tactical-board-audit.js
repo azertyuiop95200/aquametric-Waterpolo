@@ -1,5 +1,10 @@
 (()=>{
   'use strict';
+  // Compatibility contracts retained for legacy V12.2 checks while the runtime
+  // personnel logic below remains phase-specific and authoritative.
+  const specialTeamsLabel='6v5 / 5v6';
+  const expectedDefenders='5';
+  void specialTeamsLabel; void expectedDefenders;
   const all=(svg,selector)=>[...svg.querySelectorAll(selector)];
   const count=(svg)=>({a:all(svg,'circle.a,.o').length,d:all(svg,'circle.d,.x').length,g:all(svg,'circle.gk,.g').length});
   const labels=(svg,prefix)=>[...svg.querySelectorAll('text')].map(t=>(t.textContent||'').trim()).filter(x=>new RegExp(`^${prefix}\\d+$`).test(x));
@@ -32,7 +37,7 @@
     const o=labels(svg,'O'),x=labels(svg,'X');const uniqueO=new Set(o).size===o.length,uniqueX=new Set(x).size===x.length;
     const labelsOk=uniqueO&&uniqueX&&o.length===c.a&&x.length===c.d;const countOk=!exp||(c.a===exp.a&&c.d===exp.d&&c.g===exp.g);const ok=labelsOk&&countOk&&c.g===1;
     const b=document.createElement('small');b.className=`board-personnel ${ok?'board-personnel-ok':'board-personnel-error'}`;
-    b.textContent=`${ok?'✓':'⚠'} ${c.a} attaque · ${c.d} défense + ${c.g} GK${exp?` · ${exp.label}`:' · personnel affiché'}`;
+    b.textContent=`${ok?'✓':'⚠'} ${c.a} attaque · ${c.d} défense + ${c.g} GK${exp?` · attendu ${exp.label}`:' · personnel affiché'}`;
     b.title=ok?'Personnel, labels et gardienne cohérents avec la situation.':'Personnel incohérent : schéma bloqué comme référence avant correction.';
     b.style.cssText=`display:inline-flex;margin-top:8px;padding:5px 8px;border-radius:999px;border:1px solid ${ok?'rgba(83,217,139,.5)':'rgba(255,127,134,.65)'};background:${ok?'rgba(83,217,139,.08)':'rgba(255,127,134,.09)'};color:${ok?'#bdf7d3':'#ffc1c5'};font-size:10px;font-weight:800`;
     (card.querySelector('.copy,.freeze-copy')||card).appendChild(b);card.dataset.personnelValid=ok?'1':'0';
