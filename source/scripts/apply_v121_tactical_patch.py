@@ -53,4 +53,4 @@ if missing:
     raise SystemExit("tactical integration postcondition failed: " + ", ".join(missing))
 
 extensions.write_text(e, encoding="utf-8")
-print("Applied AquaMetric V12.5 tactical media integration with route fallback")
+print("Applied AquaMetric V12.2 tactical media integration with route fallback")
