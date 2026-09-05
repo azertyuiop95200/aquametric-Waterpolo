@@ -1,4 +1,5 @@
 (()=>{
+  // Executive Coach Brief · V12.2 premium match surface.
   document.documentElement.dataset.aquametricProductRelease='V12.2-ultimate-match-video-intelligence';
   const directMatch=location.pathname.match(/^\/matches\/(\d+)\/?$/);
   if(directMatch&&!new URLSearchParams(location.search).has('workspace')){
