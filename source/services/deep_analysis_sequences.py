@@ -59,6 +59,33 @@ def _label(value: str) -> str:
     return (value or "séquence").replace("_", " ").strip().title()
 
 
+def _confidence_value(value, default: float = 1.0) -> float:
+    """Normalize numeric and historical text confidence values without crashing.
+
+    Older AquaMetric datasets used labels such as CONFIRMED/HIGH/MEDIUM rather than
+    numeric scores. They are evidence states, not measurements, so the mapping is
+    deliberately conservative and bounded to [0, 1].
+    """
+    if value is None or value == "":
+        return default
+    try:
+        return max(0.0, min(1.0, float(value)))
+    except (TypeError, ValueError):
+        label = str(value).strip().upper()
+        return {
+            "CONFIRMED": 1.0,
+            "VERIFIED": 1.0,
+            "HIGH": 0.9,
+            "HAUTE": 0.9,
+            "MEDIUM": 0.72,
+            "MOYENNE": 0.72,
+            "LOW": 0.45,
+            "FAIBLE": 0.45,
+            "ESTIMATED": 0.55,
+            "CANDIDATE": 0.5,
+        }.get(label, default)
+
+
 def _confidence_label(value: float) -> str:
     if value >= 0.86:
         return "HAUTE"
@@ -90,7 +117,7 @@ def _target(
         start = max(0.0, float(start_second))
     if end_second is not None:
         end = max(start + 0.5, float(end_second))
-    confidence = max(0.0, min(1.0, float(confidence or 0)))
+    confidence = _confidence_value(confidence, 0.0)
     return {
         "key": f"{kind}:{event_id or 't'}:{float(second):.2f}",
         "kind": kind,
@@ -138,7 +165,7 @@ def collect_sequence_targets(db, match, *, max_total: int = 72) -> list[dict]:
     for event in sorted(list(match.events or []), key=lambda e: float(e.second or 0)):
         if event.event_type not in INTERESTING_EVENTS:
             continue
-        confidence = float(event.confidence or 1.0)
+        confidence = _confidence_value(event.confidence, 1.0)
         meta = getattr(event, "context_meta", None)
         phase = getattr(meta, "phase_tag", "") if meta else ""
         player = event.player.name if event.player else ""
@@ -168,7 +195,7 @@ def collect_sequence_targets(db, match, *, max_total: int = 72) -> list[dict]:
                 second=float(candidate.second or 0),
                 title=f"Candidat · {_label(candidate.event_type)}",
                 summary=candidate.summary or "Moment automatique à vérifier.",
-                confidence=float(candidate.confidence_score or 0),
+                confidence=_confidence_value(candidate.confidence_score, 0.0),
                 source=candidate.source or "automatic_candidate",
             ))
 
@@ -244,7 +271,7 @@ def collect_sequence_targets(db, match, *, max_total: int = 72) -> list[dict]:
                 second=focus,
                 title="Fenêtre de jeu actif",
                 summary=f"Fenêtre visuelle active estimée sur {duration:.1f}s. À vérifier dans la vidéo.",
-                confidence=float(window.get("confidence", 0.45) or 0.45),
+                confidence=_confidence_value(window.get("confidence", 0.45), 0.45),
                 start_second=start,
                 end_second=end,
                 source="vision_active_window",
