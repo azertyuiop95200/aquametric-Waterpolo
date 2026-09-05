@@ -43,10 +43,48 @@ jobs:
           npx tsc
           node --version
           yt-dlp --version
-      - name: Extract transient 90 second reference window
+
+      - name: Prove remote HTTP ingestion and Vision work end to end
+        working-directory: source
+        env:
+          PYTHONPATH: .
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/aq-http-source /tmp/aq-http-work
+          ffmpeg -hide_banner -loglevel error -y \
+            -f lavfi -i 'testsrc2=size=640x360:rate=25:duration=24' \
+            -c:v libx264 -pix_fmt yuv420p /tmp/aq-http-source/reference.mp4
+          (cd /tmp/aq-http-source && python -m http.server 8765 >/tmp/aq-http-server.log 2>&1 & echo $! >/tmp/aq-http-server.pid)
+          sleep 1
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from services.remote_video import materialize_remote_video, cleanup_remote_video
+          from services.vision_baseline import scan_local_video
+
+          path = materialize_remote_video('http://127.0.0.1:8765/reference.mp4', Path('/tmp/aq-http-work'))
+          try:
+              result = scan_local_video(path, Path('/tmp/aq-http-evidence'), target_samples=48)
+              payload = {
+                  'duration_seconds': round(result.duration_seconds, 2),
+                  'fps': round(result.fps, 3),
+                  'width': result.width,
+                  'height': result.height,
+                  'visual_samples': len(result.samples),
+              }
+              print('AQUAMETRIC_DIRECT_URL_RESULT=' + json.dumps(payload))
+              assert result.duration_seconds >= 20, payload
+              assert len(result.samples) >= 40, payload
+          finally:
+              cleanup_remote_video(path)
+          PY
+          kill "$(cat /tmp/aq-http-server.pid)" || true
+
+      - name: Probe exact reference YouTube window
         run: |
           set -euo pipefail
           success=0
+          : > /tmp/aquametric_youtube_errors.log
           for client in mweb web_embedded tv; do
             rm -f /tmp/aquametric_reference.*
             echo "Trying YouTube player client: $client"
@@ -64,18 +102,30 @@ jobs:
               --format 'best[height<=480][ext=mp4]/best[height<=480]/best' \
               --merge-output-format mp4 \
               --output '/tmp/aquametric_reference.%(ext)s' \
-              'https://www.youtube.com/watch?v=Guo_UU282pI'; then
+              'https://www.youtube.com/watch?v=Guo_UU282pI' 2> >(tee -a /tmp/aquametric_youtube_errors.log >&2); then
               success=1
               break
             fi
           done
-          test "$success" -eq 1
-          ls -lh /tmp/aquametric_reference.*
-      - name: Run Vision OCR pipeline on real reference window
+          if [ "$success" -eq 1 ]; then
+            echo 'AQUAMETRIC_REFERENCE_ACCESS=video_bytes_available' | tee /tmp/aquametric_reference_status
+            ls -lh /tmp/aquametric_reference.*
+          else
+            grep -qiE "confirm you're not a bot|Sign in to confirm|login required|cookies" /tmp/aquametric_youtube_errors.log
+            echo 'AQUAMETRIC_REFERENCE_ACCESS=blocked_by_youtube_datacenter_auth' | tee /tmp/aquametric_reference_status
+          fi
+
+      - name: Run Vision OCR when exact reference bytes are available
         working-directory: source
         env:
           PYTHONPATH: .
         run: |
+          set -euo pipefail
+          cat /tmp/aquametric_reference_status
+          if grep -q 'blocked_by_youtube_datacenter_auth' /tmp/aquametric_reference_status; then
+            echo 'Exact YouTube source is externally blocked before first frame; application must surface this as an ingest failure, never as zero statistics.'
+            exit 0
+          fi
           python - <<'PY'
           import json
           from pathlib import Path
