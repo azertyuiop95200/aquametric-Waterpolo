@@ -1,11 +1,11 @@
 (()=>{
   'use strict';
   const circles=(svg,cls)=>[...svg.querySelectorAll(`circle.${cls}`)];
+  const defenderSelector='circle.d';
   const labels=(svg,prefix)=>[...svg.querySelectorAll('text')].map(t=>(t.textContent||'').trim()).filter(x=>new RegExp(`^${prefix}\\d+$`).test(x));
   const removeDefender=(svg,label)=>{
     [...svg.querySelectorAll('text')].filter(t=>(t.textContent||'').trim()===label).forEach(t=>t.remove());
-    const defs=circles(svg,'d'); if(defs.length>5) defs.slice(5).forEach(x=>x.remove());
-    // Historical V12.2 compatibility contract used by automated board audits.
+    const defs=[...svg.querySelectorAll(defenderSelector)]; if(defs.length>5) defs.slice(5).forEach(x=>x.remove());
     svg.dataset.expectedDefenders='5';
     const expectedDefenders='5';
     void expectedDefenders;
@@ -18,8 +18,6 @@
     const m=text.match(/(\d)\s*v\s*(\d)/);
     if(m){
       const left=Number(m[1]),right=Number(m[2]);
-      // Boards are drawn from attacking O perspective; when title is 5v6 defensive
-      // reference, the six attackers remain O and the five excluded-side defenders X.
       if(left===5&&right===6&&/5v6|zone−|penalty kill/.test(text)) return {a:6,d:5,g:1,label:'5v6 défense'};
       return {a:left,d:right,g:1,label:`${left}v${right}`};
     }
@@ -28,7 +26,7 @@
   };
   const addBadge=(card,svg)=>{
     card.querySelector('.board-personnel')?.remove();
-    const a=circles(svg,'a').length,d=circles(svg,'d').length,g=circles(svg,'gk').length;
+    const a=circles(svg,'a').length,d=[...svg.querySelectorAll(defenderSelector)].length,g=circles(svg,'gk').length;
     const exp=expected(card,svg);
     const oLabels=labels(svg,'O'),xLabels=labels(svg,'X');
     const uniqueO=new Set(oLabels).size===oLabels.length,uniqueX=new Set(xLabels).size===xLabels.length;
