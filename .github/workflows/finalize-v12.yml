@@ -1,5 +1,5 @@
-name: Validate AquaMetric V12.1
-# validation-trigger: ux-intelligence-v12-1
+name: Validate AquaMetric V12.2 — Full Integration
+# validation-trigger: ultimate-v12-2
 
 on:
   push:
@@ -22,10 +22,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Apply V12 integration patch
+      - name: Apply V12.2 core integration
         run: python source/scripts/apply_v12_patch.py
 
-      - name: Apply V12.5 tactical video integration
+      - name: Apply V12.2 tactical-video compatibility integration
         run: python source/scripts/apply_v121_tactical_patch.py
 
       - name: Install system dependencies
@@ -43,14 +43,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r source/requirements.txt
 
-      - name: Debug V12 route registration
+      - name: Debug V12.2 route registration
         working-directory: source
         env:
           PYTHONPATH: .
-          DATABASE_URL: sqlite:////tmp/aquametric_v12_debug.db
-          UPLOAD_DIR: /tmp/aquametric_v12_uploads_debug
-          EVIDENCE_DIR: /tmp/aquametric_v12_evidence_debug
-          SECRET_KEY: v12-debug-secret-key-only
+          DATABASE_URL: sqlite:////tmp/aquametric_v122_debug.db
+          UPLOAD_DIR: /tmp/aquametric_v122_uploads_debug
+          EVIDENCE_DIR: /tmp/aquametric_v122_evidence_debug
+          SECRET_KEY: v122-debug-secret-key-only
           COOKIE_SECURE: '0'
           WEB_DEMO_MODE: '0'
         run: |
@@ -59,30 +59,33 @@ jobs:
           print('extension router routes:', [getattr(r, 'path', None) for r in extensions.router.routes])
           from main import app
           paths = sorted({getattr(r, 'path', '') for r in app.routes})
-          print('app V12 routes:', [p for p in paths if 'intelligence' in p or 'coach' in p or 'profiles' in p or 'study-pack' in p])
+          print('app V12.2 routes:', [p for p in paths if 'intelligence' in p or 'analysis' in p or 'coach' in p or 'profiles' in p or 'study-pack' in p])
           assert '/matches/{match_id}/intelligence/study-pack' in paths
+          assert '/matches/{match_id}/analysis/result' in paths
+          assert '/api/matches/{match_id}/performance' in paths
+          assert '/api/premium/matches/{match_id}/brief' in paths
           PY
 
-      - name: Run full AquaMetric test suite
+      - name: Run full AquaMetric V12.2 test suite
         working-directory: source
         env:
           PYTHONPATH: .
-          DATABASE_URL: sqlite:////tmp/aquametric_v12_ci.db
-          UPLOAD_DIR: /tmp/aquametric_v12_uploads
-          EVIDENCE_DIR: /tmp/aquametric_v12_evidence
-          SECRET_KEY: v12-ci-secret-key-only
+          DATABASE_URL: sqlite:////tmp/aquametric_v122_ci.db
+          UPLOAD_DIR: /tmp/aquametric_v122_uploads
+          EVIDENCE_DIR: /tmp/aquametric_v122_evidence
+          SECRET_KEY: v122-ci-secret-key-only
           COOKIE_SECURE: '0'
           WEB_DEMO_MODE: '0'
         run: python -m pytest -q
 
-      - name: Smoke test V12 routes and security headers
+      - name: Smoke test V12.2 Ultimate routes and security headers
         working-directory: source
         env:
           PYTHONPATH: .
-          DATABASE_URL: sqlite:////tmp/aquametric_v12_smoke.db
-          UPLOAD_DIR: /tmp/aquametric_v12_uploads_smoke
-          EVIDENCE_DIR: /tmp/aquametric_v12_evidence_smoke
-          SECRET_KEY: v12-smoke-secret-key-only
+          DATABASE_URL: sqlite:////tmp/aquametric_v122_smoke.db
+          UPLOAD_DIR: /tmp/aquametric_v122_uploads_smoke
+          EVIDENCE_DIR: /tmp/aquametric_v122_evidence_smoke
+          SECRET_KEY: v122-smoke-secret-key-only
           COOKIE_SECURE: '0'
           WEB_DEMO_MODE: '0'
         run: |
@@ -92,6 +95,9 @@ jobs:
           paths = {getattr(r, 'path', None) for r in app.routes}
           assert '/matches/{match_id}/intelligence' in paths
           assert '/matches/{match_id}/intelligence/study-pack' in paths
+          assert '/matches/{match_id}/analysis/result' in paths
+          assert '/api/matches/{match_id}/performance' in paths
+          assert '/api/premium/matches/{match_id}/brief' in paths
           assert '/profiles/players/{profile_id}' in paths
           assert '/coach-intelligence/{coach_id}' in paths
           assert '/simulation' in paths
@@ -100,21 +106,24 @@ jobs:
           assert r.status_code == 200, r.text
           assert r.headers.get('x-content-type-options') == 'nosniff'
           assert r.headers.get('content-security-policy')
+          release = c.get('/static/release.json').json()
+          assert release['product_version'] == '12.2.0'
+          assert release['analysis_engine'] == 'ultimate-analyst-v2.0'
           print('health:', r.json())
-          print('V12.5 tactical routes + security headers: OK')
+          print('AquaMetric V12.2 Ultimate routes + security headers: OK')
           PY
 
-      - name: Publish integrated source after green validation
+      - name: Publish integrated V12.2 source after green validation
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add source
           if git diff --cached --quiet; then
-            echo 'V12.5 integration already present on this checkout.'
+            echo 'V12.2 integration already present on this checkout.'
             exit 0
           fi
 
-          git commit -m 'Integrate AquaMetric V12.5 source after validation'
+          git commit -m 'Integrate AquaMetric V12.2 source after validation'
 
           # Other AquaMetric workflows can legitimately advance main while this
           # relatively long FFmpeg/Tesseract test job is running. Rebase the
@@ -125,7 +134,7 @@ jobs:
             git fetch origin main
             git rebase origin/main
             if git push origin HEAD:main; then
-              echo 'Validated V12.5 source published.'
+              echo 'Validated V12.2 source published.'
               exit 0
             fi
             sleep 2
