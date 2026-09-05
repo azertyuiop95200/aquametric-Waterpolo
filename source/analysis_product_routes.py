@@ -137,7 +137,7 @@ def start_real_analysis(
         )
         materialize_deep_sequence_pack(
             db, match, UPLOAD_DIR, EVIDENCE_DIR,
-            max_targets=72, max_clips=24, max_image_targets=48, triple_frames=18,
+            max_targets=72, max_clips=48, max_image_targets=72, triple_frames=48,
         )
     except RapidAnalysisError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -199,7 +199,7 @@ def regenerate_exact_evidence(match_id: int, request: Request, db: Session = Dep
     build_exact_evidence_pack(db, match, UPLOAD_DIR, EVIDENCE_DIR, max_verified_events=32, max_candidates=24)
     materialize_deep_sequence_pack(
         db, match, UPLOAD_DIR, EVIDENCE_DIR,
-        max_targets=72, max_clips=48, max_image_targets=72, triple_frames=30,
+        max_targets=72, max_clips=48, max_image_targets=72, triple_frames=48,
     )
     return RedirectResponse(f"/matches/{match_id}/analysis/result#sequences", status_code=303)
 
@@ -209,7 +209,7 @@ def export_complete_analysis(match_id: int, request: Request, db: Session = Depe
     _, match = _owned_match(match_id, request, db)
     materialize_deep_sequence_pack(
         db, match, UPLOAD_DIR, EVIDENCE_DIR,
-        max_targets=72, max_clips=72, max_image_targets=72, triple_frames=36,
+        max_targets=72, max_clips=72, max_image_targets=72, triple_frames=48,
     )
     archive = build_analysis_zip(db, match, EVIDENCE_DIR)
     root = _zip_root(match)
