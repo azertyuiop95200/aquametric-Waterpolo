@@ -108,7 +108,7 @@ def _run_owned_video(match_id: int):
             run_complete_analysis(db, match, UPLOAD_DIR, EVIDENCE_DIR, include_audio=True)
             materialize_deep_sequence_pack(
                 db, match, UPLOAD_DIR, EVIDENCE_DIR,
-                max_targets=72, max_clips=32, max_image_targets=64, triple_frames=30,
+                max_targets=72, max_clips=48, max_image_targets=72, triple_frames=48,
             )
             match.status = "analysis_ready"; db.commit()
         except Exception as exc:
