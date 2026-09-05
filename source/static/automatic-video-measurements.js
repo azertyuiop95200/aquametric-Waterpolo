@@ -1,6 +1,6 @@
 (()=>{
 'use strict';
-const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const rows=x=>Array.isArray(x)?x:[];
 const table=(heads,body,empty='Aucune mesure automatique disponible.')=>body.length?`<div class="aqm-table-wrap"><table class="aqm-table"><thead><tr>${heads.map(x=>`<th>${esc(x)}</th>`).join('')}</tr></thead><tbody>${body.join('')}</tbody></table></div>`:`<div class="aqm-empty">${esc(empty)}</div>`;
 const kpi=(label,value,detail='')=>`<div class="aqm-kpi"><small>${esc(label)}</small><strong>${esc(value)}</strong><em>mesure automatique</em>${detail?`<span>${esc(detail)}</span>`:''}</div>`;
@@ -26,6 +26,28 @@ function jobs(items){
  const body=rows(items).map(j=>`<tr><td>${esc(j.stage)}</td><td>${esc(j.status)}</td><td>${esc(j.progress)}%</td><td>${esc(j.message)}</td></tr>`);
  return `<div class="aqm-panel"><h3>Pipeline d’analyse exécuté</h3>${table(['Étape','Statut','Progression','Message'],body,'Aucun job d’analyse enregistré.')}</div>`;
 }
+function maskFalseZerosWhenNothingVerified(eventCount){
+ if(Number(eventCount||0)>0)return;
+ const labels=new Set(['Couverture','Buts','Tirs','Passes','Pertes','Décisions taguées']);
+ const apply=()=>{
+  const panel=document.getElementById('aq-premium-brief');
+  if(!panel)return false;
+  panel.querySelectorAll('.aq-kpi').forEach(card=>{
+   const label=(card.querySelector('span')?.textContent||'').trim();
+   if(!labels.has(label))return;
+   const value=card.querySelector('b');if(value)value.textContent='—';
+   let detail=card.querySelector('small');
+   if(!detail){detail=document.createElement('small');card.appendChild(detail)}
+   detail.textContent='non mesuré · aucune action vérifiée';
+   card.title='Aucune action validée : zéro ne signifie pas zéro sportif.';
+  });
+  return true;
+ };
+ if(apply())return;
+ const observer=new MutationObserver(()=>{if(apply())observer.disconnect()});
+ observer.observe(document.documentElement,{childList:true,subtree:true});
+ setTimeout(()=>observer.disconnect(),10000);
+}
 function installElapsedTimer(){
  const selector='form[action="/analysis/url/create"], form[action$="/analysis/start"], form[action$="/url-analysis/start"]';
  document.querySelectorAll(selector).forEach(form=>{
@@ -34,7 +56,6 @@ function installElapsedTimer(){
   form.addEventListener('submit',()=>{
    const button=form.querySelector('button[type="submit"],input[type="submit"]');
    if(!button)return;
-   const initial=button.tagName==='INPUT'?button.value:button.textContent;
    button.disabled=true;
    const started=Date.now();
    const render=()=>{
@@ -47,7 +68,6 @@ function installElapsedTimer(){
    render();
    const timer=setInterval(render,1000);
    window.addEventListener('pagehide',()=>clearInterval(timer),{once:true});
-   setTimeout(()=>{if(document.visibilityState==='visible'&&!form.isConnected){clearInterval(timer);if(button.tagName==='INPUT')button.value=initial;else button.textContent=initial;}},1000);
   });
  });
 }
@@ -56,6 +76,7 @@ async function init(){
  const m=location.pathname.match(/^\/matches\/(\d+)\/analysis\/result\/?$/);if(!m)return;
  try{
   const r=await fetch(`/api/matches/${m[1]}/performance`,{credentials:'same-origin'});if(!r.ok)return;const d=await r.json();
+  maskFalseZerosWhenNothingVerified(d.ultimate?.team?.coverage?.event_count);
   let host=document.getElementById('aq-measured-analysis');
   for(let i=0;i<30&&!host;i++){await new Promise(res=>setTimeout(res,100));host=document.getElementById('aq-measured-analysis');}
   if(!host||document.getElementById('aqm-measurement-matrix'))return;
