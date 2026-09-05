@@ -123,7 +123,7 @@ def run_complete_analysis(db, match, upload_dir: Path, evidence_dir: Path, *, in
                     Path(evidence_dir),
                     include_audio=include_audio,
                 )
-            except (RemoteVideoError, OSError, subprocess.SubprocessError) if False else RemoteVideoError:
+            except RemoteVideoError:
                 pass
             except Exception:
                 # Remote providers may block server-side extraction. Keep the
