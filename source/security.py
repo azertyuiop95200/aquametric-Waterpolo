@@ -104,9 +104,9 @@ class AquaMetricSecurityMiddleware(BaseHTTPMiddleware):
 def install_security(app):
     app.add_middleware(AquaMetricSecurityMiddleware)
 
-    # Product routes are registered before historical compatibility endpoints in
-    # main.py. FastAPI resolves the first matching route, so uploads enter the
-    # real analysis pipeline while old internal match-id workflows stay compatible.
+    # V12.2 product routes are deliberately registered before rapid/legacy
+    # compatibility routers. FastAPI resolves the first matching route, so the
+    # premium Analysis Library and ingest experience must win on shared URLs.
     from rapid_analysis_routes import router as rapid_analysis_router
     from scorer_routes import router as scorer_router
     from premium_ingest_routes import router as premium_ingest_router
@@ -114,12 +114,12 @@ def install_security(app):
     from premium_product_routes import router as premium_product_router, premium_match_brief
     from premium_national_routes import router as premium_national_router
 
-    app.include_router(rapid_analysis_router)
-    app.include_router(scorer_router)
+    app.include_router(premium_product_router)
     app.include_router(premium_ingest_router)
     app.include_router(premium_status_router)
-    app.include_router(premium_product_router)
     app.include_router(premium_national_router)
+    app.include_router(rapid_analysis_router)
+    app.include_router(scorer_router)
 
     # V12.2 invariant: the Executive Coach Brief is a first-class Ultimate
     # analysis endpoint. Keep a direct fallback because historical integration
