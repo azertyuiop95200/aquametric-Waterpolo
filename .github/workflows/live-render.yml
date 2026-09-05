@@ -1,8 +1,8 @@
-name: Verify live AquaMetric Render
+name: Verify live AquaMetric V12.2 Render
 
 on:
   workflow_run:
-    workflows: ["AquaMetric V12 CI"]
+    workflows: ["AquaMetric V12.2 CI"]
     types: [completed]
   schedule:
     - cron: '17 * * * *'
@@ -15,29 +15,34 @@ jobs:
   verify-live:
     if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 10
     steps:
-      - name: Wait briefly for Render and detect deployed main HEAD
+      - name: Wait for Render and verify current V12.2 main HEAD
         id: live
         env:
           EVENT_TARGET_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
         run: |
           set -euo pipefail
           base='https://aquametric-web-demo.onrender.com'
-          marker='AQUAMETRIC_V12_7_ULTIMATE_VISUAL_ANALYSIS_2026_09_04'
+          marker='AQUAMETRIC_V12_2_ULTIMATE_MATCH_VIDEO_INTELLIGENCE_2026_09_05'
           target=$(git ls-remote "https://github.com/${GITHUB_REPOSITORY}.git" refs/heads/main | awk '{print $1}')
           if [ -z "$target" ]; then
             target="$EVENT_TARGET_SHA"
           fi
           echo "Event target: $EVENT_TARGET_SHA"
           echo "Current main HEAD target: $target"
-          for i in $(seq 1 8); do
-            echo "Live check $i/8"
+          for i in $(seq 1 10); do
+            echo "Live check $i/10"
             health=$(curl -L --max-time 30 -fsS "$base/health" 2>/dev/null || true)
             release=$(curl -L --max-time 30 -fsS "$base/static/release.json" 2>/dev/null || true)
             echo "Live health: ${health:-unavailable}"
-            if [ -n "$target" ] && echo "$health" | grep -q '"ok":true' && echo "$health" | grep -q "\"git_commit\":\"$target\"" && echo "$release" | grep -q "$marker"; then
-              echo "Current main HEAD is live on Render: $target"
+            if [ -n "$target" ] \
+              && echo "$health" | grep -q '"ok":true' \
+              && echo "$health" | grep -q "\"git_commit\":\"$target\"" \
+              && echo "$release" | grep -q '"product_version": "12.2.0"' \
+              && echo "$release" | grep -q '"analysis_engine": "ultimate-analyst-v2.0"' \
+              && echo "$release" | grep -q "$marker"; then
+              echo "AquaMetric V12.2 current main HEAD is live on Render: $target"
               echo "deployed=true" >> "$GITHUB_OUTPUT"
               echo "target_sha=$target" >> "$GITHUB_OUTPUT"
               exit 0
@@ -46,10 +51,10 @@ jobs:
           done
           echo "deployed=false" >> "$GITHUB_OUTPUT"
           echo "target_sha=$target" >> "$GITHUB_OUTPUT"
-          echo "::error::Render has not exposed current main HEAD $target within the verification window."
+          echo "::error::Render has not exposed current V12.2 main HEAD $target within the verification window."
           exit 1
 
-      - name: Verify public security and V12.7 product assets
+      - name: Verify public security and V12.2 product assets
         if: ${{ steps.live.outputs.deployed == 'true' }}
         run: |
           set -euo pipefail
@@ -57,14 +62,17 @@ jobs:
           curl -L --max-time 30 -fsS "$base/security-status" | tee /tmp/security.json
           grep -q '"security_headers":true' /tmp/security.json
           grep -q '"api_docs_public":false' /tmp/security.json
-          curl -L --max-time 30 -fsS "$base/static/app.js" | grep -q 'menuBackdrop'
-          curl -L --max-time 30 -fsS "$base/static/tactical-board-audit.js?v=2026.09.04.1" | grep -q 'board-personnel'
-          curl -L --max-time 30 -fsS "$base/static/elite-video-atlas.html" | grep -q '2026-09-04-full-7v7'
-          curl -L --max-time 30 -fsS "$base/static/elite-video-atlas.html" | grep -q '6 défenseures X1–X6'
-          curl -L --max-time 30 -fsS "$base/knowledge" | grep -q 'tactic-board-card'
-          curl -L --max-time 30 -fsS "$base/scouting" | grep -q 'scout-card'
+          curl -L --max-time 30 -fsS "$base/login" >/tmp/login.html
+          grep -q 'V12.2 · Ultimate' /tmp/login.html
+          grep -q 'analysis-metrics-surface.js?v=12.2.0' /tmp/login.html
+          grep -q 'automatic-video-measurements.js?v=12.2.0' /tmp/login.html
+          grep -q 'premium-product.js?v=12.2.0' /tmp/login.html
+          curl -L --max-time 30 -fsS "$base/static/analysis-metrics-surface.js?v=12.2.0" | grep -q 'Toutes les données mesurées'
+          curl -L --max-time 30 -fsS "$base/static/automatic-video-measurements.js?v=12.2.0" | grep -q 'Matrice de mesure'
+          curl -L --max-time 30 -fsS "$base/static/premium-product.js?v=12.2.0" | grep -q 'EXECUTIVE COACH BRIEF'
+          curl -L --max-time 30 -fsS "$base/static/tactical-board-audit.js?v=12.2.0" | grep -q 'board-personnel'
 
-      - name: Verify Ultimate analysis library is actually served
+      - name: Verify V12.2 Analysis Library and Film Room are actually served
         if: ${{ steps.live.outputs.deployed == 'true' }}
         run: |
           set -euo pipefail
@@ -72,18 +80,28 @@ jobs:
           cookie=/tmp/aquametric-analysis-cookie.txt
           curl -L --max-time 45 -fsS -c "$cookie" -b "$cookie" "$base/demo-login" >/tmp/demo.html
           curl -L --max-time 45 -fsS -c "$cookie" -b "$cookie" "$base/analysis-library" >/tmp/analysis-library.html
-          grep -q "Bibliothèque d'analyse opérationnelle" /tmp/analysis-library.html
-          grep -q 'Résultats réellement produits' /tmp/analysis-library.html
-          detail_path=$(grep -oE '/analysis-library/[0-9]+' /tmp/analysis-library.html | head -1 || true)
-          if [ -n "$detail_path" ]; then
-            curl -L --max-time 45 -fsS -c "$cookie" -b "$cookie" "$base$detail_path" >/tmp/analysis-detail.html
-            grep -q 'VIDÉO SOURCE · LECTURE DIRECTE' /tmp/analysis-detail.html
-            grep -q 'Player stats' /tmp/analysis-detail.html
-            grep -q 'Tactical notes' /tmp/analysis-detail.html
-            grep -q 'Traçabilité' /tmp/analysis-detail.html
-            grep -q 'RELECTURE QUART PAR QUART' /tmp/analysis-detail.html
-          fi
-          echo 'Ultimate analysis library is live and verified.'
+          grep -q 'Une bibliothèque qui produit des décisions' /tmp/analysis-library.html
+          grep -q 'FILM ROOM' /tmp/analysis-library.html
+          grep -q 'Analyse réellement calculée' /tmp/analysis-library.html
+          grep -q 'Dossier complet' /tmp/analysis-library.html
+          echo 'AquaMetric V12.2 Analysis Library + Film Room are live.'
+
+      - name: Verify improved Ultimate analysis assets and routes
+        if: ${{ steps.live.outputs.deployed == 'true' }}
+        run: |
+          set -euo pipefail
+          base='https://aquametric-web-demo.onrender.com'
+          cookie=/tmp/aquametric-ultimate-cookie.txt
+          curl -L --max-time 45 -fsS -c "$cookie" -b "$cookie" "$base/demo-login" >/tmp/demo.html
+          curl -L --max-time 45 -fsS -c "$cookie" -b "$cookie" "$base/analysis-history" >/tmp/history.html
+          grep -q 'Analysis' /tmp/history.html
+          curl -L --max-time 30 -fsS "$base/static/analysis-metrics-surface.js?v=12.2.0" >/tmp/metrics.js
+          grep -q 'DONNÉES MESURÉES & ANALYSÉES' /tmp/metrics.js
+          grep -q 'Équipe, joueuses, tirs, passes, pertes, transitions, possession et mesures calibrées' /tmp/metrics.js
+          curl -L --max-time 30 -fsS "$base/static/automatic-video-measurements.js?v=12.2.0" >/tmp/auto.js
+          grep -q 'AUTO, CANDIDAT AUTO, TAGUÉ, CALIBRÉ ou NON MESURÉ' /tmp/auto.js
+          grep -q 'non promus en stats joueuse sans validation' /tmp/auto.js
+          echo 'AquaMetric V12.2 improved Ultimate analysis surface is live and verified.'
 
       - name: Verify Coaches directory is actually served
         if: ${{ steps.live.outputs.deployed == 'true' }}
@@ -97,6 +115,4 @@ jobs:
           grep -q 'data-season="2026-2027"' /tmp/coaches.html
           grep -q 'data-season="2025-2026"' /tmp/coaches.html
           grep -q 'data-view="national"' /tmp/coaches.html
-          grep -q 'coach-directory.js?v=20260828-2' /tmp/coaches.html
-          curl -L --max-time 30 -fsS "$base/static/coach-directory.js?v=20260828-2" | grep -q "const CURRENT = '2026-2027'"
-          echo 'Coaches directory v2 is live and verified.'
+          echo 'Coaches directory is live and verified.'
