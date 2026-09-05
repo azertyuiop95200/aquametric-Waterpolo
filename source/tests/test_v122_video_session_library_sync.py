@@ -30,7 +30,7 @@ def test_video_session_replaces_placeholder_with_evidence_room():
 def test_analysis_library_exposes_deep_workspace_metrics_and_video_session():
     html = read("templates/premium_analysis_library.html")
     for marker in [
-        "recalculé V12.2", "Ballons touchés", "Temps de jeu", "Duels",
+        "recalculée V12.2", "Ballons touchés", "Temps de jeu", "Duels",
         "Distance", "Séance vidéo", "/analysis/video-session-elite?match_id=",
         "Les anciens dossiers sont remis à jour",
     ]:
