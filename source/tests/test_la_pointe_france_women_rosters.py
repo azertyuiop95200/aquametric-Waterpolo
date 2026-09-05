@@ -1,5 +1,8 @@
 from sqlalchemy import func, select
 
+# Importing the application executes the normal seed chain used in production/CI.
+# The tests below then verify that the La Pointe updater is both correct and idempotent.
+from main import app as _app  # noqa: F401
 from db import SessionLocal
 from intelligence_models import CoachIntelligenceProfile
 from models import (
