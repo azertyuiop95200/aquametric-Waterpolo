@@ -113,8 +113,10 @@ def install_security(app):
     from premium_status_routes import router as premium_status_router
     from premium_product_routes import router as premium_product_router, premium_match_brief
     from premium_national_routes import router as premium_national_router
+    from player_metrics_routes import router as player_metrics_router
 
     app.include_router(premium_product_router)
+    app.include_router(player_metrics_router)
     app.include_router(premium_ingest_router)
     app.include_router(premium_status_router)
     app.include_router(premium_national_router)
