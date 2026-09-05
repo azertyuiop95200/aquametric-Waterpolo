@@ -103,7 +103,7 @@ def _upsert_marseille_scouting(db):
     if not team:
         return None
 
-    team.roster_status = "partial_current_media_confirmed_pending_ffn_match_sheet"
+    team.roster_status = "partial_current_media_pending_ffn"
     team.source_note = _append_once(
         team.source_note,
         "Ema Vernoux's return to Marseille for the women's Elite project is explicitly announced "
@@ -129,7 +129,7 @@ def _upsert_marseille_scouting(db):
     player.source_season = SEASON
     player.source_url = LA_POINTE_E101_EMA
     player.source_quality = "media_direct_interview"
-    player.current_status = "current_media_confirmed_pending_ffn_match_sheet"
+    player.current_status = "current_media_confirmed_pending_ffn"
     player.note = (
         "Named current-roster signal: La Pointe E101 states Ema Vernoux is returning to Marseille "
         "to join the CN Marseille women's Elite project. Registration/full squad still awaits FFN "
@@ -153,7 +153,7 @@ def _upsert_ema_profile(db):
     profile.role = "Winger / demi"
     profile.current_club = MARSEILLE_NAME
     profile.current_national_team = profile.current_national_team or "France — Women Senior"
-    profile.roster_status = "media_direct_interview_current_pending_ffn_match_sheet"
+    profile.roster_status = "current_media_direct_pending_ffn"
     profile.roster_season = SEASON
     profile.confidence_score = max(float(profile.confidence_score or 0), 0.97)
     profile.primary_source_url = LA_POINTE_E101_EMA
@@ -209,7 +209,7 @@ def _upsert_yann_vernoux(db):
     row.team_type = "club"
     row.category = "Women Senior"
     row.role = "Head coach — Elite Féminine"
-    row.status = "media_direct_interview_current_pending_club_or_ffn_confirmation"
+    row.status = "current_media_direct_pending_official"
     row.source_url = LA_POINTE_E103_MARSEILLE
     row.source_tier = "media_direct_interview"
     row.confidence_score = 0.97
