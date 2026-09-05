@@ -11,6 +11,8 @@ pytest>=8,<10
 imageio-ffmpeg>=0.6,<1
 beautifulsoup4>=4.12,<5
 
+yt-dlp>=2025.1
+
 opencv-python-headless>=4.10,<5
 
 numpy>=1.26,<3
