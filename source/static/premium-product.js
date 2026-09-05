@@ -1,5 +1,5 @@
 (()=>{
-  document.documentElement.dataset.aquametricProductRelease='2026-09-04-premium-v4';
+  document.documentElement.dataset.aquametricProductRelease='V12.2-ultimate-match-video-intelligence';
   const directMatch=location.pathname.match(/^\/matches\/(\d+)\/?$/);
   if(directMatch&&!new URLSearchParams(location.search).has('workspace')){
     fetch(`/api/premium/matches/${directMatch[1]}/status`,{credentials:'same-origin'}).then(r=>r.ok?r.json():null).then(d=>{
