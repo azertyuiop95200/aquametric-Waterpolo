@@ -268,10 +268,8 @@ def export_complete_analysis(match_id: int, request: Request, db: Session = Depe
             match,
             UPLOAD_DIR,
             EVIDENCE_DIR,
-            max_targets=72,
-            max_clips=72,
-            max_image_targets=72,
-            triple_frames=48,
+            max_targets=72, max_clips=72,
+            max_image_targets=72, triple_frames=48,
         )
     else:
         materialize_deep_sequence_pack(
