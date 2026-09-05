@@ -96,15 +96,20 @@ def test_tactical_board_audit_corrects_special_teams_and_displays_personnel():
     assert "circle.d" in js
 
 
-def test_v127_release_marker_is_explicit():
+def test_v122_release_marker_is_explicit():
     release = (ROOT / "static" / "release.json").read_text(encoding="utf-8")
-    assert "AQUAMETRIC_V12_7_ULTIMATE_VISUAL_ANALYSIS_2026_09_04" in release
+    assert "AQUAMETRIC_V12_2_ULTIMATE_MATCH_VIDEO_INTELLIGENCE_2026_09_05" in release
+    assert '"product_version": "12.2.0"' in release
+    assert '"analysis_engine": "ultimate-analyst-v2.0"' in release
     assert "up_to_72_evidence_sequences" in release
     assert "complete_analysis_zip_export" in release
+    assert "automatic_video_measurement_matrix" in release
+    assert "complete_measured_analytics_surface" in release
 
 
 def test_base_loads_engineering_and_tactical_audit_assets():
     base = (ROOT / "templates" / "base.html").read_text(encoding="utf-8")
-    assert "/static/elite-analyst.css?v=2026.09.03.1" in base
-    assert "/static/elite-analyst.js?v=2026.09.03.1" in base
-    assert "/static/tactical-board-audit.js?v=2026.09.04.1" in base
+    assert "/static/elite-analyst.css?v=12.2.0" in base
+    assert "/static/elite-analyst.js?v=12.2.0" in base
+    assert "/static/tactical-board-audit.js?v=12.2.0" in base
+    assert 'data-product-version="12.2.0"' in base
