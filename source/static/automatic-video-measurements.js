@@ -23,16 +23,17 @@ function autonomy(a){
  return `<div class="aqm-panel" id="aqm-auto-ocr"><h3>OCR, périodes, score et audio — sorties automatiques</h3><div class="aqm-note"><b>Format vidéo observé : ${esc(format)}</b><div>Une rencontre amicale en 3 périodes reste en 3 périodes : AquaMetric n’ajoute jamais artificiellement une quatrième période.</div></div><div class="aqm-kpis" style="margin-top:12px">${kpi('Observations scoreboard',a.scoreboard_observations,`OCR ${a.ocr_available?'disponible':'indisponible'}`)}${kpi('Périodes inférées',a.period_count,a.engine)}${kpi('Événements candidats',a.candidate_count,'non promus en stats joueuse sans validation')}${kpi('Variations score',rows(a.score_change_candidates).length,'fenêtres candidates')}${kpi('Sifflets candidats',rows(a.whistle_candidates).length,'analyse audio')}</div><div class="aqm-grid-2" style="margin-top:12px"><div><h4>Types de candidats</h4>${table(['Type','Nombre'],counts)}</div><div><h4>Périodes inférées</h4>${table(['Période','Début','Fin','Confiance'],periods)}</div></div><h4>Fenêtres de variation de score</h4>${table(['Temps','Type','Confiance','Preuve'],score,'Aucune variation de score candidate détectée.')}${whistles.length?`<h4>Sifflets candidats</h4>${table(['Temps','Confiance','Signal'],whistles)}`:''}</div>`;
 }
 function jobs(items){
+ const failures=rows(items).filter(j=>String(j.status||'').toLowerCase()==='failed');
+ const alert=failures.length?`<div class="aqm-note warn"><b>Analyse non exécutée jusqu’au bout</b><div>${esc(failures[0].message||'Le pipeline vidéo a échoué avant de produire des mesures.')}</div></div>`:'';
  const body=rows(items).map(j=>`<tr><td>${esc(j.stage)}</td><td>${esc(j.status)}</td><td>${esc(j.progress)}%</td><td>${esc(j.message)}</td></tr>`);
- return `<div class="aqm-panel"><h3>Pipeline d’analyse exécuté</h3>${table(['Étape','Statut','Progression','Message'],body,'Aucun job d’analyse enregistré.')}</div>`;
+ return `<div class="aqm-panel"><h3>Pipeline d’analyse exécuté</h3>${alert}${table(['Étape','Statut','Progression','Message'],body,'Aucun job d’analyse enregistré.')}</div>`;
 }
 function maskFalseZerosWhenNothingVerified(eventCount){
  if(Number(eventCount||0)>0)return;
- const labels=new Set(['Couverture','Buts','Tirs','Passes','Pertes','Décisions taguées']);
- const apply=()=>{
-  const panel=document.getElementById('aq-premium-brief');
-  if(!panel)return false;
-  panel.querySelectorAll('.aq-kpi').forEach(card=>{
+ const labels=new Set(['Couverture','Couverture Ultimate','Buts','Tirs','Passes','Pertes','Décisions taguées','Ballons gagnés','Exclusions provoquées','Passes clés']);
+ const rewrite=root=>{
+  if(!root)return;
+  root.querySelectorAll('.aq-kpi,.result-kpi').forEach(card=>{
    const label=(card.querySelector('span')?.textContent||'').trim();
    if(!labels.has(label))return;
    const value=card.querySelector('b');if(value)value.textContent='—';
@@ -41,10 +42,9 @@ function maskFalseZerosWhenNothingVerified(eventCount){
    detail.textContent='non mesuré · aucune action vérifiée';
    card.title='Aucune action validée : zéro ne signifie pas zéro sportif.';
   });
-  return true;
  };
- if(apply())return;
- const observer=new MutationObserver(()=>{if(apply())observer.disconnect()});
+ rewrite(document);
+ const observer=new MutationObserver(()=>rewrite(document));
  observer.observe(document.documentElement,{childList:true,subtree:true});
  setTimeout(()=>observer.disconnect(),10000);
 }
