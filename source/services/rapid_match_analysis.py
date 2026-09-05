@@ -1,10 +1,8 @@
-"""Rapid, evidence-first analysis pipeline for long owned match videos.
+"""Rapid, evidence-first analysis pipeline for match videos.
 
-The fast pass intentionally samples the video sparsely instead of decoding every frame:
-~180 visual samples for the whole match and at most 48 scoreboard OCR samples. This makes
-1–2 hour videos practical on ordinary CPU hosts. A full audio whistle pass is optional
-because it is more expensive. The pipeline never promotes unclassified visual activity
-to player/ball facts.
+The fast pass samples video sparsely instead of decoding every frame. Automatic
+Vision/OCR/audio outputs remain candidate evidence and are never silently promoted
+to player or ball facts.
 """
 from __future__ import annotations
 
@@ -35,10 +33,12 @@ def run_rapid_analysis(
     include_audio: bool = False,
     visual_samples: int = 180,
     ocr_samples: int = 48,
+    source_kind: str = "upload",
+    persist_visual_artifacts: bool = True,
 ):
     source_path = Path(source_path)
     if not source_path.exists():
-        raise RapidAnalysisError("Uploaded video file is missing.")
+        raise RapidAnalysisError("Video source file is missing.")
 
     job = AnalysisJob(
         match_id=match.id,
@@ -64,7 +64,7 @@ def run_rapid_analysis(
         match_id=match.id,
         status="complete",
         engine_version="rapid-visual-v1",
-        source_kind="upload",
+        source_kind=(source_kind or "upload")[:32],
         duration_seconds=result.duration_seconds,
         fps=result.fps,
         width=result.width,
@@ -80,7 +80,9 @@ def run_rapid_analysis(
         active_windows_json=json.dumps(result.active_windows),
         interesting_moments_json=json.dumps(result.interesting_moments),
         scoreboard_candidates_json=json.dumps([asdict(c) for c in result.scoreboard_candidates]),
-        contact_sheet_file=result.contact_sheet_file,
+        # Third-party sources may be decoded transiently for derived measurements,
+        # but AquaMetric does not persist or expose their contact-sheet imagery.
+        contact_sheet_file=result.contact_sheet_file if persist_visual_artifacts else "",
         limitations_json=json.dumps(result.limitations, ensure_ascii=False),
     )
     db.add(vision)
@@ -141,6 +143,7 @@ def run_rapid_analysis(
     summary = build_auto_summary(observations, periods, candidates)
     summary.update({
         "pipeline": "rapid-long-video-v1",
+        "source_kind": source_kind,
         "duration_minutes": round(result.duration_seconds / 60.0, 1),
         "visual_samples": len(result.samples),
         "ocr_samples_cap": max(12, min(96, int(ocr_samples))),
@@ -151,10 +154,13 @@ def run_rapid_analysis(
     })
     limitations = [
         "Automatic output is candidate evidence until cross-validated; it never replaces official truth.",
-        "The fast pass does not yet identify player numbers/faces or track the ball continuously.",
+        "The fast pass does not yet visually resolve every player number/face or track the ball continuously.",
         "Player-level passes, shot attribution, possessions, exclusions and tactical shapes require verified tagging or dedicated models.",
+        "Cap numbers are only unique inside a team; any attributed identity must include match + side/team + cap number.",
         "All unavailable match statistics stay visibly unavailable instead of being filled with synthetic values.",
     ]
+    if source_kind != "upload":
+        limitations.append("Third-party source pixels are transient: derived measurements are stored, source frames/clips/contact sheets are not persisted.")
     autonomy = AutonomousAnalysis(
         match_id=match.id,
         status="complete",
