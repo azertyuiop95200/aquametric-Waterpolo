@@ -19,7 +19,7 @@ from analysis_product_routes import (
     start_real_analysis,
     start_real_url_analysis,
 )
-from capture_turbo_routes import (
+from capture_turbo_routes_v4 import (
     turbo_append_chunk,
     turbo_browser_capture_page,
     turbo_capture_status,
@@ -34,8 +34,10 @@ def install_priority_analysis_routes(app) -> None:
         ("/analysis/url/create", create_real_url_analysis, "POST", None, "product_create_url_analysis"),
         ("/matches/{match_id}/analysis/start", start_real_analysis, "POST", None, "product_start_analysis"),
         ("/matches/{match_id}/url-analysis/start", start_real_url_analysis, "POST", None, "product_start_url_analysis"),
-        # Priority browser capture v3: live progress + concurrent pre-analysis +
-        # four chronological segments in one 2×2 capture for the ≤15 min target.
+        # Priority browser capture v4: no manually preloaded player identities,
+        # official YouTube player readiness with a non-blocking capture fallback,
+        # live pre-analysis and preservation of a completed Vision report even if
+        # optional sequence enrichment fails afterwards.
         ("/matches/{match_id}/analysis/browser-capture", turbo_browser_capture_page, "GET", HTMLResponse, "turbo_browser_capture_page"),
         ("/matches/{match_id}/analysis/browser-capture/session", turbo_create_session, "POST", None, "turbo_capture_session"),
         ("/matches/{match_id}/analysis/browser-capture/chunk", turbo_append_chunk, "POST", None, "turbo_capture_chunk"),
