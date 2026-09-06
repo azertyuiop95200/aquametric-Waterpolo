@@ -19,6 +19,14 @@ from analysis_product_routes import (
     start_real_analysis,
     start_real_url_analysis,
 )
+from capture_turbo_routes import (
+    turbo_append_chunk,
+    turbo_browser_capture_page,
+    turbo_capture_status,
+    turbo_create_session,
+    turbo_finish_capture,
+    turbo_progress_frame,
+)
 
 
 def install_priority_analysis_routes(app) -> None:
@@ -26,6 +34,14 @@ def install_priority_analysis_routes(app) -> None:
         ("/analysis/url/create", create_real_url_analysis, "POST", None, "product_create_url_analysis"),
         ("/matches/{match_id}/analysis/start", start_real_analysis, "POST", None, "product_start_analysis"),
         ("/matches/{match_id}/url-analysis/start", start_real_url_analysis, "POST", None, "product_start_url_analysis"),
+        # Priority browser capture v3: live progress + concurrent pre-analysis +
+        # four chronological segments in one 2×2 capture for the ≤15 min target.
+        ("/matches/{match_id}/analysis/browser-capture", turbo_browser_capture_page, "GET", HTMLResponse, "turbo_browser_capture_page"),
+        ("/matches/{match_id}/analysis/browser-capture/session", turbo_create_session, "POST", None, "turbo_capture_session"),
+        ("/matches/{match_id}/analysis/browser-capture/chunk", turbo_append_chunk, "POST", None, "turbo_capture_chunk"),
+        ("/matches/{match_id}/analysis/browser-capture/frame", turbo_progress_frame, "POST", None, "turbo_capture_frame"),
+        ("/matches/{match_id}/analysis/browser-capture/status", turbo_capture_status, "GET", None, "turbo_capture_status"),
+        ("/matches/{match_id}/analysis/browser-capture/finish", turbo_finish_capture, "POST", None, "turbo_capture_finish"),
         ("/matches/{match_id}/analysis/result", analysis_result, "GET", HTMLResponse, "product_analysis_result"),
         ("/matches/{match_id}/analysis/evidence-pack", regenerate_exact_evidence, "POST", None, "product_evidence_pack"),
         ("/matches/{match_id}/analysis/export.zip", export_complete_analysis, "GET", None, "product_analysis_export"),
