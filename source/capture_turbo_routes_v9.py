@@ -1,18 +1,19 @@
 """V9 browser capture bindings.
 
 This layer keeps the V7/V8 async analysis and quality protection, while fixing
-three production details:
+production stalls and misleading progress:
 - live AI progress no longer plateaus around 85% while the last video seconds are
   still being read;
-- /finish acknowledges the background consolidation immediately with HTTP 200,
-  avoiding clients/proxies treating the async handoff as an exceptional response;
-- multi-match scope selection is evaluated before requiring capture bytes, so a
-  detected mixed video can ask for the correct range without attempting analysis.
+- /finish acknowledges the background consolidation immediately with HTTP 200;
+- multi-match scope selection is evaluated before requiring capture bytes;
+- final 90–99% progress only follows a currently running analysis job, never a
+  completed job left over from an earlier run.
 """
 from __future__ import annotations
 
 from fastapi import BackgroundTasks, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from analysis_product_routes import _capture_session_dir, _owned_match
@@ -21,11 +22,11 @@ from capture_turbo_routes_v7 import _finalize_capture_job, _segments
 from capture_turbo_routes_v8 import (
     turbo_append_chunk,
     turbo_browser_capture_page,
-    turbo_capture_status,
     turbo_create_session,
 )
 from capture_turbo_routes_v7 import turbo_progress_frame as _v7_progress_frame
 from db import get_db
+from models import AnalysisJob
 
 
 def _json_body(response) -> dict:
@@ -59,9 +60,9 @@ def turbo_progress_frame(
         return response
 
     read = max(0.0, min(100.0, float(progress.get("read_percent") or 0.0)))
-    # The V5 pre-analysis ceiling was 86%, yielding ~85.1% at its 99% read cap.
-    # V9 maps only work backed by decoded live frames and tops out below the 89%
-    # finalization handoff, so the UI remains truthful but does not look frozen.
+    # The previous pre-analysis ceiling yielded ~85.1% at its 99% read cap.
+    # This value is still backed only by decoded live frames and stays below the
+    # 89% finalization handoff.
     moving = min(87.5, read * 0.884)
     progress["analysis_percent"] = max(float(progress.get("analysis_percent") or 0.0), round(moving, 1))
     if read >= 98.0:
@@ -73,6 +74,37 @@ def turbo_progress_frame(
     state.update(progress)
     _write_state(root, state)
     return JSONResponse({"ok": True, "progress": progress})
+
+
+def turbo_capture_status(
+    match_id: int,
+    request: Request,
+    session_id: str,
+    db: Session = Depends(get_db),
+):
+    """Return session progress without inheriting stale jobs from older runs."""
+    user, match = _owned_match(match_id, request, db)
+    root = _capture_session_dir(user, match, session_id)
+    if not root.is_dir():
+        return JSONResponse({"ok": False, "status": "finished_or_expired"})
+    state = _read_state(root)
+    status = str(state.get("status") or "")
+
+    if status in {"queued_finalization", "finalizing"}:
+        job = db.scalar(
+            select(AnalysisJob)
+            .where(AnalysisJob.match_id == match_id)
+            .order_by(AnalysisJob.id.desc())
+        )
+        if job and str(job.status or "") == "running":
+            raw = max(0, min(100, int(job.progress or 0)))
+            mapped = min(99.0, 92.0 + raw * 0.07)
+            state["analysis_percent"] = max(float(state.get("analysis_percent") or 0.0), round(mapped, 1))
+            state["phase"] = job.message or state.get("phase") or "Vision/OCR final ciblé"
+            state["final_job_progress"] = raw
+    if status in {"complete", "partial"}:
+        state.setdefault("redirect", f"/matches/{match_id}/analysis/result")
+    return JSONResponse({"ok": True, "progress": state})
 
 
 def turbo_finish_capture(
