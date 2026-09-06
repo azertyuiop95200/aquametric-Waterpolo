@@ -1,9 +1,9 @@
 """Autonomous evidence interpreter.
 
 This layer converts low-level visual/OCR observations into candidates. It never
-fabricates player/ball events. Score changes are bracketed by scoreboard evidence
-and, when possible, focused on the strongest visual peak inside that bracket so the
-review clip is materially closer to the action than the next sparse OCR sample.
+fabricates player/ball events. A goal candidate can only come from a stable
+scoreboard increment; visual activity alone can never create or duplicate a goal.
+Replay/break/final observations and period resets are excluded from goal counting.
 """
 from __future__ import annotations
 
@@ -32,31 +32,84 @@ def confidence_label(value: float) -> str:
     return "LOW"
 
 
-def _stable_score(obs: list[dict]) -> list[dict]:
-    result = []
-    last = None
-    for row in sorted(obs, key=lambda x: float(x.get("second", 0))):
-        h, a = row.get("home_score"), row.get("away_score")
+def _valid_score_rows(obs: list[dict]) -> list[dict]:
+    rows = []
+    for raw in sorted(obs, key=lambda x: float(x.get("second", 0))):
+        h, a = raw.get("home_score"), raw.get("away_score")
         if h is None or a is None:
             continue
-        if not (0 <= int(h) <= 40 and 0 <= int(a) <= 40):
+        try:
+            current = (int(h), int(a))
+        except (TypeError, ValueError):
             continue
-        current = (int(h), int(a))
+        if not (0 <= current[0] <= 40 and 0 <= current[1] <= 40):
+            continue
+        row = dict(raw)
+        row["home_score"], row["away_score"] = current
+        rows.append(row)
+    return rows
+
+
+def _same_period(a: dict, b: dict) -> bool:
+    pa, pb = a.get("period"), b.get("period")
+    return pa is None or pb is None or int(pa) == int(pb)
+
+
+def _status_blocked(row: dict) -> bool:
+    return bool(row.get("is_replay") or row.get("is_break") or row.get("is_final"))
+
+
+def _score_state_confirmed(rows: list[dict], index: int, horizon: int = 3) -> bool:
+    """Require nearby scoreboard support before treating an increment as a goal.
+
+    This rejects single OCR spikes. A later equal score or a later monotonic score
+    that necessarily contains the candidate state counts as confirmation.
+    """
+    row = rows[index]
+    h, a = int(row["home_score"]), int(row["away_score"])
+    period = row.get("period")
+    for later in rows[index + 1:index + 1 + max(1, horizon)]:
+        if _status_blocked(later):
+            continue
+        lp = later.get("period")
+        if period is not None and lp is not None and int(lp) != int(period):
+            break
+        lh, la = int(later["home_score"]), int(later["away_score"])
+        if (lh, la) == (h, a):
+            return True
+        # A later monotonic state also confirms that this was not a one-frame spike.
+        if lh >= h and la >= a and (lh - h) + (la - a) <= 2:
+            return True
+        if lh < h or la < a:
+            continue
+    return False
+
+
+def _stable_score(obs: list[dict]) -> list[dict]:
+    rows = _valid_score_rows(obs)
+    result: list[dict] = []
+    last: tuple[int, int] | None = None
+    for idx, row in enumerate(rows):
+        current = (int(row["home_score"]), int(row["away_score"]))
+        row["score_state_confirmed"] = _score_state_confirmed(rows, idx) or idx == 0
         if last is not None:
+            # Old score shown inside a replay is never allowed to move the live
+            # match score backwards. A huge upward OCR jump is also ignored.
             if current[0] < last[0] or current[1] < last[1]:
                 continue
             if current[0] - last[0] > 2 or current[1] - last[1] > 2:
                 continue
-        row = dict(row)
-        row["home_score"], row["away_score"] = current
         result.append(row)
-        last = current
+        if not _status_blocked(row):
+            last = current
     return result
 
 
 def infer_periods(observations: list[dict], duration: float) -> list[dict]:
     by_period: dict[int, list[dict]] = {}
     for row in observations:
+        if row.get("is_replay"):
+            continue
         q = row.get("period")
         if q in (1, 2, 3, 4):
             by_period.setdefault(int(q), []).append(row)
@@ -74,40 +127,72 @@ def infer_periods(observations: list[dict], duration: float) -> list[dict]:
 
 
 def _best_visual_focus(interesting_moments: list[dict], start: float, end: float):
-    inside = [
-        item for item in interesting_moments
-        if start <= float(item.get("second", -1)) <= end
-    ]
+    inside = [item for item in interesting_moments if start <= float(item.get("second", -1)) <= end]
     if not inside:
         return None
     return max(inside, key=lambda item: float(item.get("score", 0) or 0))
 
 
-def _score_change_candidate(prev: dict, row: dict, side: str, delta: int, interesting_moments: list[dict]) -> AutoCandidate:
+def _clock_state(prev: dict, row: dict) -> str:
+    """Classify scoreboard clock movement without pretending to know ball state."""
+    if not _same_period(prev, row):
+        return "period_reset"
+    pc, rc = prev.get("clock_seconds"), row.get("clock_seconds")
+    if pc is None or rc is None:
+        return "unknown"
+    try:
+        pc, rc = int(pc), int(rc)
+    except (TypeError, ValueError):
+        return "unknown"
+    if rc > pc + 3:
+        return "clock_reset_or_inconsistent"
+    if rc < pc:
+        return "live_clock_progress"
+    return "clock_stopped"
+
+
+def _score_change_candidate(
+    prev: dict,
+    row: dict,
+    side: str,
+    delta: int,
+    interesting_moments: list[dict],
+    *,
+    strict_goal: bool,
+) -> AutoCandidate:
     start = float(prev.get("second", 0) or 0)
     end = float(row.get("second", start) or start)
+    clock_state = _clock_state(prev, row)
     focus = _best_visual_focus(interesting_moments, start, end)
     ocr_conf = min(float(row.get("ocr_confidence", 0.5)), float(prev.get("ocr_confidence", 0.5)))
-    visual_score = float(focus.get("score", 0) or 0) if focus else 0.0
-    # The score change itself is strong evidence that scoring occurred in the bracket;
-    # the visual peak improves clip focus but never makes the exact goal time certain.
-    base = ocr_conf * (0.92 if delta == 1 else 0.78)
-    conf = min(0.9, base + min(0.08, visual_score * 0.08))
-    second = float(focus["second"]) if focus else end
     before_score = [prev["home_score"], prev["away_score"]]
     after_score = [row["home_score"], row["away_score"]]
     team_label = "home" if side == "home" else "away"
-    event_type = f"goal_candidate_{team_label}" if delta == 1 else f"score_change_window_{team_label}"
-    if focus:
+
+    # A visual peak is never the proof of the goal and is deliberately not used
+    # as the goal timestamp. This prevents a broadcast replay from being stored as
+    # if it were the live scoring action. The only counting proof is the scoreboard.
+    visual_score = float(focus.get("score", 0) or 0) if focus else 0.0
+    second = end
+    if strict_goal:
+        base = ocr_conf * 0.94
+        if clock_state == "live_clock_progress":
+            base += 0.03
+        conf = min(0.94, base)
+        event_type = f"goal_candidate_{team_label}"
         summary = (
-            f"Scoreboard changed {before_score[0]}-{before_score[1]} → {after_score[0]}-{after_score[1]} "
-            f"between {start:.1f}s and {end:.1f}s; review focused on the strongest visual peak at {second:.1f}s."
+            f"Bandeau confirmé {before_score[0]}-{before_score[1]} → {after_score[0]}-{after_score[1]} "
+            f"entre {start:.1f}s et {end:.1f}s. Le but est compté depuis le changement du bandeau, "
+            "jamais depuis une image de ralenti/replay; l'instant exact reste dans cette fenêtre."
         )
     else:
+        conf = min(0.72, ocr_conf * 0.78)
+        event_type = f"score_change_window_{team_label}"
         summary = (
-            f"Scoreboard changed {before_score[0]}-{before_score[1]} → {after_score[0]}-{after_score[1]} "
-            f"between {start:.1f}s and {end:.1f}s. Exact scoring instant is not localized."
+            f"Variation de bandeau {before_score[0]}-{before_score[1]} → {after_score[0]}-{after_score[1]} "
+            f"entre {start:.1f}s et {end:.1f}s, conservée comme fenêtre à vérifier et non comme but validé."
         )
+
     return AutoCandidate(
         second,
         event_type,
@@ -119,12 +204,16 @@ def _score_change_candidate(prev: dict, row: dict, side: str, delta: int, intere
             "after": after_score,
             "delta": delta,
             "side": side,
-            "signal": "scoreboard_ocr+visual_focus" if focus else "scoreboard_ocr",
+            "signal": "stable_scoreboard_ocr",
             "bracket_start_second": round(start, 2),
             "bracket_end_second": round(end, 2),
-            "visual_focus_second": round(second, 2) if focus else None,
+            "visual_focus_second": round(float(focus["second"]), 2) if focus else None,
             "visual_activity_score": round(visual_score, 3) if focus else None,
-            "time_precision": "visual_focus_within_score_bracket" if focus else "score_bracket_only",
+            "time_precision": "score_bracket_only",
+            "play_state": clock_state,
+            "score_state_confirmed": bool(row.get("score_state_confirmed")),
+            "replay_guard": "visual peaks never create/count goals; replay/break/final rows are excluded",
+            "counting_rule": "one-team +1 scoreboard increment only" if strict_goal else "not counted as a confirmed goal",
         },
     )
 
@@ -135,13 +224,12 @@ def infer_candidates(observations: list[dict], interesting_moments: list[dict]) 
     prev = None
     for row in stable:
         if prev is not None:
-            dh = row["home_score"] - prev["home_score"]
-            da = row["away_score"] - prev["away_score"]
-            if dh in (1, 2) and da == 0:
-                candidates.append(_score_change_candidate(prev, row, "home", dh, interesting_moments))
-            elif da in (1, 2) and dh == 0:
-                candidates.append(_score_change_candidate(prev, row, "away", da, interesting_moments))
-            if row.get("period") and prev.get("period") and int(row["period"]) != int(prev["period"]):
+            period_changed = (
+                row.get("period") is not None
+                and prev.get("period") is not None
+                and int(row["period"]) != int(prev["period"])
+            )
+            if period_changed:
                 conf = min(float(row.get("ocr_confidence", 0.5)), float(prev.get("ocr_confidence", 0.5))) * 0.85
                 candidates.append(AutoCandidate(
                     float(row["second"]), "period_change_candidate", conf, confidence_label(conf),
@@ -150,11 +238,34 @@ def infer_candidates(observations: list[dict], interesting_moments: list[dict]) 
                         "before_period": prev["period"], "after_period": row["period"],
                         "signal": "scoreboard_ocr", "bracket_start_second": float(prev.get("second", 0)),
                         "bracket_end_second": float(row.get("second", 0)),
+                        "play_state": "quarter_break_or_period_transition",
                     },
                 ))
+                # Never manufacture a goal from the score difference across a
+                # quarter/period boundary. The score can only be reconciled later.
+                prev = row
+                continue
+
+            if _status_blocked(prev) or _status_blocked(row):
+                prev = row
+                continue
+
+            dh = row["home_score"] - prev["home_score"]
+            da = row["away_score"] - prev["away_score"]
+            clock_state = _clock_state(prev, row)
+            reset_like = clock_state in {"period_reset", "clock_reset_or_inconsistent"}
+            if not reset_like and dh == 1 and da == 0:
+                strict = bool(row.get("score_state_confirmed"))
+                candidates.append(_score_change_candidate(prev, row, "home", 1, interesting_moments, strict_goal=strict))
+            elif not reset_like and da == 1 and dh == 0:
+                strict = bool(row.get("score_state_confirmed"))
+                candidates.append(_score_change_candidate(prev, row, "away", 1, interesting_moments, strict_goal=strict))
+            elif not reset_like and ((dh in (1, 2) and da == 0) or (da in (1, 2) and dh == 0)):
+                side, delta = ("home", dh) if dh else ("away", da)
+                candidates.append(_score_change_candidate(prev, row, side, delta, interesting_moments, strict_goal=False))
         prev = row
 
-    # Vision-only peaks stay generic. They are review targets, not sporting truth.
+    # Vision-only peaks stay generic. They are review targets, never goals.
     for item in interesting_moments[:16]:
         sec = float(item.get("second", 0))
         score = float(item.get("score", 0))
@@ -163,8 +274,8 @@ def infer_candidates(observations: list[dict], interesting_moments: list[dict]) 
         conf = min(0.55, max(0.2, score * 0.55))
         candidates.append(AutoCandidate(
             sec, "unclassified_action_candidate", conf, "LOW",
-            "High visual activity detected; action type requires ball/player/audio models.",
-            {"visual_activity_score": round(score, 3), "signal": "visual_baseline"},
+            "High visual activity detected; action type requires ball/player/audio models and is never counted as a goal by itself.",
+            {"visual_activity_score": round(score, 3), "signal": "visual_baseline", "counting_rule": "never a goal without scoreboard transition"},
         ))
     return sorted(candidates, key=lambda x: x.second)
 
@@ -172,15 +283,24 @@ def infer_candidates(observations: list[dict], interesting_moments: list[dict]) 
 def build_auto_summary(observations: list[dict], periods: list[dict], candidates: list[AutoCandidate]) -> dict:
     goals = [c for c in candidates if c.event_type.startswith("goal_candidate")]
     score_windows = [c for c in candidates if c.event_type.startswith("score_change_window")]
-    focused = [c for c in goals + score_windows if c.evidence.get("visual_focus_second") is not None]
+    replay_rows = [row for row in observations if row.get("is_replay")]
+    break_rows = [row for row in observations if row.get("is_break")]
+    final_rows = [row for row in observations if row.get("is_final")]
     return {
         "scoreboard_observations": len(observations),
         "periods_observed": len(periods),
         "goal_candidates": len(goals),
         "multi_goal_score_windows": len(score_windows),
-        "score_changes_with_visual_focus": len(focused),
+        "score_changes_with_visual_focus": len([c for c in goals + score_windows if c.evidence.get("visual_focus_second") is not None]),
         "action_candidates": len(candidates),
-        "autonomy_level": "L1.5 — scoreboard + visual focus + optional audio",
-        "next_required_models": ["player/team detection", "ball tracking", "possession/event classifier"],
-        "scientific_honesty": "Score changes are bracketed by OCR; visual peaks only refine the review timestamp and do not prove the exact scoring instant.",
+        "replay_observations_ignored_for_goals": len(replay_rows),
+        "break_observations_ignored_for_goals": len(break_rows),
+        "final_observations_ignored_for_goals": len(final_rows),
+        "autonomy_level": "L1.7 — stable scoreboard truth gate + replay/break guard + visual review",
+        "next_required_models": ["dense scoreboard refinement", "player/team detection", "ball tracking", "possession/event classifier"],
+        "scientific_honesty": (
+            "Goals can only originate from a stable +1 scoreboard transition on one side. "
+            "Replays, quarter breaks, final screens, period resets and visual peaks cannot create a goal. "
+            "Visual activity may suggest where to review, but never proves the live scoring instant."
+        ),
     }
