@@ -63,6 +63,7 @@ def test_browser_capture_chunks_reconstruct_real_video_and_create_vision_analysi
     assert response.status_code == 303
     location = response.headers["location"]
     assert "/analysis/browser-capture" in location
+    assert "scope_start=0.000" in location
     match_id = int(location.split("/matches/", 1)[1].split("/", 1)[0])
 
     page = client.get(location)
@@ -73,7 +74,8 @@ def test_browser_capture_chunks_reconstruct_real_video_and_create_vision_analysi
     assert "Turbo ≤15 min" in page.text
     assert "Lecture vidéo" in page.text
     assert "Analyse IA" in page.text
-    assert 'value="465.0"' in page.text
+    assert 'value="0.0"' in page.text
+    assert "Curseur YouTube ignoré pour l’analyse : 465.0 s → départ réel 0.0 s." in page.text
     assert "https://www.youtube.com/iframe_api" in page.text
     assert "Roster de référence" not in page.text
     assert "Maëlle" not in page.text
@@ -106,6 +108,8 @@ def test_browser_capture_chunks_reconstruct_real_video_and_create_vision_analysi
         total += len(data)
         assert body["bytes"] == total
 
+    # Direct endpoint call below deliberately exercises a manually supplied
+    # source offset. Auto URL creation above is separately required to start at 0.
     response = client.post(
         f"/matches/{match_id}/analysis/browser-capture/finish",
         data={"session_id": session_id, "source_start_second": "465"},
