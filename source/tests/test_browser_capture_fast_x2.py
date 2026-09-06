@@ -40,8 +40,10 @@ def test_turbo_routes_start_real_preanalysis_while_capture_is_running():
 
 def test_mosaic_engine_maps_four_parallel_segments_to_source_timeline():
     engine = (ROOT / "services" / "mosaic_match_analysis.py").read_text(encoding="utf-8")
-    assert "4-segment turbo" in engine
+    assert "parallel YouTube segments" in engine
     assert "segment_span = source_duration / segments" in engine
     assert "seg * segment_span + float(capture_second) * rate" in engine
     assert '"parallel_segments": segments' in engine
-    assert '"pipeline": "parallel-mosaic-v1"' in engine
+    assert '"pipeline": "parallel-mosaic-v2-focused-ocr"' in engine
+    assert "_ocr_target_seconds" in engine
+    assert "budget_exhausted" in engine
