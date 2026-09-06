@@ -91,7 +91,13 @@ class AquaMetricSecurityMiddleware(BaseHTTPMiddleware):
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
         response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
-        response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()")
+        # Screen/tab capture is intentionally allowed only for AquaMetric's own
+        # top-level pages. Camera/microphone access remains disabled; tab audio is
+        # part of the display-capture stream and never grants microphone access.
+        response.headers.setdefault(
+            "Permissions-Policy",
+            "display-capture=(self), camera=(), microphone=(), geolocation=(), payment=()",
+        )
         response.headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
         proto = request.headers.get("x-forwarded-proto", request.url.scheme)
         if proto == "https":
