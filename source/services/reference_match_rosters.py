@@ -1,5 +1,13 @@
 from __future__ import annotations
 
+"""Compatibility shim for historical match-roster calls.
+
+AquaMetric used to preload a user-supplied roster for one reference video. That
+is intentionally disabled: player names and cap numbers must now come from the
+video analysis itself. Existing callers can keep importing these helpers while
+they are migrated, but they always receive no identity evidence.
+"""
+
 from dataclasses import dataclass
 from urllib.parse import parse_qs, urlparse
 
@@ -14,29 +22,12 @@ class MatchRosterCandidate:
     player_name: str
     role: str = ""
     cap_color: str = ""
-    source: str = "user_match_reference"
+    source: str = "disabled_manual_reference"
 
 
-_REFERENCE_ROSTERS: dict[str, tuple[MatchRosterCandidate, ...]] = {
-    REFERENCE_VIDEO_ID: (
-        MatchRosterCandidate("for", 1, "Rumina"),
-        MatchRosterCandidate("for", 2, "Morgane"),
-        MatchRosterCandidate("for", 3, "Capu"),
-        MatchRosterCandidate("for", 4, "Cléo"),
-        MatchRosterCandidate("for", 5, "Luce"),
-        MatchRosterCandidate("for", 6, "Sofia"),
-        MatchRosterCandidate("for", 7, "Amandine"),
-        MatchRosterCandidate("for", 8, "Suzanne"),
-        MatchRosterCandidate("for", 9, "Clémence"),
-        MatchRosterCandidate("for", 10, "Mauranne"),
-        MatchRosterCandidate("for", 11, "Veronika"),
-        MatchRosterCandidate("for", 12, "Hitomi"),
-        MatchRosterCandidate("for", 12, "Hanae"),
-        MatchRosterCandidate("for", 13, "Maëlle", role="gardienne", cap_color="rouge"),
-        MatchRosterCandidate("for", 13, "Clara", role="joueuse de champ"),
-        MatchRosterCandidate("for", 14, "Charlotte"),
-    )
-}
+# Deliberately empty. User-supplied names/numbers are context only and must not
+# be injected into Vision, reports, or cap-number identification.
+_REFERENCE_ROSTERS: dict[str, tuple[MatchRosterCandidate, ...]] = {}
 
 
 def video_id(url: str | None) -> str:
@@ -53,33 +44,15 @@ def video_id(url: str | None) -> str:
 
 
 def roster_for_video(url: str | None) -> tuple[MatchRosterCandidate, ...]:
-    return _REFERENCE_ROSTERS.get(video_id(url), ())
+    # Never turn a manually supplied roster into analysis evidence.
+    return ()
 
 
 def cap_candidates(url: str | None, side: str, cap_number: int) -> tuple[str, ...]:
-    side = (side or "for").strip().lower()
-    return tuple(
-        row.player_name
-        for row in roster_for_video(url)
-        if row.side == side and row.cap_number == int(cap_number)
-    )
+    # Identity must be resolved from visual/temporal tracking, not a cap lookup.
+    return ()
 
 
 def roster_payload(url: str | None) -> list[dict]:
-    rows = roster_for_video(url)
-    cap_counts: dict[tuple[str, int], int] = {}
-    for row in rows:
-        key = (row.side, row.cap_number)
-        cap_counts[key] = cap_counts.get(key, 0) + 1
-    return [
-        {
-            "side": row.side,
-            "cap_number": row.cap_number,
-            "player_name": row.player_name,
-            "role": row.role,
-            "cap_color": row.cap_color,
-            "ambiguous_cap": cap_counts[(row.side, row.cap_number)] > 1,
-            "source": row.source,
-        }
-        for row in rows
-    ]
+    # Historical templates/routes may still call this until fully removed.
+    return []
