@@ -48,6 +48,19 @@ def _jpeg_frame() -> bytes:
     return encoded.tobytes()
 
 
+def test_capture_page_is_truthful_before_video_pixels_are_confirmed():
+    match_id = _create_match()
+    response = client.get(f"/matches/{match_id}/analysis/browser-capture")
+    assert response.status_code == 200
+    html = response.text
+    assert "Vidéo réelle" in html
+    assert "En attente d’une image vidéo décodée côté serveur." in html
+    assert "Analyse IA à 0 % tant qu’aucune image vidéo réelle n’a été décodée côté serveur." in html
+    assert "En attente de la première image vidéo confirmée côté serveur" in html
+    assert "Vidéo réelle reçue par l’IA ✓" in html
+    assert "Pré-analyse Vision/OCR démarrée." not in html
+
+
 def test_session_does_not_claim_ai_analysis_before_a_real_frame_is_decoded():
     match_id = _create_match()
     response = client.post(
