@@ -13,7 +13,7 @@ from analysis_product_routes import (
     start_real_url_analysis,
 )
 from analysis_result_clean_v2 import clean_analysis_result
-from capture_turbo_routes_v6 import (
+from capture_turbo_routes_v7 import (
     turbo_append_chunk,
     turbo_browser_capture_page,
     turbo_capture_status,
