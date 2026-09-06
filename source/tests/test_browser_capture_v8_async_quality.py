@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 
 from capture_turbo_routes_v7 import _quality_metrics
+from capture_turbo_routes_v10 import _final_scan_budget
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -44,13 +45,28 @@ def test_v8_resolves_post_render_match_urls_prebuffers_and_caps_quality_pauses()
 
 def test_v9_removes_85_plateau_and_uses_normal_async_http_handoff():
     source = (ROOT / "capture_turbo_routes_v9.py").read_text(encoding="utf-8")
-    priority = (ROOT / "priority_analysis_routes.py").read_text(encoding="utf-8")
     assert "moving = min(87.5, read * 0.884)" in source
     assert '"analysis_percent": 89.0' in source
     assert '"accepted": True' in source
     assert "status_code=202" not in source
     assert "multiple_match_candidates" in source
-    assert "from capture_turbo_routes_v9 import" in priority
+
+
+def test_v10_adapts_warmup_and_reduces_redundant_final_scan():
+    source = (ROOT / "capture_turbo_routes_v10.py").read_text(encoding="utf-8")
+    priority = (ROOT / "priority_analysis_routes.py").read_text(encoding="utf-8")
+    assert "warmGood" in source
+    assert "setPlaybackRate(1)" in source
+    assert "waited<6500" in source
+    assert "progressive_samples" in source
+    assert "visual_samples=visual_samples" in source
+    assert "ocr_samples=ocr_samples" in source
+    assert "from capture_turbo_routes_v10 import" in priority
+
+    assert _final_scan_budget({"progressive_samples": 120}, 0, 3600, 4) == (120, 24, "dense live coverage")
+    assert _final_scan_budget({"progressive_samples": 50}, 0, 3600, 4) == (132, 28, "live coverage")
+    assert _final_scan_budget({}, 0, 1200, 1) == (136, 28, "short capture")
+    assert _final_scan_budget({}, 0, 3600, 4) == (144, 32, "fallback verification")
 
 
 def test_fast_browser_normalization_uses_analysis_oriented_fallback():
