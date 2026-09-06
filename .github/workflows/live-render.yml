@@ -72,7 +72,7 @@ jobs:
           curl -L --max-time 30 -fsS "$base/static/premium-product.js?v=12.2.0" | grep -q 'EXECUTIVE COACH BRIEF'
           curl -L --max-time 30 -fsS "$base/static/tactical-board-audit.js?v=12.2.0" | grep -q 'board-personnel'
 
-      - name: Verify V12.2 Analysis Library and Film Room are actually served
+      - name: Verify current V12.2 Analysis Library surface is actually served
         if: ${{ steps.live.outputs.deployed == 'true' }}
         run: |
           set -euo pipefail
@@ -80,11 +80,11 @@ jobs:
           cookie=/tmp/aquametric-analysis-cookie.txt
           curl -L --max-time 45 -fsS -c "$cookie" -b "$cookie" "$base/demo-login" >/tmp/demo.html
           curl -L --max-time 45 -fsS -c "$cookie" -b "$cookie" "$base/analysis-library" >/tmp/analysis-library.html
-          grep -q 'Une bibliothèque qui produit des décisions' /tmp/analysis-library.html
-          grep -q 'FILM ROOM' /tmp/analysis-library.html
-          grep -q 'Analyse réellement calculée' /tmp/analysis-library.html
-          grep -q 'Dossier complet' /tmp/analysis-library.html
-          echo 'AquaMetric V12.2 Analysis Library + Film Room are live.'
+          grep -q 'Résultats, vidéos, preuves et ZIP' /tmp/analysis-library.html
+          grep -q 'vision / OCR / événements' /tmp/analysis-library.html
+          grep -q 'Analyse réelle, pas vitrine démo.' /tmp/analysis-library.html
+          grep -q 'Replays directement lisibles + données publiées' /tmp/analysis-library.html
+          echo 'AquaMetric V12.2 current Analysis Library surface is live.'
 
       - name: Verify improved Ultimate analysis assets and routes
         if: ${{ steps.live.outputs.deployed == 'true' }}
