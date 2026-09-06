@@ -43,17 +43,23 @@ def _patch_full_match_scope(html: str, *, mode: str, embedded_start: float) -> s
     )
     html = re.sub(r"requestedScopeStart=-?\d+(?:\.\d+)?", "requestedScopeStart=0.000", html, count=1)
     html = re.sub(r"requestedScopeEnd=-?\d+(?:\.\d+)?", "requestedScopeEnd=0.000", html, count=1)
+
+    scope_notice = (
+        "Analyse automatique depuis 0:00 : le t=/start= du lien YouTube sert seulement de curseur d’ouverture "
+        "et ne coupe jamais le début du match."
+    )
+    if embedded_start > 0:
+        scope_notice += f" Curseur YouTube ignoré pour l’analyse : {embedded_start:.1f} s → départ réel 0.0 s."
+    scope_notice += (
+        " Si la vidéo contient plusieurs rencontres, AquaMetric compare les bandeaux OCR avant toute consolidation."
+    )
     html = html.replace(
         "Si la vidéo contient plusieurs rencontres, AquaMetric compare les bandeaux OCR et demande une plage avant de mélanger deux matchs.",
-        "Analyse automatique depuis 0:00 : le t=/start= du lien YouTube sert seulement de curseur d’ouverture et ne coupe jamais le début du match. Si la vidéo contient plusieurs rencontres, AquaMetric compare les bandeaux OCR avant toute consolidation.",
+        scope_notice,
         1,
     )
     if embedded_start > 0:
-        html = html.replace(
-            "<b>Match ciblé</b>",
-            f"<b>Match ciblé · vidéo complète</b><div>Curseur YouTube ignoré pour l’analyse : {embedded_start:.1f} s → départ réel 0.0 s.</div>",
-            1,
-        )
+        html = html.replace("<b>Match ciblé</b>", "<b>Match ciblé · vidéo complète</b>", 1)
     return html
 
 
