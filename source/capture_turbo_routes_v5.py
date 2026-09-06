@@ -9,18 +9,18 @@ from __future__ import annotations
 
 import json
 
-from fastapi import Depends, File, Form, Request, UploadFile
-from fastapi.responses import JSONResponse
+from fastapi import Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import HTMLResponse, JSONResponse
 from sqlalchemy.orm import Session
 
 from db import get_db
-from analysis_product_routes import _capture_session_dir, _owned_match
+from analysis_product_routes import TEMPLATES, _capture_session_dir, _owned_match, _source_start_second
 from capture_turbo_routes import _read_state, _write_state
 from capture_turbo_routes import turbo_append_chunk as _append_chunk
 from capture_turbo_routes import turbo_capture_status as _capture_status
 from capture_turbo_routes import turbo_create_session as _create_session
 from capture_turbo_routes import turbo_progress_frame as _progress_frame
-from capture_turbo_routes_v4 import turbo_browser_capture_page, turbo_finish_capture
+from capture_turbo_routes_v4 import turbo_finish_capture
 
 
 def _json_body(response) -> dict:
@@ -28,6 +28,42 @@ def _json_body(response) -> dict:
         return json.loads(bytes(response.body).decode("utf-8"))
     except Exception:
         return {}
+
+
+def turbo_browser_capture_page(match_id: int, request: Request, db: Session = Depends(get_db)):
+    user, match = _owned_match(match_id, request, db)
+    if not match.video_url:
+        raise HTTPException(status_code=400, detail="This capture mode requires a video URL.")
+    html = TEMPLATES.env.get_template("browser_capture_v4.html").render(
+        request=request,
+        user=user,
+        app_name="AquaMetric",
+        match=match,
+        source_start_second=_source_start_second(match.video_url),
+    )
+    # Keep the stable V4 template while making the truth state explicit. The UI
+    # must not claim that AI analysis is running before the server decodes pixels.
+    html = html.replace(
+        '<div class="capture-warning"><b>Rapport prioritaire :</b>',
+        '<div class="capture-permission" id="videoProofState"><b>Vidéo réelle</b><div>En attente d’une image vidéo décodée côté serveur.</div></div>\n    <div class="capture-warning"><b>Rapport prioritaire :</b>',
+        1,
+    )
+    html = html.replace(
+        "Vision/OCR démarre dès les premières images capturées.",
+        "Analyse IA à 0 % tant qu’aucune image vidéo réelle n’a été décodée côté serveur.",
+        1,
+    )
+    html = html.replace(
+        "function applyServerProgress(p){if(Number.isFinite(Number(p.analysis_percent)))",
+        "function applyServerProgress(p){if(p.video_confirmed){const proof=document.getElementById('videoProofState');if(proof){proof.innerHTML='<b>Vidéo réelle reçue par l’IA ✓</b><div>Une image issue du flux capturé a été décodée côté serveur.</div>';proof.style.borderLeftColor='#4ade80'}setStatus('Vidéo réelle reçue par l’IA ✓ · analyse Vision/OCR en cours.')}if(Number.isFinite(Number(p.analysis_percent)))",
+        1,
+    )
+    html = html.replace(
+        "Capture active · ${parallelSegments} segment(s) · x${playbackRate}. Pré-analyse Vision/OCR démarrée.",
+        "Capture active · ${parallelSegments} segment(s) · x${playbackRate}. En attente de la première image vidéo confirmée côté serveur…",
+        1,
+    )
+    return HTMLResponse(html)
 
 
 def turbo_create_session(
@@ -95,7 +131,7 @@ def turbo_progress_frame(
 ):
     # The base route rejects malformed/non-decodable images with HTTP 400. We only
     # set video_confirmed AFTER that successful OpenCV decode and real frame pass.
-    response = _progress_frame(
+    _progress_frame(
         match_id=match_id,
         request=request,
         session_id=session_id,
