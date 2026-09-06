@@ -93,4 +93,6 @@ def test_exact_reference_youtube_link_renders_full_match_from_zero_and_live_fina
     assert "requestedScopeEnd=0.000" in body
     assert "Curseur YouTube ignoré pour l’analyse : 465.0 s → départ réel 0.0 s." in body
     assert "clearInterval(tick);clearInterval(statusTick);clearInterval(frameTick)" not in body
-    assert "Finalisation serveur en cours · progression 88–99 % suivie en direct" in body
+    assert "Consolidation rapide lancée · progression suivie en direct" in body
+    assert "waitForFinalReport" in body
+    assert "Pause qualité automatique" in body
