@@ -1,39 +1,48 @@
 {% extends "base.html" %}
 {% block content %}
 <style>
-.capture-shell{max-width:980px;margin:0 auto;display:grid;gap:18px}.capture-panel{border:1px solid var(--border,#294754);border-radius:22px;background:var(--panel,#0b202b);padding:20px}.capture-grid{display:grid;grid-template-columns:1.2fr .8fr;gap:16px}.capture-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.capture-status{padding:14px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);white-space:pre-wrap}.capture-timer{font-size:34px;font-weight:800}.capture-help{opacity:.8}.capture-warning{padding:12px 14px;border-left:3px solid #fb923c;background:rgba(251,146,60,.08);border-radius:0 12px 12px 0}.capture-good{padding:12px 14px;border-left:3px solid #4ade80;background:rgba(74,222,128,.08);border-radius:0 12px 12px 0}.capture-permission{padding:12px 14px;border-left:3px solid #38bdf8;background:rgba(56,189,248,.08);border-radius:0 12px 12px 0}.source-link{word-break:break-all}.capture-time{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.capture-time input{width:130px;padding:9px 10px;border-radius:10px;border:1px solid rgba(255,255,255,.18);background:#06131b;color:inherit}.roster-meta{display:block;opacity:.75;margin-top:3px}.cap-red{display:inline-block;margin-left:5px;padding:1px 6px;border-radius:999px;background:#7f1d1d;color:#fecaca;font-size:11px}@media(max-width:800px){.capture-grid{grid-template-columns:1fr}}
+.capture-shell{max-width:1040px;margin:0 auto;display:grid;gap:18px}.capture-panel{border:1px solid var(--border,#294754);border-radius:22px;background:var(--panel,#0b202b);padding:20px}.capture-grid{display:grid;grid-template-columns:1.2fr .8fr;gap:16px}.capture-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.capture-status{padding:14px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);white-space:pre-wrap}.capture-timer{font-size:34px;font-weight:800}.capture-help{opacity:.8}.capture-warning{padding:12px 14px;border-left:3px solid #fb923c;background:rgba(251,146,60,.08);border-radius:0 12px 12px 0}.capture-good{padding:12px 14px;border-left:3px solid #4ade80;background:rgba(74,222,128,.08);border-radius:0 12px 12px 0}.capture-permission{padding:12px 14px;border-left:3px solid #38bdf8;background:rgba(56,189,248,.08);border-radius:0 12px 12px 0}.source-link{word-break:break-all}.capture-time{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.capture-time input{width:130px;padding:9px 10px;border-radius:10px;border:1px solid rgba(255,255,255,.18);background:#06131b;color:inherit}.roster-meta{display:block;opacity:.75;margin-top:3px}.cap-red{display:inline-block;margin-left:5px;padding:1px 6px;border-radius:999px;background:#7f1d1d;color:#fecaca;font-size:11px}.studio-wrap{display:grid;gap:12px}.studio-player{position:relative;aspect-ratio:16/9;background:#02070a;border-radius:18px;overflow:hidden;border:1px solid rgba(255,255,255,.12)}.studio-player iframe{width:100%;height:100%;border:0;display:block}.studio-fallback{height:100%;display:grid;place-items:center;text-align:center;padding:28px}.studio-live-bar{display:none}.capture-shell.studio-live{max-width:none;margin:0}.capture-shell.studio-live>.capture-panel:not(.studio-panel){display:none}.capture-shell.studio-live .studio-panel{position:fixed;inset:0;z-index:9999;border:0;border-radius:0;padding:0;background:#000}.capture-shell.studio-live .studio-wrap{height:100%;display:block}.capture-shell.studio-live .studio-player{position:absolute;inset:0;aspect-ratio:auto;border:0;border-radius:0}.capture-shell.studio-live .studio-live-bar{display:flex;position:fixed;z-index:10001;left:12px;right:12px;bottom:12px;gap:10px;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:14px;background:rgba(4,13,18,.88);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.16)}.capture-shell.studio-live .studio-live-bar .capture-status{padding:7px 10px;flex:1;max-width:720px}.capture-shell.studio-live .studio-live-bar .capture-timer{font-size:24px}.capture-shell.studio-live .studio-info{display:none}@media(max-width:800px){.capture-grid{grid-template-columns:1fr}.capture-shell.studio-live .studio-live-bar{flex-wrap:wrap}}
 </style>
-<div class="capture-shell">
+<div class="capture-shell" id="captureShell">
   <section class="capture-panel">
-    <span class="eyebrow">ANALYSE VIDÉO · AUTORISATION NAVIGATEUR</span>
-    <h1>Autoriser AquaMetric à analyser l’onglet du match</h1>
-    <p>YouTube peut bloquer l’accès vidéo depuis un serveur de datacenter. AquaMetric utilise alors l’autorisation native du navigateur : <b>tu choisis uniquement l’onglet YouTube du match</b>, puis Vision/OCR reçoit les images de cet onglet par petits fragments.</p>
+    <span class="eyebrow">ANALYSE VIDÉO · PONT NAVIGATEUR</span>
+    <h1>Analyser YouTube sans téléchargement serveur</h1>
+    <p>Le serveur Render est parfois bloqué par YouTube. AquaMetric contourne ce problème proprement : <b>le replay reste lu dans ton navigateur</b> et seule la vidéo de l’onglet que tu autorises est transmise par fragments à Vision/OCR.</p>
     <div class="capture-permission" id="permissionState"><b>Vérification de l’autorisation navigateur…</b></div>
-    <p class="capture-help">AquaMetric ne reçoit ni mot de passe, ni cookies YouTube, ni accès général à ton compte. Les navigateurs imposent une confirmation de partage à chaque nouvelle analyse : le site ne peut pas la contourner ni la rendre permanente.</p>
-    <div class="capture-warning"><b>Pour conserver les timestamps exacts :</b> ouvre la vidéo au même instant que celui indiqué ci-dessous, lis-la à <b>vitesse 1×</b>, puis autorise l’onglet. Pour analyser tout le match, laisse tourner jusqu’à la fin de la 3e période.</div>
+    <p class="capture-help">AquaMetric ne reçoit ni mot de passe, ni cookies YouTube, ni accès général à ton compte. Le navigateur impose une confirmation native pour chaque nouvelle capture ; cette confirmation ne peut pas être automatisée par un site web.</p>
+    <div class="capture-warning"><b>Mode recommandé : un seul onglet.</b> Le replay est intégré ci-dessous. Clique « Démarrer l’analyse », puis dans la fenêtre de partage choisis <b>cet onglet / onglet actuel</b>. AquaMetric bascule ensuite automatiquement en mode vidéo plein écran et demande à YouTube de lire à vitesse 1×.</div>
   </section>
 
-  <section class="capture-panel capture-grid">
-    <div>
-      <h2>1. Ouvre le replay dans un autre onglet</h2>
-      <p class="source-link"><a id="openReplay" class="btn secondary" href="{{ match.video_url }}" target="_blank" rel="noopener noreferrer">Ouvrir le match YouTube</a></p>
-      <div class="capture-time">
-        <label for="sourceStart"><b>Timestamp vidéo au démarrage</b></label>
-        <input id="sourceStart" type="number" min="0" step="0.1" value="{{ source_start_second|round(1) }}">
-        <span>secondes</span>
+  <section class="capture-panel studio-panel">
+    <div class="studio-wrap">
+      <div class="studio-info">
+        <span class="eyebrow">CAPTURE STUDIO · 1 ONGLET</span>
+        <h2>Replay intégré</h2>
+        <p class="capture-help">Si le lecteur intégré ne fonctionne pas sur ton navigateur, utilise le bouton « Ouvrir le replay dans un autre onglet » puis partage cet autre onglet : le backend reste identique.</p>
       </div>
-      <p class="capture-help">Par défaut AquaMetric a lu le timestamp du lien. Tu peux le corriger si tu démarres ailleurs dans la vidéo.</p>
-      <h2>2. Autorise uniquement l’onglet du match</h2>
-      <div class="capture-actions">
-        <button id="startCapture" class="btn primary" type="button">Autoriser l’onglet et démarrer l’analyse</button>
-        <button id="stopCapture" class="btn" type="button" disabled>Arrêter et analyser</button>
-        <a class="btn secondary" href="/matches/{{match.id}}/analysis/result">Retour aux résultats</a>
+      <div class="studio-player" id="studioPlayerBox">
+        <div class="studio-fallback" id="studioFallback"><div><b>Préparation du lecteur YouTube…</b><br><small>Le lecteur sera chargé au timestamp de la source.</small></div></div>
+        <iframe id="studioPlayer" title="Replay du match à analyser" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen hidden></iframe>
       </div>
-      <p class="capture-help"><b>Dans la fenêtre du navigateur, choisis « Onglet » puis sélectionne le match YouTube.</b> Si tu choisis un écran ou une fenêtre entière, AquaMetric peut continuer mais l’OCR sera moins précis. Les fragments sont envoyés progressivement : le navigateur ne garde pas tout le match en mémoire.</p>
-    </div>
-    <div>
-      <div class="capture-timer" id="captureTimer">00:00</div>
-      <div class="capture-status" id="captureStatus">Prêt. Aucune frame n’est encore envoyée.</div>
+      <div class="studio-info">
+        <div class="capture-time">
+          <label for="sourceStart"><b>Timestamp source au démarrage</b></label>
+          <input id="sourceStart" type="number" min="0" step="0.1" value="{{ source_start_second|round(1) }}">
+          <span>secondes</span>
+        </div>
+        <div class="capture-actions" style="margin-top:12px">
+          <button id="startCapture" class="btn primary" type="button">Démarrer l’analyse dans cet onglet</button>
+          <button id="stopCapture" class="btn" type="button" disabled>Arrêter et analyser</button>
+          <a id="openReplay" class="btn secondary" href="{{ match.video_url }}" target="_blank" rel="noopener noreferrer">Ouvrir le replay dans un autre onglet</a>
+          <a class="btn secondary" href="/matches/{{match.id}}/analysis/result">Retour aux résultats</a>
+        </div>
+      </div>
+      <div class="studio-live-bar" id="studioLiveBar">
+        <div class="capture-timer" id="captureTimer">00:00</div>
+        <div class="capture-status" id="captureStatus">Prêt. Aucune frame n’est encore envoyée.</div>
+        <button id="stopCaptureLive" class="btn" type="button">Arrêter et analyser</button>
+      </div>
+      <div class="studio-info capture-status" id="captureStatusStatic">Prêt. Aucune frame n’est encore envoyée.</div>
     </div>
   </section>
 
@@ -51,12 +60,18 @@
 </div>
 <script>
 (() => {
+  const captureShell = document.getElementById('captureShell');
   const startBtn = document.getElementById('startCapture');
   const stopBtn = document.getElementById('stopCapture');
+  const stopLiveBtn = document.getElementById('stopCaptureLive');
   const status = document.getElementById('captureStatus');
+  const statusStatic = document.getElementById('captureStatusStatic');
   const permissionState = document.getElementById('permissionState');
   const timer = document.getElementById('captureTimer');
   const sourceStartInput = document.getElementById('sourceStart');
+  const player = document.getElementById('studioPlayer');
+  const fallback = document.getElementById('studioFallback');
+  const rawVideoUrl = {{ match.video_url|tojson }};
   let stream = null;
   let recorder = null;
   let sessionId = '';
@@ -68,7 +83,44 @@
   let uploadError = null;
   let uploadedBytes = 0;
 
-  function setStatus(text){ status.textContent = text; }
+  function youtubeId(url){
+    try {
+      const u = new URL(url, window.location.href);
+      const host = u.hostname.toLowerCase();
+      if(host === 'youtu.be') return u.pathname.split('/').filter(Boolean)[0] || '';
+      if(host.endsWith('youtube.com')){
+        if(u.pathname === '/watch') return u.searchParams.get('v') || '';
+        const parts = u.pathname.split('/').filter(Boolean);
+        if(['embed','shorts','live'].includes(parts[0])) return parts[1] || '';
+      }
+    } catch(_) {}
+    return '';
+  }
+  function loadEmbeddedReplay(){
+    const id = youtubeId(rawVideoUrl);
+    if(!id){
+      fallback.innerHTML = '<div><b>Cette source n’est pas un lien YouTube intégrable.</b><br><small>Ouvre la source dans un autre onglet et partage cet onglet.</small></div>';
+      return false;
+    }
+    const start = Math.max(0, Math.floor(Number(sourceStartInput.value || 0)));
+    player.src = `https://www.youtube.com/embed/${encodeURIComponent(id)}?enablejsapi=1&playsinline=1&rel=0&controls=1&start=${start}`;
+    player.hidden = false;
+    fallback.hidden = true;
+    return true;
+  }
+  function ytCommand(func, args=[]){
+    if(!player || !player.contentWindow) return;
+    try { player.contentWindow.postMessage(JSON.stringify({event:'command', func, args}), '*'); } catch(_) {}
+  }
+  function primeReplay(){
+    ytCommand('seekTo', [sourceStart, true]);
+    ytCommand('setPlaybackRate', [1]);
+    ytCommand('playVideo', []);
+  }
+  function setStatus(text){
+    status.textContent = text;
+    statusStatic.textContent = text;
+  }
   function setPermission(text, ok=true){
     permissionState.innerHTML = `<b>${ok ? 'Autorisation disponible' : 'Autorisation indisponible'}</b><div>${text}</div>`;
     permissionState.style.borderLeftColor = ok ? '#4ade80' : '#fb923c';
@@ -82,16 +134,18 @@
   }
   function updateTimer(){ timer.textContent = fmt((Date.now()-startedAt)/1000); }
   function stopTracks(){ if(stream){ stream.getTracks().forEach(t => t.stop()); } }
+  function leaveStudio(){ captureShell.classList.remove('studio-live'); }
   function captureErrorMessage(err){
     const name = String(err && err.name || '');
-    if(name === 'NotAllowedError') return 'Partage annulé ou refusé. Clique de nouveau sur « Autoriser l’onglet » puis sélectionne l’onglet YouTube. Le navigateur exige cette confirmation pour chaque analyse.';
-    if(name === 'InvalidStateError') return 'La demande doit être lancée directement depuis un clic sur cette page active. Reviens sur AquaMetric, mets la page au premier plan et reclique sur le bouton.';
+    if(name === 'NotAllowedError') return 'Partage annulé ou refusé. Reclique sur « Démarrer l’analyse » puis sélectionne cet onglet dans la fenêtre native.';
+    if(name === 'InvalidStateError') return 'La demande doit être lancée directement depuis un clic sur cette page active.';
     if(name === 'NotReadableError') return 'Le système ou le navigateur bloque actuellement la capture d’écran. Ferme une autre application de capture éventuelle puis réessaie.';
     if(name === 'NotFoundError') return 'Aucune source de partage disponible sur cet appareil.';
     if(name === 'AbortError') return 'La sélection de l’onglet a été annulée avant le démarrage.';
     return err && err.message ? err.message : String(err || 'Erreur inconnue');
   }
   function checkCaptureCapability(){
+    loadEmbeddedReplay();
     if(!window.isSecureContext){
       setPermission('La capture d’onglet exige HTTPS. Ouvre AquaMetric avec son adresse https://.', false);
       startBtn.disabled = true;
@@ -102,7 +156,7 @@
       startBtn.disabled = true;
       return;
     }
-    setPermission('Le navigateur peut partager un onglet avec AquaMetric. Au clic, une fenêtre native te demandera quel onglet autoriser. Choisis uniquement le match YouTube.', true);
+    setPermission('Prêt. Au clic, le navigateur proposera les sources de partage. Choisis « cet onglet / onglet actuel » pour que le replay intégré soit capturé directement.', true);
   }
   async function jsonFetch(url, options={}){
     const response = await fetch(url, options);
@@ -128,6 +182,15 @@
     setStatus(`Capture terminée · ${(uploadedBytes/1024/1024).toFixed(1)} Mo reçus. Vision/OCR analyse maintenant la vidéo…`);
     return jsonFetch('/matches/{{match.id}}/analysis/browser-capture/finish', {method:'POST', body:form});
   }
+  function requestStop(){
+    if(recorder && recorder.state === 'recording'){
+      stopBtn.disabled = true;
+      stopLiveBtn.disabled = true;
+      setStatus('Finalisation du dernier fragment…');
+      ytCommand('pauseVideo', []);
+      recorder.stop();
+    }
+  }
 
   startBtn.addEventListener('click', async () => {
     try {
@@ -136,12 +199,15 @@
         throw new Error('La capture d’onglet n’est pas disponible dans ce navigateur.');
       }
       sourceStart = Math.max(0, Number(sourceStartInput.value || 0));
-      setStatus('Demande d’autorisation ouverte. Sélectionne l’onglet YouTube du match dans la fenêtre du navigateur…');
+      ytCommand('seekTo', [sourceStart, true]);
+      ytCommand('pauseVideo', []);
+      captureShell.classList.add('studio-live');
+      setStatus('Fenêtre de partage ouverte : choisis « cet onglet / onglet actuel ». Ne choisis pas tout l’écran si l’onglet est proposé.');
       stream = await navigator.mediaDevices.getDisplayMedia({
         video: {frameRate: {ideal: 15, max: 30}, displaySurface: 'browser'},
         audio: false,
-        preferCurrentTab: false,
-        selfBrowserSurface: 'exclude',
+        preferCurrentTab: true,
+        selfBrowserSurface: 'include',
         surfaceSwitching: 'include',
       });
       const videoTrack = stream.getVideoTracks()[0];
@@ -177,12 +243,14 @@
         stopTracks();
         startBtn.disabled = false;
         stopBtn.disabled = true;
+        stopLiveBtn.disabled = true;
         sourceStartInput.disabled = false;
         try {
           const payload = await finishAnalysis();
           setStatus(`Analyse terminée : ${payload.visual_samples ?? 0} échantillons visuels, ${payload.scoreboard_observations ?? 0} observations scoreboard, ${payload.candidates ?? 0} moments candidats. Redirection…`);
           setTimeout(() => { window.location.href = payload.redirect || '/matches/{{match.id}}/analysis/result'; }, 800);
         } catch(err){
+          leaveStudio();
           setStatus(`Échec de l’analyse : ${err.message || err}`);
         }
       };
@@ -195,29 +263,28 @@
       tick = setInterval(updateTimer, 500);
       startBtn.disabled = true;
       stopBtn.disabled = false;
+      stopLiveBtn.disabled = false;
       sourceStartInput.disabled = true;
-      const surfaceNote = surface === 'browser' ? 'onglet navigateur autorisé' : `${surface} autorisé — préfère l’onglet YouTube pour un meilleur OCR`;
-      setPermission(`Accès accordé : ${surfaceNote}. AquaMetric reçoit maintenant uniquement le flux visuel choisi.`, true);
-      setStatus(`Capture active. Source = ${sourceStart.toFixed(1)} s. Lis le match à vitesse 1× jusqu’à la fin voulue.`);
+      const surfaceNote = surface === 'browser' ? 'onglet navigateur autorisé' : `${surface} autorisé — l’onglet du replay donnera un meilleur OCR`;
+      setPermission(`Accès accordé : ${surfaceNote}. AquaMetric reçoit uniquement le flux visuel choisi.`, true);
+      setStatus(`Capture active. Timestamp source = ${sourceStart.toFixed(1)} s. Lecture demandée à vitesse 1×.`);
+      setTimeout(primeReplay, 250);
+      setTimeout(primeReplay, 1200);
     } catch(err){
       const message = captureErrorMessage(err);
+      leaveStudio();
       setStatus(`Impossible de démarrer la capture : ${message}`);
       setPermission(message, false);
       stopTracks();
       startBtn.disabled = false;
       stopBtn.disabled = true;
+      stopLiveBtn.disabled = true;
       sourceStartInput.disabled = false;
     }
   });
 
-  stopBtn.addEventListener('click', () => {
-    if(recorder && recorder.state === 'recording'){
-      stopBtn.disabled = true;
-      setStatus('Finalisation du dernier fragment…');
-      recorder.stop();
-    }
-  });
-
+  stopBtn.addEventListener('click', requestStop);
+  stopLiveBtn.addEventListener('click', requestStop);
   checkCaptureCapability();
 })();
 </script>
