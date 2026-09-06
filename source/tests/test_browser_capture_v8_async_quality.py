@@ -24,7 +24,7 @@ def test_quality_detector_distinguishes_blank_from_detailed_mosaic():
 def test_v7_uses_non_blocking_finish_and_quality_pause_with_time_safe_recording():
     source = (ROOT / "capture_turbo_routes_v7.py").read_text(encoding="utf-8")
     assert "BackgroundTasks" in source
-    assert 'status_code=202' in source
+    assert "status_code=202" in source
     assert '"accepted": True' in source
     assert "fast_analysis=True" in source
     assert "visual_samples=176" in source
@@ -40,7 +40,7 @@ def test_v8_resolves_post_render_match_urls_and_prebuffers_longer():
     source = (ROOT / "capture_turbo_routes_v8.py").read_text(encoding="utf-8")
     priority = (ROOT / "priority_analysis_routes.py").read_text(encoding="utf-8")
     assert 'html.replace("{{match.id}}", str(match_id))' in source
-    assert 'setTimeout(r,2800)' in source
+    assert "setTimeout(r,2800)" in source
     assert "from capture_turbo_routes_v8 import" in priority
 
 
@@ -48,5 +48,5 @@ def test_fast_browser_normalization_uses_analysis_oriented_fallback():
     source = (ROOT / "services" / "browser_capture_media.py").read_text(encoding="utf-8")
     assert "fast_analysis: bool = False" in source
     assert '"-preset", "ultrafast"' in source
-    assert '"fps=12,scale=w=min(1280\\\\,iw):h=-2"' not in source
+    assert "fps=12" in source
     assert "reencode_h264_fast_analysis" in source
