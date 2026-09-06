@@ -67,7 +67,8 @@ def test_browser_capture_chunks_reconstruct_real_video_and_create_vision_analysi
 
     page = client.get(location)
     assert page.status_code == 200
-    assert "Autoriser l’onglet et démarrer l’analyse" in page.text
+    assert "Démarrer l’analyse dans cet onglet" in page.text
+    assert "preferCurrentTab: true" in page.text
     assert 'value="465.0"' in page.text
     assert "#13 Maëlle" in page.text
     assert "bonnet rouge" in page.text
