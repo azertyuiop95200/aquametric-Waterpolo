@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.report-shell{max-width:1280px;margin:0 auto;display:grid;gap:18px}.hero-report{padding:24px;border:1px solid var(--border,#284654);border-radius:24px;background:linear-gradient(145deg,rgba(14,165,233,.08),rgba(34,197,94,.04))}.hero-top{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;flex-wrap:wrap}.match-title{font-size:clamp(28px,4vw,48px);margin:7px 0}.chips{display:flex;gap:8px;flex-wrap:wrap}.chip{padding:7px 10px;border-radius:999px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.11);font-size:13px}.report-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.report-card{padding:18px;border:1px solid var(--border,#284654);border-radius:18px;background:var(--panel,#0b202b)}.report-card h2{margin-top:0}.status-good{border-left:4px solid #22c55e}.status-warn{border-left:4px solid #f59e0b}.metric-table{width:100%;border-collapse:collapse}.metric-table th,.metric-table td{padding:11px 8px;border-bottom:1px solid rgba(255,255,255,.08);text-align:left}.metric-table th:nth-child(n+2),.metric-table td:nth-child(n+2){text-align:center}.metric-value{font-weight:900;font-size:18px}.unmeasured{opacity:.58;font-size:13px}.candidate{padding:11px 12px;border-radius:12px;background:rgba(255,255,255,.035);margin:8px 0}.candidate strong{display:block}.evidence-note{font-size:13px;opacity:.78;line-height:1.5}.periods{display:flex;gap:8px;flex-wrap:wrap}.period-pill{padding:9px 11px;border-radius:12px;background:rgba(56,189,248,.08);border:1px solid rgba(56,189,248,.18)}.video-frame{aspect-ratio:16/9;width:100%;border:0;border-radius:15px;background:#000}.actions{display:flex;gap:10px;flex-wrap:wrap}.event-list{display:grid;gap:8px}.event-row{display:grid;grid-template-columns:80px 1fr auto;gap:10px;align-items:start;padding:10px;border-bottom:1px solid rgba(255,255,255,.07)}.confidence{font-size:12px;opacity:.7}.section-wide{grid-column:1/-1}@media(max-width:820px){.report-grid{grid-template-columns:1fr}.section-wide{grid-column:auto}.event-row{grid-template-columns:65px 1fr}.event-row .confidence{grid-column:2}}
+</style>
+<div class="report-shell">
+  <section class="hero-report">
+    <div class="hero-top">
+      <div>
+        <span class="eyebrow">RAPPORT D’ANALYSE · PREUVES D’ABORD</span>
+        <h1 class="match-title">{{match.team.name}} <span style="opacity:.45">vs</span> {{match.opponent}}</h1>
+        <div class="chips">
+          <span class="chip">{{category}}</span>
+          {% if match.competition %}<span class="chip">{{match.competition}}</span>{% endif %}
+          {% if match.match_date %}<span class="chip">{{match.match_date}}</span>{% endif %}
+          <span class="chip">Source : {{match.video_source}}</span>
+        </div>
+      </div>
+      <div class="actions">
+        {% if match.video_url %}<a class="btn secondary" href="{{match.video_url}}" target="_blank" rel="noopener">Replay</a>{% endif %}
+        <a class="btn secondary" href="/matches/{{match.id}}/analysis/export.zip">ZIP complet</a>
+        <a class="btn" href="/analysis-library">Bibliothèque</a>
+      </div>
+    </div>
+  </section>
+
+  <div class="report-grid">
+    <section class="report-card {% if vision.available %}status-good{% else %}status-warn{% endif %}">
+      <h2>État de l’analyse</h2>
+      {% if vision.available %}
+        <p><strong>Rapport Vision disponible ✓</strong></p>
+        <p>{{vision.sample_count}} images analysées · {{"%.1f"|format(vision.duration_seconds or 0)}} s de capture décodable · confiance {{vision.confidence or "non renseignée"}}.</p>
+      {% else %}
+        <p><strong>Aucun rapport Vision finalisé.</strong></p>
+        <p class="evidence-note">La page ne transforme pas l’absence d’analyse en statistiques nulles.</p>
+      {% endif %}
+      {% if vision.limitations %}<div class="evidence-note"><b>Limites :</b> {{vision.limitations|join(" · ")}}</div>{% endif %}
+    </section>
+
+    <section class="report-card">
+      <h2>Couverture vérifiée</h2>
+      <p><strong>{{snapshot.verified_events|length}}</strong> événements confirmés · <strong>{{automatic.candidates|length}}</strong> candidats automatiques · <strong>{{vision.sample_count or 0}}</strong> échantillons Vision.</p>
+      <p class="evidence-note">Un candidat IA n’est pas affiché comme un fait. Un KPI non prouvé reste « — · non mesuré ».</p>
+    </section>
+
+    <section class="report-card section-wide">
+      <h2>Statistiques sportives vérifiées</h2>
+      <table class="metric-table">
+        <thead><tr><th>Mesure</th><th>{{match.team.name}}</th><th>{{match.opponent}}</th></tr></thead>
+        <tbody>
+        {% for label,key in [("Buts","goals"),("Tirs","shots"),("Arrêts","saves"),("Pertes de balle","turnovers"),("Récupérations / interceptions","recoveries"),("Exclusions provoquées","exclusions_earned"),("Exclusions commises","exclusions_committed"),("Passes décisives","assists"),("Passes clés","key_passes")] %}
+          <tr>
+            <td>{{label}}</td>
+            <td>{% if for_verified[key] is not none %}<span class="metric-value">{{for_verified[key]}}</span>{% else %}<span class="unmeasured">— · non mesuré</span>{% endif %}</td>
+            <td>{% if against_verified[key] is not none %}<span class="metric-value">{{against_verified[key]}}</span>{% else %}<span class="unmeasured">— · non mesuré</span>{% endif %}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      <p class="evidence-note">Ces nombres proviennent uniquement d’événements déjà promus comme vérifiés. Ils ne prétendent pas être des totaux complets si la couverture du match ne le permet pas.</p>
+    </section>
+
+    <section class="report-card">
+      <h2>Périodes détectées</h2>
+      {% if period_rows %}
+        <div class="periods">
+        {% for p in period_rows %}
+          <div class="period-pill"><b>{{p.label}}</b><br><small>{% if p.start is not none %}{{"%.1f"|format(p.start)}} s{% else %}début —{% endif %} → {% if p.end is not none %}{{"%.1f"|format(p.end)}} s{% else %}fin —{% endif %} · {{p.confidence}}</small></div>
+        {% endfor %}
+        </div>
+      {% else %}<p class="unmeasured">— · aucune période suffisamment détectée</p>{% endif %}
+    </section>
+
+    <section class="report-card">
+      <h2>Score / scoreboard</h2>
+      {% set obs = automatic.observations or [] %}
+      {% if obs %}
+        <p><strong>{{obs|length}} observation(s) OCR</strong></p>
+        <p class="evidence-note">Les lectures OCR ci-dessous restent des observations/candidats tant qu’elles ne sont pas suffisamment cohérentes pour être vérifiées.</p>
+      {% else %}
+        <p class="unmeasured">— · score non vérifié</p>
+      {% endif %}
+    </section>
+
+    <section class="report-card section-wide">
+      <h2>Chronologie vérifiée</h2>
+      {% if snapshot.verified_events %}
+        <div class="event-list">
+          {% for e in snapshot.verified_events %}
+          <div class="event-row">
+            <b>{{"%02d:%02d"|format((e.second//60)|int,(e.second%60)|int)}}</b>
+            <div><strong>{{e.event_type|replace("_"," ")|title}}</strong>{% if e.player %} · {{e.player}}{% endif %}{% if e.note %}<div class="evidence-note">{{e.note}}</div>{% endif %}</div>
+            <span class="confidence">{{e.confidence or ""}} · {{e.source or ""}}</span>
+          </div>
+          {% endfor %}
+        </div>
+      {% else %}<p class="unmeasured">Aucun événement sportif n’a encore été promu comme fait vérifié. Les candidats restent séparés ci-dessous.</p>{% endif %}
+    </section>
+
+    <section class="report-card section-wide">
+      <h2>Candidats IA à confirmer</h2>
+      {% if automatic.candidates %}
+        {% for c in automatic.candidates[:30] %}
+        <div class="candidate">
+          <strong>{{"%02d:%02d"|format((c.second//60)|int,(c.second%60)|int)}} · {{c.event_type|replace("_"," ")|title}}</strong>
+          <div>{{c.summary}}</div><div class="confidence">Confiance : {{c.confidence_label}} · {{"%.2f"|format(c.confidence or 0)}}</div>
+        </div>
+        {% endfor %}
+      {% else %}<p class="unmeasured">— · aucun candidat automatique disponible</p>{% endif %}
+    </section>
+
+    <section class="report-card">
+      <h2>Joueuses / joueurs et bonnets</h2>
+      <p class="evidence-note">Aucun nom ni numéro fourni manuellement n’est imposé au moteur. Les identités doivent venir de preuves visuelles. Si un numéro de bonnet ou une identité n’est pas suffisamment lisible : <b>indéterminé</b>.</p>
+      {% set named = snapshot.verified_events|selectattr("player")|list %}
+      {% if named %}
+        {% for e in named[:20] %}<div class="candidate">{{e.player}} · {{e.event_type|replace("_"," ")}} · {{"%02d:%02d"|format((e.second//60)|int,(e.second%60)|int)}}</div>{% endfor %}
+      {% else %}<p class="unmeasured">— · aucune identité individuelle suffisamment vérifiée</p>{% endif %}
+    </section>
+
+    <section class="report-card">
+      <h2>Séquences et tactique</h2>
+      {% if sequences %}
+        <p><strong>{{sequences|length}}</strong> séquence(s) indexée(s).</p>
+        {% for s in sequences[:8] %}<div class="candidate"><strong>{{s.title or s.analysis_type or "Séquence"}}</strong><div class="evidence-note">{{s.note or "Séquence candidate liée à la chronologie."}}</div></div>{% endfor %}
+      {% else %}<p class="unmeasured">— · pas encore de séquence tactique consolidée</p>{% endif %}
+    </section>
+
+    {% if source_embed %}
+    <section class="report-card section-wide">
+      <h2>Replay source</h2>
+      <iframe class="video-frame" src="{{source_embed}}" allowfullscreen loading="lazy"></iframe>
+    </section>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
