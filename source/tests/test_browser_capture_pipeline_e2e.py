@@ -108,8 +108,8 @@ def test_browser_capture_chunks_reconstruct_real_video_and_create_vision_analysi
         total += len(data)
         assert body["bytes"] == total
 
-    # Direct endpoint call below deliberately exercises a manually supplied
-    # source offset. Auto URL creation above is separately required to start at 0.
+    # /finish is now only an async handoff. It must acknowledge immediately; the
+    # authoritative measurements are read from /status and the persisted analysis.
     response = client.post(
         f"/matches/{match_id}/analysis/browser-capture/finish",
         data={"session_id": session_id, "source_start_second": "465"},
@@ -117,9 +117,15 @@ def test_browser_capture_chunks_reconstruct_real_video_and_create_vision_analysi
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["ok"] is True
-    assert body["visual_samples"] >= 8
-    assert body["source_time_offset_seconds"] == 465.0
+    assert body["accepted"] is True
+    assert body["analysis_percent"] >= 89.0
     assert body["redirect"] == f"/matches/{match_id}/analysis/result"
+
+    status = client.get(body["status_url"])
+    assert status.status_code == 200, status.text
+    progress = status.json()["progress"]
+    assert progress["status"] in {"complete", "partial"}
+    assert int(progress.get("visual_samples") or 0) >= 8
 
     db = SessionLocal()
     try:
@@ -135,7 +141,7 @@ def test_browser_capture_chunks_reconstruct_real_video_and_create_vision_analysi
         assert vision is not None
         assert vision.status == "complete"
         assert vision.source_kind == "browser_capture"
-        assert vision.sample_count == body["visual_samples"]
+        assert vision.sample_count == int(progress["visual_samples"])
         assert vision.sample_count >= 8
         assert vision.duration_seconds >= 7.0
         assert vision.width == 640
