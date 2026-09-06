@@ -81,7 +81,9 @@ def _score_state_confirmed(rows: list[dict], index: int, horizon: int = 3) -> bo
     """Require nearby scoreboard support before treating an increment as a goal.
 
     This rejects single OCR spikes. A later equal score or a later monotonic score
-    that necessarily contains the candidate state counts as confirmation.
+    that necessarily contains the candidate state counts as confirmation. A later
+    lower live-looking score immediately disproves the candidate, so a one-frame
+    OCR spike cannot be retroactively "confirmed" by a genuinely later goal.
     """
     row = rows[index]
     h, a = int(row["home_score"]), int(row["away_score"])
@@ -93,12 +95,12 @@ def _score_state_confirmed(rows: list[dict], index: int, horizon: int = 3) -> bo
         if period is not None and lp is not None and int(lp) != int(period):
             break
         lh, la = int(later["home_score"]), int(later["away_score"])
+        if lh < h or la < a:
+            return False
         if (lh, la) == (h, a):
             return True
         if lh >= h and la >= a and (lh - h) + (la - a) <= 2:
             return True
-        if lh < h or la < a:
-            continue
     return False
 
 
