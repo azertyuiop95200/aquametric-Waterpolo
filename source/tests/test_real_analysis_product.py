@@ -29,7 +29,9 @@ def test_real_url_create_and_start_precede_framework_only_routes():
 
     create_routes = _routes(app, "/analysis/url/create", "POST")
     start_routes = _routes(app, "/matches/{match_id}/url-analysis/start", "POST")
-    assert create_routes and create_routes[0].endpoint.__module__ in {"analysis_product_routes", "analysis_input_routes_v2"}
+    assert create_routes and create_routes[0].endpoint.__module__ in {
+        "analysis_product_routes", "analysis_input_routes_v2", "analysis_input_routes_v3"
+    }
     assert start_routes and start_routes[0].endpoint.__module__ == "analysis_product_routes"
 
 
