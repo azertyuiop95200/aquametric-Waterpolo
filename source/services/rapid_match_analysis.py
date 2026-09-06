@@ -30,6 +30,7 @@ _TIME_KEYS = {
     "bracket_start_second", "bracket_end_second", "visual_focus_second",
     "previous_focus_second",
 }
+_FAST_CAPTURE_SENTINEL = 1_000_000.0
 
 
 def _map_times(value, offset: float, scale: float = 1.0):
@@ -68,14 +69,19 @@ def run_rapid_analysis(
     if not source_path.exists():
         raise RapidAnalysisError("Video source file is missing.")
     try:
-        time_offset = max(0.0, float(time_offset_seconds or 0.0))
+        encoded_offset = max(0.0, float(time_offset_seconds or 0.0))
     except (TypeError, ValueError):
-        time_offset = 0.0
+        encoded_offset = 0.0
 
-    # The browser-capture studio intentionally plays YouTube at 2× so a long
-    # replay is ingested in roughly half the wall-clock time. All derived
-    # timestamps are expanded back onto the original replay timeline here.
-    time_scale = 2.0 if source_kind == "browser_capture" else 1.0
+    # Browser-capture v2 can encode a 2× ingest in the otherwise backwards-
+    # compatible source_start_second field. Real source timestamps never reach
+    # one million seconds, so this transport marker is unambiguous here.
+    if source_kind == "browser_capture" and encoded_offset >= _FAST_CAPTURE_SENTINEL:
+        time_scale = 2.0
+        time_offset = encoded_offset - _FAST_CAPTURE_SENTINEL
+    else:
+        time_scale = 1.0
+        time_offset = encoded_offset
 
     job = AnalysisJob(
         match_id=match.id,
