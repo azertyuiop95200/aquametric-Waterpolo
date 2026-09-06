@@ -7,6 +7,7 @@ fails after the main analysis has already completed.
 """
 from __future__ import annotations
 
+import logging
 import shutil
 
 from fastapi import Depends, Form, HTTPException, Request
@@ -31,9 +32,12 @@ from capture_turbo_routes import (
     turbo_create_session,
     turbo_progress_frame,
 )
+from services.browser_capture_media import normalize_browser_capture
 from services.deep_analysis_sequences import materialize_deep_sequence_pack
 from services.mosaic_match_analysis import run_mosaic_analysis
 from services.rapid_match_analysis import RapidAnalysisError, run_rapid_analysis
+
+log = logging.getLogger("aquametric.browser_capture")
 
 
 def turbo_browser_capture_page(match_id: int, request: Request, db: Session = Depends(get_db)):
@@ -81,7 +85,7 @@ def turbo_finish_capture(
     segments = int(state.get("parallel_segments") or parallel_segments or 1)
     segments = 4 if segments >= 4 else (2 if segments >= 2 else 1)
     state.update({
-        "phase": "consolidation finale du rapport",
+        "phase": "normalisation de la capture navigateur",
         "analysis_percent": 88.0,
         "read_percent": 100.0,
         "status": "finalizing",
@@ -91,12 +95,27 @@ def turbo_finish_capture(
     derived_dir = root / "derived"
     derived_dir.mkdir(parents=True, exist_ok=True)
     core_complete = False
+    media_info = {}
     try:
+        # Real MediaRecorder WebM files frequently have no reliable duration/cue
+        # metadata even though their frames are valid. Remux first so OpenCV can
+        # seek through the complete capture instead of failing at 88%.
+        analysis_source, media_info = normalize_browser_capture(source_path, derived_dir)
+        state = _read_state(root)
+        state.update({
+            "phase": "capture normalisée · analyse Vision/OCR complète",
+            "media_normalization": media_info.get("normalization", "unknown"),
+            "capture_media_duration_seconds": round(float(media_info.get("duration") or 0.0), 3),
+            "capture_media_width": int(media_info.get("width") or 0),
+            "capture_media_height": int(media_info.get("height") or 0),
+        })
+        _write_state(root, state)
+
         if segments >= 4 and total_duration > start + 30.0:
             result = run_mosaic_analysis(
                 db,
                 match,
-                source_path,
+                analysis_source,
                 source_start_second=start,
                 source_duration_seconds=total_duration,
                 playback_rate=rate,
@@ -105,13 +124,11 @@ def turbo_finish_capture(
                 ocr_samples=112,
             )
         else:
-            # A fast single-pane capture has no reliable source clock in the
-            # encoded file, so keep the established sentinel-based remapping.
             encoded_offset = (_FAST_CAPTURE_SENTINEL + start) if rate >= 1.75 else start
             result = run_rapid_analysis(
                 db,
                 match,
-                source_path,
+                analysis_source,
                 derived_dir,
                 include_audio=False,
                 visual_samples=320,
@@ -121,8 +138,6 @@ def turbo_finish_capture(
                 time_offset_seconds=encoded_offset,
             )
 
-        # Commit the core report BEFORE optional enrichment. A later failure in
-        # sequence materialisation must never erase a successful Vision analysis.
         core_complete = True
         match.status = "browser_capture_analyzed"
         db.commit()
@@ -142,7 +157,7 @@ def turbo_finish_capture(
                 max_clips=0,
                 max_image_targets=0,
             )
-        except Exception as exc:  # optional enrichment: keep the core report usable
+        except Exception as exc:
             enrichment_warning = f"Séquences avancées non finalisées: {exc}"
             match.status = "browser_capture_analyzed_partial"
             db.commit()
@@ -169,18 +184,27 @@ def turbo_finish_capture(
             "playback_rate": float(summary.get("playback_rate") or rate),
             "capture_duration_minutes": float(summary.get("capture_duration_minutes") or 0.0),
             "source_time_offset_seconds": float(summary.get("source_time_offset_seconds") or start),
+            "media_normalization": media_info.get("normalization", "unknown"),
             "redirect": f"/matches/{match.id}/analysis/result",
         })
     except RapidAnalysisError as exc:
         match.status = "browser_capture_failed"
         db.commit()
         state = _read_state(root)
-        state.update({"phase": "échec de l’analyse Vision", "status": "failed", "error": str(exc)})
+        state.update({
+            "phase": "échec de l’analyse Vision",
+            "status": "failed",
+            "error": str(exc),
+            "media_normalization": media_info.get("normalization", "unknown"),
+        })
         _write_state(root, state)
+        log.exception(
+            "browser capture core analysis failed match=%s session=%s bytes=%s normalization=%s detail=%s",
+            match.id, session_id, source_path.stat().st_size if source_path.exists() else 0,
+            media_info.get("normalization", "unknown"), str(exc),
+        )
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:
-        # If the core analysis already committed, return the report rather than
-        # converting an enrichment/UI problem into a total analysis failure.
         if core_complete:
             match.status = "browser_capture_analyzed_partial"
             db.commit()
@@ -195,6 +219,7 @@ def turbo_finish_capture(
         state = _read_state(root)
         state.update({"phase": "échec de l’analyse Vision", "status": "failed", "error": str(exc)})
         _write_state(root, state)
+        log.exception("unexpected browser capture failure match=%s session=%s", match.id, session_id)
         raise HTTPException(status_code=422, detail=f"Core video analysis failed: {exc}") from exc
     finally:
         shutil.rmtree(root, ignore_errors=True)
