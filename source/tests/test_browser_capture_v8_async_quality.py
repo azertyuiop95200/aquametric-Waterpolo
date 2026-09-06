@@ -61,12 +61,25 @@ def test_v10_adapts_warmup_and_reduces_redundant_final_scan():
     assert "progressive_samples" in source
     assert "visual_samples=visual_samples" in source
     assert "ocr_samples=ocr_samples" in source
-    assert "from capture_turbo_routes_v10 import" in priority
+    assert "from capture_turbo_routes_v11 import" in priority
 
     assert _final_scan_budget({"progressive_samples": 120}, 0, 3600, 4) == (120, 24, "dense live coverage")
     assert _final_scan_budget({"progressive_samples": 50}, 0, 3600, 4) == (132, 28, "live coverage")
     assert _final_scan_budget({}, 0, 1200, 1) == (136, 28, "short capture")
     assert _final_scan_budget({}, 0, 3600, 4) == (144, 32, "fallback verification")
+
+
+def test_v11_has_independent_post_finish_watchdog_and_history_marker():
+    source = (ROOT / "capture_turbo_routes_v11.py").read_text(encoding="utf-8")
+    extensions = (ROOT / "extensions.py").read_text(encoding="utf-8")
+    assert "aquametric-v11-final-watchdog" in source
+    assert "response.clone().json()" in source
+    assert "payload.accepted" in source
+    assert "payload.status_url" in source
+    assert "setTimeout(resolve, 600)" in source
+    assert "browser_capture_finalize_v11" in source
+    assert "background_tasks.add_task(_close_finalize_marker" in source
+    assert "app.include_router(video_session_router)" in extensions
 
 
 def test_fast_browser_normalization_uses_analysis_oriented_fallback():
