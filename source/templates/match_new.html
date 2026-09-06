@@ -1,1 +1,98 @@
-{% extends 'base.html' %}{% block content %}<div class="panel"><span class="eyebrow">NEW ANALYSIS</span><h1>Create a match</h1>{% if team_catalog %}<form method="post" action="/matches" enctype="multipart/form-data"><div class="formgrid"><label>Team<input name="team_name" list="analysis-team-catalog" value="{{default_team_name}}" placeholder="Search any club or national team" autocomplete="off" required></label><label>Opponent<input name="opponent" list="analysis-team-catalog" placeholder="Search any opponent" autocomplete="off" required></label><label>Competition<input name="competition"></label><label>Date<input type="date" name="match_date"></label></div><datalist id="analysis-team-catalog">{% for t in team_catalog %}<option value="{{t.name}}">{% if t.country %}{{t.country}}{% endif %}{% if t.category %} · {{t.category}}{% endif %}{% if t.competition %} · {{t.competition}}{% endif %}</option>{% endfor %}</datalist><small>{{team_catalog|length}} teams available in the AquaMetric database. Granville can stay your default team, but analysis is available for every listed club or national team.</small><label>Video URL<input name="video_url" placeholder="YouTube or supported remote URL"></label><div class="notice"><b>Analyse depuis URL = même minimum Ultimate Analyst.</b> Tirs, passes, pertes, possessions, transitions, quarts/phases, pression, décisions et analyse joueuse par joueuse sont toujours présents dans le résultat. Les métriques non prouvées restent « — ».</div><div class="actions compact"><button class="btn intelligence-cta" type="submit" formaction="/analysis/url/create" formenctype="application/x-www-form-urlencoded">Analyser directement depuis l'URL</button><button class="btn secondary" type="submit">Créer le match</button></div><div class="or">OR</div><label>Upload video<input type="file" name="video_file" accept="video/mp4,video/webm,video/quicktime,video/ogg,.m4v"></label><small>Local MVP upload limit: {{max_upload_mb}} MB. MP4/WebM are recommended for browser playback.</small></form>{% else %}<p>No team is currently available in the analysis catalogue.</p><a class="btn" href="/teams">Create team</a>{% endif %}</div>{% endblock %}
+{% extends 'base.html' %}
+{% block content %}
+<style>
+.device-choice{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:18px 0}.device-choice button{min-height:104px;text-align:left;padding:18px;border:1px solid var(--border,#294754);border-radius:18px;background:var(--panel,#0b202b);color:inherit;cursor:pointer}.device-choice button:hover,.device-choice button.active{border-color:#38bdf8;box-shadow:0 0 0 2px rgba(56,189,248,.14)}.device-choice strong{display:block;font-size:18px;margin-bottom:6px}.device-choice small{display:block;opacity:.78;line-height:1.4}.analysis-mode{display:none;margin-top:16px;padding:16px;border:1px solid rgba(255,255,255,.1);border-radius:16px;background:rgba(255,255,255,.025)}.analysis-mode.active{display:block}.mode-note{margin:0 0 12px;opacity:.82}.analysis-mode .actions{margin-top:12px}@media(max-width:700px){.device-choice{grid-template-columns:1fr}.device-choice button{min-height:92px}}
+</style>
+<div class="panel">
+  <span class="eyebrow">NEW ANALYSIS</span>
+  <h1>Créer une analyse de match</h1>
+  {% if team_catalog %}
+  <form method="post" action="/matches" enctype="multipart/form-data" id="analysisForm">
+    <div class="formgrid">
+      <label>Équipe
+        <input name="team_name" list="analysis-team-catalog" value="{{default_team_name}}" placeholder="Rechercher une équipe" autocomplete="off" required>
+      </label>
+      <label>Adversaire
+        <input name="opponent" list="analysis-team-catalog" placeholder="Rechercher un adversaire" autocomplete="off" required>
+      </label>
+      <label>Compétition<input name="competition"></label>
+      <label>Date<input type="date" name="match_date"></label>
+    </div>
+    <datalist id="analysis-team-catalog">
+      {% for t in team_catalog %}<option value="{{t.name}}">{% if t.country %}{{t.country}}{% endif %}{% if t.category %} · {{t.category}}{% endif %}{% if t.competition %} · {{t.competition}}{% endif %}</option>{% endfor %}
+    </datalist>
+    <small>{{team_catalog|length}} équipes disponibles dans la base AquaMetric. L’analyse reste disponible pour toutes les équipes listées.</small>
+
+    <h2 style="margin-top:22px">Choisis ton appareil</h2>
+    <div class="device-choice" role="group" aria-label="Choix du mode d’analyse">
+      <button type="button" id="desktopAnalysisMode" data-analysis-mode="desktop" aria-pressed="false">
+        <strong>💻 Analyse sur ordinateur</strong>
+        <small>Colle le lien YouTube. AquaMetric ouvre le Studio puis analyse l’onglet vidéo partagé par le navigateur.</small>
+      </button>
+      <button type="button" id="phoneAnalysisMode" data-analysis-mode="phone" aria-pressed="false">
+        <strong>📱 Analyse sur téléphone</strong>
+        <small>Importe une vidéo ou un enregistrement d’écran depuis Photos/Fichiers. Aucun partage d’onglet mobile n’est requis.</small>
+      </button>
+    </div>
+
+    <section class="analysis-mode" id="desktopModePanel" data-mode-panel="desktop">
+      <h3>Analyse sur ordinateur</h3>
+      <p class="mode-note">Pour YouTube : colle le lien, puis AquaMetric te demandera uniquement de partager l’onglet du replay.</p>
+      <label>Lien vidéo
+        <input id="desktopVideoUrl" name="video_url" placeholder="https://www.youtube.com/watch?v=..." inputmode="url">
+      </label>
+      <div class="notice"><b>Analyse depuis URL = minimum Ultimate Analyst.</b> Les métriques non prouvées restent « — » et ne sont jamais transformées en faux zéros.</div>
+      <div class="actions compact">
+        <button class="btn intelligence-cta" type="submit" id="desktopAnalyzeSubmit" formaction="/analysis/url/create" formenctype="application/x-www-form-urlencoded">Analyser sur ordinateur</button>
+      </div>
+    </section>
+
+    <section class="analysis-mode" id="phoneModePanel" data-mode-panel="phone">
+      <h3>Analyse sur téléphone</h3>
+      <p class="mode-note">Sélectionne le fichier du match ou ton enregistrement d’écran. AquaMetric utilisera directement les pixels du fichier pour Vision/OCR.</p>
+      <label>Vidéo / enregistrement d’écran
+        <input id="phoneVideoFile" type="file" name="video_file" accept="video/mp4,video/webm,video/quicktime,video/ogg,.m4v" capture="environment">
+      </label>
+      <small>Limite actuelle : {{max_upload_mb}} MB. MP4/MOV sont recommandés sur téléphone.</small>
+      <div class="actions compact">
+        <button class="btn intelligence-cta" type="submit" id="phoneAnalyzeSubmit" formaction="/matches" formenctype="multipart/form-data">Analyser sur téléphone</button>
+      </div>
+    </section>
+  </form>
+  {% else %}
+    <p>Aucune équipe n’est actuellement disponible dans le catalogue d’analyse.</p>
+    <a class="btn" href="/teams">Créer une équipe</a>
+  {% endif %}
+</div>
+<script>
+(() => {
+  const desktopButton = document.getElementById('desktopAnalysisMode');
+  const phoneButton = document.getElementById('phoneAnalysisMode');
+  const desktopPanel = document.getElementById('desktopModePanel');
+  const phonePanel = document.getElementById('phoneModePanel');
+  const desktopUrl = document.getElementById('desktopVideoUrl');
+  const phoneFile = document.getElementById('phoneVideoFile');
+  if(!desktopButton || !phoneButton) return;
+
+  function selectMode(mode){
+    const desktop = mode === 'desktop';
+    desktopButton.classList.toggle('active', desktop);
+    phoneButton.classList.toggle('active', !desktop);
+    desktopButton.setAttribute('aria-pressed', desktop ? 'true' : 'false');
+    phoneButton.setAttribute('aria-pressed', desktop ? 'false' : 'true');
+    desktopPanel.classList.toggle('active', desktop);
+    phonePanel.classList.toggle('active', !desktop);
+    desktopUrl.required = desktop;
+    phoneFile.required = !desktop;
+    if(desktop){ phoneFile.value = ''; desktopUrl.focus(); }
+    else { desktopUrl.value = ''; phoneFile.focus(); }
+  }
+
+  desktopButton.addEventListener('click', () => selectMode('desktop'));
+  phoneButton.addEventListener('click', () => selectMode('phone'));
+
+  const mobileLike = window.matchMedia('(max-width: 700px)').matches || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+  selectMode(mobileLike ? 'phone' : 'desktop');
+})();
+</script>
+{% endblock %}
