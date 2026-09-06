@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, asdict
 from typing import Any
+import re
 
 
 @dataclass
@@ -55,8 +56,25 @@ def _same_period(a: dict, b: dict) -> bool:
     return pa is None or pb is None or int(pa) == int(pb)
 
 
+def _status_kind(row: dict) -> str:
+    if row.get("is_replay"):
+        return "replay"
+    if row.get("is_break"):
+        return "break"
+    if row.get("is_final"):
+        return "final"
+    text = " ".join(str(row.get("normalized_text") or row.get("raw_text") or "").upper().split())
+    if re.search(r"\b(?:REPLAY|RALENTI|SLOW\s*MOTION|SLOWMO)\b", text):
+        return "replay"
+    if re.search(r"\b(?:FINAL|FULL\s*TIME|FIN\s+DU\s+MATCH|MATCH\s+TERMINE|FT)\b", text):
+        return "final"
+    if re.search(r"\b(?:BREAK|PAUSE|INTERVAL|HALF\s*TIME|HALFTIME|END\s+OF\s+(?:Q|QUARTER|PERIOD)|QUARTER\s+BREAK)\b", text):
+        return "break"
+    return "live_or_unknown"
+
+
 def _status_blocked(row: dict) -> bool:
-    return bool(row.get("is_replay") or row.get("is_break") or row.get("is_final"))
+    return _status_kind(row) in {"replay", "break", "final"}
 
 
 def _score_state_confirmed(rows: list[dict], index: int, horizon: int = 3) -> bool:
@@ -77,7 +95,6 @@ def _score_state_confirmed(rows: list[dict], index: int, horizon: int = 3) -> bo
         lh, la = int(later["home_score"]), int(later["away_score"])
         if (lh, la) == (h, a):
             return True
-        # A later monotonic state also confirms that this was not a one-frame spike.
         if lh >= h and la >= a and (lh - h) + (la - a) <= 2:
             return True
         if lh < h or la < a:
@@ -93,8 +110,6 @@ def _stable_score(obs: list[dict]) -> list[dict]:
         current = (int(row["home_score"]), int(row["away_score"]))
         row["score_state_confirmed"] = _score_state_confirmed(rows, idx) or idx == 0
         if last is not None:
-            # Old score shown inside a replay is never allowed to move the live
-            # match score backwards. A huge upward OCR jump is also ignored.
             if current[0] < last[0] or current[1] < last[1]:
                 continue
             if current[0] - last[0] > 2 or current[1] - last[1] > 2:
@@ -108,7 +123,7 @@ def _stable_score(obs: list[dict]) -> list[dict]:
 def infer_periods(observations: list[dict], duration: float) -> list[dict]:
     by_period: dict[int, list[dict]] = {}
     for row in observations:
-        if row.get("is_replay"):
+        if _status_kind(row) == "replay":
             continue
         q = row.get("period")
         if q in (1, 2, 3, 4):
@@ -134,7 +149,6 @@ def _best_visual_focus(interesting_moments: list[dict], start: float, end: float
 
 
 def _clock_state(prev: dict, row: dict) -> str:
-    """Classify scoreboard clock movement without pretending to know ball state."""
     if not _same_period(prev, row):
         return "period_reset"
     pc, rc = prev.get("clock_seconds"), row.get("clock_seconds")
@@ -168,10 +182,6 @@ def _score_change_candidate(
     before_score = [prev["home_score"], prev["away_score"]]
     after_score = [row["home_score"], row["away_score"]]
     team_label = "home" if side == "home" else "away"
-
-    # A visual peak is never the proof of the goal and is deliberately not used
-    # as the goal timestamp. This prevents a broadcast replay from being stored as
-    # if it were the live scoring action. The only counting proof is the scoreboard.
     visual_score = float(focus.get("score", 0) or 0) if focus else 0.0
     second = end
     if strict_goal:
@@ -241,8 +251,6 @@ def infer_candidates(observations: list[dict], interesting_moments: list[dict]) 
                         "play_state": "quarter_break_or_period_transition",
                     },
                 ))
-                # Never manufacture a goal from the score difference across a
-                # quarter/period boundary. The score can only be reconciled later.
                 prev = row
                 continue
 
@@ -265,7 +273,6 @@ def infer_candidates(observations: list[dict], interesting_moments: list[dict]) 
                 candidates.append(_score_change_candidate(prev, row, side, delta, interesting_moments, strict_goal=False))
         prev = row
 
-    # Vision-only peaks stay generic. They are review targets, never goals.
     for item in interesting_moments[:16]:
         sec = float(item.get("second", 0))
         score = float(item.get("score", 0))
@@ -283,9 +290,9 @@ def infer_candidates(observations: list[dict], interesting_moments: list[dict]) 
 def build_auto_summary(observations: list[dict], periods: list[dict], candidates: list[AutoCandidate]) -> dict:
     goals = [c for c in candidates if c.event_type.startswith("goal_candidate")]
     score_windows = [c for c in candidates if c.event_type.startswith("score_change_window")]
-    replay_rows = [row for row in observations if row.get("is_replay")]
-    break_rows = [row for row in observations if row.get("is_break")]
-    final_rows = [row for row in observations if row.get("is_final")]
+    replay_rows = [row for row in observations if _status_kind(row) == "replay"]
+    break_rows = [row for row in observations if _status_kind(row) == "break"]
+    final_rows = [row for row in observations if _status_kind(row) == "final"]
     return {
         "scoreboard_observations": len(observations),
         "periods_observed": len(periods),
