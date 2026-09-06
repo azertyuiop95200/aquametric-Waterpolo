@@ -1,16 +1,16 @@
 {% extends "base.html" %}
 {% block content %}
 <style>
-.capture-shell{max-width:1040px;margin:0 auto;display:grid;gap:18px}.capture-panel{border:1px solid var(--border,#294754);border-radius:22px;background:var(--panel,#0b202b);padding:20px}.capture-grid{display:grid;grid-template-columns:1.2fr .8fr;gap:16px}.capture-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.capture-status{padding:14px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);white-space:pre-wrap}.capture-timer{font-size:34px;font-weight:800}.capture-help{opacity:.8}.capture-warning{padding:12px 14px;border-left:3px solid #fb923c;background:rgba(251,146,60,.08);border-radius:0 12px 12px 0}.capture-good{padding:12px 14px;border-left:3px solid #4ade80;background:rgba(74,222,128,.08);border-radius:0 12px 12px 0}.capture-permission{padding:12px 14px;border-left:3px solid #38bdf8;background:rgba(56,189,248,.08);border-radius:0 12px 12px 0}.source-link{word-break:break-all}.capture-time{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.capture-time input{width:130px;padding:9px 10px;border-radius:10px;border:1px solid rgba(255,255,255,.18);background:#06131b;color:inherit}.roster-meta{display:block;opacity:.75;margin-top:3px}.cap-red{display:inline-block;margin-left:5px;padding:1px 6px;border-radius:999px;background:#7f1d1d;color:#fecaca;font-size:11px}.studio-wrap{display:grid;gap:12px}.studio-player{position:relative;aspect-ratio:16/9;background:#02070a;border-radius:18px;overflow:hidden;border:1px solid rgba(255,255,255,.12)}.studio-player iframe{width:100%;height:100%;border:0;display:block}.studio-fallback{height:100%;display:grid;place-items:center;text-align:center;padding:28px}.studio-live-bar{display:none}.capture-shell.studio-live{max-width:none;margin:0}.capture-shell.studio-live>.capture-panel:not(.studio-panel){display:none}.capture-shell.studio-live .studio-panel{position:fixed;inset:0;z-index:9999;border:0;border-radius:0;padding:0;background:#000}.capture-shell.studio-live .studio-wrap{height:100%;display:block}.capture-shell.studio-live .studio-player{position:absolute;inset:0;aspect-ratio:auto;border:0;border-radius:0}.capture-shell.studio-live .studio-live-bar{display:flex;position:fixed;z-index:10001;left:12px;right:12px;bottom:12px;gap:10px;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:14px;background:rgba(4,13,18,.88);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.16)}.capture-shell.studio-live .studio-live-bar .capture-status{padding:7px 10px;flex:1;max-width:720px}.capture-shell.studio-live .studio-live-bar .capture-timer{font-size:24px}.capture-shell.studio-live .studio-info{display:none}@media(max-width:800px){.capture-grid{grid-template-columns:1fr}.capture-shell.studio-live .studio-live-bar{flex-wrap:wrap}}
+.capture-shell{max-width:1040px;margin:0 auto;display:grid;gap:18px}.capture-panel{border:1px solid var(--border,#294754);border-radius:22px;background:var(--panel,#0b202b);padding:20px}.capture-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.capture-status{padding:14px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);white-space:pre-wrap}.capture-timer{font-size:34px;font-weight:800}.capture-help{opacity:.8}.capture-warning{padding:12px 14px;border-left:3px solid #fb923c;background:rgba(251,146,60,.08);border-radius:0 12px 12px 0}.capture-good{padding:12px 14px;border-left:3px solid #4ade80;background:rgba(74,222,128,.08);border-radius:0 12px 12px 0}.capture-permission{padding:12px 14px;border-left:3px solid #38bdf8;background:rgba(56,189,248,.08);border-radius:0 12px 12px 0}.capture-time{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.capture-time input{width:130px;padding:9px 10px;border-radius:10px;border:1px solid rgba(255,255,255,.18);background:#06131b;color:inherit}.speed-choice{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:14px 0}.speed-btn{padding:14px;border:1px solid rgba(255,255,255,.16);border-radius:14px;background:rgba(255,255,255,.04);color:inherit;text-align:left;cursor:pointer}.speed-btn.active{outline:2px solid #38bdf8;background:rgba(56,189,248,.12)}.speed-btn b{display:block;font-size:17px}.roster-meta{display:block;opacity:.75;margin-top:3px}.cap-red{display:inline-block;margin-left:5px;padding:1px 6px;border-radius:999px;background:#7f1d1d;color:#fecaca;font-size:11px}.studio-wrap{display:grid;gap:12px}.studio-player{position:relative;aspect-ratio:16/9;background:#02070a;border-radius:18px;overflow:hidden;border:1px solid rgba(255,255,255,.12)}.studio-player iframe{width:100%;height:100%;border:0;display:block}.studio-fallback{height:100%;display:grid;place-items:center;text-align:center;padding:28px}.studio-live-bar{display:none}.capture-shell.studio-live{max-width:none;margin:0}.capture-shell.studio-live>.capture-panel:not(.studio-panel){display:none}.capture-shell.studio-live .studio-panel{position:fixed;inset:0;z-index:9999;border:0;border-radius:0;padding:0;background:#000}.capture-shell.studio-live .studio-wrap{height:100%;display:block}.capture-shell.studio-live .studio-player{position:absolute;inset:0;aspect-ratio:auto;border:0;border-radius:0}.capture-shell.studio-live .studio-live-bar{display:flex;position:fixed;z-index:10001;left:12px;right:12px;bottom:12px;gap:10px;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:14px;background:rgba(4,13,18,.88);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.16)}.capture-shell.studio-live .studio-live-bar .capture-status{padding:7px 10px;flex:1;max-width:720px}.capture-shell.studio-live .studio-live-bar .capture-timer{font-size:24px}.capture-shell.studio-live .studio-info{display:none}@media(max-width:800px){.speed-choice{grid-template-columns:1fr}.capture-shell.studio-live .studio-live-bar{flex-wrap:wrap}}
 </style>
 <div class="capture-shell" id="captureShell">
   <section class="capture-panel">
     <span class="eyebrow">ANALYSE VIDÉO · PONT NAVIGATEUR</span>
     <h1>Analyser YouTube sans téléchargement serveur</h1>
-    <p>Le serveur Render est parfois bloqué par YouTube. AquaMetric contourne ce problème proprement : <b>le replay reste lu dans ton navigateur</b> et seule la vidéo de l’onglet que tu autorises est transmise par fragments à Vision/OCR.</p>
+    <p>Le replay reste lu dans ton navigateur et seule la vidéo de l’onglet que tu autorises est transmise par fragments à Vision/OCR.</p>
     <div class="capture-permission" id="permissionState"><b>Vérification de l’autorisation navigateur…</b></div>
-    <p class="capture-help">AquaMetric ne reçoit ni mot de passe, ni cookies YouTube, ni accès général à ton compte. Le navigateur impose une confirmation native pour chaque nouvelle capture ; cette confirmation ne peut pas être automatisée par un site web.</p>
-    <div class="capture-warning"><b>Mode recommandé : un seul onglet.</b> Le replay est intégré ci-dessous. Clique « Démarrer l’analyse », puis dans la fenêtre de partage choisis <b>cet onglet / onglet actuel</b>. AquaMetric bascule ensuite automatiquement en mode vidéo plein écran et demande à YouTube de lire à vitesse 1×.</div>
+    <p class="capture-help">AquaMetric ne reçoit ni mot de passe, ni cookies YouTube, ni accès général à ton compte. Le navigateur impose une confirmation native pour chaque nouvelle capture.</p>
+    <div class="capture-warning"><b>Mode recommandé : un seul onglet.</b> Choisis « cet onglet / onglet actuel » dans la fenêtre de partage. Le mode rapide lit le replay à <b>x2</b> et AquaMetric reconvertit automatiquement tous les timestamps vers le temps réel du match.</div>
   </section>
 
   <section class="capture-panel studio-panel">
@@ -18,7 +18,11 @@
       <div class="studio-info">
         <span class="eyebrow">CAPTURE STUDIO · 1 ONGLET</span>
         <h2>Replay intégré</h2>
-        <p class="capture-help">Si le lecteur intégré ne fonctionne pas sur ton navigateur, utilise le bouton « Ouvrir le replay dans un autre onglet » puis partage cet autre onglet : le backend reste identique.</p>
+        <div class="speed-choice" aria-label="Vitesse d'analyse">
+          <button id="speed1" class="speed-btn" type="button"><b>Analyse normale x1</b><span>Qualité maximale · temps réel.</span></button>
+          <button id="speed2" class="speed-btn active" type="button"><b>Analyse rapide x2</b><span>Environ 2× plus vite · timestamps corrigés automatiquement.</span></button>
+        </div>
+        <p class="capture-help">Si tu ouvres le replay dans un autre onglet, règle YouTube sur la même vitesse que celle choisie ici avant de lancer la capture.</p>
       </div>
       <div class="studio-player" id="studioPlayerBox">
         <div class="studio-fallback" id="studioFallback"><div><b>Préparation du lecteur YouTube…</b><br><small>Le lecteur sera chargé au timestamp de la source.</small></div></div>
@@ -60,10 +64,13 @@
 </div>
 <script>
 (() => {
+  const FAST_CAPTURE_SENTINEL = 1000000;
   const captureShell = document.getElementById('captureShell');
   const startBtn = document.getElementById('startCapture');
   const stopBtn = document.getElementById('stopCapture');
   const stopLiveBtn = document.getElementById('stopCaptureLive');
+  const speed1Btn = document.getElementById('speed1');
+  const speed2Btn = document.getElementById('speed2');
   const status = document.getElementById('captureStatus');
   const statusStatic = document.getElementById('captureStatusStatic');
   const permissionState = document.getElementById('permissionState');
@@ -72,6 +79,7 @@
   const player = document.getElementById('studioPlayer');
   const fallback = document.getElementById('studioFallback');
   const rawVideoUrl = {{ match.video_url|tojson }};
+  let playbackRate = 2;
   let stream = null;
   let recorder = null;
   let sessionId = '';
@@ -82,6 +90,15 @@
   let uploadChain = Promise.resolve();
   let uploadError = null;
   let uploadedBytes = 0;
+
+  function chooseSpeed(rate){
+    playbackRate = rate === 1 ? 1 : 2;
+    speed1Btn.classList.toggle('active', playbackRate === 1);
+    speed2Btn.classList.toggle('active', playbackRate === 2);
+    ytCommand('setPlaybackRate', [playbackRate]);
+  }
+  speed1Btn.addEventListener('click', () => chooseSpeed(1));
+  speed2Btn.addEventListener('click', () => chooseSpeed(2));
 
   function youtubeId(url){
     try {
@@ -114,22 +131,17 @@
   }
   function primeReplay(){
     ytCommand('seekTo', [sourceStart, true]);
-    ytCommand('setPlaybackRate', [1]);
+    ytCommand('setPlaybackRate', [playbackRate]);
     ytCommand('playVideo', []);
   }
-  function setStatus(text){
-    status.textContent = text;
-    statusStatic.textContent = text;
-  }
+  function setStatus(text){ status.textContent = text; statusStatic.textContent = text; }
   function setPermission(text, ok=true){
     permissionState.innerHTML = `<b>${ok ? 'Autorisation disponible' : 'Autorisation indisponible'}</b><div>${text}</div>`;
     permissionState.style.borderLeftColor = ok ? '#4ade80' : '#fb923c';
   }
   function fmt(seconds){
     seconds = Math.max(0, Math.floor(seconds));
-    const h = Math.floor(seconds/3600);
-    const m = Math.floor((seconds%3600)/60);
-    const s = seconds%60;
+    const h = Math.floor(seconds/3600), m = Math.floor((seconds%3600)/60), s = seconds%60;
     return h ? `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}` : `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
   }
   function updateTimer(){ timer.textContent = fmt((Date.now()-startedAt)/1000); }
@@ -139,24 +151,19 @@
     const name = String(err && err.name || '');
     if(name === 'NotAllowedError') return 'Partage annulé ou refusé. Reclique sur « Démarrer l’analyse » puis sélectionne cet onglet dans la fenêtre native.';
     if(name === 'InvalidStateError') return 'La demande doit être lancée directement depuis un clic sur cette page active.';
-    if(name === 'NotReadableError') return 'Le système ou le navigateur bloque actuellement la capture d’écran. Ferme une autre application de capture éventuelle puis réessaie.';
+    if(name === 'NotReadableError') return 'Le système ou le navigateur bloque actuellement la capture d’écran.';
     if(name === 'NotFoundError') return 'Aucune source de partage disponible sur cet appareil.';
     if(name === 'AbortError') return 'La sélection de l’onglet a été annulée avant le démarrage.';
     return err && err.message ? err.message : String(err || 'Erreur inconnue');
   }
   function checkCaptureCapability(){
     loadEmbeddedReplay();
-    if(!window.isSecureContext){
-      setPermission('La capture d’onglet exige HTTPS. Ouvre AquaMetric avec son adresse https://.', false);
-      startBtn.disabled = true;
-      return;
-    }
+    if(!window.isSecureContext){ setPermission('La capture d’onglet exige HTTPS.', false); startBtn.disabled = true; return; }
     if(!window.MediaRecorder || !navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia){
-      setPermission('Ce navigateur ne fournit pas l’API de partage d’onglet nécessaire. Utilise un navigateur de bureau Chromium/Firefox compatible ou importe directement la vidéo.', false);
-      startBtn.disabled = true;
-      return;
+      setPermission('Ce navigateur ne fournit pas l’API de partage d’onglet nécessaire. Utilise un navigateur de bureau compatible ou importe directement la vidéo.', false);
+      startBtn.disabled = true; return;
     }
-    setPermission('Prêt. Au clic, le navigateur proposera les sources de partage. Choisis « cet onglet / onglet actuel » pour que le replay intégré soit capturé directement.', true);
+    setPermission('Prêt. Au clic, choisis « cet onglet / onglet actuel ». Le mode x2 est sélectionné par défaut.', true);
   }
   async function jsonFetch(url, options={}){
     const response = await fetch(url, options);
@@ -171,21 +178,21 @@
     form.append('chunk', blob, `capture-${String(index).padStart(5,'0')}.webm`);
     const payload = await jsonFetch('/matches/{{match.id}}/analysis/browser-capture/chunk', {method:'POST', body:form});
     uploadedBytes = Number(payload.bytes || uploadedBytes);
-    setStatus(`Capture active · ${fmt((Date.now()-startedAt)/1000)} · ${(uploadedBytes/1024/1024).toFixed(1)} Mo transmis à AquaMetric.`);
+    setStatus(`Capture x${playbackRate} active · ${fmt((Date.now()-startedAt)/1000)} · ${(uploadedBytes/1024/1024).toFixed(1)} Mo transmis.`);
   }
   async function finishAnalysis(){
     await uploadChain;
     if(uploadError) throw uploadError;
     const form = new FormData();
     form.append('session_id', sessionId);
-    form.append('source_start_second', String(sourceStart));
+    const encodedStart = playbackRate === 2 ? FAST_CAPTURE_SENTINEL + sourceStart : sourceStart;
+    form.append('source_start_second', String(encodedStart));
     setStatus(`Capture terminée · ${(uploadedBytes/1024/1024).toFixed(1)} Mo reçus. Vision/OCR analyse maintenant la vidéo…`);
     return jsonFetch('/matches/{{match.id}}/analysis/browser-capture/finish', {method:'POST', body:form});
   }
   function requestStop(){
     if(recorder && recorder.state === 'recording'){
-      stopBtn.disabled = true;
-      stopLiveBtn.disabled = true;
+      stopBtn.disabled = true; stopLiveBtn.disabled = true;
       setStatus('Finalisation du dernier fragment…');
       ytCommand('pauseVideo', []);
       recorder.stop();
@@ -195,14 +202,12 @@
   startBtn.addEventListener('click', async () => {
     try {
       if(!window.isSecureContext || !window.MediaRecorder || !navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia){
-        checkCaptureCapability();
-        throw new Error('La capture d’onglet n’est pas disponible dans ce navigateur.');
+        checkCaptureCapability(); throw new Error('La capture d’onglet n’est pas disponible dans ce navigateur.');
       }
       sourceStart = Math.max(0, Number(sourceStartInput.value || 0));
-      ytCommand('seekTo', [sourceStart, true]);
-      ytCommand('pauseVideo', []);
+      ytCommand('seekTo', [sourceStart, true]); ytCommand('pauseVideo', []);
       captureShell.classList.add('studio-live');
-      setStatus('Fenêtre de partage ouverte : choisis « cet onglet / onglet actuel ». Ne choisis pas tout l’écran si l’onglet est proposé.');
+      setStatus(`Fenêtre de partage ouverte : choisis « cet onglet / onglet actuel ». Vitesse prévue : x${playbackRate}.`);
       stream = await navigator.mediaDevices.getDisplayMedia({
         video: {frameRate: {ideal: 15, max: 30}, displaySurface: 'browser'},
         audio: false,
@@ -216,70 +221,36 @@
       const surface = settings.displaySurface || 'source partagée';
       const session = await jsonFetch('/matches/{{match.id}}/analysis/browser-capture/session', {method:'POST'});
       sessionId = session.session_id;
-      const preferred = [
-        'video/webm;codecs=vp9',
-        'video/webm;codecs=vp8',
-        'video/webm'
-      ].find(t => MediaRecorder.isTypeSupported(t));
+      const preferred = ['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'].find(t => MediaRecorder.isTypeSupported(t));
       recorder = new MediaRecorder(stream, preferred ? {mimeType: preferred, videoBitsPerSecond: 2500000} : {videoBitsPerSecond: 2500000});
-      chunkIndex = 0;
-      uploadedBytes = 0;
-      uploadError = null;
-      uploadChain = Promise.resolve();
+      chunkIndex = 0; uploadedBytes = 0; uploadError = null; uploadChain = Promise.resolve();
       recorder.ondataavailable = ev => {
         if(!ev.data || !ev.data.size || uploadError) return;
         const index = chunkIndex++;
-        uploadChain = uploadChain
-          .then(() => uploadChunk(ev.data, index))
-          .catch(err => {
-            uploadError = err;
-            setStatus(`Erreur d’envoi du fragment ${index}: ${err.message || err}`);
-            if(recorder && recorder.state === 'recording') recorder.stop();
-            throw err;
-          });
+        uploadChain = uploadChain.then(() => uploadChunk(ev.data, index)).catch(err => {
+          uploadError = err; setStatus(`Erreur d’envoi du fragment ${index}: ${err.message || err}`);
+          if(recorder && recorder.state === 'recording') recorder.stop();
+          throw err;
+        });
       };
       recorder.onstop = async () => {
-        clearInterval(tick);
-        stopTracks();
-        startBtn.disabled = false;
-        stopBtn.disabled = true;
-        stopLiveBtn.disabled = true;
-        sourceStartInput.disabled = false;
+        clearInterval(tick); stopTracks(); startBtn.disabled = false; stopBtn.disabled = true; stopLiveBtn.disabled = true; sourceStartInput.disabled = false; speed1Btn.disabled = false; speed2Btn.disabled = false;
         try {
           const payload = await finishAnalysis();
           setStatus(`Analyse terminée : ${payload.visual_samples ?? 0} échantillons visuels, ${payload.scoreboard_observations ?? 0} observations scoreboard, ${payload.candidates ?? 0} moments candidats. Redirection…`);
           setTimeout(() => { window.location.href = payload.redirect || '/matches/{{match.id}}/analysis/result'; }, 800);
-        } catch(err){
-          leaveStudio();
-          setStatus(`Échec de l’analyse : ${err.message || err}`);
-        }
+        } catch(err){ leaveStudio(); setStatus(`Échec de l’analyse : ${err.message || err}`); }
       };
-      videoTrack.addEventListener('ended', () => {
-        if(recorder && recorder.state === 'recording') recorder.stop();
-      });
+      videoTrack.addEventListener('ended', () => { if(recorder && recorder.state === 'recording') recorder.stop(); });
       recorder.start(5000);
-      startedAt = Date.now();
-      updateTimer();
-      tick = setInterval(updateTimer, 500);
-      startBtn.disabled = true;
-      stopBtn.disabled = false;
-      stopLiveBtn.disabled = false;
-      sourceStartInput.disabled = true;
+      startedAt = Date.now(); updateTimer(); tick = setInterval(updateTimer, 500);
+      startBtn.disabled = true; stopBtn.disabled = false; stopLiveBtn.disabled = false; sourceStartInput.disabled = true; speed1Btn.disabled = true; speed2Btn.disabled = true;
       const surfaceNote = surface === 'browser' ? 'onglet navigateur autorisé' : `${surface} autorisé — l’onglet du replay donnera un meilleur OCR`;
       setPermission(`Accès accordé : ${surfaceNote}. AquaMetric reçoit uniquement le flux visuel choisi.`, true);
-      setStatus(`Capture active. Timestamp source = ${sourceStart.toFixed(1)} s. Lecture demandée à vitesse 1×.`);
-      setTimeout(primeReplay, 250);
-      setTimeout(primeReplay, 1200);
+      setStatus(`Capture active. Timestamp source = ${sourceStart.toFixed(1)} s. Lecture demandée à vitesse x${playbackRate}.`);
+      setTimeout(primeReplay, 250); setTimeout(primeReplay, 1200);
     } catch(err){
-      const message = captureErrorMessage(err);
-      leaveStudio();
-      setStatus(`Impossible de démarrer la capture : ${message}`);
-      setPermission(message, false);
-      stopTracks();
-      startBtn.disabled = false;
-      stopBtn.disabled = true;
-      stopLiveBtn.disabled = true;
-      sourceStartInput.disabled = false;
+      const message = captureErrorMessage(err); leaveStudio(); setStatus(`Impossible de démarrer la capture : ${message}`); setPermission(message, false); stopTracks(); startBtn.disabled = false; stopBtn.disabled = true; stopLiveBtn.disabled = true; sourceStartInput.disabled = false; speed1Btn.disabled = false; speed2Btn.disabled = false;
     }
   });
 
