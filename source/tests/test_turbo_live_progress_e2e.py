@@ -184,7 +184,7 @@ def test_turbo_finish_analyzes_four_quadrants_and_maps_full_source_timeline(tmp_
             .order_by(VisionAnalysis.id.desc())
         )
         assert vision is not None
-        assert vision.engine_version == "parallel-mosaic-vision-v1"
+        assert vision.engine_version == "parallel-mosaic-vision-v2"
         assert vision.duration_seconds == 32.0
         samples = db.scalars(
             select(VisionSample)
