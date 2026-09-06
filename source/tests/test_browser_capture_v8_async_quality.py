@@ -21,10 +21,9 @@ def test_quality_detector_distinguishes_blank_from_detailed_mosaic():
     assert high["quality_score"] > low["quality_score"]
 
 
-def test_v7_uses_non_blocking_finish_and_quality_pause_with_time_safe_recording():
+def test_v7_quality_pause_is_time_safe_and_final_rescan_is_bounded():
     source = (ROOT / "capture_turbo_routes_v7.py").read_text(encoding="utf-8")
     assert "BackgroundTasks" in source
-    assert "status_code=202" in source
     assert '"accepted": True' in source
     assert "fast_analysis=True" in source
     assert "visual_samples=176" in source
@@ -36,12 +35,22 @@ def test_v7_uses_non_blocking_finish_and_quality_pause_with_time_safe_recording(
     assert "quality_pause_recommended" in source
 
 
-def test_v8_resolves_post_render_match_urls_and_prebuffers_longer():
+def test_v8_resolves_post_render_match_urls_prebuffers_and_caps_quality_pauses():
     source = (ROOT / "capture_turbo_routes_v8.py").read_text(encoding="utf-8")
-    priority = (ROOT / "priority_analysis_routes.py").read_text(encoding="utf-8")
     assert 'html.replace("{{match.id}}", str(match_id))' in source
     assert "setTimeout(r,2800)" in source
-    assert "from capture_turbo_routes_v8 import" in priority
+    assert "qualityPauseCount>=6" in source
+
+
+def test_v9_removes_85_plateau_and_uses_normal_async_http_handoff():
+    source = (ROOT / "capture_turbo_routes_v9.py").read_text(encoding="utf-8")
+    priority = (ROOT / "priority_analysis_routes.py").read_text(encoding="utf-8")
+    assert "moving = min(87.5, read * 0.884)" in source
+    assert '"analysis_percent": 89.0' in source
+    assert '"accepted": True' in source
+    assert "status_code=202" not in source
+    assert "multiple_match_candidates" in source
+    assert "from capture_turbo_routes_v9 import" in priority
 
 
 def test_fast_browser_normalization_uses_analysis_oriented_fallback():
