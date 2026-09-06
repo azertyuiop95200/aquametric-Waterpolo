@@ -40,12 +40,12 @@ def test_same_cap_number_on_opposite_teams_is_never_same_identity():
 
 def test_same_cap_number_inside_same_team_needs_visual_track_to_split_identity():
     unresolved = cap_identity_key(12, "for", 12)
-    hitomi_track = cap_identity_key(12, "for", 12, "white12-a")
-    hanae_track = cap_identity_key(12, "for", 12, "white12-b")
+    track_a = cap_identity_key(12, "for", 12, "white12-a")
+    track_b = cap_identity_key(12, "for", 12, "white12-b")
     assert unresolved.endswith("cap:12:track:ambiguous")
-    assert hitomi_track != hanae_track
-    assert hitomi_track != unresolved
-    assert hanae_track != unresolved
+    assert track_a != track_b
+    assert track_a != unresolved
+    assert track_b != unresolved
 
 
 def test_event_identity_uses_perspective_and_optional_visual_track():
@@ -66,10 +66,11 @@ def test_event_identity_uses_perspective_and_optional_visual_track():
     assert event_identity_key(own) != event_identity_key(opponent)
 
 
-def test_reference_match_roster_keeps_duplicate_12_and_13_candidates():
-    assert cap_candidates(REFERENCE_URL, "for", 1) == ("Rumina",)
-    assert cap_candidates(REFERENCE_URL, "for", 12) == ("Hitomi", "Hanae")
-    assert cap_candidates(REFERENCE_URL, "for", 13) == ("Maëlle", "Clara")
-    rows = roster_payload(REFERENCE_URL)
-    assert len(rows) == 16
-    assert all(row["ambiguous_cap"] for row in rows if row["cap_number"] in {12, 13})
+def test_manual_reference_roster_is_not_used_as_visual_identity_evidence():
+    # The user may give contextual hints, but AquaMetric must infer cap numbers
+    # and identities from the video itself. Historical roster helpers therefore
+    # intentionally return no candidates and no preloaded rows.
+    assert cap_candidates(REFERENCE_URL, "for", 1) == ()
+    assert cap_candidates(REFERENCE_URL, "for", 12) == ()
+    assert cap_candidates(REFERENCE_URL, "for", 13) == ()
+    assert roster_payload(REFERENCE_URL) == []
