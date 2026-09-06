@@ -68,7 +68,11 @@ def test_browser_capture_chunks_reconstruct_real_video_and_create_vision_analysi
     page = client.get(location)
     assert page.status_code == 200
     assert "Démarrer l’analyse dans cet onglet" in page.text
-    assert "preferCurrentTab: true" in page.text
+    assert "preferCurrentTab:true" in page.text
+    assert "displaySurface:'browser'" in page.text
+    assert "Turbo ≤15 min" in page.text
+    assert "Lecture vidéo" in page.text
+    assert "Analyse IA" in page.text
     assert 'value="465.0"' in page.text
     assert "#13 Maëlle" in page.text
     assert "bonnet rouge" in page.text
@@ -105,9 +109,6 @@ def test_browser_capture_chunks_reconstruct_real_video_and_create_vision_analysi
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["ok"] is True
-    # An 8-second source can only provide about one sparse sample per second in
-    # the current baseline. The test proves real decoded frames reached Vision;
-    # target_samples is a cap/target, not a promise to duplicate short footage.
     assert body["visual_samples"] >= 8
     assert body["source_time_offset_seconds"] == 465.0
     assert body["redirect"] == f"/matches/{match_id}/analysis/result"
