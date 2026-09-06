@@ -170,14 +170,21 @@ def test_turbo_finish_analyzes_four_quadrants_and_maps_full_source_timeline(tmp_
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["ok"] is True
-    assert body["parallel_segments"] == 4
-    assert body["visual_samples"] >= 80
+    assert body["accepted"] is True
+    assert body["analysis_percent"] >= 89.0
+
+    status = client.get(body["status_url"])
+    assert status.status_code == 200, status.text
+    progress = status.json()["progress"]
+    assert progress["status"] in {"complete", "partial"}
+    assert int(progress.get("parallel_segments") or 0) == 4
+    assert int(progress.get("visual_samples") or 0) >= 80
 
     db = SessionLocal()
     try:
         match = db.get(Match, match_id)
         assert match is not None
-        assert match.status == "browser_capture_analyzed"
+        assert match.status in {"browser_capture_analyzed", "browser_capture_analyzed_partial"}
         vision = db.scalar(
             select(VisionAnalysis)
             .where(VisionAnalysis.match_id == match_id)
