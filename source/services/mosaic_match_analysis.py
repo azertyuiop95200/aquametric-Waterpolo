@@ -1,10 +1,10 @@
-"""Fast analysis for a browser capture containing four parallel YouTube segments.
+"""Fast analysis for a browser capture containing parallel YouTube segments.
 
-The browser plays four chronological quarters of the same replay at 2× in a 2×2
-mosaic. This module samples the mosaic once, crops each quadrant, and maps every
-measurement back to the original source timeline. It avoids serialising/re-encoding
-four videos and is designed to keep a deep first-pass report inside a ~15 minute
-product budget on ordinary match lengths.
+The browser plays chronological quarters of the same replay in a mosaic. This
+module samples the mosaic once, crops each pane, and maps every measurement back
+to the original source timeline. OCR is focused around visually interesting
+moments and bounded by a real time budget so finalisation cannot spend minutes
+rescanning low-value frames.
 """
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from pathlib import Path
 import copy
 import json
 import math
+import time
 
 import cv2
 import numpy as np
@@ -42,7 +43,6 @@ def _pane(frame: np.ndarray, index: int, segments: int) -> np.ndarray:
     if segments == 2:
         half = w // 2
         return frame[:, :half] if index == 0 else frame[:, half:]
-    # 4-segment turbo: TL, TR, BL, BR.
     half_w, half_h = w // 2, h // 2
     boxes = (
         (0, 0, half_w, half_h),
@@ -92,19 +92,68 @@ def _read_at(cap, second: float):
     return frame if ok else None
 
 
-def _ocr_observations(video_path: Path, rois, *, capture_duration: float, source_start: float,
-                      source_duration: float, playback_rate: float, segments: int, max_samples: int):
+def _ocr_target_seconds(source_duration: float, max_samples: int, focus_seconds=None) -> list[float]:
+    """Return a dense-but-bounded OCR plan biased toward likely actions.
+
+    A uniform pass is retained for score/period continuity, then extra probes are
+    spent around high-action visual moments where goals, exclusions and restarts
+    are most likely to change the scoreboard. This gives more useful observations
+    with far fewer Tesseract calls than a 100+ frame uniform sweep.
+    """
+    duration = max(1.0, float(source_duration or 0.0))
+    cap = max(16, min(int(max_samples or 0), 64))
+    uniform_count = max(12, min(24, cap // 2))
+    end = max(0.0, duration - 0.25)
+    raw = [float(x) for x in np.linspace(0.0, end, uniform_count)]
+
+    for focus in list(focus_seconds or [])[:16]:
+        center = max(0.0, min(end, float(focus or 0.0)))
+        for delta in (-2.0, -0.75, 0.0, 0.75, 2.0):
+            raw.append(max(0.0, min(end, center + delta)))
+
+    # Chronological dedupe. Closely spaced OCR frames rarely add information and
+    # are the main cause of unnecessarily long finalisation.
+    selected: list[float] = []
+    for second in sorted(raw):
+        if any(abs(second - existing) < 0.65 for existing in selected):
+            continue
+        selected.append(second)
+        if len(selected) >= cap:
+            break
+    return selected
+
+
+def _ocr_observations(
+    video_path: Path,
+    rois,
+    *,
+    capture_duration: float,
+    source_start: float,
+    source_duration: float,
+    playback_rate: float,
+    segments: int,
+    max_samples: int,
+    focus_seconds=None,
+):
     if not tesseract_available() or not rois:
-        return []
+        return [], {"targets": 0, "elapsed_seconds": 0.0, "budget_exhausted": False}
     cap = cv2.VideoCapture(str(video_path))
     if not cap.isOpened():
-        return []
+        return [], {"targets": 0, "elapsed_seconds": 0.0, "budget_exhausted": False}
+
+    targets = _ocr_target_seconds(source_duration, max_samples, focus_seconds)
+    # Hard wall-clock budget: finalisation must finish even when Tesseract is slow.
+    budget_seconds = max(18.0, min(36.0, len(targets) * 0.48))
+    started = time.monotonic()
+    deadline = started + budget_seconds
+    observations = []
+    exhausted = False
     try:
-        count = max(16, min(int(max_samples), 128))
-        targets = np.linspace(0.0, max(0.0, source_duration - 0.25), count)
         segment_span = source_duration / segments
-        observations = []
         for rel_second in targets:
+            if time.monotonic() >= deadline:
+                exhausted = True
+                break
             seg = min(segments - 1, int(rel_second / max(segment_span, 0.001)))
             seg_rel = rel_second - seg * segment_span
             capture_second = min(max(0.0, capture_duration - 0.2), seg_rel / playback_rate)
@@ -114,6 +163,9 @@ def _ocr_observations(video_path: Path, rois, *, capture_duration: float, source
             pane = _pane(frame, seg, segments)
             best = None
             for roi_info in rois[:2]:
+                if time.monotonic() >= deadline:
+                    exhausted = True
+                    break
                 rect = tuple(float(getattr(roi_info, key)) for key in ("x", "y", "w", "h"))
                 text, confidence = ocr_image(_roi(pane, rect))
                 parsed = parse_scoreboard_text(text)
@@ -131,6 +183,9 @@ def _ocr_observations(video_path: Path, rois, *, capture_duration: float, source
                     numbers=parsed["numbers"],
                     home_score=parsed["home_score"],
                     away_score=parsed["away_score"],
+                    is_replay=bool(parsed.get("is_replay")),
+                    is_break=bool(parsed.get("is_break")),
+                    is_final=bool(parsed.get("is_final")),
                 )
                 if best is None or obs.ocr_confidence > best.ocr_confidence:
                     best = obs
@@ -138,7 +193,12 @@ def _ocr_observations(video_path: Path, rois, *, capture_duration: float, source
                     break
             if best:
                 observations.append(best.to_dict())
-        return observations
+        return observations, {
+            "targets": len(targets),
+            "elapsed_seconds": round(time.monotonic() - started, 2),
+            "budget_seconds": round(budget_seconds, 2),
+            "budget_exhausted": exhausted,
+        }
     finally:
         cap.release()
 
@@ -178,7 +238,7 @@ def run_mosaic_analysis(
     try:
         fps, frame_count, width, height, capture_duration = _probe(source_path)
         cap = cv2.VideoCapture(str(source_path))
-        sample_instants = max(24, min(120, math.ceil(int(visual_samples) / segments)))
+        sample_instants = max(24, min(96, math.ceil(int(visual_samples) / segments)))
         times = np.linspace(0.0, max(0.0, capture_duration - 0.25), sample_instants)
         segment_span = source_duration / segments
         signals = []
@@ -205,9 +265,15 @@ def run_mosaic_analysis(
         signals.sort(key=lambda row: row.second)
         interval = source_duration / max(1, len(signals))
         windows_rel = _group_windows(signals, interval)
-        moments_rel = _interesting_moments(signals, limit=24, separation=5.0)
+        moments_rel = _interesting_moments(signals, limit=28, separation=4.0)
         rois = _scoreboard_candidates(raw_frames)
-        observations_rel = _ocr_observations(
+
+        job.progress = 52
+        job.message = f"Visual pass complete: {len(signals)} timeline samples; focused OCR starting."
+        db.commit()
+
+        focus_seconds = [float(moment.get("second", 0.0) or 0.0) for moment in moments_rel]
+        observations_rel, ocr_meta = _ocr_observations(
             source_path,
             rois,
             capture_duration=capture_duration,
@@ -216,9 +282,17 @@ def run_mosaic_analysis(
             playback_rate=rate,
             segments=segments,
             max_samples=ocr_samples,
+            focus_seconds=focus_seconds,
         )
         periods_rel = infer_periods(observations_rel, source_duration)
         candidates_rel = infer_candidates(observations_rel, moments_rel)
+
+        job.progress = 78
+        job.message = (
+            f"Focused OCR complete: {len(observations_rel)} useful observations from "
+            f"{ocr_meta.get('targets', 0)} planned probes."
+        )
+        db.commit()
 
         windows = _map_times(copy.deepcopy(windows_rel), source_start, 1.0)
         moments = _map_times(copy.deepcopy(moments_rel), source_start, 1.0)
@@ -239,7 +313,7 @@ def run_mosaic_analysis(
         vision = VisionAnalysis(
             match_id=match.id,
             status="complete",
-            engine_version="parallel-mosaic-vision-v1",
+            engine_version="parallel-mosaic-vision-v2",
             source_kind="browser_capture",
             duration_seconds=source_duration,
             fps=fps,
@@ -258,7 +332,8 @@ def run_mosaic_analysis(
             scoreboard_candidates_json=json.dumps([asdict(c) for c in rois]),
             contact_sheet_file="",
             limitations_json=json.dumps([
-                "Parallel browser capture: four chronological source segments were analysed from one 2×2 mosaic.",
+                "Parallel browser capture: chronological source segments were analysed from one mosaic.",
+                "Focused OCR uses uniform continuity probes plus extra samples around visual action peaks.",
                 "Automatic output remains candidate evidence until cross-validated.",
                 "Player identity requires side + visual track; duplicated cap numbers are never merged automatically.",
             ], ensure_ascii=False),
@@ -276,13 +351,9 @@ def run_mosaic_analysis(
                 action_score=row.action_score,
             ))
 
-        job.progress = 72
-        job.message = f"Parallel visual pass complete: {len(signals)} source-timeline samples."
-        db.commit()
-
         summary = build_auto_summary(observations, periods, candidates)
         summary.update({
-            "pipeline": "parallel-mosaic-v1",
+            "pipeline": "parallel-mosaic-v2-focused-ocr",
             "source_kind": "browser_capture",
             "source_time_offset_seconds": round(source_start, 3),
             "source_time_scale": round(rate, 3),
@@ -291,13 +362,18 @@ def run_mosaic_analysis(
             "capture_duration_minutes": round(capture_duration / 60.0, 1),
             "visual_samples": len(signals),
             "scoreboard_observations": len(observations),
-            "ocr_samples_cap": int(ocr_samples),
-            "speed_strategy": f"{segments} parallel chronological segments × {rate:g} playback; direct mosaic sampling",
+            "ocr_samples_requested": int(ocr_samples),
+            "ocr_targets_used": int(ocr_meta.get("targets") or 0),
+            "ocr_elapsed_seconds": float(ocr_meta.get("elapsed_seconds") or 0.0),
+            "ocr_budget_seconds": float(ocr_meta.get("budget_seconds") or 0.0),
+            "ocr_budget_exhausted": bool(ocr_meta.get("budget_exhausted")),
+            "measurement_strategy": "dense visual sampling + focused scoreboard OCR + confidence-labelled candidate extraction",
+            "speed_strategy": f"{segments} parallel chronological segments × {rate:g} playback; focused OCR with hard time budget",
         })
         autonomy = AutonomousAnalysis(
             match_id=match.id,
             status="complete",
-            engine_version="parallel-mosaic-autonomy-v1",
+            engine_version="parallel-mosaic-autonomy-v2",
             ocr_available=tesseract_available(),
             observations_json=json.dumps(observations, ensure_ascii=False),
             periods_json=json.dumps(periods, ensure_ascii=False),
@@ -305,7 +381,7 @@ def run_mosaic_analysis(
             limitations_json=json.dumps([
                 "Turbo mode accelerates acquisition by analysing chronological segments in parallel.",
                 "Score, periods and event candidates remain confidence-labelled evidence, not fabricated official truth.",
-                "A final detailed player/tactical layer must only use identities supported by the visual track and roster evidence.",
+                "Fields unsupported by sufficient visual evidence stay unmeasured instead of being silently set to zero.",
             ], ensure_ascii=False),
         )
         db.add(autonomy)
@@ -320,7 +396,7 @@ def run_mosaic_analysis(
                 confidence_label=candidate.confidence_label,
                 summary=candidate.summary,
                 evidence_json=json.dumps(candidate.evidence, ensure_ascii=False),
-                source="parallel-mosaic-v1",
+                source="parallel-mosaic-v2",
             ))
 
         job.progress = 100
@@ -332,8 +408,7 @@ def run_mosaic_analysis(
         match.status = "browser_capture_analyzed"
         db.commit()
         return {"job": job, "vision": vision, "autonomy": autonomy, "summary": summary, "candidates": candidates}
-    except (VisionBaselineError, Exception) as exc:
-        # Keep the public exception stable for the route; database state remains explicit.
+    except Exception as exc:
         job.status = "failed"
         job.message = str(exc)
         match.status = "browser_capture_failed"
