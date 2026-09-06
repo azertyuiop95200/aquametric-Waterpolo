@@ -12,13 +12,15 @@ def test_security_explicitly_allows_first_party_display_capture():
 
 def test_browser_capture_permission_flow_is_user_visible_and_actionable():
     template = (ROOT / "templates" / "browser_capture.html").read_text(encoding="utf-8")
-    assert "Autoriser l’onglet et démarrer l’analyse" in template
+    assert "Démarrer l’analyse dans cet onglet" in template
     assert "navigator.mediaDevices.getDisplayMedia" in template
     assert "window.isSecureContext" in template
     assert "NotAllowedError" in template
     assert "displaySurface: 'browser'" in template
     assert "source_start_second" in template
     assert "recorder.start(5000)" in template
+    assert "preferCurrentTab: true" in template
+    assert "selfBrowserSurface: 'include'" in template
 
 
 def test_reference_match_shared_cap_13_keeps_goalkeeper_identity_signal():
