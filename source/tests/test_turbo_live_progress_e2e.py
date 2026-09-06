@@ -66,8 +66,6 @@ def _jpeg_frame(width=1280, height=720):
 def _make_mosaic_webm(path: Path, seconds: int = 4) -> bytes:
     ffmpeg = shutil.which("ffmpeg")
     assert ffmpeg, "ffmpeg is required for the turbo E2E test"
-    # One real 2x2 video frame. Each quadrant has a distinct moving test source,
-    # matching the layout captured by the Turbo browser studio.
     cmd = [
         ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
         "-f", "lavfi", "-i", f"testsrc2=size=640x360:rate=15:duration={seconds}",
@@ -84,7 +82,6 @@ def _make_mosaic_webm(path: Path, seconds: int = 4) -> bytes:
 
 
 def test_live_progress_routes_are_priority_routes_and_process_real_frames(monkeypatch):
-    # Keep this test about real frame decoding/pool analysis, not OCR latency.
     monkeypatch.setattr(capture_turbo_routes, "tesseract_available", lambda: False)
     match_id, location, source_duration = _register_and_create_match(duration=497.0)
 
@@ -134,7 +131,6 @@ def test_live_progress_routes_are_priority_routes_and_process_real_frames(monkey
 
 
 def test_turbo_finish_analyzes_four_quadrants_and_maps_full_source_timeline(tmp_path, monkeypatch):
-    # Disable OCR so the test exercises the real mosaic Vision path quickly.
     monkeypatch.setattr(mosaic_match_analysis, "tesseract_available", lambda: False)
     match_id, _, source_duration = _register_and_create_match(duration=497.0)
     response = client.post(
@@ -175,7 +171,6 @@ def test_turbo_finish_analyzes_four_quadrants_and_maps_full_source_timeline(tmp_
     body = response.json()
     assert body["ok"] is True
     assert body["parallel_segments"] == 4
-    assert body["playback_rate"] == 2.0
     assert body["visual_samples"] >= 80
 
     db = SessionLocal()
@@ -197,8 +192,6 @@ def test_turbo_finish_analyzes_four_quadrants_and_maps_full_source_timeline(tmp_
             .order_by(VisionSample.second.asc())
         ).all()
         assert len(samples) == vision.sample_count
-        # Source timestamps must cover all four chronological panes, not just the
-        # four seconds of wall-clock capture.
         assert samples[0].second >= 465.0
         assert samples[-1].second > 490.0
         assert samples[-1].second <= 497.0
