@@ -3,7 +3,9 @@
 V7 patches HTML after Jinja rendering, so this layer resolves the numeric match
 id into the injected async-status URLs before the page is sent to the browser.
 It also gives the embedded YouTube players a slightly longer initial buffer so
-capture does not start while the source is still in its lowest-quality ramp-up.
+capture does not start while the source is still in its lowest-quality ramp-up,
+and caps automatic quality pauses so a permanently low-quality source cannot
+prevent the analysis from ever finishing.
 """
 from __future__ import annotations
 
@@ -27,4 +29,14 @@ def turbo_browser_capture_page(match_id: int, request: Request, db: Session = De
     html = bytes(response.body).decode("utf-8")
     html = html.replace("{{match.id}}", str(match_id))
     html = html.replace("setTimeout(r,1800)", "setTimeout(r,2800)", 1)
+    html = html.replace(
+        "let qualityPaused=false,qualityPauseStarted=0,qualityPausedMs=0,qualityRetryTimer=null,lastQualityPauseAt=0;",
+        "let qualityPaused=false,qualityPauseStarted=0,qualityPausedMs=0,qualityRetryTimer=null,lastQualityPauseAt=0,qualityPauseCount=0;",
+        1,
+    )
+    html = html.replace(
+        "if(externalFallback||qualityPaused||stopping||!recorder||Date.now()-lastQualityPauseAt<1600)return;lastQualityPauseAt=Date.now();qualityPaused=true;",
+        "if(externalFallback||qualityPaused||stopping||!recorder||qualityPauseCount>=6||Date.now()-lastQualityPauseAt<1600)return;lastQualityPauseAt=Date.now();qualityPauseCount++;qualityPaused=true;",
+        1,
+    )
     return HTMLResponse(html)
