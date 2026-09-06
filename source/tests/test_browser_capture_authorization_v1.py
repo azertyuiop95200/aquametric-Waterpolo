@@ -16,11 +16,14 @@ def test_browser_capture_permission_flow_is_user_visible_and_actionable():
     assert "navigator.mediaDevices.getDisplayMedia" in template
     assert "window.isSecureContext" in template
     assert "NotAllowedError" in template
-    assert "displaySurface: 'browser'" in template
+    assert "displaySurface:'browser'" in template
     assert "source_start_second" in template
     assert "recorder.start(5000)" in template
-    assert "preferCurrentTab: true" in template
-    assert "selfBrowserSurface: 'include'" in template
+    assert "preferCurrentTab:true" in template
+    assert "selfBrowserSurface:'include'" in template
+    assert "Lecture vidéo" in template
+    assert "Analyse IA" in template
+    assert "Turbo ≤15 min" in template
 
 
 def test_reference_match_shared_cap_13_keeps_goalkeeper_identity_signal():
