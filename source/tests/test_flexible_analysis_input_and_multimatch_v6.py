@@ -1,15 +1,13 @@
 import os
 import uuid
-from pathlib import Path
 
 os.environ.setdefault("DATABASE_URL", "sqlite:///./test_aquametric.db")
 
 from fastapi.testclient import TestClient
-from sqlalchemy import select
 
 from main import app
 from db import SessionLocal
-from models import Match, Team
+from models import Match, Team, User
 from analysis_product_routes import _capture_session_dir
 from capture_turbo_routes import _read_state, _write_state
 
@@ -111,7 +109,9 @@ def test_multimatch_finish_requests_scope_instead_of_mixing_matches():
     db = SessionLocal()
     try:
         match = db.get(Match, match_id)
-        user = match.owner
+        assert match is not None
+        user = db.get(User, match.owner_id)
+        assert user is not None
         root = _capture_session_dir(user, match, session_id)
         state = _read_state(root)
         state["multiple_match_candidates"] = True
