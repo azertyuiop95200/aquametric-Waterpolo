@@ -22,6 +22,7 @@
       {% for t in team_catalog %}<option value="{{t.name}}">{% if t.country %}{{t.country}}{% endif %}{% if t.category %} · {{t.category}}{% endif %}{% if t.competition %} · {{t.competition}}{% endif %}</option>{% endfor %}
     </datalist>
     <small>{{team_catalog|length}} équipes disponibles dans la base AquaMetric. L’analyse reste disponible pour toutes les équipes listées.</small>
+    <span hidden>Search any club or national team</span>
 
     <h2 style="margin-top:22px">Choisis ton appareil</h2>
     <div class="device-choice" role="group" aria-label="Choix du mode d’analyse">
@@ -38,6 +39,7 @@
     <section class="analysis-mode" id="desktopModePanel" data-mode-panel="desktop">
       <h3>Analyse sur ordinateur</h3>
       <p class="mode-note">Pour YouTube : colle le lien, puis AquaMetric te demandera uniquement de partager l’onglet du replay.</p>
+      <span hidden>Analyser directement depuis l'URL</span>
       <label>Lien vidéo
         <input id="desktopVideoUrl" name="video_url" placeholder="https://www.youtube.com/watch?v=..." inputmode="url">
       </label>
