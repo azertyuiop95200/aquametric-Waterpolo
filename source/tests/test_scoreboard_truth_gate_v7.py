@@ -29,7 +29,7 @@ def test_goal_requires_confirmed_plus_one_scoreboard_increment():
         _obs(10, (1, 0), clock=410),
         _obs(20, (1, 0), clock=400),
     ]
-    candidates = infer_candidates(rows, [{"second": 14, "score": 0.99}])
+    candidates = infer_candidates(rows, [{"second": 8, "score": 0.99}])
     goals = _goals(candidates)
     assert len(goals) == 1
     goal = goals[0]
@@ -39,7 +39,7 @@ def test_goal_requires_confirmed_plus_one_scoreboard_increment():
     assert goal.evidence["time_precision"] == "score_bracket_only"
     # The visual peak can be shown for review but is never the asserted goal time.
     assert goal.second == 10.0
-    assert goal.evidence["visual_focus_second"] == 14.0
+    assert goal.evidence["visual_focus_second"] == 8.0
     assert "scoreboard" in goal.evidence["signal"]
 
 
