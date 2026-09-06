@@ -44,6 +44,15 @@ def turbo_browser_capture_page(match_id: int, request: Request, db: Session = De
     user, match = _owned_match(match_id, request, db)
     if not match.video_url:
         raise HTTPException(status_code=400, detail="This capture mode requires a video URL.")
+    scope_start = request.query_params.get("scope_start")
+    try:
+        scope_start_value = max(0.0, float(scope_start)) if scope_start not in (None, "") else _source_start_second(match.video_url)
+    except (TypeError, ValueError):
+        scope_start_value = _source_start_second(match.video_url)
+    try:
+        scope_end_value = max(0.0, float(request.query_params.get("scope_end") or 0.0))
+    except (TypeError, ValueError):
+        scope_end_value = 0.0
     return TEMPLATES.TemplateResponse(
         request,
         "browser_capture_v4.html",
@@ -52,7 +61,9 @@ def turbo_browser_capture_page(match_id: int, request: Request, db: Session = De
             "user": user,
             "app_name": "AquaMetric",
             "match": match,
-            "source_start_second": _source_start_second(match.video_url),
+            "source_start_second": scope_start_value,
+            "scope_end_second": scope_end_value,
+            "scope_mode": (request.query_params.get("scope_mode") or "auto")[:24],
         },
     )
 
@@ -95,11 +106,9 @@ def turbo_finish_capture(
     derived_dir = root / "derived"
     derived_dir.mkdir(parents=True, exist_ok=True)
     core_complete = False
+    cleanup_capture = False
     media_info = {}
     try:
-        # Real MediaRecorder WebM files frequently have no reliable duration/cue
-        # metadata even though their frames are valid. Remux first so OpenCV can
-        # seek through the complete capture instead of failing at 88%.
         analysis_source, media_info = normalize_browser_capture(source_path, derived_dir)
         state = _read_state(root)
         state.update({
@@ -173,6 +182,7 @@ def turbo_finish_capture(
         if enrichment_warning:
             state["warning"] = enrichment_warning
         _write_state(root, state)
+        cleanup_capture = True
         return JSONResponse({
             "ok": True,
             "partial": bool(enrichment_warning),
@@ -192,9 +202,10 @@ def turbo_finish_capture(
         db.commit()
         state = _read_state(root)
         state.update({
-            "phase": "échec de l’analyse Vision",
+            "phase": "échec de l’analyse Vision · capture conservée pour nouvelle consolidation",
             "status": "failed",
             "error": str(exc),
+            "retry_available": True,
             "media_normalization": media_info.get("normalization", "unknown"),
         })
         _write_state(root, state)
@@ -208,6 +219,7 @@ def turbo_finish_capture(
         if core_complete:
             match.status = "browser_capture_analyzed_partial"
             db.commit()
+            cleanup_capture = True
             return JSONResponse({
                 "ok": True,
                 "partial": True,
@@ -217,9 +229,15 @@ def turbo_finish_capture(
         match.status = "browser_capture_failed"
         db.commit()
         state = _read_state(root)
-        state.update({"phase": "échec de l’analyse Vision", "status": "failed", "error": str(exc)})
+        state.update({
+            "phase": "échec de l’analyse Vision · capture conservée pour nouvelle consolidation",
+            "status": "failed",
+            "error": str(exc),
+            "retry_available": True,
+        })
         _write_state(root, state)
         log.exception("unexpected browser capture failure match=%s session=%s", match.id, session_id)
         raise HTTPException(status_code=422, detail=f"Core video analysis failed: {exc}") from exc
     finally:
-        shutil.rmtree(root, ignore_errors=True)
+        if cleanup_capture:
+            shutil.rmtree(root, ignore_errors=True)
