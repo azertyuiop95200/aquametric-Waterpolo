@@ -16,9 +16,9 @@ from fastapi import BackgroundTasks, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from sqlalchemy.orm import Session
 
+import capture_turbo_routes_v7 as v7
 from analysis_product_routes import EVIDENCE_DIR, UPLOAD_DIR, _capture_session_dir, _owned_match
 from capture_turbo_routes import _FAST_CAPTURE_SENTINEL, _read_state, _write_state
-from capture_turbo_routes_v7 import _cleanup_pixels_keep_state, _segments
 from capture_turbo_routes_v9 import (
     turbo_append_chunk,
     turbo_capture_status,
@@ -28,10 +28,6 @@ from capture_turbo_routes_v9 import (
 from capture_turbo_routes_v9 import turbo_browser_capture_page as _v9_page
 from db import SessionLocal, get_db
 from models import Match
-from services.browser_capture_media import normalize_browser_capture
-from services.deep_analysis_sequences import materialize_deep_sequence_pack
-from services.mosaic_match_analysis import run_mosaic_analysis
-from services.rapid_match_analysis import run_rapid_analysis
 
 log = logging.getLogger("aquametric.browser_capture.v10")
 
@@ -39,9 +35,9 @@ log = logging.getLogger("aquametric.browser_capture.v10")
 def _final_scan_budget(state: dict, start: float, total_duration: float, segments: int) -> tuple[int, int, str]:
     """Choose a small verification scan without pretending live samples are final stats.
 
-    The browser already sends decoded JPEG frames throughout playback.  When that
+    The browser already sends decoded JPEG frames throughout playback. When that
     pass is dense, the final video scan only needs to verify the full timeline and
-    materialize the canonical VisionAnalysis.  Sparse/fallback captures retain a
+    materialize the canonical VisionAnalysis. Sparse/fallback captures retain a
     larger budget.
     """
     span = max(0.0, float(total_duration or 0.0) - float(start or 0.0))
@@ -62,9 +58,9 @@ def turbo_browser_capture_page(match_id: int, request: Request, db: Session = De
     response = _v9_page(match_id=match_id, request=request, db=db)
     html = bytes(response.body).decode("utf-8")
 
-    # Do not pay a fixed startup penalty on a healthy replay.  Warm at x1 (not
+    # Do not pay a fixed startup penalty on a healthy replay. Warm at x1 (not
     # x2), wait until every active YouTube player is ready and stable twice, then
-    # rewind to each segment start when recording actually begins.  The loop is
+    # rewind to each segment start when recording actually begins. The loop is
     # bounded to ~3 s for slow connections.
     html = html.replace(
         "playPlayers();await new Promise(r=>setTimeout(r,2800));pausePlayers();",
@@ -72,9 +68,9 @@ def turbo_browser_capture_page(match_id: int, request: Request, db: Session = De
         1,
     )
 
-    # A quality pause now waits for recovery instead of resuming blindly after a
-    # fixed delay.  It checks the embedded player quality, but is capped at 6.5 s
-    # so a low-resolution source cannot freeze the analysis.
+    # A quality pause waits for recovery instead of resuming blindly after a
+    # fixed delay. It checks embedded player quality, but is capped at 6.5 s so
+    # a low-resolution source cannot freeze the analysis.
     html = html.replace(
         "clearTimeout(qualityRetryTimer);qualityRetryTimer=setTimeout(()=>resumeAfterQualityPause(),2200);",
         "clearTimeout(qualityRetryTimer);const retryQuality=()=>{const waited=Date.now()-qualityPauseStarted;if(embeddedQualityPoor()&&waited<6500){qualityRetryTimer=setTimeout(retryQuality,900);return}resumeAfterQualityPause()};qualityRetryTimer=setTimeout(retryQuality,1500);",
@@ -84,6 +80,7 @@ def turbo_browser_capture_page(match_id: int, request: Request, db: Session = De
 
 
 def _fast_finalize_capture_job(match_id: int, root_value: str, start: float, total_duration: float, rate: float, segments: int) -> None:
+    """Finalize quickly while keeping V7's patch/test extension points intact."""
     root = Path(root_value)
     db = SessionLocal()
     try:
@@ -105,7 +102,10 @@ def _fast_finalize_capture_job(match_id: int, root_value: str, start: float, tot
         })
         _write_state(root, state)
 
-        analysis_source, media_info = normalize_browser_capture(source_path, derived_dir, fast_analysis=True)
+        # Call through the V7 module rather than frozen imports. Besides keeping
+        # existing resilience hooks compatible, this centralizes media-analysis
+        # behavior in the layer that owns it.
+        analysis_source, media_info = v7.normalize_browser_capture(source_path, derived_dir, fast_analysis=True)
         state = _read_state(root)
         state.update({
             "analysis_percent": 92.0,
@@ -115,7 +115,7 @@ def _fast_finalize_capture_job(match_id: int, root_value: str, start: float, tot
         _write_state(root, state)
 
         if segments >= 4 and total_duration > start + 30.0:
-            result = run_mosaic_analysis(
+            result = v7.run_mosaic_analysis(
                 db,
                 match,
                 analysis_source,
@@ -128,7 +128,7 @@ def _fast_finalize_capture_job(match_id: int, root_value: str, start: float, tot
             )
         else:
             encoded_offset = (_FAST_CAPTURE_SENTINEL + start) if rate >= 1.75 else start
-            result = run_rapid_analysis(
+            result = v7.run_rapid_analysis(
                 db,
                 match,
                 analysis_source,
@@ -158,7 +158,7 @@ def _fast_finalize_capture_job(match_id: int, root_value: str, start: float, tot
         _write_state(root, state)
 
         try:
-            materialize_deep_sequence_pack(
+            v7.materialize_deep_sequence_pack(
                 db,
                 match,
                 UPLOAD_DIR,
@@ -175,7 +175,7 @@ def _fast_finalize_capture_job(match_id: int, root_value: str, start: float, tot
             match.status = "browser_capture_analyzed_partial"
             db.commit()
         finally:
-            _cleanup_pixels_keep_state(root)
+            v7._cleanup_pixels_keep_state(root)
     except Exception as exc:
         log.exception("V10 async browser capture finalization failed match=%s", match_id)
         try:
@@ -264,7 +264,7 @@ def turbo_finish_capture(
     start = max(0.0, float(state.get("source_start_second") or source_start_second or 0.0))
     total_duration = max(0.0, float(state.get("source_duration_seconds") or source_duration_seconds or 0.0))
     rate = max(1.0, min(4.0, float(state.get("playback_rate") or playback_rate or 1.0)))
-    segments = _segments(state.get("parallel_segments") or parallel_segments)
+    segments = v7._segments(state.get("parallel_segments") or parallel_segments)
     state.update({
         "status": "queued_finalization",
         "phase": "dernier fragment reçu · consolidation V10 en arrière-plan",
