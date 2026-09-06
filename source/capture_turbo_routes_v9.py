@@ -11,7 +11,7 @@ three production details:
 """
 from __future__ import annotations
 
-from fastapi import BackgroundTasks, Depends, Form, HTTPException, Request
+from fastapi import BackgroundTasks, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
@@ -36,9 +36,23 @@ def _json_body(response) -> dict:
         return {}
 
 
-def turbo_progress_frame(*args, **kwargs):
+def turbo_progress_frame(
+    match_id: int,
+    request: Request,
+    session_id: str = Form(...),
+    wall_second: float = Form(...),
+    frame: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
     """Keep live progress moving continuously into the async handoff window."""
-    response = _v7_progress_frame(*args, **kwargs)
+    response = _v7_progress_frame(
+        match_id=match_id,
+        request=request,
+        session_id=session_id,
+        wall_second=wall_second,
+        frame=frame,
+        db=db,
+    )
     payload = _json_body(response)
     progress = payload.get("progress") if isinstance(payload.get("progress"), dict) else None
     if not progress:
@@ -53,22 +67,11 @@ def turbo_progress_frame(*args, **kwargs):
     if read >= 98.0:
         progress["phase"] = "dernières images live + préparation du dernier fragment"
 
-    # Persist the adjusted value using the same session root when normal FastAPI
-    # dependency arguments are available. Failure to persist is harmless because
-    # the immediate JSON response still carries the corrected progress.
-    try:
-        request = kwargs.get("request")
-        match_id = int(kwargs.get("match_id"))
-        session_id = str(kwargs.get("session_id"))
-        db = kwargs.get("db")
-        if request is not None and db is not None and session_id:
-            user, match = _owned_match(match_id, request, db)
-            root = _capture_session_dir(user, match, session_id)
-            state = _read_state(root)
-            state.update(progress)
-            _write_state(root, state)
-    except Exception:
-        pass
+    user, match = _owned_match(match_id, request, db)
+    root = _capture_session_dir(user, match, session_id)
+    state = _read_state(root)
+    state.update(progress)
+    _write_state(root, state)
     return JSONResponse({"ok": True, "progress": progress})
 
 
