@@ -1,0 +1,139 @@
+name: AquaMetric Live Browser Capture E2E
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'source/capture_turbo_routes_v11.py'
+      - 'source/priority_analysis_routes.py'
+      - 'source/extensions.py'
+      - 'source/templates/analysis_result_clean_v2.html'
+      - '.github/workflows/live-browser-capture-e2e.yml'
+
+concurrency:
+  group: aquametric-live-capture-e2e
+  cancel-in-progress: true
+
+jobs:
+  live-capture-report:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Wait for this exact commit on Render
+        env:
+          TARGET_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          base='https://aquametric-web-demo.onrender.com'
+          for i in $(seq 1 40); do
+            body=$(curl -L --max-time 30 -fsS "$base/health" 2>/dev/null || true)
+            echo "deploy check $i/40: ${body:-unavailable}"
+            if echo "$body" | grep -q "\"git_commit\":\"$TARGET_SHA\""; then
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::Render did not expose commit $TARGET_SHA in time"
+          exit 1
+
+      - name: Generate a valid four-pane capture source
+        run: |
+          set -euo pipefail
+          if ! command -v ffmpeg >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y ffmpeg
+          fi
+          ffmpeg -hide_banner -loglevel error \
+            -f lavfi -i 'testsrc2=size=1280x720:rate=12' \
+            -t 8 -an -c:v libvpx -deadline realtime -cpu-used 8 -b:v 750k \
+            /tmp/aquametric-live-e2e.webm
+          test $(stat -c%s /tmp/aquametric-live-e2e.webm) -gt 65536
+
+      - name: Create match, ingest capture, publish report and verify every surface
+        run: |
+          set -euo pipefail
+          base='https://aquametric-web-demo.onrender.com'
+          origin="$base"
+          cookie=/tmp/aquametric-e2e-cookie.txt
+          marker="V11-LIVE-E2E-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+
+          curl -L --max-time 45 -fsS -c "$cookie" -b "$cookie" "$base/demo-login" >/tmp/demo-login.html
+
+          curl --max-time 45 -sS -D /tmp/create.headers -o /tmp/create.body \
+            -c "$cookie" -b "$cookie" -H "Origin: $origin" \
+            --data-urlencode 'team_name=Granville' \
+            --data-urlencode "opponent=$marker" \
+            --data-urlencode 'competition=Live E2E' \
+            --data-urlencode 'match_date=2026-09-07' \
+            --data-urlencode 'video_url=https://www.youtube.com/watch?v=Guo_UU282pI' \
+            "$base/analysis/url/create"
+          location=$(awk 'BEGIN{IGNORECASE=1} /^location:/{gsub("\r",""); print $2}' /tmp/create.headers | tail -1)
+          test -n "$location"
+          match_id=$(echo "$location" | sed -n 's#.*\/matches\/\([0-9][0-9]*\)/.*#\1#p')
+          test -n "$match_id"
+          echo "match_id=$match_id marker=$marker"
+
+          curl -L --max-time 45 -fsS -c "$cookie" -b "$cookie" "$base$location" >/tmp/capture-page.html
+          grep -q 'aquametric-v11-final-watchdog' /tmp/capture-page.html
+          if grep -q '{{match.id}}' /tmp/capture-page.html; then
+            echo '::error::Unresolved match placeholder in production capture page'
+            exit 1
+          fi
+
+          session=$(curl --max-time 45 -fsS -c "$cookie" -b "$cookie" -H "Origin: $origin" \
+            -F 'source_start_second=0' -F 'source_duration_seconds=64' \
+            -F 'playback_rate=2' -F 'parallel_segments=4' \
+            "$base/matches/$match_id/analysis/browser-capture/session")
+          session_id=$(python -c 'import json,sys; print(json.load(sys.stdin)["session_id"])' <<<"$session")
+          test -n "$session_id"
+
+          curl --max-time 90 -fsS -c "$cookie" -b "$cookie" -H "Origin: $origin" \
+            -F "session_id=$session_id" -F 'index=0' \
+            -F 'chunk=@/tmp/aquametric-live-e2e.webm;type=video/webm' \
+            "$base/matches/$match_id/analysis/browser-capture/chunk" >/tmp/chunk.json
+
+          finish=$(curl --max-time 45 -fsS -c "$cookie" -b "$cookie" -H "Origin: $origin" \
+            -F "session_id=$session_id" -F 'source_start_second=0' \
+            -F 'source_duration_seconds=64' -F 'playback_rate=2' -F 'parallel_segments=4' \
+            "$base/matches/$match_id/analysis/browser-capture/finish")
+          echo "$finish" | tee /tmp/finish.json
+          accepted=$(python -c 'import json,sys; print(str(json.load(sys.stdin).get("accepted",False)).lower())' <<<"$finish")
+          test "$accepted" = true
+          status_url=$(python -c 'import json,sys; print(json.load(sys.stdin)["status_url"])' <<<"$finish")
+
+          terminal=''
+          for i in $(seq 1 180); do
+            status=$(curl --max-time 30 -fsS -c "$cookie" -b "$cookie" "$base$status_url")
+            state=$(python -c 'import json,sys; print(json.load(sys.stdin).get("progress",{}).get("status",""))' <<<"$status")
+            pct=$(python -c 'import json,sys; print(json.load(sys.stdin).get("progress",{}).get("analysis_percent",""))' <<<"$status")
+            echo "final poll $i: state=$state pct=$pct"
+            if [ "$state" = complete ] || [ "$state" = partial ]; then
+              terminal="$state"
+              echo "$status" >/tmp/final-status.json
+              break
+            fi
+            if [ "$state" = failed ]; then
+              echo "$status"
+              exit 1
+            fi
+            sleep 1
+          done
+          test -n "$terminal"
+          grep -q '"analysis_percent":100' <(tr -d ' ' </tmp/final-status.json)
+
+          curl -L --max-time 45 -fsS -c "$cookie" -b "$cookie" "$base/matches/$match_id/analysis/result" >/tmp/result.html
+          grep -q "$marker" /tmp/result.html
+          grep -q 'Rapport Vision disponible' /tmp/result.html
+
+          curl -L --max-time 45 -fsS -c "$cookie" -b "$cookie" "$base/analysis-library" >/tmp/library.html
+          grep -q "$marker" /tmp/library.html
+
+          curl -L --max-time 45 -fsS -c "$cookie" -b "$cookie" "$base/analysis-history" >/tmp/history.html
+          grep -q "$marker" /tmp/history.html
+          grep -q 'browser_capture_finalize_v11' /tmp/history.html
+
+          curl -L --max-time 45 -fsS -c "$cookie" -b "$cookie" "$base/analysis/video-session-elite?match_id=$match_id" >/tmp/video-session.html
+          grep -q "$marker" /tmp/video-session.html
+
+          echo "LIVE_E2E_OK match=$match_id state=$terminal marker=$marker"
