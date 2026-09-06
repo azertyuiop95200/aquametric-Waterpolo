@@ -32,22 +32,22 @@ _TIME_KEYS = {
 }
 
 
-def _shift_times(value, offset: float):
-    """Shift absolute source-time fields in a JSON-like structure."""
-    if not offset:
+def _map_times(value, offset: float, scale: float = 1.0):
+    """Map capture-time fields back onto the original source timeline."""
+    if not offset and scale == 1.0:
         return value
     if isinstance(value, list):
-        return [_shift_times(item, offset) for item in value]
+        return [_map_times(item, offset, scale) for item in value]
     if isinstance(value, tuple):
-        return tuple(_shift_times(item, offset) for item in value)
+        return tuple(_map_times(item, offset, scale) for item in value)
     if isinstance(value, dict):
-        shifted = {}
+        mapped = {}
         for key, item in value.items():
             if key in _TIME_KEYS and isinstance(item, (int, float)):
-                shifted[key] = float(item) + offset
+                mapped[key] = float(item) * scale + offset
             else:
-                shifted[key] = _shift_times(item, offset)
-        return shifted
+                mapped[key] = _map_times(item, offset, scale)
+        return mapped
     return value
 
 
@@ -72,6 +72,11 @@ def run_rapid_analysis(
     except (TypeError, ValueError):
         time_offset = 0.0
 
+    # The browser-capture studio intentionally plays YouTube at 2× so a long
+    # replay is ingested in roughly half the wall-clock time. All derived
+    # timestamps are expanded back onto the original replay timeline here.
+    time_scale = 2.0 if source_kind == "browser_capture" else 1.0
+
     job = AnalysisJob(
         match_id=match.id,
         stage="rapid_long_video",
@@ -92,26 +97,27 @@ def run_rapid_analysis(
         db.commit()
         raise RapidAnalysisError(str(exc)) from exc
 
-    active_windows = _shift_times(copy.deepcopy(result.active_windows), time_offset)
-    interesting_moments = _shift_times(copy.deepcopy(result.interesting_moments), time_offset)
+    source_duration_seconds = float(result.duration_seconds) * time_scale
+    active_windows = _map_times(copy.deepcopy(result.active_windows), time_offset, time_scale)
+    interesting_moments = _map_times(copy.deepcopy(result.interesting_moments), time_offset, time_scale)
 
     vision = VisionAnalysis(
         match_id=match.id,
         status="complete",
         engine_version="rapid-visual-v1",
         source_kind=(source_kind or "upload")[:32],
-        duration_seconds=result.duration_seconds,
+        duration_seconds=source_duration_seconds,
         fps=result.fps,
         width=result.width,
         height=result.height,
-        sample_interval_seconds=result.sample_interval_seconds,
+        sample_interval_seconds=float(result.sample_interval_seconds) * time_scale,
         sample_count=len(result.samples),
         video_type=result.video_type,
         confidence=result.video_type_confidence,
         avg_pool_ratio=result.avg_pool_ratio,
         avg_motion_score=result.avg_motion_score,
         scene_cut_rate=result.scene_cut_rate,
-        active_seconds_estimate=result.active_seconds_estimate,
+        active_seconds_estimate=float(result.active_seconds_estimate) * time_scale,
         active_windows_json=json.dumps(active_windows),
         interesting_moments_json=json.dumps(interesting_moments),
         scoreboard_candidates_json=json.dumps([asdict(c) for c in result.scoreboard_candidates]),
@@ -125,7 +131,7 @@ def run_rapid_analysis(
     for sample in result.samples:
         db.add(VisionSample(
             analysis_id=vision.id,
-            second=float(sample.second) + time_offset,
+            second=float(sample.second) * time_scale + time_offset,
             pool_ratio=sample.pool_ratio,
             motion_score=sample.motion_score,
             scene_change=sample.scene_change,
@@ -134,7 +140,7 @@ def run_rapid_analysis(
         ))
 
     job.progress = 58
-    job.message = f"Visual sparse scan complete: {len(result.samples)} samples over {result.duration_seconds/60:.1f} min."
+    job.message = f"Visual sparse scan complete: {len(result.samples)} samples over {source_duration_seconds/60:.1f} source min."
     db.commit()
 
     rois = [asdict(c) for c in result.scoreboard_candidates]
@@ -175,33 +181,35 @@ def run_rapid_analysis(
             audio_state = "ffmpeg_unavailable"
     candidates.sort(key=lambda item: item.second)
 
-    if time_offset:
-        observations = _shift_times(observations, time_offset)
-        periods = _shift_times(periods, time_offset)
-        shifted_candidates = []
+    if time_offset or time_scale != 1.0:
+        observations = _map_times(observations, time_offset, time_scale)
+        periods = _map_times(periods, time_offset, time_scale)
+        mapped_candidates = []
         for candidate in candidates:
-            shifted_candidates.append(AutoCandidate(
-                float(candidate.second) + time_offset,
+            mapped_candidates.append(AutoCandidate(
+                float(candidate.second) * time_scale + time_offset,
                 candidate.event_type,
                 candidate.confidence,
                 candidate.confidence_label,
                 candidate.summary,
-                _shift_times(copy.deepcopy(candidate.evidence), time_offset),
+                _map_times(copy.deepcopy(candidate.evidence), time_offset, time_scale),
             ))
-        candidates = shifted_candidates
+        candidates = mapped_candidates
 
     summary = build_auto_summary(observations, periods, candidates)
     summary.update({
         "pipeline": "rapid-long-video-v1",
         "source_kind": source_kind,
-        "duration_minutes": round(result.duration_seconds / 60.0, 1),
+        "duration_minutes": round(source_duration_seconds / 60.0, 1),
+        "capture_duration_minutes": round(float(result.duration_seconds) / 60.0, 1),
         "source_time_offset_seconds": round(time_offset, 3),
+        "source_time_scale": round(time_scale, 3),
         "visual_samples": len(result.samples),
         "ocr_samples_cap": max(12, min(96, int(ocr_samples))),
         "scoreboard_observations": len(observations),
         "whistle_candidates": len(whistle_rows),
         "audio_scan": audio_state,
-        "speed_strategy": "sparse visual sampling + bounded scoreboard OCR; no frame-by-frame full decode",
+        "speed_strategy": "2x browser ingest + source-timeline remap" if time_scale != 1.0 else "sparse visual sampling + bounded scoreboard OCR; no frame-by-frame full decode",
     })
     limitations = [
         "Automatic output is candidate evidence until cross-validated; it never replaces official truth.",
@@ -212,6 +220,8 @@ def run_rapid_analysis(
     ]
     if source_kind != "upload":
         limitations.append("Third-party source pixels are transient: derived measurements are stored, source frames/clips/contact sheets are not persisted.")
+    if time_scale != 1.0:
+        limitations.append("Browser ingest used 2× playback; timestamps and durations shown by AquaMetric are remapped to the original replay timeline.")
     autonomy = AutonomousAnalysis(
         match_id=match.id,
         status="complete",
