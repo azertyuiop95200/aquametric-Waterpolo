@@ -4,7 +4,8 @@ from __future__ import annotations
 from fastapi.responses import HTMLResponse
 
 from analysis_library_product_routes import published_ultimate_detail, ultimate_analysis_library
-from analysis_input_routes_v2 import create_flexible_uploaded_match, create_flexible_url_analysis
+from analysis_input_routes_v2 import create_flexible_uploaded_match
+from analysis_input_routes_v3 import create_flexible_url_analysis
 from analysis_product_routes import (
     export_complete_analysis,
     regenerate_exact_evidence,
