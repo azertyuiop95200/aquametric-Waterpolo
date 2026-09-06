@@ -2,6 +2,8 @@
 
 V7 patches HTML after Jinja rendering, so this layer resolves the numeric match
 id into the injected async-status URLs before the page is sent to the browser.
+It also gives the embedded YouTube players a slightly longer initial buffer so
+capture does not start while the source is still in its lowest-quality ramp-up.
 """
 from __future__ import annotations
 
@@ -24,4 +26,5 @@ def turbo_browser_capture_page(match_id: int, request: Request, db: Session = De
     response = _v7_page(match_id=match_id, request=request, db=db)
     html = bytes(response.body).decode("utf-8")
     html = html.replace("{{match.id}}", str(match_id))
+    html = html.replace("setTimeout(r,1800)", "setTimeout(r,2800)", 1)
     return HTMLResponse(html)
