@@ -82,10 +82,11 @@ class AquaMetricSecurityMiddleware(BaseHTTPMiddleware):
             "default-src 'self'; "
             "base-uri 'self'; form-action 'self'; frame-ancestors 'self'; "
             "object-src 'none'; "
-            "script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
+            "script-src 'self' 'unsafe-inline' https://www.youtube.com; "
+            "style-src 'self' 'unsafe-inline'; "
             "img-src 'self' data: blob: https:; media-src 'self' blob: https:; "
             "frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com; "
-            "connect-src 'self'"
+            "connect-src 'self' https://www.youtube.com"
         )
         response.headers.setdefault("Content-Security-Policy", csp)
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
