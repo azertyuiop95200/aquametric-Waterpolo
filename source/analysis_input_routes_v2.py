@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 
 from db import get_db
 from models import Club, Match, Team
-from analysis_product_routes import UPLOAD_DIR, _user
+from analysis_product_routes import UPLOAD_DIR, _source_start_second, _user
 from services.video import is_http_url, youtube_embed
 
 MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "1024"))
@@ -47,7 +47,6 @@ def _free_team(db: Session, user, name: str, competition: str, category: str) ->
         )
     )
     if team:
-        # Do not silently overwrite a known category, but fill an unspecified one.
         if not (team.category or "").strip():
             team.category = cat
         return team
@@ -73,11 +72,16 @@ def _free_team(db: Session, user, name: str, competition: str, category: str) ->
     return team
 
 
-def _scope_query(scope_mode: str, scope_start_second: float, scope_end_second: float) -> str:
+def _scope_query(scope_mode: str, scope_start_second: float, scope_end_second: float, *, video_url: str = "") -> str:
     mode = (scope_mode or "auto").strip().lower()
     if mode not in {"auto", "single", "manual", "multiple"}:
         mode = "auto"
     start = max(0.0, float(scope_start_second or 0.0))
+    # In automatic/single mode, a t=/start= value embedded in the source URL is
+    # part of the user's intended match range. Do not accidentally replace it by
+    # an explicit zero in the redirect query string.
+    if start <= 0.0 and mode != "manual" and video_url:
+        start = max(0.0, float(_source_start_second(video_url) or 0.0))
     end = max(0.0, float(scope_end_second or 0.0))
     if end and end <= start:
         end = 0.0
@@ -119,7 +123,7 @@ def create_flexible_url_analysis(
     db.add(match)
     db.commit()
     db.refresh(match)
-    query = _scope_query(scope_mode, scope_start_second, scope_end_second)
+    query = _scope_query(scope_mode, scope_start_second, scope_end_second, video_url=url)
     return RedirectResponse(f"/matches/{match.id}/analysis/browser-capture?{query}", status_code=303)
 
 
@@ -202,5 +206,5 @@ def create_flexible_uploaded_match(
     db.refresh(match)
     if source == "upload":
         return RedirectResponse(f"/matches/{match.id}/analysis/result", status_code=303)
-    query = _scope_query(scope_mode, scope_start_second, scope_end_second)
+    query = _scope_query(scope_mode, scope_start_second, scope_end_second, video_url=url)
     return RedirectResponse(f"/matches/{match.id}/analysis/browser-capture?{query}", status_code=303)
