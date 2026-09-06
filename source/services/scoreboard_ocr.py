@@ -41,6 +41,13 @@ class ScoreboardObservation:
         return asdict(self)
 
 
+def _ocr_timeout_seconds() -> float:
+    try:
+        return max(0.8, min(8.0, float(os.getenv("AQUAMETRIC_OCR_CALL_TIMEOUT", "2.5"))))
+    except (TypeError, ValueError):
+        return 2.5
+
+
 def tesseract_available() -> bool:
     if pytesseract is None:
         return False
@@ -152,7 +159,12 @@ def parse_scoreboard_text(text: str) -> dict:
 
 def _ocr_once(variant: np.ndarray, config: str = "--psm 7") -> tuple[str, float]:
     try:
-        data = pytesseract.image_to_data(variant, config=config, output_type=pytesseract.Output.DICT)
+        data = pytesseract.image_to_data(
+            variant,
+            config=config,
+            output_type=pytesseract.Output.DICT,
+            timeout=_ocr_timeout_seconds(),
+        )
     except Exception:
         return "", 0.0
     parts, confs = [], []
