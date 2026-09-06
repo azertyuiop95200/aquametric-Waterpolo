@@ -1,10 +1,9 @@
 """Media normalization for real MediaRecorder browser captures.
 
-Browser-produced WebM files are often perfectly decodable but omit reliable
-container duration/cue metadata. Synthetic ffmpeg fixtures do not reproduce this.
-Before Vision seeks through a capture, remux it with generated timestamps so
-OpenCV/ffprobe can seek and determine duration reliably. Re-encoding is only a
-last-resort fallback.
+Browser-produced WebM files are often decodable but omit reliable duration/cue
+metadata. Analysis prefers a no-loss remux; only when that fails do we transcode.
+The ``fast_analysis`` mode deliberately reduces frame-rate/encoding cost because
+Vision samples sparse frames and does not need a delivery-quality master file.
 """
 from __future__ import annotations
 
@@ -31,7 +30,7 @@ def ffprobe_video(path: Path) -> dict:
         "-of", "json", str(path),
     ]
     try:
-        raw = subprocess.run(cmd, capture_output=True, text=True, timeout=30, check=True).stdout
+        raw = subprocess.run(cmd, capture_output=True, text=True, timeout=20, check=True).stdout
         payload = json.loads(raw or "{}")
         streams = payload.get("streams") or [{}]
         stream = streams[0] if streams else {}
@@ -58,12 +57,20 @@ def _run(cmd: list[str], timeout: int = 120) -> bool:
         return False
 
 
-def normalize_browser_capture(source_path: Path, derived_dir: Path) -> tuple[Path, dict]:
+def normalize_browser_capture(
+    source_path: Path,
+    derived_dir: Path,
+    *,
+    fast_analysis: bool = False,
+) -> tuple[Path, dict]:
     """Return a seekable video path plus probe metadata.
 
-    Fast path: keep the original if it already has usable metadata. Otherwise
-    remux with generated timestamps (no quality loss). Only if remuxing cannot
-    produce a usable file do we re-encode the video stream.
+    1. Keep an already seekable source.
+    2. Remux with generated timestamps (no re-encoding).
+    3. If remuxing fails, transcode. In ``fast_analysis`` mode the fallback is
+       intentionally analysis-oriented: 12 fps, <=1280 px, ultrafast H.264.
+       This removes the old multi-minute 88% stall without lowering the source
+       pixels used during the live pre-analysis pass.
     """
     source_path = Path(source_path)
     derived_dir = Path(derived_dir)
@@ -83,7 +90,8 @@ def normalize_browser_capture(source_path: Path, derived_dir: Path) -> tuple[Pat
         "-map", "0:v:0", "-an", "-c:v", "copy",
         "-avoid_negative_ts", "make_zero", str(remuxed),
     ]
-    if _run(remux_cmd, timeout=90) and remuxed.exists() and remuxed.stat().st_size > 64 * 1024:
+    remux_timeout = 45 if fast_analysis else 90
+    if _run(remux_cmd, timeout=remux_timeout) and remuxed.exists() and remuxed.stat().st_size > 64 * 1024:
         probe = ffprobe_video(remuxed)
         if probe.get("ok"):
             return remuxed, {**probe, "normalization": "remux_genpts"}
@@ -92,13 +100,24 @@ def normalize_browser_capture(source_path: Path, derived_dir: Path) -> tuple[Pat
     encode_cmd = [
         ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
         "-fflags", "+genpts+discardcorrupt", "-i", str(source_path),
-        "-map", "0:v:0", "-an", "-c:v", "libx264", "-preset", "veryfast",
-        "-crf", "25", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
-        str(encoded),
+        "-map", "0:v:0", "-an",
     ]
-    if _run(encode_cmd, timeout=300) and encoded.exists() and encoded.stat().st_size > 64 * 1024:
+    if fast_analysis:
+        encode_cmd += [
+            "-vf", "fps=12,scale=w=min(1280\\,iw):h=-2",
+            "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
+        ]
+        encode_timeout = 90
+        normalization = "reencode_h264_fast_analysis"
+    else:
+        encode_cmd += ["-c:v", "libx264", "-preset", "veryfast", "-crf", "25"]
+        encode_timeout = 300
+        normalization = "reencode_h264"
+    encode_cmd += ["-pix_fmt", "yuv420p", "-movflags", "+faststart", str(encoded)]
+
+    if _run(encode_cmd, timeout=encode_timeout) and encoded.exists() and encoded.stat().st_size > 64 * 1024:
         probe = ffprobe_video(encoded)
         if probe.get("ok"):
-            return encoded, {**probe, "normalization": "reencode_h264"}
+            return encoded, {**probe, "normalization": normalization}
 
     return source_path, {**original, "normalization": "failed_keep_original"}
