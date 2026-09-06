@@ -12,4 +12,5 @@ def test_browser_capture_prefers_same_tab_and_embeds_youtube_replay():
     assert "setPlaybackRate" in template
     assert "playVideo" in template
     assert "captureShell.classList.add('studio-live')" in template
-    assert "Ouvrir le replay dans un autre onglet" in template
+    assert "Ouvrir le replay" in template
+    assert "Turbo ≤15 min" in template
