@@ -60,12 +60,7 @@ def _label(value: str) -> str:
 
 
 def _confidence_value(value, default: float = 1.0) -> float:
-    """Normalize numeric and historical text confidence values without crashing.
-
-    Older AquaMetric datasets used labels such as CONFIRMED/HIGH/MEDIUM rather than
-    numeric scores. They are evidence states, not measurements, so the mapping is
-    deliberately conservative and bounded to [0, 1].
-    """
+    """Normalize numeric and historical text confidence values without crashing."""
     if value is None or value == "":
         return default
     try:
@@ -136,7 +131,48 @@ def _target(
     }
 
 
-def _dedupe_targets(rows: list[dict], *, min_gap: float = 1.2, max_total: int = 72) -> list[dict]:
+def _partition_playback_windows(rows: list[dict]) -> list[dict]:
+    """Make sequence playback mutually exclusive on the source timeline.
+
+    Evidence generators often describe overlapping context windows around nearby
+    actions. Showing those raw windows as independent players makes the same video
+    seconds play repeatedly and can make a sequence appear to continue into the
+    next action. We keep the evidence focus but partition playback at the midpoint
+    between consecutive focuses so one source second belongs to at most one card.
+    """
+    if not rows:
+        return rows
+    rows.sort(key=lambda r: float(r["second"]))
+    if len(rows) == 1:
+        return rows
+
+    boundaries = [
+        (float(left["second"]) + float(right["second"])) / 2.0
+        for left, right in zip(rows, rows[1:])
+    ]
+    for index, row in enumerate(rows):
+        original_start = float(row["start_second"])
+        original_end = float(row["end_second"])
+        left_boundary = boundaries[index - 1] if index > 0 else original_start
+        right_boundary = boundaries[index] if index < len(boundaries) else original_end
+        start = max(original_start, left_boundary)
+        end = min(original_end, right_boundary)
+
+        # The normal dedupe gap leaves enough room, but keep a stable fallback for
+        # pathological imported timestamps while still preserving non-overlap.
+        if end <= start:
+            start = max(0.0, left_boundary)
+            end = max(start + 0.25, right_boundary)
+        if abs(start - original_start) > 0.01 or abs(end - original_end) > 0.01:
+            row["untrimmed_start_second"] = round(original_start, 2)
+            row["untrimmed_end_second"] = round(original_end, 2)
+            row["playback_partitioned"] = True
+        row["start_second"] = round(start, 2)
+        row["end_second"] = round(end, 2)
+    return rows
+
+
+def _dedupe_targets(rows: list[dict], *, min_gap: float = 2.0, max_total: int = 72) -> list[dict]:
     ranked = sorted(rows, key=lambda r: (r["priority"], -r["confidence"], r["second"]))
     kept: list[dict] = []
     for row in ranked:
@@ -151,15 +187,11 @@ def _dedupe_targets(rows: list[dict], *, min_gap: float = 1.2, max_total: int = 
         if len(kept) >= max_total:
             break
     kept.sort(key=lambda r: r["second"])
-    return kept
+    return _partition_playback_windows(kept)
 
 
 def collect_sequence_targets(db, match, *, max_total: int = 72) -> list[dict]:
-    """Build the densest evidence-first review timeline available for one match.
-
-    Targets remain explicitly typed: verified events, automatic candidates, tactical
-    sequences, vision peaks and coarse active-play windows are never mixed as equal facts.
-    """
+    """Build the densest evidence-first review timeline available for one match."""
     rows: list[dict] = []
 
     for event in sorted(list(match.events or []), key=lambda e: float(e.second or 0)):
@@ -297,7 +329,14 @@ def _youtube_segment_embed(video_url: str, start_second: float, end_second: floa
     params = dict(parse_qsl(parsed.query, keep_blank_values=True))
     start = max(0, int(float(start_second or 0)))
     end = max(start + 1, int(float(end_second or start + 1)))
-    params.update({"start": str(start), "end": str(end), "rel": "0"})
+    params.update({
+        "start": str(start),
+        "end": str(end),
+        "rel": "0",
+        "autoplay": "0",
+        "playsinline": "1",
+        "loop": "0",
+    })
     return urlunparse(parsed._replace(query=urlencode(params)))
 
 
@@ -491,7 +530,7 @@ def append_sequence_manifest(zip_buffer: io.BytesIO, cards: list[dict], root: st
         )
         archive.writestr(
             f"{root}/04_sequences/README.txt",
-            "verified = fait confirmé ; automatic = candidat automatique ; tactical = séquence dérivée des événements tagués ; vision_peak/active_window = signaux visuels à contrôler.\n",
+            "verified = fait confirmé ; automatic = candidat automatique ; tactical = séquence dérivée des événements tagués ; vision_peak/active_window = signaux visuels à contrôler. Les fenêtres de lecture sont partitionnées pour éviter tout doublon temporel entre cartes.\n",
         )
     zip_buffer.seek(0)
     return zip_buffer
