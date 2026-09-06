@@ -33,6 +33,9 @@ class ScoreboardObservation:
     numbers: list[int]
     home_score: int | None = None
     away_score: int | None = None
+    is_replay: bool = False
+    is_break: bool = False
+    is_final: bool = False
 
     def to_dict(self):
         return asdict(self)
@@ -94,6 +97,14 @@ def _parse_period(text: str) -> int | None:
     return None
 
 
+def _broadcast_status(text: str) -> tuple[bool, bool, bool]:
+    upper = " ".join((text or "").upper().replace("É", "E").replace("È", "E").split())
+    replay = bool(re.search(r"\b(?:REPLAY|RALENTI|SLOW\s*MOTION|SLOWMO)\b", upper))
+    break_flag = bool(re.search(r"\b(?:BREAK|PAUSE|INTERVAL|HALF\s*TIME|HALFTIME|END\s+OF\s+(?:Q|QUARTER|PERIOD)|QUARTER\s+BREAK)\b", upper))
+    final = bool(re.search(r"\b(?:FINAL|FULL\s*TIME|FIN\s+DU\s+MATCH|MATCH\s+TERMINE|FT)\b", upper))
+    return replay, break_flag, final
+
+
 def _canonical_numeric_tokens(text: str) -> str:
     out = []
     for token in (text or "").split():
@@ -105,7 +116,6 @@ def _canonical_numeric_tokens(text: str) -> str:
 
 def _extract_numbers(text: str) -> list[int]:
     cleaned = _canonical_numeric_tokens(text)
-    # Remove clock and period tokens before score extraction so Q1 does not erase a 1-0 score.
     cleaned = re.sub(r"\d{1,2}\s*[:.]\s*\d{2}", " ", cleaned)
     cleaned = re.sub(r"\b(?:Q|P|PER)\s*[1-4]\b", " ", cleaned, flags=re.I)
     cleaned = re.sub(r"\b[1-4]\s*(?:Q|ST|ND|RD|TH)\b", " ", cleaned, flags=re.I)
@@ -123,8 +133,8 @@ def parse_scoreboard_text(text: str) -> dict:
     period = _parse_period(canonical)
     clock = _parse_clock(canonical)
     numbers = _extract_numbers(canonical)
+    replay, break_flag, final = _broadcast_status(normalized)
     home = away = None
-    # Two score-like numbers plus a clock or period cue are sufficient for a candidate.
     if (period is not None or clock is not None) and len(numbers) >= 2:
         home, away = numbers[0], numbers[1]
     return {
@@ -134,6 +144,9 @@ def parse_scoreboard_text(text: str) -> dict:
         "numbers": numbers,
         "home_score": home,
         "away_score": away,
+        "is_replay": replay,
+        "is_break": break_flag,
+        "is_final": final,
     }
 
 
@@ -145,8 +158,10 @@ def _ocr_once(variant: np.ndarray, config: str = "--psm 7") -> tuple[str, float]
     parts, confs = [], []
     for txt, conf in zip(data.get("text", []), data.get("conf", [])):
         txt = (txt or "").strip()
-        try: cf = float(conf)
-        except Exception: cf = -1
+        try:
+            cf = float(conf)
+        except Exception:
+            cf = -1
         if txt:
             parts.append(txt)
             if cf >= 0:
@@ -160,13 +175,10 @@ def ocr_image(img: np.ndarray) -> tuple[str, float]:
     variants = _variants(img)
     if not variants:
         return "", 0.0
-    # Fast path: one OCR call on the enlarged colour/gray image. Broadcast overlays
-    # are usually high contrast. This is essential for 1–2 h matches.
     text, conf = _ocr_once(variants[0], "--psm 7")
     parsed = parse_scoreboard_text(text)
     if text and (parsed["clock_seconds"] is not None or parsed["period"] is not None or len(parsed["numbers"]) >= 2):
         return text, min(1.0, conf)
-    # Fallback only when the fast pass did not produce useful scoreboard syntax.
     best_text, best_conf, best_utility = text, conf, conf
     for variant in variants[1:3]:
         t, c = _ocr_once(variant, "--psm 7")
@@ -215,6 +227,7 @@ def sample_scoreboard_observations(
                     ocr_confidence=round(confidence, 3), period=parsed["period"],
                     clock_seconds=parsed["clock_seconds"], numbers=parsed["numbers"],
                     home_score=parsed["home_score"], away_score=parsed["away_score"],
+                    is_replay=bool(parsed["is_replay"]), is_break=bool(parsed["is_break"]), is_final=bool(parsed["is_final"]),
                 )
                 if best is None or obs.ocr_confidence > best.ocr_confidence:
                     best = obs
