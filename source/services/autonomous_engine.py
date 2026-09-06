@@ -115,7 +115,11 @@ def _stable_score(obs: list[dict]) -> list[dict]:
             if current[0] - last[0] > 2 or current[1] - last[1] > 2:
                 continue
         result.append(row)
-        if not _status_blocked(row):
+        if not _status_blocked(row) and (
+            last is None or current == last or bool(row.get("score_state_confirmed"))
+        ):
+            # A one-frame upward OCR spike is kept as a review window but never
+            # becomes the live baseline that would invalidate later real readings.
             last = current
     return result
 
