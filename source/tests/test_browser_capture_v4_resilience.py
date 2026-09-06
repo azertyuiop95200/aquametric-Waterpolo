@@ -6,7 +6,7 @@ os.environ.setdefault("DATABASE_URL", "sqlite:///./test_aquametric.db")
 
 from fastapi.testclient import TestClient
 
-import capture_turbo_routes_v4
+import capture_turbo_routes_v7
 from db import SessionLocal
 from main import app
 from models import Match
@@ -51,7 +51,8 @@ def test_capture_page_does_not_preload_manual_player_names_or_numbers():
     assert "durée non détectée" in html
     assert "navigator.mediaDevices.getDisplayMedia" in html
     assert "displaySurface:'browser'" in html
-    assert "recorder.start(5000)" in html
+    assert "recorder.start(3000)" in html
+    assert "Pause qualité automatique" in html
     assert "NotAllowedError" in html
     assert "Roster de référence" not in html
     assert "Morgane" not in html
@@ -103,9 +104,14 @@ def test_completed_vision_report_survives_sequence_enrichment_failure(monkeypatc
             "candidates": [{"second": 470.0}],
         }
 
-    monkeypatch.setattr(capture_turbo_routes_v4, "run_rapid_analysis", fake_rapid)
     monkeypatch.setattr(
-        capture_turbo_routes_v4,
+        capture_turbo_routes_v7,
+        "normalize_browser_capture",
+        lambda source, derived, fast_analysis=False: (Path(source), {"normalization": "test"}),
+    )
+    monkeypatch.setattr(capture_turbo_routes_v7, "run_rapid_analysis", fake_rapid)
+    monkeypatch.setattr(
+        capture_turbo_routes_v7,
         "materialize_deep_sequence_pack",
         lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("sequence pack test failure")),
     )
@@ -123,11 +129,16 @@ def test_completed_vision_report_survives_sequence_enrichment_failure(monkeypatc
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["ok"] is True
-    assert body["partial"] is True
-    assert body["visual_samples"] == 42
-    assert body["scoreboard_observations"] == 5
-    assert body["redirect"] == f"/matches/{match_id}/analysis/result"
-    assert "Séquences avancées non finalisées" in body["warning"]
+    assert body["accepted"] is True
+
+    status = client.get(body["status_url"])
+    assert status.status_code == 200, status.text
+    progress = status.json()["progress"]
+    assert progress["status"] == "partial"
+    assert progress["visual_samples"] == 42
+    assert progress["scoreboard_observations"] == 5
+    assert progress["redirect"] == f"/matches/{match_id}/analysis/result"
+    assert "enrichissement de séquences partiel" in progress["warning"]
 
     db = SessionLocal()
     try:
