@@ -63,6 +63,43 @@ def _patch_full_match_scope(html: str, *, mode: str, embedded_start: float) -> s
     return html
 
 
+def _patch_segment_end_guard(html: str) -> str:
+    """Stop every player at its own segment boundary.
+
+    In turbo mode the four YouTube players start at different quarters of the
+    source. Without an explicit per-player stop, a player can continue into the
+    next quarter after that quarter is already being read by another tile. That
+    duplicates source seconds, wastes capture time, and pollutes visual/OCR
+    evidence. Poll at 100 ms and clamp each tile to its exact end.
+    """
+    old = (
+        "function pollPlayers(){for(let i=0;i<parallelSegments;i++){try{"
+        "if(ytReady[i]&&ytPlayers[i]&&ytPlayers[i].getCurrentTime)"
+        "currentTimes[i]=Number(ytPlayers[i].getCurrentTime())||currentTimes[i]"
+        "}catch(_){}}}"
+    )
+    new = (
+        "function pollPlayers(){for(let i=0;i<parallelSegments;i++){try{"
+        "if(ytReady[i]&&ytPlayers[i]&&ytPlayers[i].getCurrentTime){"
+        "const now=Number(ytPlayers[i].getCurrentTime())||currentTimes[i];"
+        "const end=Number(segmentEnds[i]||0);currentTimes[i]=now;"
+        "if(end>segmentStarts[i]&&now>=end-0.08){"
+        "ytPlayers[i].pauseVideo();currentTimes[i]=end;"
+        "if(labels[i]&&!labels[i].dataset.done){labels[i].dataset.done='1';labels[i].textContent+=` · terminé ${fmt(end)}`;}"
+        "}}}catch(_){}}}"
+    )
+    if old in html:
+        html = html.replace(old, new, 1)
+    html = html.replace("playerTick=setInterval(pollPlayers,400)", "playerTick=setInterval(pollPlayers,100)", 1)
+    # A new run must not inherit the visual 'done' marker from a previous run.
+    html = html.replace(
+        "labels[index].textContent=`Segment ${index+1} · ${fmt(start)}`;",
+        "labels[index].dataset.done='';labels[index].textContent=`Segment ${index+1} · ${fmt(start)}`;",
+        1,
+    )
+    return html
+
+
 def _patch_final_progress_polling(html: str) -> str:
     """Keep /status polling alive while the synchronous /finish job is running.
 
@@ -104,6 +141,7 @@ def turbo_browser_capture_page(match_id: int, request: Request, db: Session = De
         mode = "auto"
     embedded_start = max(0.0, float(_source_start_second(match.video_url) or 0.0))
     html = _patch_full_match_scope(html, mode=mode, embedded_start=embedded_start)
+    html = _patch_segment_end_guard(html)
     html = _patch_final_progress_polling(html)
 
     patch = f'''
