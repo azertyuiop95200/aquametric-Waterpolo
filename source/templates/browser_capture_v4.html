@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.capture-shell{max-width:1120px;margin:0 auto;display:grid;gap:18px}.capture-panel{border:1px solid var(--border,#294754);border-radius:22px;background:var(--panel,#0b202b);padding:20px}.capture-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.capture-status{padding:14px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);white-space:pre-wrap}.capture-warning{padding:12px 14px;border-left:3px solid #fb923c;background:rgba(251,146,60,.08);border-radius:0 12px 12px 0}.capture-good{padding:12px 14px;border-left:3px solid #4ade80;background:rgba(74,222,128,.08);border-radius:0 12px 12px 0}.capture-permission{padding:12px 14px;border-left:3px solid #38bdf8;background:rgba(56,189,248,.08);border-radius:0 12px 12px 0}.capture-time{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.capture-time input{width:130px;padding:9px 10px;border-radius:10px;border:1px solid rgba(255,255,255,.18);background:#06131b;color:inherit}.mode-choice{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:14px 0}.mode-btn{padding:14px;border:1px solid rgba(255,255,255,.16);border-radius:14px;background:rgba(255,255,255,.04);color:inherit;text-align:left;cursor:pointer}.mode-btn.active{outline:2px solid #38bdf8;background:rgba(56,189,248,.12)}.mode-btn:disabled{opacity:.45;cursor:not-allowed}.mode-btn b{display:block;font-size:17px}.progress-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.progress-card{padding:14px;border:1px solid rgba(255,255,255,.1);border-radius:14px;background:rgba(255,255,255,.03)}.progress-head{display:flex;justify-content:space-between;gap:12px;font-weight:800;margin-bottom:8px}.progress-track{height:12px;background:rgba(255,255,255,.08);border-radius:999px;overflow:hidden}.progress-fill{height:100%;width:0%;background:linear-gradient(90deg,#0ea5e9,#22c55e);transition:width .35s ease}.progress-meta{font-size:12px;opacity:.75;margin-top:7px}.studio-wrap{display:grid;gap:12px}.studio-player-grid{position:relative;aspect-ratio:16/9;background:#02070a;border-radius:18px;overflow:hidden;border:1px solid rgba(255,255,255,.12);display:grid;grid-template-columns:1fr;grid-template-rows:1fr}.studio-player-grid.turbo{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}.studio-tile{position:relative;min-width:0;min-height:0;background:#000;border:1px solid rgba(255,255,255,.08);overflow:hidden}.studio-tile iframe,.yt-host{width:100%;height:100%;border:0;display:block}.seg-label{position:absolute;left:8px;top:8px;z-index:3;background:rgba(0,0,0,.65);padding:4px 7px;border-radius:8px;font-size:11px}.capture-live-hud{display:none}.capture-shell.studio-live{max-width:none;margin:0}.capture-shell.studio-live>.capture-panel:not(.studio-panel){display:none}.capture-shell.studio-live .studio-panel{position:fixed;inset:0;z-index:9999;border:0;border-radius:0;padding:0;background:#000}.capture-shell.studio-live .studio-wrap{height:100%;display:block}.capture-shell.studio-live .studio-player-grid{position:absolute;inset:0;aspect-ratio:auto;border:0;border-radius:0}.capture-shell.studio-live .studio-info{display:none}.capture-shell.studio-live .capture-live-hud{display:block;position:fixed;z-index:10002;left:10px;right:10px;bottom:10px;padding:10px;border-radius:14px;background:rgba(4,13,18,.9);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.16)}.capture-shell.studio-live .capture-live-hud .progress-grid{grid-template-columns:1fr 1fr auto}.capture-shell.studio-live .capture-live-hud .progress-card{padding:8px 10px}#capturePreview,#captureCanvas{display:none}
+@media(max-width:820px){.mode-choice,.progress-grid{grid-template-columns:1fr}.capture-shell.studio-live .capture-live-hud .progress-grid{grid-template-columns:1fr}.capture-shell.studio-live .capture-live-hud{max-height:45vh;overflow:auto}.studio-player-grid.turbo{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}}
+</style>
+<div class="capture-shell" id="captureShell">
+  <section class="capture-panel">
+    <span class="eyebrow">ANALYSE VIDÉO · VISION</span>
+    <h1>Lecture + analyse en parallèle</h1>
+    <p>Les numéros de bonnet et les identités ne sont plus préchargés depuis une liste manuelle. AquaMetric doit les déterminer à partir des images et conserver « indéterminé » quand la preuve visuelle n’est pas suffisante.</p>
+    <div class="capture-permission" id="permissionState"><b>Vérification de l’autorisation navigateur…</b></div>
+    <div class="capture-warning"><b>Rapport prioritaire :</b> une analyse Vision terminée reste disponible même si un enrichissement secondaire (séquences avancées, galerie) échoue ensuite.</div>
+  </section>
+
+  <section class="capture-panel studio-panel">
+    <div class="studio-wrap">
+      <div class="studio-info">
+        <span class="eyebrow">STUDIO D’ANALYSE</span>
+        <h2>Choisir le mode</h2>
+        <div class="mode-choice" aria-label="Mode d'analyse">
+          <button id="mode1" class="mode-btn" type="button"><b>Analyse normale x1</b><span>Lecture temps réel.</span></button>
+          <button id="mode2" class="mode-btn" type="button"><b>Analyse rapide x2</b><span>Lecture accélérée avec chronologie corrigée.</span></button>
+          <button id="modeTurbo" class="mode-btn active" type="button"><b>Turbo ≤15 min</b><span>4 segments parallèles × x2 lorsque la durée YouTube est disponible.</span></button>
+        </div>
+        <div class="capture-time">
+          <label for="sourceStart"><b>Début source</b></label>
+          <input id="sourceStart" type="number" min="0" step="0.1" value="{{ source_start_second|round(1) }}">
+          <span>secondes · <span id="durationState">connexion au lecteur YouTube…</span></span>
+        </div>
+        <div class="capture-actions" style="margin-top:12px">
+          <button id="startCapture" class="btn primary" type="button">Démarrer l’analyse</button>
+          <button id="stopCapture" class="btn" type="button" disabled>Arrêter et analyser</button>
+          <a id="openReplay" class="btn secondary" href="{{ match.video_url }}" target="_blank" rel="noopener noreferrer">Ouvrir le replay YouTube</a>
+          <a class="btn secondary" href="/matches/{{match.id}}/analysis/result">Voir le dernier rapport</a>
+        </div>
+        <p class="capture-status" id="captureStatusStatic">Initialisation du lecteur. Si YouTube ne fournit pas sa durée, AquaMetric basculera automatiquement vers un mode de capture qui ne bloque pas le rapport.</p>
+      </div>
+
+      <div class="studio-player-grid" id="studioGrid">
+        {% for idx in range(4) %}
+        <div class="studio-tile" id="tile{{idx}}" {% if idx > 0 %}hidden{% endif %}>
+          <span class="seg-label" id="segLabel{{idx}}">Segment {{idx + 1}}</span>
+          <div class="yt-host" id="studioPlayer{{idx}}"></div>
+        </div>
+        {% endfor %}
+      </div>
+
+      <div class="studio-info progress-grid" style="margin-top:12px">
+        <div class="progress-card">
+          <div class="progress-head"><span>Lecture vidéo</span><span id="readPct">0%</span></div>
+          <div class="progress-track"><div class="progress-fill" id="readBar"></div></div>
+          <div class="progress-meta" id="readMeta">0 min lues · en attente</div>
+        </div>
+        <div class="progress-card">
+          <div class="progress-head"><span>Analyse IA</span><span id="analysisPct">0%</span></div>
+          <div class="progress-track"><div class="progress-fill" id="analysisBar"></div></div>
+          <div class="progress-meta" id="analysisMeta">Vision/OCR démarre dès les premières images capturées.</div>
+        </div>
+      </div>
+
+      <div class="capture-live-hud" id="liveHud">
+        <div class="progress-grid">
+          <div class="progress-card"><div class="progress-head"><span>Vidéo</span><span id="readPctLive">0%</span></div><div class="progress-track"><div class="progress-fill" id="readBarLive"></div></div></div>
+          <div class="progress-card"><div class="progress-head"><span>Analyse IA</span><span id="analysisPctLive">0%</span></div><div class="progress-track"><div class="progress-fill" id="analysisBarLive"></div></div></div>
+          <button id="stopCaptureLive" class="btn" type="button">Arrêter et analyser</button>
+        </div>
+        <div class="capture-status" id="captureStatus">Prêt.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="capture-panel">
+    <h2>Ce que le moteur doit produire</h2>
+    <div class="capture-good">Vision · activité · OCR scoreboard · périodes · variations de score candidates · chronologie source · moments clés · séquences tactiques. Les numéros de bonnet sont des observations visuelles, jamais une identité imposée. En cas de doute : numéro/joueuse indéterminé.</div>
+  </section>
+</div>
+<video id="capturePreview" autoplay muted playsinline></video><canvas id="captureCanvas"></canvas>
+<script>
+(() => {
+  const captureShell=document.getElementById('captureShell'),grid=document.getElementById('studioGrid');
+  const tiles=[0,1,2,3].map(i=>document.getElementById(`tile${i}`)),labels=[0,1,2,3].map(i=>document.getElementById(`segLabel${i}`));
+  const mode1=document.getElementById('mode1'),mode2=document.getElementById('mode2'),modeTurbo=document.getElementById('modeTurbo');
+  const startBtn=document.getElementById('startCapture'),stopBtn=document.getElementById('stopCapture'),stopLiveBtn=document.getElementById('stopCaptureLive');
+  const permissionState=document.getElementById('permissionState'),status=document.getElementById('captureStatus'),statusStatic=document.getElementById('captureStatusStatic');
+  const sourceStartInput=document.getElementById('sourceStart'),durationState=document.getElementById('durationState'),preview=document.getElementById('capturePreview'),canvas=document.getElementById('captureCanvas');
+  const rawVideoUrl={{ match.video_url|tojson }};
+  let mode='turbo',playbackRate=2,parallelSegments=4,sourceStart=Math.max(0,Number(sourceStartInput.value||0)),sourceDuration=0;
+  let segmentStarts=[sourceStart,0,0,0],segmentEnds=[0,0,0,0],currentTimes=[sourceStart,0,0,0],ytPlayers=[null,null,null,null],ytReady=[false,false,false,false];
+  let stream=null,recorder=null,sessionId='',startedAt=0,tick=null,statusTick=null,frameTick=null,playerTick=null,chunkIndex=0,uploadedBytes=0,uploadError=null,uploadChain=Promise.resolve(),frameBusy=false,stopping=false,analysisPercent=0,externalFallback=false;
+
+  function youtubeId(url){try{const u=new URL(url,location.href),h=u.hostname.toLowerCase();if(h==='youtu.be')return u.pathname.split('/').filter(Boolean)[0]||'';if(h.endsWith('youtube.com')){if(u.pathname==='/watch')return u.searchParams.get('v')||'';const p=u.pathname.split('/').filter(Boolean);if(['embed','shorts','live'].includes(p[0]))return p[1]||''}}catch(_){}return''}
+  const videoId=youtubeId(rawVideoUrl);
+  function fmt(sec){sec=Math.max(0,Math.floor(sec||0));const h=Math.floor(sec/3600),m=Math.floor((sec%3600)/60),s=sec%60;return h?`${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`:`${m}:${String(s).padStart(2,'0')}`}
+  function setStatus(text){status.textContent=text;statusStatic.textContent=text}
+  function setPermission(text,ok=true){permissionState.innerHTML=`<b>${ok?'Autorisation disponible':'Autorisation indisponible'}</b><div>${text}</div>`;permissionState.style.borderLeftColor=ok?'#4ade80':'#fb923c'}
+  function setBars(read,analysis,readMeta='',analysisMeta=''){const r=Math.max(0,Math.min(100,Number(read)||0)),a=Math.max(0,Math.min(100,Number(analysis)||0));['readBar','readBarLive'].forEach(id=>document.getElementById(id).style.width=`${r}%`);['analysisBar','analysisBarLive'].forEach(id=>document.getElementById(id).style.width=`${a}%`);['readPct','readPctLive'].forEach(id=>document.getElementById(id).textContent=`${Math.round(r)}%`);['analysisPct','analysisPctLive'].forEach(id=>document.getElementById(id).textContent=`${Math.round(a)}%`);if(readMeta)document.getElementById('readMeta').textContent=readMeta;if(analysisMeta)document.getElementById('analysisMeta').textContent=analysisMeta}
+  function chooseMode(next){mode=next;playbackRate=next==='normal'?1:2;parallelSegments=next==='turbo'?4:1;mode1.classList.toggle('active',next==='normal');mode2.classList.toggle('active',next==='fast');modeTurbo.classList.toggle('active',next==='turbo');if(next==='turbo'&&sourceDuration>sourceStart+30)prepareTurbo();else prepareSingle()}
+  mode1.addEventListener('click',()=>chooseMode('normal'));mode2.addEventListener('click',()=>chooseMode('fast'));modeTurbo.addEventListener('click',()=>chooseMode('turbo'));
+
+  function playerVars(start){return {playsinline:1,rel:0,controls:1,start:Math.max(0,Math.floor(start)),origin:location.origin}}
+  function createPlayer(index,start){
+    tiles[index].hidden=false;labels[index].textContent=`Segment ${index+1} · ${fmt(start)}`;
+    if(ytPlayers[index]&&typeof ytPlayers[index].cueVideoById==='function'){ytPlayers[index].cueVideoById({videoId,startSeconds:start});return}
+    if(!(window.YT&&YT.Player))return;
+    ytPlayers[index]=new YT.Player(`studioPlayer${index}`,{videoId,playerVars:playerVars(start),events:{
+      onReady:e=>{ytReady[index]=true;e.target.mute();e.target.pauseVideo();if(index===0)detectDuration()},
+      onError:e=>{if(index===0){durationState.textContent=`lecteur YouTube indisponible (code ${e.data}) · capture externe disponible`;modeTurbo.disabled=true;externalFallback=true;setStatus('Le lecteur embarqué YouTube ne répond pas. Le bouton Démarrer reste utilisable : ouvre le replay puis sélectionne son onglet dans la fenêtre de partage.')}}
+    }})
+  }
+  function prepareSingle(){grid.classList.remove('turbo');sourceStart=Math.max(0,Number(sourceStartInput.value||0));segmentStarts=[sourceStart,0,0,0];segmentEnds=[sourceDuration||0,0,0,0];createPlayer(0,sourceStart);for(let i=1;i<4;i++){tiles[i].hidden=true;if(ytPlayers[i])ytPlayers[i].pauseVideo()}return true}
+  function prepareTurbo(){sourceStart=Math.max(0,Number(sourceStartInput.value||0));if(!(sourceDuration>sourceStart+30))return false;const span=(sourceDuration-sourceStart)/4;grid.classList.add('turbo');for(let i=0;i<4;i++){segmentStarts[i]=sourceStart+i*span;segmentEnds[i]=i===3?sourceDuration:sourceStart+(i+1)*span;currentTimes[i]=segmentStarts[i];createPlayer(i,segmentStarts[i])}return true}
+  function detectDuration(){
+    let attempts=0;const timer=setInterval(()=>{attempts++;try{const d=Number(ytPlayers[0]&&ytPlayers[0].getDuration?ytPlayers[0].getDuration():0);if(d>sourceStart+30){sourceDuration=d;durationState.textContent=`durée détectée ${fmt(d)}`;modeTurbo.disabled=false;clearInterval(timer);if(mode==='turbo'&&!stream)prepareTurbo();return}}catch(_){}
+      if(attempts>=30){clearInterval(timer);durationState.textContent='durée non détectée · mode rapide/capture externe disponible';modeTurbo.disabled=true;externalFallback=true;if(mode==='turbo')chooseMode('fast');setStatus('YouTube ne fournit pas sa durée. AquaMetric ne reste pas bloqué : le mode x2 est sélectionné et une capture du replay peut démarrer.')}
+    },300)
+  }
+  function pollPlayers(){for(let i=0;i<parallelSegments;i++){try{if(ytReady[i]&&ytPlayers[i]&&ytPlayers[i].getCurrentTime)currentTimes[i]=Number(ytPlayers[i].getCurrentTime())||currentTimes[i]}catch(_){}}}
+  function playPlayers(){for(let i=0;i<parallelSegments;i++){try{if(ytReady[i]){ytPlayers[i].mute();ytPlayers[i].seekTo(segmentStarts[i],true);ytPlayers[i].setPlaybackRate(playbackRate);ytPlayers[i].playVideo()}}catch(_){}}}
+  function pausePlayers(){for(let i=0;i<4;i++){try{if(ytReady[i])ytPlayers[i].pauseVideo()}catch(_){}}}
+
+  function localReadPercent(){if(!(sourceDuration>sourceStart)){const elapsed=Math.max(0,(Date.now()-startedAt)/1000);return recorder&&recorder.state==='recording'?Math.min(99,elapsed/60*100):0}const total=sourceDuration-sourceStart;if(parallelSegments===1){const actual=Math.max(0,currentTimes[0]-sourceStart)||Math.max(0,(Date.now()-startedAt)/1000)*playbackRate;return Math.min(100,actual/total*100)}let covered=0;for(let i=0;i<4;i++){const span=segmentEnds[i]-segmentStarts[i],actual=Math.max(0,currentTimes[i]-segmentStarts[i])||Math.max(0,(Date.now()-startedAt)/1000)*playbackRate;covered+=Math.max(0,Math.min(span,actual))}return Math.min(100,covered/total*100)}
+  function estimatedSourceRead(){return sourceDuration>sourceStart?(sourceDuration-sourceStart)*localReadPercent()/100:Math.max(0,(Date.now()-startedAt)/1000)*playbackRate}
+  async function jsonFetch(url,options={}){const r=await fetch(url,options),p=await r.json().catch(()=>({}));if(!r.ok)throw new Error(p.detail||p.error||`HTTP ${r.status}`);return p}
+  async function createSession(){const f=new FormData();f.append('source_start_second',String(sourceStart));f.append('source_duration_seconds',String(sourceDuration));f.append('playback_rate',String(playbackRate));f.append('parallel_segments',String(parallelSegments));const p=await jsonFetch('/matches/{{match.id}}/analysis/browser-capture/session',{method:'POST',body:f});sessionId=p.session_id;return p}
+  async function uploadChunk(blob,index){const f=new FormData();f.append('session_id',sessionId);f.append('index',String(index));f.append('chunk',blob,`capture-${String(index).padStart(5,'0')}.webm`);const p=await jsonFetch('/matches/{{match.id}}/analysis/browser-capture/chunk',{method:'POST',body:f});uploadedBytes=Number(p.bytes||uploadedBytes);return p}
+  async function sendProgressFrame(){if(frameBusy||!sessionId||!stream||preview.readyState<2)return;frameBusy=true;try{const maxW=1280,scale=Math.min(1,maxW/Math.max(1,preview.videoWidth));canvas.width=Math.max(320,Math.round(preview.videoWidth*scale));canvas.height=Math.max(180,Math.round(preview.videoHeight*scale));canvas.getContext('2d').drawImage(preview,0,0,canvas.width,canvas.height);const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',0.72));if(!blob)return;const f=new FormData();f.append('session_id',sessionId);f.append('wall_second',String(Math.max(0,(Date.now()-startedAt)/1000)));f.append('frame',blob,'progress.jpg');const p=await jsonFetch('/matches/{{match.id}}/analysis/browser-capture/frame',{method:'POST',body:f});applyServerProgress(p.progress||{})}catch(err){console.warn('progress frame',err)}finally{frameBusy=false}}
+  function applyServerProgress(p){if(Number.isFinite(Number(p.analysis_percent)))analysisPercent=Math.max(analysisPercent,Number(p.analysis_percent));const r=Math.max(localReadPercent(),Number(p.read_percent)||0),samples=Number(p.progressive_samples||0),ocr=Number(p.progressive_ocr_hits||0);setBars(r,analysisPercent,`${fmt(estimatedSourceRead())}${sourceDuration>sourceStart?` de ${fmt(sourceDuration-sourceStart)}`:''} parcourues`,`${p.phase||'pré-analyse IA'} · ${samples} échantillons live · ${ocr} OCR utiles`)}
+  async function pollStatus(){if(!sessionId)return;try{const p=await jsonFetch(`/matches/{{match.id}}/analysis/browser-capture/status?session_id=${encodeURIComponent(sessionId)}`);if(p.ok)applyServerProgress(p.progress||{})}catch(_){}}
+  function tickUi(){pollPlayers();const r=localReadPercent();setBars(r,analysisPercent,`${fmt(estimatedSourceRead())}${sourceDuration>sourceStart?` de ${fmt(sourceDuration-sourceStart)}`:''} parcourues`,document.getElementById('analysisMeta').textContent);if(sourceDuration>sourceStart&&recorder&&recorder.state==='recording'&&r>=99.8&&!stopping)requestStop()}
+  function stopTracks(){if(stream)stream.getTracks().forEach(t=>t.stop())}
+  function leaveStudio(){captureShell.classList.remove('studio-live')}
+  function captureErrorMessage(err){const n=String(err&&err.name||'');if(n==='NotAllowedError')return'Partage annulé ou refusé.';if(n==='InvalidStateError')return'La demande doit être lancée directement depuis un clic.';if(n==='NotReadableError')return'Le système bloque actuellement la capture.';if(n==='NotFoundError')return'Aucune source de partage disponible.';if(n==='AbortError')return'La sélection a été annulée.';return err&&err.message?err.message:String(err||'Erreur inconnue')}
+  async function finishAnalysis(){await uploadChain;if(uploadError)throw uploadError;analysisPercent=Math.max(analysisPercent,88);setBars(100,analysisPercent,'Lecture terminée','Consolidation finale Vision/OCR + tactique…');const f=new FormData();f.append('session_id',sessionId);f.append('source_start_second',String(sourceStart));f.append('source_duration_seconds',String(sourceDuration));f.append('playback_rate',String(playbackRate));f.append('parallel_segments',String(parallelSegments));return jsonFetch('/matches/{{match.id}}/analysis/browser-capture/finish',{method:'POST',body:f})}
+  function requestStop(){if(stopping)return;stopping=true;pausePlayers();if(recorder&&recorder.state==='recording'){stopBtn.disabled=true;stopLiveBtn.disabled=true;setStatus('Lecture terminée. Finalisation de l’analyse…');recorder.stop()}}
+
+  startBtn.addEventListener('click',async()=>{
+    try{
+      if(!window.isSecureContext||!window.MediaRecorder||!navigator.mediaDevices||!navigator.mediaDevices.getDisplayMedia)throw new Error('La capture d’onglet n’est pas disponible dans ce navigateur.');
+      sourceStart=Math.max(0,Number(sourceStartInput.value||0));
+      if(mode==='turbo'&&!(sourceDuration>sourceStart+30)){chooseMode('fast');externalFallback=true;setStatus('Turbo indisponible sans durée fiable. AquaMetric démarre en mode x2 au lieu de rester bloqué.')}
+      if(externalFallback&&!ytReady[0]){mode='normal';playbackRate=1;parallelSegments=1;setStatus('Sélectionne l’onglet YouTube du replay dans la fenêtre de partage. AquaMetric analysera le flux réel en x1.')}
+      else if(mode==='turbo')prepareTurbo();else prepareSingle();
+      pausePlayers();captureShell.classList.add('studio-live');
+      stream=await navigator.mediaDevices.getDisplayMedia({video:{frameRate:{ideal:20,max:30},displaySurface:'browser'},audio:false,preferCurrentTab:!externalFallback,selfBrowserSurface:'include',surfaceSwitching:'include'});
+      const track=stream.getVideoTracks()[0];if(!track)throw new Error('Aucune piste vidéo autorisée.');preview.srcObject=stream;await preview.play().catch(()=>{});await createSession();
+      const preferred=['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'].find(t=>MediaRecorder.isTypeSupported(t));recorder=new MediaRecorder(stream,preferred?{mimeType:preferred,videoBitsPerSecond:3200000}:{videoBitsPerSecond:3200000});
+      chunkIndex=0;uploadedBytes=0;uploadError=null;uploadChain=Promise.resolve();stopping=false;analysisPercent=0;
+      recorder.ondataavailable=ev=>{if(!ev.data||!ev.data.size||uploadError)return;const index=chunkIndex++;uploadChain=uploadChain.then(()=>uploadChunk(ev.data,index)).catch(err=>{uploadError=err;setStatus(`Erreur fragment ${index}: ${err.message||err}`);if(recorder&&recorder.state==='recording')recorder.stop();throw err})};
+      recorder.onstop=async()=>{clearInterval(tick);clearInterval(statusTick);clearInterval(frameTick);clearInterval(playerTick);stopTracks();sourceStartInput.disabled=false;[mode1,mode2,modeTurbo].forEach(b=>b.disabled=false);try{const payload=await finishAnalysis();analysisPercent=100;setBars(100,100,'Lecture complète',payload.partial?'Rapport Vision prêt · enrichissement partiel':'Rapport prêt');setStatus(payload.warning?`Rapport produit. ${payload.warning} Redirection…`:`Analyse terminée : ${payload.visual_samples??0} échantillons · ${payload.scoreboard_observations??0} observations scoreboard. Redirection…`);setTimeout(()=>location.href=payload.redirect||'/matches/{{match.id}}/analysis/result',500)}catch(err){leaveStudio();setStatus(`Échec de l’analyse Vision : ${err.message||err}`)}};
+      track.addEventListener('ended',()=>{if(recorder&&recorder.state==='recording')requestStop()});recorder.start(5000);startedAt=Date.now();startBtn.disabled=true;stopBtn.disabled=false;stopLiveBtn.disabled=false;sourceStartInput.disabled=true;[mode1,mode2,modeTurbo].forEach(b=>b.disabled=true);setPermission('Accès accordé : le flux visuel choisi est transmis par fragments. Caméra et microphone restent désactivés.',true);setStatus(`Capture active · ${parallelSegments} segment(s) · x${playbackRate}. Pré-analyse Vision/OCR démarrée.`);tick=setInterval(tickUi,500);statusTick=setInterval(pollStatus,1500);frameTick=setInterval(sendProgressFrame,3000);playerTick=setInterval(pollPlayers,400);if(!externalFallback){setTimeout(playPlayers,300);setTimeout(playPlayers,1300)}setTimeout(sendProgressFrame,2000)
+    }catch(err){const m=captureErrorMessage(err);leaveStudio();setStatus(`Impossible de démarrer : ${m}`);setPermission(m,false);stopTracks();startBtn.disabled=false;stopBtn.disabled=true;stopLiveBtn.disabled=true;sourceStartInput.disabled=false;[mode1,mode2,modeTurbo].forEach(b=>b.disabled=false)}
+  });
+  stopBtn.addEventListener('click',requestStop);stopLiveBtn.addEventListener('click',requestStop);sourceStartInput.addEventListener('change',()=>{sourceStart=Math.max(0,Number(sourceStartInput.value||0));if(mode==='turbo'&&sourceDuration>sourceStart+30)prepareTurbo();else prepareSingle()});
+
+  function init(){
+    if(!videoId){durationState.textContent='source YouTube non reconnue';startBtn.disabled=true;setPermission('Utilise l’import vidéo pour cette URL.',false);return}
+    if(!window.isSecureContext||!window.MediaRecorder||!navigator.mediaDevices||!navigator.mediaDevices.getDisplayMedia){setPermission('Ce navigateur ne permet pas le partage d’onglet. Utilise un navigateur desktop compatible ou l’import vidéo.',false);startBtn.disabled=true;return}
+    setPermission('Prêt. AquaMetric tente le lecteur intégré ; si YouTube ne répond pas, la capture du replay reste disponible.',true);modeTurbo.disabled=true;
+    window.onYouTubeIframeAPIReady=()=>{createPlayer(0,sourceStart);setStatus('Lecteur YouTube connecté. Détection de la durée en cours…')};
+    const tag=document.createElement('script');tag.src='https://www.youtube.com/iframe_api';tag.async=true;tag.onerror=()=>{durationState.textContent='API YouTube indisponible · capture externe disponible';externalFallback=true;modeTurbo.disabled=true;setStatus('Le lecteur intégré ne peut pas être initialisé. Ouvre le replay YouTube puis clique Démarrer et sélectionne son onglet.')};document.head.appendChild(tag);
+  }
+  init();
+})();
+</script>
+{% endblock %}
