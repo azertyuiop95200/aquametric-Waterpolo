@@ -12,6 +12,8 @@ class MatchRosterCandidate:
     side: str
     cap_number: int
     player_name: str
+    role: str = ""
+    cap_color: str = ""
     source: str = "user_match_reference"
 
 
@@ -30,8 +32,8 @@ _REFERENCE_ROSTERS: dict[str, tuple[MatchRosterCandidate, ...]] = {
         MatchRosterCandidate("for", 11, "Veronika"),
         MatchRosterCandidate("for", 12, "Hitomi"),
         MatchRosterCandidate("for", 12, "Hanae"),
-        MatchRosterCandidate("for", 13, "Maëlle"),
-        MatchRosterCandidate("for", 13, "Clara"),
+        MatchRosterCandidate("for", 13, "Maëlle", role="gardienne", cap_color="rouge"),
+        MatchRosterCandidate("for", 13, "Clara", role="joueuse de champ"),
         MatchRosterCandidate("for", 14, "Charlotte"),
     )
 }
@@ -74,6 +76,8 @@ def roster_payload(url: str | None) -> list[dict]:
             "side": row.side,
             "cap_number": row.cap_number,
             "player_name": row.player_name,
+            "role": row.role,
+            "cap_color": row.cap_color,
             "ambiguous_cap": cap_counts[(row.side, row.cap_number)] > 1,
             "source": row.source,
         }
