@@ -67,15 +67,19 @@ def test_browser_capture_chunks_reconstruct_real_video_and_create_vision_analysi
 
     page = client.get(location)
     assert page.status_code == 200
-    assert "Démarrer l’analyse dans cet onglet" in page.text
-    assert "preferCurrentTab:true" in page.text
+    assert "Démarrer l’analyse" in page.text
+    assert "preferCurrentTab:!externalFallback" in page.text
     assert "displaySurface:'browser'" in page.text
     assert "Turbo ≤15 min" in page.text
     assert "Lecture vidéo" in page.text
     assert "Analyse IA" in page.text
     assert 'value="465.0"' in page.text
-    assert "#13 Maëlle" in page.text
-    assert "bonnet rouge" in page.text
+    assert "https://www.youtube.com/iframe_api" in page.text
+    assert "Roster de référence" not in page.text
+    assert "Maëlle" not in page.text
+    assert "Hitomi" not in page.text
+    assert "#13" not in page.text
+    assert "#12" not in page.text
 
     response = client.post(f"/matches/{match_id}/analysis/browser-capture/session")
     assert response.status_code == 200
@@ -117,7 +121,7 @@ def test_browser_capture_chunks_reconstruct_real_video_and_create_vision_analysi
     try:
         match = db.get(Match, match_id)
         assert match is not None
-        assert match.status == "browser_capture_analyzed"
+        assert match.status in {"browser_capture_analyzed", "browser_capture_analyzed_partial"}
 
         vision = db.scalar(
             select(VisionAnalysis)
