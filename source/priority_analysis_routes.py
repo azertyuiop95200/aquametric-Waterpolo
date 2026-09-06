@@ -11,9 +11,9 @@ from __future__ import annotations
 from fastapi.responses import HTMLResponse
 
 from analysis_library_product_routes import published_ultimate_detail, ultimate_analysis_library
+from analysis_input_routes_v2 import create_flexible_uploaded_match, create_flexible_url_analysis
 from analysis_product_routes import (
     analysis_result,
-    create_real_url_analysis,
     export_complete_analysis,
     regenerate_exact_evidence,
     start_real_analysis,
@@ -31,7 +31,9 @@ from capture_turbo_routes_v5 import (
 
 def install_priority_analysis_routes(app) -> None:
     registrations = [
-        ("/analysis/url/create", create_real_url_analysis, "POST", None, "product_create_url_analysis"),
+        ("/analysis/url/create", create_flexible_url_analysis, "POST", None, "product_create_url_analysis"),
+        # Keep /matches flexible as well: phone uploads must not require a pre-seeded team_id.
+        ("/matches", create_flexible_uploaded_match, "POST", None, "product_create_uploaded_match"),
         ("/matches/{match_id}/analysis/start", start_real_analysis, "POST", None, "product_start_analysis"),
         ("/matches/{match_id}/url-analysis/start", start_real_url_analysis, "POST", None, "product_start_url_analysis"),
         # Priority browser capture v5: no manually preloaded player identities,
