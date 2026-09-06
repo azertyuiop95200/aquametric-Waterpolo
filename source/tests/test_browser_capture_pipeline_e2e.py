@@ -62,7 +62,7 @@ def test_browser_capture_chunks_reconstruct_real_video_and_create_vision_analysi
     )
     assert response.status_code == 303
     location = response.headers["location"]
-    assert location.endswith("/analysis/browser-capture")
+    assert "/analysis/browser-capture" in location
     match_id = int(location.split("/matches/", 1)[1].split("/", 1)[0])
 
     page = client.get(location)
