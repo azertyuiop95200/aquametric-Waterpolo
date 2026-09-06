@@ -4,7 +4,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_browser_capture_exposes_normal_fast_and_turbo_modes():
-    template = (ROOT / "templates" / "browser_capture.html").read_text(encoding="utf-8")
+    template = (ROOT / "templates" / "browser_capture_v4.html").read_text(encoding="utf-8")
     assert "Analyse normale x1" in template
     assert "Analyse rapide x2" in template
     assert "Turbo ≤15 min" in template
@@ -15,6 +15,8 @@ def test_browser_capture_exposes_normal_fast_and_turbo_modes():
     assert "/analysis/browser-capture/status" in template
     assert "recorder.start(5000)" in template
     assert "setPlaybackRate" in template
+    assert "durée non détectée" in template
+    assert "chooseMode('fast')" in template
 
 
 def test_rapid_analysis_remaps_2x_capture_to_source_timeline():
