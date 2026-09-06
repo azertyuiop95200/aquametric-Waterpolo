@@ -1,7 +1,14 @@
+import re
 from urllib.parse import parse_qs
+
+from fastapi.testclient import TestClient
 
 from analysis_input_routes_v3 import _scope_query
 from capture_turbo_routes_v6 import _patch_final_progress_polling, _patch_full_match_scope
+from main import app
+
+
+client = TestClient(app)
 
 
 def test_auto_scope_never_uses_youtube_timestamp_as_match_start():
@@ -47,3 +54,43 @@ def test_finalization_keeps_status_polling_until_finish_response():
     assert "clearInterval(tick);clearInterval(statusTick);clearInterval(frameTick)" not in patched
     assert "const payload=await finishAnalysis();clearInterval(statusTick);statusTick=null;" in patched
     assert "Finalisation serveur en cours · progression 88–99 % suivie en direct" in patched
+
+
+def test_exact_reference_youtube_link_renders_full_match_from_zero_and_live_final_progress():
+    email = "scope-v8@example.com"
+    password = "strongpass123"
+    client.post(
+        "/register",
+        data={"email": email, "password": password, "name": "Scope V8"},
+        follow_redirects=True,
+    )
+    client.post("/login", data={"email": email, "password": password}, follow_redirects=True)
+
+    created = client.post(
+        "/analysis/url/create",
+        data={
+            "team_name": "Granville Water Polo",
+            "opponent": "Choisy le Roi",
+            "category": "Women",
+            "competition": "Friendly",
+            "match_date": "2026-09-05",
+            "video_url": "https://www.youtube.com/watch?v=Guo_UU282pI&t=465s",
+            "scope_mode": "auto",
+        },
+        follow_redirects=False,
+    )
+    assert created.status_code == 303
+    location = created.headers["location"]
+    assert "scope_mode=auto" in location
+    assert "scope_start=0.000" in location
+    assert "scope_end=0.000" in location
+
+    page = client.get(location)
+    assert page.status_code == 200
+    body = page.text
+    assert re.search(r'id="sourceStart"[^>]*value="0\.0"', body)
+    assert "requestedScopeStart=0.000" in body
+    assert "requestedScopeEnd=0.000" in body
+    assert "Curseur YouTube ignoré pour l’analyse : 465.0 s → départ réel 0.0 s." in body
+    assert "clearInterval(tick);clearInterval(statusTick);clearInterval(frameTick)" not in body
+    assert "Finalisation serveur en cours · progression 88–99 % suivie en direct" in body
