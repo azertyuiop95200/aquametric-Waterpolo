@@ -61,7 +61,10 @@ def test_v10_adapts_warmup_and_reduces_redundant_final_scan():
     assert "progressive_samples" in source
     assert "visual_samples=visual_samples" in source
     assert "ocr_samples=ocr_samples" in source
-    assert "from capture_turbo_routes_v11 import" in priority
+    assert "from capture_turbo_routes_v13 import" in priority
+    v13 = (ROOT / "capture_turbo_routes_v13.py").read_text(encoding="utf-8")
+    assert "import capture_turbo_routes_v12 as v12" in v13
+    assert "run_live_frame_analysis" in v13
 
     assert _final_scan_budget({"progressive_samples": 120}, 0, 3600, 4) == (120, 24, "dense live coverage")
     assert _final_scan_budget({"progressive_samples": 50}, 0, 3600, 4) == (132, 28, "live coverage")
