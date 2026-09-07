@@ -10,6 +10,10 @@ on:
       - 'source/capture_turbo_routes_v13.py'
       - 'source/services/live_frame_match_analysis.py'
       - 'source/priority_analysis_routes.py'
+      - 'source/tests/test_browser_capture_v13_fast_finalization.py'
+      - 'source/tests/test_browser_capture_v12_end_guard.py'
+      - 'source/tests/test_browser_capture_v11_publish.py'
+      - 'source/tests/test_browser_capture_v8_async_quality.py'
       - 'source/extensions.py'
       - 'source/templates/analysis_result_clean_v2.html'
       - '.github/workflows/live-browser-capture-e2e.yml'
@@ -109,7 +113,7 @@ jobs:
               -F 'frame=@/tmp/aquametric-live-e2e.jpg;type=image/jpeg' \
               "$base/matches/$match_id/analysis/browser-capture/frame" >/tmp/frame.json
           done
-          python -c 'import json; p=json.load(open("/tmp/frame.json"))["progress"]; assert p.get("saved_live_frames",0)>=8,p; assert len(p.get("v13_live_frame_timeline",[]))>=8,p' 
+          python -c 'import json; p=json.load(open("/tmp/frame.json"))["progress"]; assert p.get("saved_live_frames",0)>=8,p; assert len(p.get("v13_live_frame_timeline",[]))>=8,p'
 
           curl --max-time 90 -fsS -c "$cookie" -b "$cookie" -H "Origin: $origin" \
             -F "session_id=$session_id" -F 'index=0' \
@@ -147,7 +151,7 @@ jobs:
           elapsed=$(( $(date +%s) - start_epoch ))
           echo "V13 final AI wall time: ${elapsed}s"
           test "$elapsed" -le 30
-          python -c 'import json; p=json.load(open("/tmp/final-status.json"))["progress"]; assert p.get("analysis_percent")==100.0,p; assert p.get("finalization_engine")=="live-frame-final-v1",p; assert float(p.get("finalization_elapsed_seconds",999))<=25,p' 
+          python -c 'import json; p=json.load(open("/tmp/final-status.json"))["progress"]; assert p.get("analysis_percent")==100.0,p; assert p.get("finalization_engine")=="live-frame-final-v1",p; assert float(p.get("finalization_elapsed_seconds",999))<=25,p'
 
           curl -L --max-time 45 -fsS -c "$cookie" -b "$cookie" "$base/matches/$match_id/analysis/result" >/tmp/result.html
           grep -q "$marker" /tmp/result.html
