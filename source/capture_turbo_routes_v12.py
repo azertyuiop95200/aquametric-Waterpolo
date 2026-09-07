@@ -97,7 +97,6 @@ def _patch_end_guard(html: str) -> str:
     if old_stop in html:
         html = html.replace(old_stop, "if(v12EndGuard(r))v12FlushAndStop(v12ForcedFinishReason)", 1)
     else:
-        # Defensive fallback for the unpatched V4 shape used by some test builds.
         old_stop = "if(sourceDuration>sourceStart&&recorder&&recorder.state==='recording'&&r>=99.8&&!stopping) requestStop()"
         html = html.replace(old_stop, "if(v12EndGuard(r))v12FlushAndStop(v12ForcedFinishReason)", 1)
 
@@ -112,11 +111,13 @@ def _patch_end_guard(html: str) -> str:
         )
 
     # Persist the real client read percentage/reason into the finish request.
-    finish_tail = "f.append('analysis_scope_end_second',String(requestedScopeEnd||0));return jsonFetch("
-    if finish_tail in html and "client_finish_reason" not in html:
+    # The preceding scope fields changed several times across V5–V11, therefore
+    # patch the unique finish return instead of depending on that older prefix.
+    finish_return = "return jsonFetch('/matches/"
+    if finish_return in html and "client_finish_reason" not in html:
         html = html.replace(
-            finish_tail,
-            "f.append('analysis_scope_end_second',String(requestedScopeEnd||0));f.append('client_read_percent',String(localReadPercent()));f.append('client_finish_reason',v12ForcedFinishReason||'normal');return jsonFetch(",
+            finish_return,
+            "f.append('client_read_percent',String(localReadPercent()));f.append('client_finish_reason',v12ForcedFinishReason||'normal');" + finish_return,
             1,
         )
     return html
