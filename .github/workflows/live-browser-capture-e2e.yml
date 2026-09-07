@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - 'source/capture_turbo_routes_v11.py'
+      - 'source/capture_turbo_routes_v12.py'
       - 'source/priority_analysis_routes.py'
       - 'source/extensions.py'
       - 'source/templates/analysis_result_clean_v2.html'
@@ -48,15 +49,18 @@ jobs:
             -f lavfi -i 'testsrc2=size=1280x720:rate=12' \
             -t 8 -an -c:v libvpx -deadline realtime -cpu-used 8 -b:v 750k \
             /tmp/aquametric-live-e2e.webm
+          ffmpeg -hide_banner -loglevel error -i /tmp/aquametric-live-e2e.webm \
+            -frames:v 1 -q:v 3 /tmp/aquametric-live-e2e.jpg
           test $(stat -c%s /tmp/aquametric-live-e2e.webm) -gt 65536
+          test $(stat -c%s /tmp/aquametric-live-e2e.jpg) -gt 10000
 
-      - name: Create match, ingest capture, publish report and verify every surface
+      - name: Create match, verify end guard, ingest capture and publish every surface
         run: |
           set -euo pipefail
           base='https://aquametric-web-demo.onrender.com'
           origin="$base"
           cookie=/tmp/aquametric-e2e-cookie.txt
-          marker="V11-LIVE-E2E-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          marker="V12-LIVE-E2E-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
 
           curl -L --max-time 45 -fsS -c "$cookie" -b "$cookie" "$base/demo-login" >/tmp/demo-login.html
 
@@ -76,6 +80,14 @@ jobs:
 
           curl -L --max-time 45 -fsS -c "$cookie" -b "$cookie" "$base$location" >/tmp/capture-page.html
           grep -q 'aquametric-v11-final-watchdog' /tmp/capture-page.html
+          grep -q 'function v12EndGuard' /tmp/capture-page.html
+          grep -q 'function v12FlushAndStop' /tmp/capture-page.html
+          grep -q 'p.force_finish' /tmp/capture-page.html
+          grep -q 'client_finish_reason' /tmp/capture-page.html
+          if grep -q 'r>=99.8' /tmp/capture-page.html; then
+            echo '::error::Historical 99.8% end condition still present in production'
+            exit 1
+          fi
           if grep -q '{{match.id}}' /tmp/capture-page.html; then
             echo '::error::Unresolved match placeholder in production capture page'
             exit 1
@@ -85,8 +97,19 @@ jobs:
             -F 'source_start_second=0' -F 'source_duration_seconds=64' \
             -F 'playback_rate=2' -F 'parallel_segments=4' \
             "$base/matches/$match_id/analysis/browser-capture/session")
-          session_id=$(python -c 'import json,sys; print(json.load(sys.stdin)["session_id"])' <<<"$session")
+          session_id=$(python -c 'import json,sys; d=json.load(sys.stdin); assert d.get("v12_end_guard") is True; print(d["session_id"])' <<<"$session")
           test -n "$session_id"
+
+          # 7.97 wall seconds at x2 across four panes represents >99.5% source
+          # coverage. The real production status endpoint must now tell the
+          # browser to close the recorder rather than plateau around 87% AI.
+          curl --max-time 60 -fsS -c "$cookie" -b "$cookie" -H "Origin: $origin" \
+            -F "session_id=$session_id" -F 'wall_second=7.97' \
+            -F 'frame=@/tmp/aquametric-live-e2e.jpg;type=image/jpeg' \
+            "$base/matches/$match_id/analysis/browser-capture/frame" >/tmp/frame.json
+          guard_status=$(curl --max-time 30 -fsS -c "$cookie" -b "$cookie" \
+            "$base/matches/$match_id/analysis/browser-capture/status?session_id=$session_id")
+          python -c 'import json,sys; p=json.load(sys.stdin)["progress"]; assert p.get("force_finish") is True, p; assert p.get("force_finish_reason") == "near_complete", p' <<<"$guard_status"
 
           curl --max-time 90 -fsS -c "$cookie" -b "$cookie" -H "Origin: $origin" \
             -F "session_id=$session_id" -F 'index=0' \
@@ -96,6 +119,7 @@ jobs:
           finish=$(curl --max-time 45 -fsS -c "$cookie" -b "$cookie" -H "Origin: $origin" \
             -F "session_id=$session_id" -F 'source_start_second=0' \
             -F 'source_duration_seconds=64' -F 'playback_rate=2' -F 'parallel_segments=4' \
+            -F 'client_read_percent=99.6' -F 'client_finish_reason=near_complete' \
             "$base/matches/$match_id/analysis/browser-capture/finish")
           echo "$finish" | tee /tmp/finish.json
           accepted=$(python -c 'import json,sys; print(str(json.load(sys.stdin).get("accepted",False)).lower())' <<<"$finish")
