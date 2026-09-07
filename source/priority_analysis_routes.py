@@ -13,6 +13,14 @@ from analysis_product_routes import (
     start_real_url_analysis,
 )
 from analysis_result_clean_v2 import clean_analysis_result
+
+# Patch the shared capture-state writer before importing V13 and its compatibility
+# chain. Every capture route then receives the same collision-safe atomic writer.
+import capture_turbo_routes as _capture_base
+from services.capture_state_io import write_state_atomic
+
+_capture_base._write_state = write_state_atomic
+
 from capture_turbo_routes_v13 import (
     turbo_append_chunk,
     turbo_browser_capture_page,
