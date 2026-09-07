@@ -1,19 +1,24 @@
 from __future__ import annotations
 
 import os
+import time
 import uuid
 
 os.environ.setdefault("DATABASE_URL", "sqlite:///./test_aquametric.db")
 
 from fastapi.testclient import TestClient
 
+from analysis_product_routes import _capture_session_dir
+from capture_turbo_routes import _read_state, _write_state
 from capture_turbo_routes_v12 import _end_guard_decision
+from db import SessionLocal
 from main import app
+from models import Match, User
 
 client = TestClient(app)
 
 
-def _capture_page() -> str:
+def _create_match() -> tuple[int, str]:
     email = f"v12-end-{uuid.uuid4().hex[:10]}@example.com"
     response = client.post(
         "/register",
@@ -33,7 +38,14 @@ def _capture_page() -> str:
         follow_redirects=False,
     )
     assert response.status_code == 303
-    page = client.get(response.headers["location"])
+    location = response.headers["location"]
+    match_id = int(location.split("/matches/", 1)[1].split("/", 1)[0])
+    return match_id, location
+
+
+def _capture_page() -> str:
+    _, location = _create_match()
+    page = client.get(location)
     assert page.status_code == 200
     return page.text
 
@@ -88,3 +100,41 @@ def test_production_capture_page_contains_independent_end_guards():
         os.path.join(os.path.dirname(__file__), "..", "priority_analysis_routes.py"),
         encoding="utf-8",
     ).read()
+
+
+def test_server_status_forces_finish_after_real_near_end_stall():
+    match_id, _ = _create_match()
+    response = client.post(
+        f"/matches/{match_id}/analysis/browser-capture/session",
+        data={
+            "source_start_second": "0",
+            "source_duration_seconds": "3600",
+            "playback_rate": "2",
+            "parallel_segments": "4",
+        },
+    )
+    assert response.status_code == 200, response.text
+    session_id = response.json()["session_id"]
+
+    db = SessionLocal()
+    try:
+        match = db.get(Match, match_id)
+        user = db.get(User, match.owner_id)
+        root = _capture_session_dir(user, match, session_id)
+        state = _read_state(root)
+        state["read_percent"] = 98.35
+        state["analysis_percent"] = 87.0
+        state["v12_last_read_percent"] = 98.35
+        state["v12_last_progress_at"] = time.time() - 8.0
+        _write_state(root, state)
+    finally:
+        db.close()
+
+    status = client.get(
+        f"/matches/{match_id}/analysis/browser-capture/status?session_id={session_id}"
+    )
+    assert status.status_code == 200, status.text
+    progress = status.json()["progress"]
+    assert progress["force_finish"] is True
+    assert progress["force_finish_reason"] == "near_end_stall"
+    assert "fermeture automatique" in progress["phase"]
