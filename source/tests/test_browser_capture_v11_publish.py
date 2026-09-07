@@ -1,13 +1,11 @@
 import os
 import uuid
-from pathlib import Path
 
 os.environ.setdefault("DATABASE_URL", "sqlite:///./test_aquametric.db")
 
-from fastapi.responses import JSONResponse
 from fastapi.testclient import TestClient
 
-import capture_turbo_routes_v11 as v11
+import capture_turbo_routes_v13 as v13
 from capture_turbo_routes import _read_state, _write_state
 from db import SessionLocal
 from main import app
@@ -77,54 +75,23 @@ def test_v11_finish_creates_history_marker_closes_it_and_exposes_surfaces(monkey
     )
     assert r.status_code == 200, r.text
 
-    def fake_v10_finish(
-        match_id,
-        request,
-        background_tasks,
-        session_id,
-        source_start_second=0.0,
-        source_duration_seconds=0.0,
-        playback_rate=1.0,
-        parallel_segments=1,
-        scope_mode="auto",
-        analysis_scope_start_second=0.0,
-        analysis_scope_end_second=0.0,
-        db=None,
-    ):
-        user, match = v11._owned_match(match_id, request, db)
-        root = v11._capture_session_dir(user, match, session_id)
-        state = _read_state(root)
-        state.update({
-            "status": "queued_finalization",
-            "analysis_percent": 89.0,
+    def fake_core(match_id, root_value, start, total_duration, rate, segments):
+        root = v13.Path(root_value)
+        out = _read_state(root)
+        out.update({
+            "status": "complete",
+            "analysis_percent": 100.0,
             "read_percent": 100.0,
-            "phase": "capture reçue",
-        })
-        _write_state(root, state)
-
-        def publish():
-            out = _read_state(root)
-            out.update({
-                "status": "complete",
-                "analysis_percent": 100.0,
-                "read_percent": 100.0,
-                "phase": "rapport Vision prêt",
-                "redirect": f"/matches/{match_id}/analysis/result",
-                "visual_samples": 48,
-                "scoreboard_observations": 3,
-            })
-            _write_state(root, out)
-
-        background_tasks.add_task(publish)
-        return JSONResponse({
-            "ok": True,
-            "accepted": True,
-            "analysis_percent": 89.0,
-            "status_url": f"/matches/{match_id}/analysis/browser-capture/status?session_id={session_id}",
+            "phase": "rapport Vision prêt",
             "redirect": f"/matches/{match_id}/analysis/result",
+            "visual_samples": 48,
+            "scoreboard_observations": 3,
+            "parallel_segments": segments,
         })
+        _write_state(root, out)
 
-    monkeypatch.setattr(v11.v10, "turbo_finish_capture", fake_v10_finish)
+    monkeypatch.setattr(v13, "_core_fast_finalize_job", fake_core)
+    monkeypatch.setattr(v13, "_enrich_after_report", lambda *args, **kwargs: None)
 
     r = client.post(
         f"/matches/{match_id}/analysis/browser-capture/finish",
