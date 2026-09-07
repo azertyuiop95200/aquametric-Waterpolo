@@ -26,6 +26,8 @@ import uuid
 import cv2
 import numpy as np
 
+from services.browser_capture_media import ffprobe_video, normalize_browser_capture, read_frame_at
+
 
 class VisionBaselineError(RuntimeError):
     pass
@@ -84,13 +86,8 @@ def _clamp(value: float, low: float = 0.0, high: float = 1.0) -> float:
 
 
 def _pool_ratio(frame: np.ndarray) -> float:
-    """Broad cyan/blue water coverage heuristic.
-
-    Pools vary a lot in white balance and lighting, therefore this threshold is
-    intentionally broad and is used only as a visual scene cue.
-    """
+    """Broad cyan/blue water coverage heuristic."""
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-    # OpenCV H range 0..179. Cyan/blue usually ~75..115 but broadcasts vary.
     lower = np.array([70, 35, 55], dtype=np.uint8)
     upper = np.array([120, 255, 255], dtype=np.uint8)
     mask = cv2.inRange(hsv, lower, upper)
@@ -107,11 +104,9 @@ def _histogram(frame: np.ndarray) -> np.ndarray:
 def _motion(prev_gray: np.ndarray | None, gray: np.ndarray) -> float:
     if prev_gray is None:
         return 0.0
-    # Resize defensively in case a corrupted stream changes dimensions.
     if prev_gray.shape != gray.shape:
         prev_gray = cv2.resize(prev_gray, (gray.shape[1], gray.shape[0]))
     diff = cv2.absdiff(prev_gray, gray)
-    # Mean absolute pixel change; normalize to a practical 0..1 range.
     return _clamp(float(diff.mean()) / 55.0)
 
 
@@ -136,12 +131,10 @@ def _region_score(frame: np.ndarray, rect: tuple[float, float, float, float]) ->
     edges = cv2.Canny(gray, 80, 180)
     edge_density = float(np.count_nonzero(edges) / edges.size)
     contrast = _clamp(float(gray.std()) / 80.0)
-    # Text/score overlays tend to combine local edges and contrast.
     return _clamp(edge_density * 2.4 + contrast * 0.35)
 
 
 _SCOREBOARD_REGIONS: dict[str, tuple[float, float, float, float]] = {
-    # Wide regions catch modern broadcast bars that contain both team names, score and clock.
     "top_wide": (0.00, 0.00, 0.72, 0.20),
     "bottom_wide": (0.00, 0.80, 0.72, 0.20),
     "top_left": (0.00, 0.00, 0.42, 0.20),
@@ -163,7 +156,6 @@ def _scoreboard_candidates(frames: list[np.ndarray]) -> list[ScoreboardCandidate
     ranked = []
     for name, values in accum.items():
         rect = _SCOREBOARD_REGIONS[name]
-        # Persistent overlay regions should repeatedly carry structured edges.
         score = float(np.mean(values)) if values else 0.0
         ranked.append(ScoreboardCandidate(name, *rect, round(score, 3)))
     ranked.sort(key=lambda x: x.score, reverse=True)
@@ -216,8 +208,6 @@ def _interesting_moments(samples: list[FrameSignal], limit: int = 10, separation
 
 
 def _classify_video_type(duration: float, scene_cut_rate: float, active_seconds: float) -> tuple[str, str]:
-    # This is intentionally conservative: video editorial style cannot be proven
-    # from duration alone, so all classes remain candidates until richer models run.
     if duration < 180:
         return "short_clip_candidate", "MODERATE"
     if duration < 1800 and scene_cut_rate >= 0.18:
@@ -259,20 +249,46 @@ def _create_contact_sheet(frames: list[tuple[float, np.ndarray]], out_dir: Path)
 
 
 def scan_local_video(video_path: Path, evidence_dir: Path, target_samples: int = 180) -> VideoScanResult:
+    """Scan a local video only after verifying real timeline readability.
+
+    Unreliable WebM/MOV/VFR sources are remuxed or transcoded into a temporary
+    analysis copy.  The original upload is never modified.
+    """
     video_path = Path(video_path)
+    evidence_dir = Path(evidence_dir)
     if not video_path.exists():
         raise VisionBaselineError("Video file does not exist.")
-    cap = cv2.VideoCapture(str(video_path))
+
+    cache_dir = evidence_dir / "_normalized_video" / video_path.stem
+    analysis_path, media_info = normalize_browser_capture(video_path, cache_dir, fast_analysis=True)
+    if not media_info.get("decode_ok"):
+        raise VisionBaselineError(
+            "Video metadata is present but frames cannot be decoded/searched reliably. "
+            "Try an MP4 H.264 export or verify that FFmpeg is installed."
+        )
+
+    probe = ffprobe_video(analysis_path)
+    cap = cv2.VideoCapture(str(analysis_path))
     if not cap.isOpened():
-        raise VisionBaselineError("OpenCV cannot open this video.")
+        raise VisionBaselineError("OpenCV cannot open the verified analysis video.")
     try:
-        fps = float(cap.get(cv2.CAP_PROP_FPS) or 0.0)
-        frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
-        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 0)
-        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0)
-        duration = (frame_count / fps) if fps > 0 and frame_count > 0 else 0.0
+        cap_fps = float(cap.get(cv2.CAP_PROP_FPS) or 0.0)
+        cap_frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+        cap_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 0)
+        cap_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0)
+
+        fps = float(probe.get("fps") or cap_fps or 0.0)
+        width = int(probe.get("width") or cap_width or 0)
+        height = int(probe.get("height") or cap_height or 0)
+        duration = float(probe.get("duration") or 0.0)
+        if duration <= 0 and cap_fps > 0 and cap_frame_count > 0:
+            duration = cap_frame_count / cap_fps
         if duration <= 0:
-            raise VisionBaselineError("Video duration could not be determined.")
+            raise VisionBaselineError("Video duration could not be determined after normalization.")
+        if fps <= 0:
+            fps = cap_fps if cap_fps > 0 else 12.0
+        frame_count = cap_frame_count if cap_frame_count > 0 else max(1, int(round(duration * fps)))
+
         sample_count = max(8, min(int(target_samples), max(8, int(duration / 2))))
         interval = max(0.5, duration / sample_count)
         end_second = max(0.0, duration - max(0.25, 3.0 / max(fps, 1.0)))
@@ -284,11 +300,9 @@ def scan_local_video(video_path: Path, evidence_dir: Path, target_samples: int =
         prev_gray = None
         prev_hist = None
         for idx, second in enumerate(times):
-            cap.set(cv2.CAP_PROP_POS_MSEC, float(second) * 1000.0)
-            ok, frame = cap.read()
-            if not ok or frame is None:
+            frame = read_frame_at(analysis_path, float(second), cap)
+            if frame is None:
                 continue
-            # Normalize analysis size for speed while preserving source metadata.
             analysis = frame
             if frame.shape[1] > 960:
                 scale = 960.0 / frame.shape[1]
@@ -298,11 +312,13 @@ def scan_local_video(video_path: Path, evidence_dir: Path, target_samples: int =
             pool = _pool_ratio(analysis)
             motion = _motion(prev_gray, gray)
             scene = _scene_change(prev_hist, hist)
-            # Active play cue: substantial water scene + visual change, penalizing hard cuts.
             water_component = _clamp((pool - 0.12) / 0.58)
             active = _clamp(0.58 * water_component + 0.32 * motion + 0.10 * (1.0 - scene))
             action = _clamp(0.46 * motion + 0.34 * active + 0.20 * scene)
-            signals.append(FrameSignal(round(float(second), 3), round(pool, 4), round(motion, 4), round(scene, 4), round(active, 4), round(action, 4)))
+            signals.append(FrameSignal(
+                round(float(second), 3), round(pool, 4), round(motion, 4),
+                round(scene, 4), round(active, 4), round(action, 4),
+            ))
             if len(raw_frames) < 40:
                 raw_frames.append(analysis.copy())
             if idx % max(1, sample_count // 12) == 0:
@@ -310,8 +326,13 @@ def scan_local_video(video_path: Path, evidence_dir: Path, target_samples: int =
             prev_gray = gray
             prev_hist = hist
 
-        if not signals:
-            raise VisionBaselineError("No readable frames were sampled from the video.")
+        minimum_decoded = max(4, int(math.ceil(sample_count * 0.55)))
+        if len(signals) < minimum_decoded:
+            raise VisionBaselineError(
+                f"Video opened but only {len(signals)}/{sample_count} requested frames were decoded. "
+                "Analysis stopped instead of publishing incomplete AI evidence."
+            )
+
         avg_pool = float(np.mean([s.pool_ratio for s in signals]))
         avg_motion = float(np.mean([s.motion_score for s in signals]))
         scene_cut_rate = float(np.mean([1.0 if s.scene_change >= 0.35 else 0.0 for s in signals]))
@@ -328,6 +349,10 @@ def scan_local_video(video_path: Path, evidence_dir: Path, target_samples: int =
             "Player identity, ball, passes, shots, goals, whistles and exclusions are not inferred by this scan.",
             "Tactical systems must not be concluded from these visual signals alone.",
         ]
+        if media_info.get("normalization") not in {"not_needed", "unknown"}:
+            limitations.append(
+                f"Analysis used a seek-safe derived copy ({media_info.get('normalization')}); the original upload was preserved."
+            )
         return VideoScanResult(
             duration_seconds=round(duration, 3), fps=round(fps, 3), width=width, height=height,
             frame_count=frame_count, sample_interval_seconds=round(interval, 3), samples=signals,
