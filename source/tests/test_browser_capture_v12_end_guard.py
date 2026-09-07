@@ -96,10 +96,16 @@ def test_production_capture_page_contains_independent_end_guards():
     assert "client_finish_reason" in html
     assert "recorder.requestData" in html
     assert "r>=99.8" not in html
-    assert "from capture_turbo_routes_v12 import" in open(
+    priority = open(
         os.path.join(os.path.dirname(__file__), "..", "priority_analysis_routes.py"),
         encoding="utf-8",
     ).read()
+    assert "from capture_turbo_routes_v13 import" in priority
+    v13_source = open(
+        os.path.join(os.path.dirname(__file__), "..", "capture_turbo_routes_v13.py"),
+        encoding="utf-8",
+    ).read()
+    assert "import capture_turbo_routes_v12 as v12" in v13_source
 
 
 def test_server_status_forces_finish_after_real_near_end_stall():
