@@ -1,11 +1,10 @@
-"""V14 browser capture: bounded, non-blocking and always-terminal finalization.
+"""V14 browser capture: fast, bounded and always-terminal finalization.
 
-V13 already reuses retained live JPEGs for the normal fast path. V14 removes the
-remaining user-visible stall modes: it never launches the expensive full-WebM
-rescan during finalization, uses a smaller evidence budget, and publishes a
-truthful partial report when retained evidence is insufficient or a fast pass
-fails. "100%" here means the processing lifecycle reaches a terminal published
-state; it never means that uncertain measurements are promoted to factual truth.
+The preferred path reuses JPEG evidence decoded during playback. If those live
+frames are missing, V14 performs only a sparse, explicitly budgeted video pass
+instead of V10's larger verification scan. Any decoder/OCR/finalizer failure is
+converted into a truthful evidence-limited terminal report. Processing reaching
+100% means the lifecycle is finished; evidence confidence remains separate.
 """
 from __future__ import annotations
 
@@ -21,7 +20,7 @@ from sqlalchemy.orm import Session
 import capture_turbo_routes_v11 as v11
 import capture_turbo_routes_v13 as v13
 from analysis_product_routes import _capture_session_dir, _owned_match
-from capture_turbo_routes import _read_state, _write_state
+from capture_turbo_routes import _FAST_CAPTURE_SENTINEL, _read_state, _write_state
 from db import SessionLocal, get_db
 from models import AutonomousAnalysis, Match, VisionAnalysis
 from services.live_frame_match_analysis import live_frame_coverage, run_live_frame_analysis
@@ -30,8 +29,14 @@ from services.scoreboard_ocr import tesseract_available
 log = logging.getLogger("aquametric.browser_capture.v14")
 
 V14_FINALIZATION_WATCHDOG_SECONDS = 35.0
+V14_LIVE_VISUAL_SAMPLES = 56
+V14_LIVE_OCR_SAMPLES = 4
+V14_VIDEO_VISUAL_SAMPLES = 32
+V14_VIDEO_OCR_SAMPLES = 4
+V14_MOSAIC_VISUAL_SAMPLES = 84
+V14_MOSAIC_OCR_SAMPLES = 8
 
-# Keep the proven V13 capture/read path. V14 changes only final publication.
+# Keep the proven V13 capture/read path. V14 changes final publication only.
 turbo_browser_capture_page = v13.turbo_browser_capture_page
 turbo_create_session = v13.turbo_create_session
 turbo_append_chunk = v13.turbo_append_chunk
@@ -46,7 +51,6 @@ def _body(response) -> dict:
 
 
 def _should_rescue(status: str, started_at: float, now: float | None = None) -> bool:
-    """Return True when finalization has exceeded its bounded publication window."""
     if str(status or "") not in {"queued_finalization", "finalizing"}:
         return False
     started = float(started_at or 0.0)
@@ -56,13 +60,12 @@ def _should_rescue(status: str, started_at: float, now: float | None = None) -> 
     return current - started >= V14_FINALIZATION_WATCHDOG_SECONDS
 
 
-def _publish_fallback_report(match_id: int, root_value: str, reason: str) -> dict:
-    """Publish a terminal evidence-limited report instead of leaving the UI stuck.
+def _terminal(state: dict) -> bool:
+    return str(state.get("status") or "") in {"complete", "partial"} and float(state.get("analysis_percent") or 0.0) >= 100.0
 
-    The fallback only persists measurements that were already produced during the
-    live progressive pass. Missing motion/events/score values remain absent/zero
-    and are explicitly labelled as unmeasured.
-    """
+
+def _publish_fallback_report(match_id: int, root_value: str, reason: str) -> dict:
+    """Publish all real live evidence and leave unmeasured fields unmeasured."""
     root = Path(root_value)
     db = SessionLocal()
     try:
@@ -70,7 +73,7 @@ def _publish_fallback_report(match_id: int, root_value: str, reason: str) -> dic
         if not match or not root.is_dir():
             return {}
         state = _read_state(root)
-        if str(state.get("status") or "") in {"complete", "partial"} and float(state.get("analysis_percent") or 0.0) >= 100.0:
+        if _terminal(state):
             return state
 
         start = max(0.0, float(state.get("source_start_second") or 0.0))
@@ -86,12 +89,12 @@ def _publish_fallback_report(match_id: int, root_value: str, reason: str) -> dic
         evidence_ratio = max(0.0, min(1.0, evidence_ratio))
         confidence = "MEDIUM" if progressive_samples >= 24 and evidence_ratio >= 0.75 else "LOW"
         latest_ocr = [str(x)[:160] for x in list(state.get("latest_live_ocr") or [])[:4]]
-
         limitations = [
-            "Publication de secours V14: le rapport utilise uniquement les preuves réellement traitées pendant la lecture live.",
+            "Publication de secours V14: uniquement les preuves réellement traitées sont conservées.",
             "Les métriques non observées restent non mesurées; aucun score, événement ou joueur n'est inventé.",
             f"Motif de repli: {str(reason or 'budget_finalisation')[:180]}",
         ]
+
         vision = VisionAnalysis(
             match_id=match.id,
             status="partial",
@@ -116,7 +119,6 @@ def _publish_fallback_report(match_id: int, root_value: str, reason: str) -> dic
             limitations_json=json.dumps(limitations, ensure_ascii=False),
         )
         db.add(vision)
-
         summary = {
             "pipeline": "live-frame-resilient-v14",
             "processing_completion_percent": 100.0,
@@ -131,7 +133,7 @@ def _publish_fallback_report(match_id: int, root_value: str, reason: str) -> dic
             "source_time_offset_seconds": round(start, 3),
             "conclusion": "Rapport publié avec toutes les preuves disponibles; les champs non prouvés restent explicitement non mesurés.",
         }
-        autonomy = AutonomousAnalysis(
+        db.add(AutonomousAnalysis(
             match_id=match.id,
             status="partial",
             engine_version="live-frame-autonomy-resilient-v14",
@@ -140,8 +142,7 @@ def _publish_fallback_report(match_id: int, root_value: str, reason: str) -> dic
             periods_json="[]",
             summary_json=json.dumps(summary, ensure_ascii=False),
             limitations_json=json.dumps(limitations, ensure_ascii=False),
-        )
-        db.add(autonomy)
+        ))
         match.status = "browser_capture_analyzed"
         db.commit()
 
@@ -162,14 +163,7 @@ def _publish_fallback_report(match_id: int, root_value: str, reason: str) -> dic
             "retry_available": False,
         })
         _write_state(root, state)
-        log.warning(
-            "V14 published bounded fallback match=%s coverage=%.3f samples=%s frames=%s reason=%s",
-            match_id,
-            evidence_ratio,
-            progressive_samples,
-            retained_frames,
-            reason,
-        )
+        log.warning("V14 terminal fallback match=%s samples=%s reason=%s", match_id, progressive_samples, reason)
         return state
     except Exception:
         db.rollback()
@@ -179,15 +173,59 @@ def _publish_fallback_report(match_id: int, root_value: str, reason: str) -> dic
         db.close()
 
 
-def _core_finalize_job_v14(
-    match_id: int,
-    root_value: str,
-    start: float,
-    total_duration: float,
-    rate: float,
-    segments: int,
-) -> None:
-    """Run one short live-frame pass; publish a bounded fallback on any failure."""
+def _bounded_video_pass(db, match: Match, root: Path, start: float, total_duration: float, rate: float, segments: int) -> dict:
+    """Sparse seek-based fallback for captures without enough retained JPEGs."""
+    source_path = root / "capture.webm"
+    derived_dir = root / "derived_v14"
+    derived_dir.mkdir(parents=True, exist_ok=True)
+    mosaic = segments >= 4 and total_duration > start + 30.0
+    visual_samples = V14_MOSAIC_VISUAL_SAMPLES if mosaic else V14_VIDEO_VISUAL_SAMPLES
+    ocr_samples = V14_MOSAIC_OCR_SAMPLES if mosaic else V14_VIDEO_OCR_SAMPLES
+    state = _read_state(root)
+    state.update({
+        "phase": f"fallback vidéo sparse V14 · {visual_samples} images max · {ocr_samples} OCR max",
+        "analysis_percent": max(95.0, float(state.get("analysis_percent") or 0.0)),
+        "v14_video_fallback": True,
+        "final_visual_budget": visual_samples,
+        "final_ocr_budget": ocr_samples,
+    })
+    _write_state(root, state)
+
+    analysis_source, media_info = v13.v10.v7.normalize_browser_capture(source_path, derived_dir, fast_analysis=True)
+    state = _read_state(root)
+    if _terminal(state):
+        return {"terminal_already": True}
+    state["media_normalization"] = media_info.get("normalization", "unknown")
+    _write_state(root, state)
+
+    if mosaic:
+        return v13.v10.v7.run_mosaic_analysis(
+            db,
+            match,
+            analysis_source,
+            source_start_second=start,
+            source_duration_seconds=total_duration,
+            playback_rate=rate,
+            parallel_segments=segments,
+            visual_samples=visual_samples,
+            ocr_samples=ocr_samples,
+        )
+    encoded_offset = (_FAST_CAPTURE_SENTINEL + start) if rate >= 1.75 else start
+    return v13.v10.v7.run_rapid_analysis(
+        db,
+        match,
+        analysis_source,
+        derived_dir,
+        include_audio=False,
+        visual_samples=visual_samples,
+        ocr_samples=ocr_samples,
+        source_kind="browser_capture_v14_sparse",
+        persist_visual_artifacts=False,
+        time_offset_seconds=encoded_offset,
+    )
+
+
+def _core_finalize_job_v14(match_id: int, root_value: str, start: float, total_duration: float, rate: float, segments: int) -> None:
     root = Path(root_value)
     db = SessionLocal()
     started = time.monotonic()
@@ -201,34 +239,39 @@ def _core_finalize_job_v14(
             "status": "finalizing",
             "analysis_percent": 94.0,
             "read_percent": 100.0,
-            "phase": "finalisation IA V14 · consolidation bornée des preuves live",
+            "phase": "finalisation IA V14 · consolidation bornée",
             "v14_finalization_started_at": float(state.get("v14_finalization_started_at") or time.time()),
             "v14_live_frame_coverage": coverage,
         })
         _write_state(root, state)
 
-        if not coverage.get("eligible"):
-            db.close()
-            _publish_fallback_report(match_id, root_value, "couverture live insuffisante pour le pass complet; aucun rescannage vidéo lancé")
-            return
+        if coverage.get("eligible"):
+            result = run_live_frame_analysis(
+                db,
+                match,
+                root,
+                source_start_second=start,
+                source_duration_seconds=total_duration,
+                playback_rate=rate,
+                parallel_segments=segments,
+                visual_samples=V14_LIVE_VISUAL_SAMPLES,
+                ocr_samples=V14_LIVE_OCR_SAMPLES,
+            )
+            engine = "live-frame-final-v14"
+            quality = "verified_live_evidence"
+        else:
+            result = _bounded_video_pass(db, match, root, start, total_duration, rate, segments)
+            if result.get("terminal_already"):
+                return
+            engine = "sparse-video-final-v14"
+            quality = "verified_sparse_video"
 
-        result = run_live_frame_analysis(
-            db,
-            match,
-            root,
-            source_start_second=start,
-            source_duration_seconds=total_duration,
-            playback_rate=rate,
-            parallel_segments=segments,
-            visual_samples=56,
-            ocr_samples=4,
-        )
-        elapsed = time.monotonic() - started
         summary = result.get("summary", {}) or {}
+        db.commit()
         state = _read_state(root)
-        # A watchdog rescue may already have published a partial report. Do not
-        # turn that terminal state back into a waiting state; an eventual complete
-        # pass may safely upgrade it to complete.
+        if _terminal(state):
+            return
+        elapsed = time.monotonic() - started
         state.update({
             "status": "complete",
             "analysis_percent": 100.0,
@@ -237,24 +280,19 @@ def _core_finalize_job_v14(
             "redirect": f"/matches/{match_id}/analysis/result",
             "visual_samples": int(summary.get("visual_samples") or 0),
             "scoreboard_observations": int(summary.get("scoreboard_observations") or 0),
+            "parallel_segments": int(summary.get("parallel_segments") or segments),
             "retained_live_frames": int(summary.get("retained_live_frames") or coverage.get("records") or 0),
-            "finalization_engine": "live-frame-final-v14",
+            "finalization_engine": engine,
             "finalization_elapsed_seconds": round(elapsed, 2),
-            "report_quality": "verified_live_evidence",
+            "report_quality": quality,
             "retry_available": False,
         })
         _write_state(root, state)
         match.status = "browser_capture_analyzed"
         db.commit()
-        log.info(
-            "V14 report ready match=%s elapsed=%.2fs visual=%s ocr=%s",
-            match_id,
-            elapsed,
-            state.get("visual_samples"),
-            state.get("scoreboard_observations"),
-        )
+        log.info("V14 report ready match=%s engine=%s elapsed=%.2fs visual=%s", match_id, engine, elapsed, state.get("visual_samples"))
     except Exception as exc:
-        log.exception("V14 fast pass failed; publishing bounded report match=%s", match_id)
+        log.exception("V14 bounded finalization failed; publishing evidence-limited report match=%s", match_id)
         try:
             db.rollback()
         except Exception:
@@ -263,7 +301,7 @@ def _core_finalize_job_v14(
             db.close()
         except Exception:
             pass
-        _publish_fallback_report(match_id, root_value, f"fast_pass_error: {exc}")
+        _publish_fallback_report(match_id, root_value, f"bounded_pass_error: {exc}")
     finally:
         try:
             db.close()
@@ -309,9 +347,6 @@ def turbo_finish_capture(
     client_finish_reason: str = Form("normal"),
     db: Session = Depends(get_db),
 ):
-    # Let V13 validate ownership/scope/source and create its durable marker, but
-    # capture its background tasks in a throwaway container so the V10 full-video
-    # fallback is never scheduled by V14.
     shadow_tasks = BackgroundTasks()
     response = v13.turbo_finish_capture(
         match_id=match_id,
@@ -352,18 +387,8 @@ def turbo_finish_capture(
     })
     _write_state(root, state)
 
-    background_tasks.add_task(
-        _core_finalize_job_v14,
-        match_id,
-        str(root),
-        start,
-        total_duration,
-        rate,
-        segments,
-    )
+    background_tasks.add_task(_core_finalize_job_v14, match_id, str(root), start, total_duration, rate, segments)
     background_tasks.add_task(v11._close_finalize_marker, match_id, str(root))
-    # Enrichment happens only after the report is terminal and therefore cannot
-    # keep the browser waiting for publication.
     background_tasks.add_task(v13._enrich_after_report, match_id, str(root))
 
     payload.update({
