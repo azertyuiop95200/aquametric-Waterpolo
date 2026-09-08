@@ -1,11 +1,11 @@
 """V16 browser capture: publish first, enrich second.
 
-The browser must never wait at 89-99% for ffmpeg/OpenCV/OCR finalisation.  V16
-turns the evidence already processed during playback into a publishable terminal
-report as soon as /finish is accepted.  More expensive verification then runs in
+The browser must never wait at 89-99% for ffmpeg/OpenCV/OCR finalisation. V16
+turns evidence already processed during playback into a publishable terminal
+report as soon as /finish is accepted. More expensive verification then runs in
 BackgroundTasks and may upgrade the report, but it can no longer block the user.
 
-A separate report-ready marker is authoritative.  Late chunk/frame requests may
+A separate report-ready marker is authoritative. Late chunk/frame requests may
 still race with progress.json, but they cannot make a finished session look
 running again because /status restores the terminal marker immediately.
 """
@@ -26,10 +26,7 @@ from analysis_product_routes import _capture_session_dir, _owned_match
 from capture_turbo_routes import _FAST_CAPTURE_SENTINEL, _read_state, _write_state
 from db import SessionLocal, get_db
 from models import Match
-from services.browser_capture_media import normalize_browser_capture
 from services.live_frame_match_analysis import live_frame_coverage, run_live_frame_analysis
-from services.mosaic_match_analysis import run_mosaic_analysis
-from services.rapid_match_analysis import run_rapid_analysis
 
 log = logging.getLogger("aquametric.browser_capture.v16")
 
@@ -53,6 +50,7 @@ def _report_marker_path(root: Path) -> Path:
 
 
 def _write_report_marker(root: Path, state: dict) -> dict:
+    """Publish an authoritative terminal marker outside mutable progress.json."""
     root = Path(root)
     root.mkdir(parents=True, exist_ok=True)
     payload = {
@@ -69,8 +67,19 @@ def _write_report_marker(root: Path, state: dict) -> dict:
         "visual_samples": int(state.get("visual_samples") or 0),
         "scoreboard_observations": int(state.get("scoreboard_observations") or 0),
         "retained_live_frames": int(state.get("retained_live_frames") or 0),
-        "published_at": float(state.get("v16_report_published_at") or time.time()),
+        "published_at": float(state.get("v16_report_published_at") or state.get("published_at") or time.time()),
     }
+    for key in (
+        "enrichment_warning",
+        "enrichment_elapsed_seconds",
+        "media_normalization",
+        "evidence_confidence",
+        "evidence_coverage_ratio",
+        "finalization_job_status",
+        "finalization_job_progress",
+    ):
+        if key in state:
+            payload[key] = state[key]
     target = _report_marker_path(root)
     tmp = root / f".{_REPORT_MARKER}.{os.getpid()}.{time.time_ns()}.tmp"
     try:
@@ -132,7 +141,6 @@ def _publish_report_first(match_id: int, root: Path) -> dict:
         "v16_report_published_at": time.time(),
     })
     _write_state(root, state)
-    _write_report_marker(root, state)
     try:
         v15._clear_start_marker(root)
     except Exception:
@@ -141,6 +149,23 @@ def _publish_report_first(match_id: int, root: Path) -> dict:
         v15.v14.v11._close_finalize_marker(match_id, str(root))
     except Exception:
         pass
+    # _close_finalize_marker may add history status fields to progress.json.
+    state = _terminal_from_marker(root, _read_state(root)) if _read_report_marker(root) else _read_state(root)
+    state.update({
+        "status": "partial",
+        "analysis_percent": 100.0,
+        "read_percent": 100.0,
+        "phase": "rapport disponible immédiatement · enrichissement IA en arrière-plan",
+        "redirect": f"/matches/{match_id}/analysis/result",
+        "finalization_engine": "report-first-v16",
+        "report_quality": "published_progressive_evidence",
+        "report_ready": True,
+        "retry_available": False,
+        "enrichment_status": "queued",
+        "v16_report_published_at": float(state.get("v16_report_published_at") or time.time()),
+    })
+    _write_state(root, state)
+    _write_report_marker(root, state)
     log.info(
         "V16 report-first published match=%s samples=%s retained=%s",
         match_id,
@@ -196,10 +221,16 @@ def _verify_after_publish(
             source_path = root / "capture.webm"
             derived_dir = root / "derived_v16"
             derived_dir.mkdir(parents=True, exist_ok=True)
-            analysis_source, media_info = normalize_browser_capture(source_path, derived_dir, fast_analysis=True)
+            # Call through V7, the owner of browser-media analysis behavior, so
+            # resilience hooks and regression extensions remain compatible.
+            analysis_source, media_info = v15.v14.v13.v10.v7.normalize_browser_capture(
+                source_path,
+                derived_dir,
+                fast_analysis=True,
+            )
             mosaic = segments >= 4 and total_duration > start + 30.0
             if mosaic:
-                result = run_mosaic_analysis(
+                result = v15.v14.v13.v10.v7.run_mosaic_analysis(
                     db,
                     match,
                     analysis_source,
@@ -212,7 +243,7 @@ def _verify_after_publish(
                 )
             else:
                 encoded_offset = (_FAST_CAPTURE_SENTINEL + start) if rate >= 1.75 else start
-                result = run_rapid_analysis(
+                result = v15.v14.v13.v10.v7.run_rapid_analysis(
                     db,
                     match,
                     analysis_source,
@@ -296,6 +327,25 @@ def turbo_browser_capture_page(match_id: int, request: Request, db: Session = De
     return HTMLResponse(_patch_report_first_ui(html, match_id), status_code=response.status_code)
 
 
+def _finish_payload(match_id: int, session_id: str, progress: dict) -> dict:
+    return {
+        "ok": True,
+        "accepted": True,
+        "report_ready": True,
+        "analysis_percent": 100.0,
+        "status": progress.get("status", "partial"),
+        "redirect": progress.get("redirect") or f"/matches/{match_id}/analysis/result",
+        "status_url": f"/matches/{match_id}/analysis/browser-capture/status?session_id={session_id}",
+        "finalization_engine": progress.get("finalization_engine") or "report-first-v16",
+        "report_quality": progress.get("report_quality") or "published_progressive_evidence",
+        "enrichment_status": progress.get("enrichment_status") or "queued",
+        # Compatibility metadata; unlike earlier versions these are not waits.
+        "non_blocking": True,
+        "fast_finalization": True,
+        "max_wait_before_rescue_seconds": 0.0,
+    }
+
+
 def turbo_finish_capture(
     match_id: int,
     request: Request,
@@ -317,16 +367,7 @@ def turbo_finish_capture(
     existing = _read_report_marker(root) if root.is_dir() else {}
     if existing:
         progress = _terminal_from_marker(root, _read_state(root))
-        return JSONResponse({
-            "ok": True,
-            "accepted": True,
-            "report_ready": True,
-            "analysis_percent": 100.0,
-            "status": progress.get("status", "partial"),
-            "redirect": progress.get("redirect") or f"/matches/{match_id}/analysis/result",
-            "status_url": f"/matches/{match_id}/analysis/browser-capture/status?session_id={session_id}",
-            "finalization_engine": progress.get("finalization_engine") or "report-first-v16",
-        })
+        return JSONResponse(_finish_payload(match_id, session_id, progress))
 
     # Reuse every V15 validation/scope check, but discard its heavy V14 tasks.
     shadow_tasks = BackgroundTasks()
@@ -375,19 +416,7 @@ def turbo_finish_capture(
         segments,
     )
     background_tasks.add_task(v15.v14.v13._enrich_after_report, match_id, str(root))
-
-    return JSONResponse({
-        "ok": True,
-        "accepted": True,
-        "report_ready": True,
-        "analysis_percent": 100.0,
-        "status": published.get("status", "partial"),
-        "redirect": published.get("redirect") or f"/matches/{match_id}/analysis/result",
-        "status_url": f"/matches/{match_id}/analysis/browser-capture/status?session_id={session_id}",
-        "finalization_engine": "report-first-v16",
-        "report_quality": published.get("report_quality"),
-        "enrichment_status": "queued",
-    })
+    return JSONResponse(_finish_payload(match_id, session_id, published))
 
 
 def turbo_capture_status(match_id: int, request: Request, session_id: str, db: Session = Depends(get_db)):
@@ -397,8 +426,9 @@ def turbo_capture_status(match_id: int, request: Request, session_id: str, db: S
         marker = _read_report_marker(root)
         if marker:
             # The marker is authoritative even if a late writer regressed progress.json.
-            state = _terminal_from_marker(root, _read_state(root))
-            if str(_read_state(root).get("status") or "") not in {"complete", "partial"}:
+            raw = _read_state(root)
+            state = _terminal_from_marker(root, raw)
+            if str(raw.get("status") or "") not in {"complete", "partial"} or float(raw.get("analysis_percent") or 0.0) < 100.0:
                 _write_state(root, state)
             return JSONResponse({"ok": True, "progress": state})
     return v15.turbo_capture_status(match_id=match_id, request=request, session_id=session_id, db=db)
