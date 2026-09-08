@@ -76,7 +76,7 @@ def test_v11_history_marker_closes_when_v16_report_is_published(monkeypatch):
     assert r.status_code == 200, r.text
 
     # The history marker must close at report publication, independently of the
-    # optional heavy enrichment that follows.
+    # optional heavy enrichment that follows. A partial result is still terminal.
     monkeypatch.setattr(v16, "_verify_after_publish", lambda *args, **kwargs: None)
     monkeypatch.setattr(v16.v15.v14.v13, "_enrich_after_report", lambda *args, **kwargs: None)
 
@@ -102,7 +102,7 @@ def test_v11_history_marker_closes_when_v16_report_is_published(monkeypatch):
     assert progress["status"] == "partial"
     assert progress["analysis_percent"] == 100.0
     assert progress["report_ready"] is True
-    assert progress["finalization_job_status"] == "complete"
+    assert progress["finalization_job_status"] == "partial"
     assert progress["finalization_job_progress"] == 100
 
     db = SessionLocal()
@@ -112,7 +112,7 @@ def test_v11_history_marker_closes_when_v16_report_is_published(monkeypatch):
             AnalysisJob.stage == "browser_capture_finalize_v11",
         ).order_by(AnalysisJob.id.desc()).first()
         assert marker is not None
-        assert marker.status == "complete"
+        assert marker.status == "partial"
         assert marker.progress == 100
     finally:
         db.close()
