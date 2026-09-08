@@ -141,6 +141,6 @@ def test_v14_finishes_from_retained_live_frames_without_rescanning_webm(monkeypa
         db.close()
 
 
-def test_priority_routes_use_v14_finalizer():
+def test_priority_routes_use_v15_finalizer():
     source = open(os.path.join(os.path.dirname(__file__), "..", "priority_analysis_routes.py"), encoding="utf-8").read()
-    assert "from capture_turbo_routes_v14 import" in source
+    assert "from capture_turbo_routes_v15 import" in source

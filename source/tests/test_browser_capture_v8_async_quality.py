@@ -69,7 +69,7 @@ def test_v10_adapts_warmup_and_v14_reduces_final_scan_further():
     assert "progressive_samples" in source
     assert "visual_samples=visual_samples" in source
     assert "ocr_samples=ocr_samples" in source
-    assert "from capture_turbo_routes_v14 import" in priority
+    assert "from capture_turbo_routes_v15 import" in priority
     v14 = (ROOT / "capture_turbo_routes_v14.py").read_text(encoding="utf-8")
     assert "import capture_turbo_routes_v13 as v13" in v14
     assert "run_live_frame_analysis" in v14
