@@ -61,7 +61,7 @@ def test_global_product_design_and_match_brief_are_loaded():
     assert "/static/premium-product.css?v=12.2.0" in base
     assert "/static/premium-product.js?v=12.2.0" in base
     assert 'data-product-version="12.2.0"' in base
-    assert "V12.2 · Ultimate" in base
+    assert "/static/workspace.css?v=20260908" in base
     js = (ROOT / "static" / "premium-product.js").read_text(encoding="utf-8")
     assert "V12.2-ultimate-match-video-intelligence" in js
     assert "/api/premium/matches/" in js
@@ -72,5 +72,5 @@ def test_global_product_design_and_match_brief_are_loaded():
 
 def test_dashboard_is_now_coach_command_center():
     html = (ROOT / "templates" / "dashboard.html").read_text(encoding="utf-8")
-    for needle in ["COACH COMMAND CENTER", "Du match brut à la décision coach", "Analyse Ultimate", "Film Room & Tactique", "Simulation manager"]:
+    for needle in ["Tableau de bord", "Reprendre une analyse", "/matches/new", "/knowledge", "/simulation"]:
         assert needle in html

@@ -326,18 +326,18 @@
 
   const load=()=>{
     fetch('/calendar',{credentials:'same-origin'}).then(r=>{if(!r.ok)throw new Error('calendar');return r.text();}).then(html=>{
-      const doc=new DOMParser().parseFromString(html,'text/html');fixturesByCompetition=new Map();teamsByCompetition=new Map();championshipMeta=new Map();
+      const doc=new DOMParser().parseFromString(html,'text/html');if(!doc.querySelector('.championship-panel[data-competition]'))throw new Error('calendar unavailable');document.getElementById('results-update-error')?.remove();fixturesByCompetition=new Map();teamsByCompetition=new Map();championshipMeta=new Map();
       doc.querySelectorAll('.championship-panel[data-competition]').forEach(section=>{
         const competition=section.dataset.competition||'Championnat';const meta=section.querySelector('.section-head .eyebrow')?.textContent.trim()||'Championnat';championshipMeta.set(competition,meta);
         const teams=new Set();const items=[...section.querySelectorAll('.championship-calendar .fixture-row')].map(row=>{fixtureTeams(row).forEach(team=>teams.add(team));return {row,date:parseFixtureDate(row.querySelector('time')?.textContent)};});
         fixturesByCompetition.set(competition,items);teamsByCompetition.set(competition,teams);
       });
       renderPeriod(new URLSearchParams(location.search).get('period')||'day');
-    }).catch(()=>{fixturesByCompetition=new Map();teamsByCompetition=new Map();championshipMeta=new Map();renderPeriod(new URLSearchParams(location.search).get('period')||'day');});
+    }).catch(()=>{renderPeriod(new URLSearchParams(location.search).get('period')||'day');let message=document.getElementById('results-update-error');if(!message){message=document.createElement('p');message.id='results-update-error';message.setAttribute('role','status');container.before(message);}message.textContent='Actualisation indisponible. Les dernières données chargées restent affichées.';});
   };
 
   buttons.forEach(btn=>btn.addEventListener('click',()=>renderPeriod(btn.dataset.resultsPeriod)));
-  load();setInterval(()=>location.reload(),5*60*1000);
+  load();setInterval(()=>{if(!document.hidden)load();},5*60*1000);
 })();
 </script>
 {% endblock %}

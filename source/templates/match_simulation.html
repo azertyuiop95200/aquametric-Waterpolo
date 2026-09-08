@@ -54,6 +54,7 @@
     </div>
   </section>
 
+  <details class="panel"><summary>Scénario avancé · plan de jeu optionnel</summary><p class="muted">Le mode automatique reste la référence. Ces consignes testent une hypothèse tactique ; leur effet est estimé et plafonné. Les niveaux, la forme et la fatigue restent calculés automatiquement.</p><div class="sim-absence-grid">{% for side, choice in [('a',scenario_a),('b',scenario_b)] %}<label>Plan de l’équipe {{side|upper}}<select name="scenario_{{side}}">{% for value,label in [('auto','Automatique'),('balanced','Équilibré'),('transition','Contre-attaque'),('centre_pressure','Jeu au centre'),('zone_plus_focus','Supériorité numérique'),('defence_first','Priorité défensive')] %}<option value="{{value}}" {{'selected' if choice==value else ''}}>{{label}}</option>{% endfor %}</select></label>{% endfor %}</div></details>
   <div><button class="btn" type="submit">Recalculer la projection complète</button></div>
 </form>
 
@@ -141,7 +142,7 @@
   <div class="sim-season-grid">
     {% for team, season in [(result.team_a,result.season_a),(result.team_b,result.season_b)] %}
     <article><h3>{{ team }}</h3>
-      {% if season.available %}
+      {% if season.available %}<p class="muted">Projection provisoire sur les rencontres disponibles : barème hypothétique 3 points / victoire, 1 / nul, 0 / défaite, top 4 pour les playoffs et deux dernières places hors maintien. Format réel et départages à confirmer ; un calendrier partiel ne représente pas toute la saison.</p>
       <div class="sim-auto-metrics">
         <div class="sim-metric"><span>Titre</span><b>{{ season.title }}%</b></div><div class="sim-metric"><span>Top 3</span><b>{{ season.top3 }}%</b></div>
         <div class="sim-metric"><span>Playoffs</span><b>{{ season.playoffs }}%</b></div><div class="sim-metric"><span>Maintien</span><b>{{ season.survival }}%</b></div>
