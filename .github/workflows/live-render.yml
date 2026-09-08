@@ -63,10 +63,12 @@ jobs:
           grep -q '"security_headers":true' /tmp/security.json
           grep -q '"api_docs_public":false' /tmp/security.json
           curl -L --max-time 30 -fsS "$base/login" >/tmp/login.html
-          grep -q 'V12.2 · Ultimate' /tmp/login.html
-          grep -q 'analysis-metrics-surface.js?v=12.2.0' /tmp/login.html
-          grep -q 'automatic-video-measurements.js?v=12.2.0' /tmp/login.html
-          grep -q 'premium-product.js?v=12.2.0' /tmp/login.html
+          grep -q 'workspace.css?v=20260908' /tmp/login.html
+          grep -q 'lang="fr"' /tmp/login.html
+          if grep -q 'src="/static/premium-product.js' /tmp/login.html; then
+            echo '::error::Login unexpectedly loads match-only scripts.'
+            exit 1
+          fi
           curl -L --max-time 30 -fsS "$base/static/analysis-metrics-surface.js?v=12.2.0" | grep -q 'Toutes les données mesurées'
           curl -L --max-time 30 -fsS "$base/static/automatic-video-measurements.js?v=12.2.0" | grep -q 'Matrice de mesure'
           curl -L --max-time 30 -fsS "$base/static/premium-product.js?v=12.2.0" | grep -q 'EXECUTIVE COACH BRIEF'
@@ -80,6 +82,9 @@ jobs:
           cookie=/tmp/aquametric-analysis-cookie.txt
           curl -L --max-time 45 -fsS -c "$cookie" -b "$cookie" "$base/demo-login" >/tmp/demo.html
           curl -L --max-time 45 -fsS -c "$cookie" -b "$cookie" "$base/analysis-library" >/tmp/analysis-library.html
+          grep -q 'analysis-metrics-surface.js?v=12.2.0' /tmp/analysis-library.html
+          grep -q 'automatic-video-measurements.js?v=12.2.0' /tmp/analysis-library.html
+          grep -q 'premium-product.js?v=12.2.0' /tmp/analysis-library.html
           grep -q 'Résultats, vidéos, preuves et ZIP' /tmp/analysis-library.html
           grep -q 'vision / OCR / événements' /tmp/analysis-library.html
           grep -q 'Analyse réelle, pas vitrine démo.' /tmp/analysis-library.html
