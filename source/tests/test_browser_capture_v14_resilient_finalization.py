@@ -39,7 +39,7 @@ def _create_match() -> int:
     return int(response.headers["location"].split("/matches/", 1)[1].split("/", 1)[0])
 
 
-def test_sparse_capture_publishes_terminal_truthful_report_without_video_rescan():
+def test_sparse_capture_publishes_terminal_truthful_report_without_blocking_on_video_decode():
     match_id = _create_match()
     session = client.post(
         f"/matches/{match_id}/analysis/browser-capture/session",
@@ -53,9 +53,6 @@ def test_sparse_capture_publishes_terminal_truthful_report_without_video_rescan(
     assert session.status_code == 200, session.text
     session_id = session.json()["session_id"]
 
-    # Deliberately invalid video bytes: V14 must not rescan/decode this fallback
-    # source after final handoff. The byte size only proves a non-empty capture was
-    # received; no visual metric may be invented from it.
     chunk = client.post(
         f"/matches/{match_id}/analysis/browser-capture/chunk",
         data={"session_id": session_id, "index": "0"},
@@ -78,16 +75,20 @@ def test_sparse_capture_publishes_terminal_truthful_report_without_video_rescan(
     body = finish.json()
     assert body["accepted"] is True
     assert body["non_blocking"] is True
-    assert body["max_wait_before_rescue_seconds"] == V14_FINALIZATION_WATCHDOG_SECONDS
+    assert body["report_ready"] is True
+    assert body["analysis_percent"] == 100.0
+    assert body["max_wait_before_rescue_seconds"] == 0.0
 
     status = client.get(body["status_url"])
     assert status.status_code == 200, status.text
     progress = status.json()["progress"]
     assert progress["status"] == "partial"
     assert progress["analysis_percent"] == 100.0
-    assert progress["finalization_engine"] == "live-frame-resilient-v14"
-    assert progress["report_quality"] == "evidence_limited"
+    assert progress["report_ready"] is True
+    assert progress["finalization_engine"] == "report-first-v16"
+    assert progress["report_quality"] == "published_progressive_evidence"
     assert progress["retry_available"] is False
+    assert progress["enrichment_status"] == "failed"
 
     db = SessionLocal()
     try:

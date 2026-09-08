@@ -60,7 +60,7 @@ def test_v9_removes_85_plateau_and_uses_normal_async_http_handoff():
     assert "multiple_match_candidates" in source
 
 
-def test_v10_adapts_warmup_and_v14_reduces_final_scan_further():
+def test_v10_adapts_warmup_and_v16_removes_final_report_wait():
     source = (ROOT / "capture_turbo_routes_v10.py").read_text(encoding="utf-8")
     priority = (ROOT / "priority_analysis_routes.py").read_text(encoding="utf-8")
     assert "warmGood" in source
@@ -69,10 +69,13 @@ def test_v10_adapts_warmup_and_v14_reduces_final_scan_further():
     assert "progressive_samples" in source
     assert "visual_samples=visual_samples" in source
     assert "ocr_samples=ocr_samples" in source
-    assert "from capture_turbo_routes_v15 import" in priority
+    assert "from capture_turbo_routes_v16 import" in priority
     v14 = (ROOT / "capture_turbo_routes_v14.py").read_text(encoding="utf-8")
+    v16 = (ROOT / "capture_turbo_routes_v16.py").read_text(encoding="utf-8")
     assert "import capture_turbo_routes_v13 as v13" in v14
     assert "run_live_frame_analysis" in v14
+    assert "report_ready" in v16
+    assert "_REPORT_MARKER" in v16
     assert V14_LIVE_VISUAL_SAMPLES == 56
     assert V14_LIVE_OCR_SAMPLES == 4
     assert V14_VIDEO_VISUAL_SAMPLES == 32
