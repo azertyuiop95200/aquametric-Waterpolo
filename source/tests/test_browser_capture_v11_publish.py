@@ -5,7 +5,7 @@ os.environ.setdefault("DATABASE_URL", "sqlite:///./test_aquametric.db")
 
 from fastapi.testclient import TestClient
 
-import capture_turbo_routes_v13 as v13
+import capture_turbo_routes_v14 as v14
 from capture_turbo_routes import _read_state, _write_state
 from db import SessionLocal
 from main import app
@@ -76,22 +76,23 @@ def test_v11_finish_creates_history_marker_closes_it_and_exposes_surfaces(monkey
     assert r.status_code == 200, r.text
 
     def fake_core(match_id, root_value, start, total_duration, rate, segments):
-        root = v13.Path(root_value)
+        root = v14.Path(root_value)
         out = _read_state(root)
         out.update({
             "status": "complete",
             "analysis_percent": 100.0,
             "read_percent": 100.0,
-            "phase": "rapport Vision prêt",
+            "phase": "rapport Vision V14 prêt",
             "redirect": f"/matches/{match_id}/analysis/result",
             "visual_samples": 48,
             "scoreboard_observations": 3,
             "parallel_segments": segments,
+            "finalization_engine": "test-v14",
         })
         _write_state(root, out)
 
-    monkeypatch.setattr(v13, "_core_fast_finalize_job", fake_core)
-    monkeypatch.setattr(v13, "_enrich_after_report", lambda *args, **kwargs: None)
+    monkeypatch.setattr(v14, "_core_finalize_job_v14", fake_core)
+    monkeypatch.setattr(v14.v13, "_enrich_after_report", lambda *args, **kwargs: None)
 
     r = client.post(
         f"/matches/{match_id}/analysis/browser-capture/finish",
