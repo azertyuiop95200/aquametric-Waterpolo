@@ -12,8 +12,9 @@ from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
-from sqlalchemy.orm import Session
-from sqlalchemy import select
+from starlette.middleware.gzip import GZipMiddleware
+from sqlalchemy.orm import Session, selectinload
+from sqlalchemy import select, func
 
 from db import Base, engine, get_db, SessionLocal
 from models import (User, Club, Team, Player, Match, Event, AnalysisJob, MediaArtifact, EventContext,
@@ -40,7 +41,7 @@ from services.player_intelligence import seed_player_intelligence, profile_snaps
 from services.france_intelligence import seed_france_intelligence, france_dashboard
 from services.advanced_metrics import METRIC_GROUPS, event_metric_summary, shot_map_summary
 from services.tactical_chess import DEFENCE_PLAYBOOK, recommend_counter_plan
-from services.simulation import simulate_matchup, SIM_TEAMS
+from services.simulation import simulate_matchup, SIM_TEAMS, absence_availability
 from extensions import install_extensions
 from security import install_security
 
@@ -80,6 +81,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title=APP_NAME, lifespan=lifespan)
 install_security(app)
+app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=5)
 SESSION_SECRET = os.getenv("SECRET_KEY", "").strip()
 if not SESSION_SECRET:
     if WEB_DEMO_MODE or os.getenv("COOKIE_SECURE", "0") == "1":
@@ -313,10 +315,12 @@ def guest_analyze(request: Request, video_url: str = Form("")):
 def dashboard(request: Request, db: Session = Depends(get_db)):
     user = require_user(request, db)
     teams = db.scalars(select(Team).where(Team.owner_id == user.id).order_by(Team.id.desc())).all()
-    matches = db.scalars(select(Match).where(Match.owner_id == user.id).order_by(Match.id.desc())).all()
+    matches = db.scalars(select(Match).where(Match.owner_id == user.id).options(selectinload(Match.team)).order_by(Match.id.desc()).limit(8)).all()
+    match_count = db.scalar(select(func.count(Match.id)).where(Match.owner_id == user.id))
+    team_count = db.scalar(select(func.count(Team.id)).where(Team.owner_id == user.id))
     sources = db.scalars(select(OfficialDataSource).order_by(OfficialDataSource.id)).all()
     structured_records = sum(s.records_count for s in sources)
-    return render(request, "dashboard.html", user=user, teams=teams, matches=matches, sources=sources, structured_records=structured_records)
+    return render(request, "dashboard.html", user=user, teams=teams, matches=matches, sources=sources, structured_records=structured_records, match_count=match_count, team_count=team_count)
 
 
 @app.get("/teams", response_class=HTMLResponse)
@@ -1213,7 +1217,7 @@ def tactical_chess_page(request: Request, defence: str = "press", db: Session = 
     return render(request,"tactical_chess.html",user=user,playbook=DEFENCE_PLAYBOOK,selected=defence,plan=plan)
 
 @app.get("/simulation", response_class=HTMLResponse)
-def simulation_page(request: Request, team_a: str = "Granville Water Polo", team_b: str = "Lille UC Métropole Water-Polo", tactic_a: str = "balanced", tactic_b: str = "balanced", availability_a: int = 100, availability_b: int = 100, form_a: int = 50, form_b: int = 50, rest_a: int = 3, rest_b: int = 3, venue: str = "neutral", db: Session = Depends(get_db)):
+def simulation_page(request: Request, team_a: str = "Granville Water Polo", team_b: str = "Lille UC Métropole Water-Polo", tactic_a: str = "balanced", tactic_b: str = "balanced", availability_a: int = 100, availability_b: int = 100, form_a: int = 50, form_b: int = 50, rest_a: int = 3, rest_b: int = 3, venue: str = "neutral", absences_a: str = "", absences_b: str = "", scenario_a: str = "auto", scenario_b: str = "auto", db: Session = Depends(get_db)):
     user=require_user(request,db)
     if team_a not in SIM_TEAMS: team_a="Granville Water Polo"
     if team_b not in SIM_TEAMS: team_b="Lille UC Métropole Water-Polo"
@@ -1221,11 +1225,12 @@ def simulation_page(request: Request, team_a: str = "Granville Water Polo", team
     if tactic_a not in allowed: tactic_a="balanced"
     if tactic_b not in allowed: tactic_b="balanced"
     if venue not in {"neutral","team_a_home","team_b_home"}: venue="neutral"
-    availability_a=max(50,min(100,availability_a)); availability_b=max(50,min(100,availability_b))
+    availability_a = absence_availability(SIM_TEAMS[team_a], absences_a[:3000].split("|"))
+    availability_b = absence_availability(SIM_TEAMS[team_b], absences_b[:3000].split("|"))
     form_a=max(30,min(70,form_a)); form_b=max(30,min(70,form_b))
     rest_a=max(0,min(7,rest_a)); rest_b=max(0,min(7,rest_b))
-    result=simulate_matchup(team_a,team_b,tactic_a,tactic_b,n=5000,availability_a=availability_a,availability_b=availability_b,form_a=form_a,form_b=form_b,rest_a=rest_a,rest_b=rest_b,venue=venue)
-    return render(request,"match_simulation.html",user=user,teams=SIM_TEAMS,result=result,tactic_a=tactic_a,tactic_b=tactic_b,availability_a=availability_a,availability_b=availability_b,form_a=form_a,form_b=form_b,rest_a=rest_a,rest_b=rest_b,venue=venue)
+    result=simulate_matchup(team_a,team_b,tactic_a,tactic_b,n=5000,availability_a=availability_a,availability_b=availability_b,form_a=form_a,form_b=form_b,rest_a=rest_a,rest_b=rest_b,venue=venue,scenario_a=scenario_a,scenario_b=scenario_b)
+    return render(request,"match_simulation.html",user=user,teams=SIM_TEAMS,result=result,tactic_a=tactic_a,tactic_b=tactic_b,availability_a=availability_a,availability_b=availability_b,form_a=form_a,form_b=form_b,rest_a=rest_a,rest_b=rest_b,venue=venue,scenario_a=scenario_a,scenario_b=scenario_b)
 
 @app.get("/health")
 def health():

@@ -24,12 +24,15 @@ function setMenu(open){
   if(!sidebar)return;
   const shouldOpen=!!open;
   sidebar.classList.toggle('open',shouldOpen);
-  sidebar.setAttribute('aria-hidden',shouldOpen?'false':'true');
+  const mobile=window.innerWidth<=900;
+  sidebar.setAttribute('aria-hidden',(!mobile||shouldOpen)?'false':'true');
+  sidebar.inert=mobile&&!shouldOpen;
   document.body.classList.toggle('menu-open',shouldOpen);
   if(menuToggle)menuToggle.setAttribute('aria-expanded',shouldOpen?'true':'false');
   if(menuBackdrop)menuBackdrop.classList.toggle('open',shouldOpen);
 }
 function toggleMenu(e){if(e){e.preventDefault();e.stopPropagation();}setMenu(!sidebar?.classList.contains('open'));}
+setMenu(false);
 if(menuToggle)menuToggle.addEventListener('click',toggleMenu,{passive:false});
 if(menuClose)menuClose.addEventListener('click',()=>setMenu(false));
 if(menuBackdrop)menuBackdrop.addEventListener('click',()=>setMenu(false));
@@ -39,7 +42,7 @@ document.addEventListener('pointerdown',e=>{
   setMenu(false);
 });
 document.addEventListener('keydown',e=>{if(e.key==='Escape')setMenu(false);});
-window.addEventListener('resize',()=>{if(window.innerWidth>900)setMenu(false);});
+window.addEventListener('resize',()=>setMenu(window.innerWidth<=900&&sidebar?.classList.contains('open')));
 document.querySelectorAll('.side-nav a').forEach(a=>a.addEventListener('click',()=>setMenu(false)));
 
 document.querySelectorAll('[data-tabs]').forEach(group => {
@@ -61,7 +64,7 @@ document.querySelectorAll(dragSelectors).forEach(el=>{
   el.classList.add('drag-scroll');
   let active=false,startX=0,startScroll=0;
   el.addEventListener('pointerdown',e=>{
-    if(e.pointerType==='touch'||e.button!==0||el.scrollWidth<=el.clientWidth)return;
+    if(e.pointerType==='touch'||e.button!==0||el.scrollWidth<=el.clientWidth||e.target.closest('a,button,input,select,textarea,label'))return;
     active=true;startX=e.clientX;startScroll=el.scrollLeft;el.classList.add('dragging');el.setPointerCapture?.(e.pointerId);
   });
   el.addEventListener('pointermove',e=>{if(active){el.scrollLeft=startScroll-(e.clientX-startX);e.preventDefault();}});

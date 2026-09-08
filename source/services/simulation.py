@@ -677,7 +677,9 @@ def _season_projection(db, focus_team, context, n=1200, seed=313):
     if len(names) < 3:
         return {"available": False, "reason": "Calendrier/participants incomplets pour projeter la compétition."}
 
-    focus = next((name for name in names if _same_team(name, focus_team)), focus_team)
+    focus = next((name for name in names if _same_team(name, focus_team)), None)
+    if focus is None:
+        return {"available": False, "reason": "Cette équipe ne figure pas dans les participants documentés."}
     points = {name: 0 for name in names}
     if standings:
         for row in standings:
@@ -746,10 +748,21 @@ def _season_projection(db, focus_team, context, n=1200, seed=313):
     }
 
 
+def absence_availability(profile, names):
+    """Compute availability server-side; named absences are scenario assumptions."""
+    import unicodedata
+    def key(value):
+        return ''.join(c for c in unicodedata.normalize('NFD', str(value)) if not unicodedata.combining(c)).strip().casefold()
+    roster = {key(player.get("name", "")): player for player in profile.get("roster_players", [])}
+    selected = list(dict.fromkeys(key(name) for name in names if key(name)))[:30]
+    impact = sum(float(roster.get(name, {}).get("impact") or 1.6) for name in selected)
+    return max(50, min(100, round(100 - impact * 3)))
+
+
 def simulate_matchup(
     team_a, team_b, tactic_a="balanced", tactic_b="balanced", n=5000, seed=17,
     availability_a=100, availability_b=100, form_a=50, form_b=50,
-    rest_a=3, rest_b=3, venue="neutral",
+    rest_a=3, rest_b=3, venue="neutral", scenario_a="auto", scenario_b="auto",
 ):
     """
     Automatic Football-Manager-style forecast.
@@ -772,6 +785,11 @@ def simulate_matchup(
     auto_rest_b = int(b.get("rest_days", 3))
     tactic_a = _recommend_tactic(a, b)
     tactic_b = _recommend_tactic(b, a)
+    scenario_plans = {"balanced", "transition", "centre_pressure", "zone_plus_focus", "defence_first"}
+    if scenario_a in scenario_plans:
+        tactic_a = scenario_a
+    if scenario_b in scenario_plans:
+        tactic_b = scenario_b
     availability_a = int(_clamp(availability_a, 50, 100))
     availability_b = int(_clamp(availability_b, 50, 100))
 
