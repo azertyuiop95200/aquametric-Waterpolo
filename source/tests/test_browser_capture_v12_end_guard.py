@@ -60,8 +60,6 @@ def test_v12_end_guard_finishes_near_complete_reader():
 
 
 def test_v12_end_guard_breaks_the_observed_87_percent_plateau():
-    # V9 maps a ~98.x% source read to an AI bar around 87%. If source progress
-    # stops there for seven seconds, V12 must hand off instead of recording forever.
     assert _end_guard_decision(
         read_percent=98.35,
         stalled_seconds=7.1,
@@ -100,12 +98,12 @@ def test_production_capture_page_contains_independent_end_guards():
         os.path.join(os.path.dirname(__file__), "..", "priority_analysis_routes.py"),
         encoding="utf-8",
     ).read()
-    assert "from capture_turbo_routes_v13 import" in priority
-    v13_source = open(
-        os.path.join(os.path.dirname(__file__), "..", "capture_turbo_routes_v13.py"),
+    assert "from capture_turbo_routes_v14 import" in priority
+    v14_source = open(
+        os.path.join(os.path.dirname(__file__), "..", "capture_turbo_routes_v14.py"),
         encoding="utf-8",
     ).read()
-    assert "import capture_turbo_routes_v12 as v12" in v13_source
+    assert "import capture_turbo_routes_v13 as v13" in v14_source
 
 
 def test_server_status_forces_finish_after_real_near_end_stall():

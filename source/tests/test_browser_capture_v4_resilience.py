@@ -7,6 +7,7 @@ os.environ.setdefault("DATABASE_URL", "sqlite:///./test_aquametric.db")
 from fastapi.testclient import TestClient
 
 import capture_turbo_routes_v7
+import capture_turbo_routes_v14 as v14
 from db import SessionLocal
 from main import app
 from models import Match
@@ -111,7 +112,7 @@ def test_completed_vision_report_survives_sequence_enrichment_failure(monkeypatc
     )
     monkeypatch.setattr(capture_turbo_routes_v7, "run_rapid_analysis", fake_rapid)
     monkeypatch.setattr(
-        capture_turbo_routes_v7,
+        v14.v13,
         "materialize_deep_sequence_pack",
         lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("sequence pack test failure")),
     )
@@ -134,16 +135,17 @@ def test_completed_vision_report_survives_sequence_enrichment_failure(monkeypatc
     status = client.get(body["status_url"])
     assert status.status_code == 200, status.text
     progress = status.json()["progress"]
-    assert progress["status"] == "partial"
+    assert progress["status"] == "complete"
+    assert progress["analysis_percent"] == 100.0
     assert progress["visual_samples"] == 42
     assert progress["scoreboard_observations"] == 5
     assert progress["redirect"] == f"/matches/{match_id}/analysis/result"
-    assert "enrichissement de séquences partiel" in progress["warning"]
+    assert progress["finalization_engine"] == "sparse-video-final-v14"
 
     db = SessionLocal()
     try:
         match = db.get(Match, match_id)
         assert match is not None
-        assert match.status == "browser_capture_analyzed_partial"
+        assert match.status == "browser_capture_analyzed"
     finally:
         db.close()

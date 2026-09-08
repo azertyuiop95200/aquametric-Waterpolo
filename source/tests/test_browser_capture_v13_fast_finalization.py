@@ -19,10 +19,10 @@ client = TestClient(app)
 
 
 def _create_match() -> int:
-    email = f"v13-fast-{uuid.uuid4().hex[:10]}@example.com"
+    email = f"v14-fast-{uuid.uuid4().hex[:10]}@example.com"
     response = client.post(
         "/register",
-        data={"name": "V13 Fast Final", "email": email, "password": "password123"},
+        data={"name": "V14 Fast Final", "email": email, "password": "password123"},
         follow_redirects=False,
     )
     assert response.status_code == 303
@@ -30,9 +30,9 @@ def _create_match() -> int:
         "/analysis/url/create",
         data={
             "team_name": "Granville",
-            "opponent": "V13 Fast Opponent",
+            "opponent": "V14 Fast Opponent",
             "competition": "Friendly",
-            "match_date": "2026-09-07",
+            "match_date": "2026-09-08",
             "video_url": "https://www.youtube.com/watch?v=Guo_UU282pI",
         },
         follow_redirects=False,
@@ -54,7 +54,7 @@ def _jpeg() -> bytes:
     return encoded.tobytes()
 
 
-def test_v13_finishes_from_retained_live_frames_without_rescanning_webm(monkeypatch):
+def test_v14_finishes_from_retained_live_frames_without_rescanning_webm(monkeypatch):
     monkeypatch.setattr(live_frame_match_analysis, "tesseract_available", lambda: False)
     match_id = _create_match()
     session = client.post(
@@ -78,9 +78,6 @@ def test_v13_finishes_from_retained_live_frames_without_rescanning_webm(monkeypa
         )
         assert response.status_code == 200, response.text
 
-    # The fast path uses the retained decoded JPEG evidence. A capture byte stream
-    # still has to exist and be non-trivial, but it is deliberately not reopened
-    # by the V13 core finalizer.
     response = client.post(
         f"/matches/{match_id}/analysis/browser-capture/chunk",
         data={"session_id": session_id, "index": "0"},
@@ -104,6 +101,8 @@ def test_v13_finishes_from_retained_live_frames_without_rescanning_webm(monkeypa
     body = finish.json()
     assert body["accepted"] is True
     assert body["fast_finalization"] is True
+    assert body["non_blocking"] is True
+    assert body["finalization_engine"] == "v14"
     assert body["retained_live_frames"] >= 8
 
     status = client.get(body["status_url"])
@@ -111,7 +110,7 @@ def test_v13_finishes_from_retained_live_frames_without_rescanning_webm(monkeypa
     progress = status.json()["progress"]
     assert progress["status"] in {"complete", "partial"}
     assert progress["analysis_percent"] == 100.0
-    assert progress["finalization_engine"] == "live-frame-final-v1"
+    assert progress["finalization_engine"] == "live-frame-final-v14"
     assert progress["retained_live_frames"] >= 8
     assert progress["finalization_elapsed_seconds"] >= 0.0
 
@@ -142,6 +141,6 @@ def test_v13_finishes_from_retained_live_frames_without_rescanning_webm(monkeypa
         db.close()
 
 
-def test_priority_routes_use_v13_finalizer():
+def test_priority_routes_use_v14_finalizer():
     source = open(os.path.join(os.path.dirname(__file__), "..", "priority_analysis_routes.py"), encoding="utf-8").read()
-    assert "from capture_turbo_routes_v13 import" in source
+    assert "from capture_turbo_routes_v14 import" in source
