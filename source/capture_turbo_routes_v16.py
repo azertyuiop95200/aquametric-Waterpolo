@@ -151,8 +151,8 @@ def _publish_report_first(match_id: int, root: Path) -> dict:
         pass
 
     # Report publication, not the later verifier, closes the user-facing job.
-    # Store this explicitly because the DB history marker is authoritative even
-    # if another progress.json writer raced with _close_finalize_marker.
+    # A partial report is terminal but remains labelled partial so evidence
+    # quality is never confused with processing completion.
     state = _read_state(root)
     state.update({
         "status": "partial",
@@ -166,7 +166,7 @@ def _publish_report_first(match_id: int, root: Path) -> dict:
         "retry_available": False,
         "enrichment_status": "queued",
         "v16_report_published_at": float(state.get("v16_report_published_at") or time.time()),
-        "finalization_job_status": "complete",
+        "finalization_job_status": "partial",
         "finalization_job_progress": 100,
     })
     _write_state(root, state)
