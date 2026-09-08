@@ -219,7 +219,7 @@ def _bounded_video_pass(db, match: Match, root: Path, start: float, total_durati
         include_audio=False,
         visual_samples=visual_samples,
         ocr_samples=ocr_samples,
-        source_kind="browser_capture_v14_sparse",
+        source_kind="browser_capture",
         persist_visual_artifacts=False,
         time_offset_seconds=encoded_offset,
     )
