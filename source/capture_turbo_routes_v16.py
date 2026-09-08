@@ -149,8 +149,11 @@ def _publish_report_first(match_id: int, root: Path) -> dict:
         v15.v14.v11._close_finalize_marker(match_id, str(root))
     except Exception:
         pass
-    # _close_finalize_marker may add history status fields to progress.json.
-    state = _terminal_from_marker(root, _read_state(root)) if _read_report_marker(root) else _read_state(root)
+
+    # Report publication, not the later verifier, closes the user-facing job.
+    # Store this explicitly because the DB history marker is authoritative even
+    # if another progress.json writer raced with _close_finalize_marker.
+    state = _read_state(root)
     state.update({
         "status": "partial",
         "analysis_percent": 100.0,
@@ -163,6 +166,8 @@ def _publish_report_first(match_id: int, root: Path) -> dict:
         "retry_available": False,
         "enrichment_status": "queued",
         "v16_report_published_at": float(state.get("v16_report_published_at") or time.time()),
+        "finalization_job_status": "complete",
+        "finalization_job_progress": 100,
     })
     _write_state(root, state)
     _write_report_marker(root, state)
@@ -302,6 +307,21 @@ def _verify_after_publish(
             })
             _write_state(root, state)
             _write_report_marker(root, state)
+
+        # A verifier is secondary once the V16 report marker exists. Some legacy
+        # analysis functions mark the match failed before raising; restore the
+        # published lifecycle state so history/library surfaces do not contradict
+        # the report that is already available to the user.
+        try:
+            published_match = db.get(Match, match_id)
+            if published_match:
+                published_match.status = "browser_capture_analyzed"
+                db.commit()
+        except Exception:
+            try:
+                db.rollback()
+            except Exception:
+                pass
         log.exception("V16 enrichment failed after report publication match=%s", match_id)
     finally:
         db.close()
