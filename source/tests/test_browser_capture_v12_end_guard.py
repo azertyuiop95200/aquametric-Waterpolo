@@ -98,7 +98,7 @@ def test_production_capture_page_contains_independent_end_guards():
         os.path.join(os.path.dirname(__file__), "..", "priority_analysis_routes.py"),
         encoding="utf-8",
     ).read()
-    assert "from capture_turbo_routes_v14 import" in priority
+    assert "from capture_turbo_routes_v15 import" in priority
     v14_source = open(
         os.path.join(os.path.dirname(__file__), "..", "capture_turbo_routes_v14.py"),
         encoding="utf-8",
