@@ -5,6 +5,14 @@ import numpy as np
 
 from capture_turbo_routes_v7 import _quality_metrics
 from capture_turbo_routes_v10 import _final_scan_budget
+from capture_turbo_routes_v14 import (
+    V14_LIVE_OCR_SAMPLES,
+    V14_LIVE_VISUAL_SAMPLES,
+    V14_MOSAIC_OCR_SAMPLES,
+    V14_MOSAIC_VISUAL_SAMPLES,
+    V14_VIDEO_OCR_SAMPLES,
+    V14_VIDEO_VISUAL_SAMPLES,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -52,7 +60,7 @@ def test_v9_removes_85_plateau_and_uses_normal_async_http_handoff():
     assert "multiple_match_candidates" in source
 
 
-def test_v10_adapts_warmup_and_reduces_redundant_final_scan():
+def test_v10_adapts_warmup_and_v14_reduces_final_scan_further():
     source = (ROOT / "capture_turbo_routes_v10.py").read_text(encoding="utf-8")
     priority = (ROOT / "priority_analysis_routes.py").read_text(encoding="utf-8")
     assert "warmGood" in source
@@ -61,10 +69,16 @@ def test_v10_adapts_warmup_and_reduces_redundant_final_scan():
     assert "progressive_samples" in source
     assert "visual_samples=visual_samples" in source
     assert "ocr_samples=ocr_samples" in source
-    assert "from capture_turbo_routes_v13 import" in priority
-    v13 = (ROOT / "capture_turbo_routes_v13.py").read_text(encoding="utf-8")
-    assert "import capture_turbo_routes_v12 as v12" in v13
-    assert "run_live_frame_analysis" in v13
+    assert "from capture_turbo_routes_v14 import" in priority
+    v14 = (ROOT / "capture_turbo_routes_v14.py").read_text(encoding="utf-8")
+    assert "import capture_turbo_routes_v13 as v13" in v14
+    assert "run_live_frame_analysis" in v14
+    assert V14_LIVE_VISUAL_SAMPLES == 56
+    assert V14_LIVE_OCR_SAMPLES == 4
+    assert V14_VIDEO_VISUAL_SAMPLES == 32
+    assert V14_VIDEO_OCR_SAMPLES == 4
+    assert V14_MOSAIC_VISUAL_SAMPLES == 84
+    assert V14_MOSAIC_OCR_SAMPLES == 8
 
     assert _final_scan_budget({"progressive_samples": 120}, 0, 3600, 4) == (120, 24, "dense live coverage")
     assert _final_scan_budget({"progressive_samples": 50}, 0, 3600, 4) == (132, 28, "live coverage")
