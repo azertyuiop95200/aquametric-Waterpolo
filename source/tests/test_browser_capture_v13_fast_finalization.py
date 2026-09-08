@@ -19,10 +19,10 @@ client = TestClient(app)
 
 
 def _create_match() -> int:
-    email = f"v14-fast-{uuid.uuid4().hex[:10]}@example.com"
+    email = f"v16-fast-{uuid.uuid4().hex[:10]}@example.com"
     response = client.post(
         "/register",
-        data={"name": "V14 Fast Final", "email": email, "password": "password123"},
+        data={"name": "V16 Report First", "email": email, "password": "password123"},
         follow_redirects=False,
     )
     assert response.status_code == 303
@@ -30,7 +30,7 @@ def _create_match() -> int:
         "/analysis/url/create",
         data={
             "team_name": "Granville",
-            "opponent": "V14 Fast Opponent",
+            "opponent": "V16 Fast Opponent",
             "competition": "Friendly",
             "match_date": "2026-09-08",
             "video_url": "https://www.youtube.com/watch?v=Guo_UU282pI",
@@ -54,7 +54,7 @@ def _jpeg() -> bytes:
     return encoded.tobytes()
 
 
-def test_v14_finishes_from_retained_live_frames_without_rescanning_webm(monkeypatch):
+def test_v16_publishes_immediately_then_enriches_from_retained_live_frames(monkeypatch):
     monkeypatch.setattr(live_frame_match_analysis, "tesseract_available", lambda: False)
     match_id = _create_match()
     session = client.post(
@@ -100,19 +100,19 @@ def test_v14_finishes_from_retained_live_frames_without_rescanning_webm(monkeypa
     assert finish.status_code == 200, finish.text
     body = finish.json()
     assert body["accepted"] is True
-    assert body["fast_finalization"] is True
-    assert body["non_blocking"] is True
-    assert body["finalization_engine"] == "v14"
-    assert body["retained_live_frames"] >= 8
+    assert body["report_ready"] is True
+    assert body["analysis_percent"] == 100.0
+    assert body["finalization_engine"] == "report-first-v16"
 
     status = client.get(body["status_url"])
     assert status.status_code == 200, status.text
     progress = status.json()["progress"]
     assert progress["status"] in {"complete", "partial"}
     assert progress["analysis_percent"] == 100.0
-    assert progress["finalization_engine"] == "live-frame-final-v14"
+    assert progress["report_ready"] is True
+    assert progress["finalization_engine"] == "live-frame-enriched-v16"
     assert progress["retained_live_frames"] >= 8
-    assert progress["finalization_elapsed_seconds"] >= 0.0
+    assert progress["enrichment_status"] == "complete"
 
     db = SessionLocal()
     try:
@@ -141,6 +141,6 @@ def test_v14_finishes_from_retained_live_frames_without_rescanning_webm(monkeypa
         db.close()
 
 
-def test_priority_routes_use_v15_finalizer():
+def test_priority_routes_use_v16_finalizer():
     source = open(os.path.join(os.path.dirname(__file__), "..", "priority_analysis_routes.py"), encoding="utf-8").read()
-    assert "from capture_turbo_routes_v15 import" in source
+    assert "from capture_turbo_routes_v16 import" in source
