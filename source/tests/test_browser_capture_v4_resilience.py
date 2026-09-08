@@ -131,16 +131,19 @@ def test_completed_vision_report_survives_sequence_enrichment_failure(monkeypatc
     body = response.json()
     assert body["ok"] is True
     assert body["accepted"] is True
+    assert body["report_ready"] is True
+    assert body["analysis_percent"] == 100.0
 
     status = client.get(body["status_url"])
     assert status.status_code == 200, status.text
     progress = status.json()["progress"]
     assert progress["status"] == "complete"
     assert progress["analysis_percent"] == 100.0
+    assert progress["report_ready"] is True
     assert progress["visual_samples"] == 42
     assert progress["scoreboard_observations"] == 5
     assert progress["redirect"] == f"/matches/{match_id}/analysis/result"
-    assert progress["finalization_engine"] == "sparse-video-final-v14"
+    assert progress["finalization_engine"] == "sparse-video-enriched-v16"
 
     db = SessionLocal()
     try:
