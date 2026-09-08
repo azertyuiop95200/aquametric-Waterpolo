@@ -5,8 +5,7 @@ os.environ.setdefault("DATABASE_URL", "sqlite:///./test_aquametric.db")
 
 from fastapi.testclient import TestClient
 
-import capture_turbo_routes_v14 as v14
-from capture_turbo_routes import _read_state, _write_state
+import capture_turbo_routes_v16 as v16
 from db import SessionLocal
 from main import app
 from models import AnalysisJob
@@ -48,11 +47,12 @@ def test_v11_capture_page_installs_watchdog_before_studio_logic():
     assert "response.clone().json()" in html
     assert "payload.accepted" in html
     assert "payload.status_url" in html
+    assert "payload.accepted&&payload.report_ready" in html
     assert f"/matches/{match_id}/analysis/browser-capture/finish" in html
     assert "{{match.id}}" not in html
 
 
-def test_v11_finish_creates_history_marker_closes_it_and_exposes_surfaces(monkeypatch):
+def test_v11_history_marker_closes_when_v16_report_is_published(monkeypatch):
     opponent = f"V11 Publish {uuid.uuid4().hex[:8]}"
     match_id, _ = _create_match(opponent)
 
@@ -75,24 +75,10 @@ def test_v11_finish_creates_history_marker_closes_it_and_exposes_surfaces(monkey
     )
     assert r.status_code == 200, r.text
 
-    def fake_core(match_id, root_value, start, total_duration, rate, segments):
-        root = v14.Path(root_value)
-        out = _read_state(root)
-        out.update({
-            "status": "complete",
-            "analysis_percent": 100.0,
-            "read_percent": 100.0,
-            "phase": "rapport Vision V14 prêt",
-            "redirect": f"/matches/{match_id}/analysis/result",
-            "visual_samples": 48,
-            "scoreboard_observations": 3,
-            "parallel_segments": segments,
-            "finalization_engine": "test-v14",
-        })
-        _write_state(root, out)
-
-    monkeypatch.setattr(v14, "_core_finalize_job_v14", fake_core)
-    monkeypatch.setattr(v14.v13, "_enrich_after_report", lambda *args, **kwargs: None)
+    # The history marker must close at report publication, independently of the
+    # optional heavy enrichment that follows.
+    monkeypatch.setattr(v16, "_verify_after_publish", lambda *args, **kwargs: None)
+    monkeypatch.setattr(v16.v15.v14.v13, "_enrich_after_report", lambda *args, **kwargs: None)
 
     r = client.post(
         f"/matches/{match_id}/analysis/browser-capture/finish",
@@ -107,12 +93,15 @@ def test_v11_finish_creates_history_marker_closes_it_and_exposes_surfaces(monkey
     assert r.status_code == 200, r.text
     payload = r.json()
     assert payload["accepted"] is True
+    assert payload["report_ready"] is True
+    assert payload["analysis_percent"] == 100.0
 
     status = client.get(payload["status_url"])
     assert status.status_code == 200, status.text
     progress = status.json()["progress"]
-    assert progress["status"] == "complete"
+    assert progress["status"] == "partial"
     assert progress["analysis_percent"] == 100.0
+    assert progress["report_ready"] is True
     assert progress["finalization_job_status"] == "complete"
     assert progress["finalization_job_progress"] == 100
 
