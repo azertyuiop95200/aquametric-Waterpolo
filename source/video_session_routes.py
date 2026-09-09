@@ -1,6 +1,12 @@
 from __future__ import annotations
 
+import json
+from datetime import datetime, timezone
 from pathlib import Path
+
+from pydantic import BaseModel, Field, model_validator
+from sqlalchemy import update
+from fastapi.responses import Response
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.templating import Jinja2Templates
@@ -8,7 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from db import get_db
-from models import Match, User
+from models import Match, User, CoachVideoSession
 from services.deep_analysis_sequences import sequence_gallery, sequence_summary
 from services.player_deep_metrics import player_deep_metrics, team_player_totals
 from services.team_scoring_patterns import build_team_scoring_patterns
@@ -143,6 +149,7 @@ def video_session_elite(
             "user": user,
             "web_demo_mode": False,
             "chapters": _chapter_rows(sequences),
+            "session_matches": [{"id": m.id, "title": f"{m.team.name} vs {m.opponent}"} for m in matches],
             "tags": TAGS,
             "benchmarks": BENCHMARKS,
             "matches": matches,
@@ -159,3 +166,114 @@ def video_session_elite(
             "playable_count": playable_count,
         },
     )
+
+
+class SessionClip(BaseModel):
+    match_id: int = Field(gt=0)
+    title: str = Field(min_length=1, max_length=180)
+    start: float = Field(ge=0, le=86400, allow_inf_nan=False)
+    end: float = Field(gt=0, le=86400, allow_inf_nan=False)
+    note: str = Field(default="", max_length=4000)
+
+    @model_validator(mode="after")
+    def valid_window(self):
+        if self.end <= self.start or self.end - self.start > 600:
+            raise ValueError("Un extrait doit durer entre 0 et 600 secondes.")
+        return self
+
+
+class SessionDraft(BaseModel):
+    title: str = Field(min_length=1, max_length=180)
+    objective: str = Field(default="", max_length=8000)
+    items: list[SessionClip] = Field(default_factory=list, max_length=100)
+    revision: int = Field(default=1, ge=1)
+
+
+def _owned_session(db, user, session_id):
+    row = db.get(CoachVideoSession, session_id)
+    if not row or row.owner_id != user.id:
+        raise HTTPException(404, "Séance introuvable")
+    return row
+
+
+def _validate_items(db, user, draft):
+    if not draft.title.strip():
+        raise HTTPException(422, "Le titre est obligatoire")
+    ids = {item.match_id for item in draft.items}
+    owned = set(db.scalars(select(Match.id).where(Match.id.in_(ids), Match.owner_id == user.id)).all())
+    if owned != ids:
+        raise HTTPException(404, "Un match est introuvable")
+
+
+def _session_data(row):
+    return {"id": row.id, "title": row.title, "objective": row.objective,
+            "items": json.loads(row.items_json), "revision": row.revision,
+            "updated_at": row.updated_at.isoformat()}
+
+
+@router.get("/api/video-sessions")
+def list_video_sessions(request: Request, db: Session = Depends(get_db)):
+    user = _require_user(request, db)
+    rows = db.scalars(select(CoachVideoSession).where(CoachVideoSession.owner_id == user.id)
+                      .order_by(CoachVideoSession.updated_at.desc())).all()
+    return [{"id": r.id, "title": r.title, "updated_at": r.updated_at.isoformat(),
+             "count": len(json.loads(r.items_json))} for r in rows]
+
+
+@router.post("/api/video-sessions", status_code=201)
+def create_video_session(draft: SessionDraft, request: Request, db: Session = Depends(get_db)):
+    user = _require_user(request, db)
+    _validate_items(db, user, draft)
+    row = CoachVideoSession(owner_id=user.id, title=draft.title.strip(), objective=draft.objective,
+                            items_json=json.dumps([i.model_dump() for i in draft.items]))
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return _session_data(row)
+
+
+@router.get("/api/video-sessions/{session_id}")
+def get_video_session(session_id: int, request: Request, db: Session = Depends(get_db)):
+    user = _require_user(request, db)
+    row = _owned_session(db, user, session_id)
+    data = _session_data(row)
+    for item in data["items"]:
+        match = db.get(Match, item["match_id"])
+        available = match is not None and match.owner_id == user.id
+        item["video"] = f"/matches/{match.id}/video" if available and match.video_path else ""
+        item["embed"] = youtube_embed(match.video_url) if available and match.video_url else ""
+        item["available"] = bool(item["video"] or item["embed"])
+    return data
+
+
+@router.put("/api/video-sessions/{session_id}")
+def update_video_session(session_id: int, draft: SessionDraft, request: Request, db: Session = Depends(get_db)):
+    user = _require_user(request, db)
+    _owned_session(db, user, session_id)
+    _validate_items(db, user, draft)
+    result = db.execute(update(CoachVideoSession).where(CoachVideoSession.id == session_id,
+        CoachVideoSession.owner_id == user.id, CoachVideoSession.revision == draft.revision).values(
+        title=draft.title.strip(), objective=draft.objective,
+        items_json=json.dumps([i.model_dump() for i in draft.items]),
+        revision=draft.revision + 1, updated_at=datetime.now(timezone.utc)))
+    if result.rowcount != 1:
+        db.rollback()
+        raise HTTPException(409, "Cette séance a été modifiée ailleurs. Recharge-la avant de l’enregistrer.")
+    db.commit()
+    return _session_data(db.get(CoachVideoSession, session_id))
+
+
+@router.delete("/api/video-sessions/{session_id}", status_code=204)
+def delete_video_session(session_id: int, request: Request, db: Session = Depends(get_db)):
+    user = _require_user(request, db)
+    db.delete(_owned_session(db, user, session_id))
+    db.commit()
+    return Response(status_code=204)
+
+
+@router.get("/api/video-sessions/{session_id}/export")
+def export_video_session(session_id: int, request: Request, db: Session = Depends(get_db)):
+    user = _require_user(request, db)
+    data = _session_data(_owned_session(db, user, session_id))
+    return Response(json.dumps(data, ensure_ascii=False, indent=2), media_type="application/json",
+                    headers={"Content-Disposition": f'attachment; filename="seance-video-{session_id}.json"'})
