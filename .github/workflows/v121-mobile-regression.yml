@@ -130,6 +130,7 @@ jobs:
             await page.goto(base+'/coaches',{waitUntil:'networkidle'});
             assert((await page.locator('body').innerText()).length>100,'coach page did not render');
             console.log('V12.2 mobile regression: scroll, 5 languages, visual tactics, teams, player dossiers and analysis history OK');
+            await require('./source/tests/video_sessions_browser.cjs')(page, base, assert);
             await browser.close();
           })().catch(e=>{console.error(e);process.exit(1);});
           JS
