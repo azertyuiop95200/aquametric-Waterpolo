@@ -52,7 +52,7 @@
     const result = await api(draft.id ? `/${draft.id}` : '', {
       method: draft.id ? 'PUT' : 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(draft)
     });
-    draft = result; dirty = false; render(); status('Séance enregistrée.'); await list();
+    draft = result; dirty = false; render(); await list(); status('Séance enregistrée.');
   }
   function closePresentation() { $('presentation-media').replaceChildren(); $('session-presentation').hidden = true; }
   function present() {
