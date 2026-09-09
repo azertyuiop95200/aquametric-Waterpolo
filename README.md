@@ -29,6 +29,24 @@ Reliable player identity, cap-number recognition, ball tracking, possession, pas
 
 The legacy `/analysis/start` placeholder remains intentionally non-fabricating; the active workflow for owned video is **Vision Lab → automatic interpretation → verified events/report**.
 
+## Saved coaching video sessions
+
+In **Séances vidéo**, coaches can add analysis sequences or manually timestamped passages,
+combine matches, reorder extracts, annotate each passage, save and reopen private sessions,
+and present them with one player. Local video playback pauses at the selected endpoint;
+YouTube embeds receive start/end timestamps. Export downloads the session plan as JSON,
+not the video files. Selecting an extract does not verify an AI candidate.
+
+Sessions are stored in the application database, with owner checks on every operation and
+revision checks preventing stale updates. Media references are resolved from owned matches,
+never from client-supplied playback URLs. Missing sources are reported in presentation mode.
+The existing free Render configuration still uses temporary storage: sessions and uploads
+are not guaranteed to survive redeployments until persistent storage is configured.
+
+Validation: 326 Python tests passed, including new session CRUD, ownership, timestamp,
+concurrent-update, export and template rendering tests. JavaScript syntax checked. Visual
+browser verification was blocked by the browser environment's localhost restriction.
+
 ## Data and privacy model
 
 - User-created clubs, teams, matches, uploads, generated evidence and match-derived evaluations are private to their owner.

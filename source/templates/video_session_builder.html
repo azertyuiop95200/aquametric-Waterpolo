@@ -1,0 +1,20 @@
+<section class="aq-section" id="session-builder">
+<span class="aq-eyebrow">MES SÉANCES · BIBLIOTHÈQUE PRIVÉE</span>
+<h2>Composer une séance vidéo</h2>
+<p>Sélectionne les séquences ci-dessous ou ajoute un passage horodaté. Les consignes restent des notes du coach ; sélectionner un extrait ne valide pas automatiquement son analyse.</p>
+<div class="aq-actions"><label>Séance enregistrée <select id="session-list"><option value="">Nouvelle séance</option></select></label><button class="btn" id="session-new" type="button">Nouvelle séance</button></div>
+<form id="session-form">
+<p><label>Titre <input id="session-title" required maxlength="180" placeholder="Préparer notre défense en infériorité"></label></p>
+<p><label>Objectif et consignes <textarea id="session-objective" maxlength="8000" rows="3" placeholder="Ce que le groupe doit observer et retenir"></textarea></label></p>
+<ol id="session-items"></ol>
+<div class="aq-actions"><button class="btn primary" type="submit">Enregistrer la séance</button><button class="btn" type="button" id="session-present">Présenter</button><a class="btn" id="session-export" hidden>Télécharger le plan JSON</a><button class="btn" type="button" id="session-delete" hidden>Supprimer</button></div>
+</form>
+<details style="margin-top:16px"><summary>Ajouter un extrait manuellement</summary>
+<form id="session-clip-form"><p><label>Match <select id="clip-match" required>{% for m in session_matches %}<option value="{{m.id}}" {% if selected and m.id == selected.id %}selected{% endif %}>{{m.title}}</option>{% endfor %}</select></label></p>
+<p><label>Titre de l’extrait <input id="clip-title" maxlength="180" required></label></p>
+<p><label>Début (secondes) <input id="clip-start" type="number" min="0" max="86400" step="0.1" required></label> <label>Fin (secondes) <input id="clip-end" type="number" min="0.1" max="86400" step="0.1" required></label></p>
+<button class="btn" type="submit">Ajouter l’extrait</button></form></details>
+<p id="session-status" role="status" aria-live="polite"></p>
+<div id="session-presentation" hidden><h3 id="presentation-title"></h3><p id="presentation-note"></p><div id="presentation-media" class="aq-media"></div><div class="aq-actions"><button type="button" class="btn" id="presentation-prev">Précédent</button><button type="button" class="btn" id="presentation-next">Suivant</button><button type="button" class="btn" id="presentation-close">Fermer</button></div></div>
+</section>
+<script defer src="/static/video-session-builder.js"></script>
