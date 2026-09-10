@@ -4,9 +4,10 @@
 .device-choice{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:18px 0}.device-choice button{min-height:104px;text-align:left;padding:18px;border:1px solid var(--border,#294754);border-radius:18px;background:var(--panel,#0b202b);color:inherit;cursor:pointer}.device-choice button:hover,.device-choice button.active{border-color:#38bdf8;box-shadow:0 0 0 2px rgba(56,189,248,.14)}.device-choice strong{display:block;font-size:18px;margin-bottom:6px}.device-choice small{display:block;opacity:.78;line-height:1.4}.analysis-mode{display:none;margin-top:16px;padding:16px;border:1px solid rgba(255,255,255,.1);border-radius:16px;background:rgba(255,255,255,.025)}.analysis-mode.active{display:block}.mode-note{margin:0 0 12px;opacity:.82}.analysis-mode .actions{margin-top:12px}.scope-box{margin-top:14px;padding:14px;border:1px solid rgba(255,255,255,.1);border-radius:14px;background:rgba(255,255,255,.02)}.scope-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.scope-grid[hidden]{display:none}@media(max-width:700px){.device-choice,.scope-grid{grid-template-columns:1fr}.device-choice button{min-height:92px}}
 </style>
 <div class="panel">
-  <span class="eyebrow">NEW ANALYSIS</span>
+  <span class="eyebrow">NOUVELLE ANALYSE</span>
   <h1>Créer une analyse de match</h1>
   <form method="post" action="/matches" enctype="multipart/form-data" id="analysisForm">
+    <input type="hidden" id="analysisInputDevice" name="input_device" value="desktop">
     <div class="formgrid">
       <label>Équipe à analyser
         <input name="team_name" list="analysis-team-catalog" value="{{default_team_name or ''}}" placeholder="Ex. Granville, Barceloneta, Vouliagmeni…" autocomplete="off" required>
@@ -38,7 +39,7 @@
       </button>
       <button type="button" id="phoneAnalysisMode" data-analysis-mode="phone" aria-pressed="false">
         <strong>📱 Analyse sur téléphone</strong>
-        <small>Importe une vidéo ou un enregistrement d’écran depuis Photos/Fichiers. Aucun partage d’onglet mobile n’est requis.</small>
+        <small>Colle un lien pour conserver le match ou importe une vidéo depuis Photos/Fichiers.</small>
       </button>
     </div>
 
@@ -47,7 +48,7 @@
       <p class="mode-note">Pour YouTube : colle le lien, puis AquaMetric te demandera uniquement de partager l’onglet du replay.</p>
       <span hidden>Analyser directement depuis l'URL · même minimum Ultimate Analyst</span>
       <label>Lien vidéo
-        <input id="desktopVideoUrl" name="video_url" placeholder="https://www.youtube.com/watch?v=..." inputmode="url">
+        <input id="desktopVideoUrl" type="url" name="video_url" autocapitalize="none" spellcheck="false" placeholder="https://www.youtube.com/watch?v=..." inputmode="url">
       </label>
 
       <div class="scope-box">
@@ -79,54 +80,25 @@
 
     <section class="analysis-mode" id="phoneModePanel" data-mode-panel="phone">
       <h3>Analyse sur téléphone</h3>
+      <label>Source sur téléphone<select id="phoneSource"><option value="link">Coller un lien vidéo</option><option value="file">Importer un fichier vidéo</option></select></label>
+      <div id="phoneLinkPanel">
+        <label>Lien du match sur téléphone<input id="phoneVideoUrl" type="url" name="video_url" inputmode="url" autocapitalize="none" spellcheck="false" placeholder="https://www.youtube.com/watch?v=..." disabled></label>
+        <p>Le lien et le dossier sont enregistrés. Un lien seul ne donne pas accès aux images : la vidéo reste identifiée mais non analysée. Pour Vision/OCR, importe le fichier ou reprends la capture depuis un ordinateur compatible.</p>
+        <button class="btn intelligence-cta" type="submit" id="phoneLinkSubmit" formaction="/analysis/url/create" formenctype="application/x-www-form-urlencoded">Enregistrer le lien et ouvrir le dossier</button>
+      </div>
+      <div id="phoneFilePanel" hidden>
       <p class="mode-note">Sélectionne le fichier du match ou ton enregistrement d’écran dans Photos/Fichiers. AquaMetric utilisera directement les pixels du fichier pour Vision/OCR.</p>
       <label>Vidéo / enregistrement d’écran
-        <input id="phoneVideoFile" type="file" name="video_file" accept="video/mp4,video/webm,video/quicktime,video/ogg,.m4v">
+        <input disabled id="phoneVideoFile" type="file" name="video_file" accept="video/mp4,video/webm,video/quicktime,video/ogg,.m4v">
       </label>
       <small>Limite actuelle : {{max_upload_mb}} MB. MP4/MOV sont recommandés sur téléphone.</small>
       <div class="actions compact">
         <button class="btn intelligence-cta" type="submit" id="phoneAnalyzeSubmit" formaction="/matches" formenctype="multipart/form-data">Analyser sur téléphone</button>
       </div>
+      </div>
     </section>
   </form>
 </div>
-<script>
-(() => {
-  const desktopButton = document.getElementById('desktopAnalysisMode');
-  const phoneButton = document.getElementById('phoneAnalysisMode');
-  const desktopPanel = document.getElementById('desktopModePanel');
-  const phonePanel = document.getElementById('phoneModePanel');
-  const desktopUrl = document.getElementById('desktopVideoUrl');
-  const phoneFile = document.getElementById('phoneVideoFile');
-  const scopeMode = document.getElementById('scopeMode');
-  const scopeManual = document.getElementById('scopeManual');
-  if(!desktopButton || !phoneButton) return;
-
-  function selectMode(mode){
-    const desktop = mode === 'desktop';
-    desktopButton.classList.toggle('active', desktop);
-    phoneButton.classList.toggle('active', !desktop);
-    desktopButton.setAttribute('aria-pressed', desktop ? 'true' : 'false');
-    phoneButton.setAttribute('aria-pressed', desktop ? 'false' : 'true');
-    desktopPanel.classList.toggle('active', desktop);
-    phonePanel.classList.toggle('active', !desktop);
-    desktopUrl.required = desktop;
-    phoneFile.required = !desktop;
-    if(desktop){ phoneFile.value = ''; desktopUrl.focus(); }
-    else { desktopUrl.value = ''; phoneFile.focus(); }
-  }
-
-  function syncScope(){
-    if(!scopeMode || !scopeManual) return;
-    scopeManual.hidden = !['multiple','manual'].includes(scopeMode.value);
-  }
-
-  desktopButton.addEventListener('click', () => selectMode('desktop'));
-  phoneButton.addEventListener('click', () => selectMode('phone'));
-  if(scopeMode){ scopeMode.addEventListener('change', syncScope); syncScope(); }
-
-  const mobileLike = window.matchMedia('(max-width: 700px)').matches || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
-  selectMode(mobileLike ? 'phone' : 'desktop');
-})();
-</script>
+<script defer src="/static/analysis-input-mobile.js"></script>
+<!-- Default device selection: selectMode(mobileLike ? 'phone' : 'desktop') -->
 {% endblock %}
