@@ -12,7 +12,7 @@ from analysis_product_routes import (
     start_real_analysis,
     start_real_url_analysis,
 )
-from analysis_result_clean_v2 import clean_analysis_result
+from analysis_result_clean_v2 import clean_analysis_result, download_analysis_report
 
 # Patch the shared capture-state writer before importing V16 and its compatibility
 # chain. Every capture route then receives the same collision-safe atomic writer.
@@ -33,6 +33,7 @@ from capture_turbo_routes_v16 import (
 
 def install_priority_analysis_routes(app) -> None:
     registrations = [
+        ("/matches/{match_id}/analysis/report.html", download_analysis_report, "GET", HTMLResponse, "download_analysis_report"),
         ("/analysis/url/create", create_flexible_url_analysis, "POST", None, "product_create_url_analysis"),
         ("/matches", create_flexible_uploaded_match, "POST", None, "product_create_uploaded_match"),
         ("/matches/{match_id}/analysis/start", start_real_analysis, "POST", None, "product_start_analysis"),

@@ -46,6 +46,7 @@ def create_flexible_url_analysis(
     competition: str = Form(""),
     match_date: str = Form(""),
     video_url: str = Form(...),
+    input_device: str = Form("desktop"),
     scope_mode: str = Form("auto"),
     scope_start_second: float = Form(0.0),
     scope_end_second: float = Form(0.0),
@@ -59,6 +60,9 @@ def create_flexible_url_analysis(
     if not opponent:
         raise HTTPException(status_code=400, detail="Le nom de l'adversaire est obligatoire.")
 
+    if input_device not in {"desktop", "phone"}:
+        raise HTTPException(status_code=400, detail="Mode d’appareil invalide.")
+
     team = _free_team(db, user, team_name, competition, category)
     match = Match(
         owner_id=user.id,
@@ -69,11 +73,14 @@ def create_flexible_url_analysis(
         video_source="youtube" if youtube_embed(url) else "url",
         video_url=url,
         video_path="",
-        status="url_capture_required",
+        status="source_link_saved" if input_device == "phone" else "url_capture_required",
     )
     db.add(match)
     db.commit()
     db.refresh(match)
+
+    if input_device == "phone":
+        return RedirectResponse(f"/matches/{match.id}/analysis/result", status_code=303)
 
     query = _scope_query(scope_mode, scope_start_second, scope_end_second)
     return RedirectResponse(f"/matches/{match.id}/analysis/browser-capture?{query}", status_code=303)

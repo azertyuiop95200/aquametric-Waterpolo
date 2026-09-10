@@ -82,3 +82,17 @@ def clean_analysis_result(match_id: int, request: Request, db: Session = Depends
             "category": getattr(match.team, "category", "") or "Non précisée",
         },
     )
+
+
+def download_analysis_report(match_id: int, request: Request, db: Session = Depends(get_db)):
+    """Portable report rebuilt from the authenticated owner's saved evidence."""
+    from datetime import datetime, timezone
+    user, match = _owned_match(match_id, request, db)
+    snapshot = analysis_snapshot(db, match)
+    return TEMPLATES.TemplateResponse(request, 'analysis_report_portable.html', {
+        'match': match, 'snapshot': snapshot,
+        'generated_at': datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC'),
+        'for_verified': _verified_side(snapshot['verified_events'], 'for'),
+        'against_verified': _verified_side(snapshot['verified_events'], 'against'),
+    }, headers={'Content-Disposition': f'attachment; filename="rapport-match-{match.id}.html"',
+                'Cache-Control': 'private, no-store'})

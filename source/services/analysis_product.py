@@ -347,6 +347,7 @@ def analysis_snapshot(db, match):
                 "phase": getattr(getattr(e, "context_meta", None), "phase_tag", "auto"),
             }
             for e in sorted(list(match.events or []), key=lambda row: float(row.second or 0))
+            if str(e.confidence or "").upper() in {"CONFIRMED", "VERIFIED"}
         ],
     }
 
