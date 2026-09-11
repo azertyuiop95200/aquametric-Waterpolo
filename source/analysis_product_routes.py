@@ -310,25 +310,9 @@ def append_browser_capture_chunk(
 ):
     user, match = _owned_match(match_id, request, db)
     root = _capture_session_dir(user, match, session_id)
-    state_file = root / "next_index.txt"
-    if not root.is_dir() or not state_file.exists():
-        raise HTTPException(status_code=404, detail="Capture session expired or not found.")
-    try:
-        expected = int(state_file.read_text(encoding="utf-8").strip() or "0")
-    except ValueError:
-        raise HTTPException(status_code=409, detail="Capture session state is invalid.")
-    if int(index) != expected:
-        raise HTTPException(status_code=409, detail=f"Capture chunk out of order: expected {expected}, got {index}.")
-    target = root / "capture.webm"
-    current_size = target.stat().st_size if target.exists() else 0
-    try:
-        written = _write_capture_chunk(chunk, target, current_size=current_size)
-    finally:
-        chunk.file.close()
-    if written <= 0:
-        raise HTTPException(status_code=400, detail="Empty capture chunk.")
-    state_file.write_text(str(expected + 1), encoding="utf-8")
-    return JSONResponse({"ok": True, "next_index": expected + 1, "bytes": current_size + written})
+    from services.capture_chunks import append_capture_chunk
+    result = append_capture_chunk(root, int(index), chunk, _write_capture_chunk)
+    return JSONResponse(result)
 
 
 @router.post("/matches/{match_id}/analysis/browser-capture/finish")
