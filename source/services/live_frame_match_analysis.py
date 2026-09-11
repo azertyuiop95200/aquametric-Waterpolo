@@ -132,6 +132,7 @@ def _focused_ocr_from_live_frames(
     deadline = started + max(3.0, min(10.0, float(budget_seconds)))
     segment_span = source_duration / max(1, segments)
     cache: dict[int, np.ndarray] = {}
+    ocr_cache: dict[tuple, tuple[str, float]] = {}
     observations: list[dict] = []
     exhausted = False
 
@@ -161,7 +162,10 @@ def _focused_ocr_from_live_frames(
                 exhausted = True
                 break
             rect = tuple(float(getattr(roi_info, key)) for key in ("x", "y", "w", "h"))
-            text, confidence = ocr_image(_roi(pane, rect))
+            key = (idx, seg, rect)
+            if key not in ocr_cache:
+                ocr_cache[key] = ocr_image(_roi(pane, rect))
+            text, confidence = ocr_cache[key]
             parsed = parse_scoreboard_text(text)
             useful = parsed["clock_seconds"] is not None or parsed["period"] is not None or parsed["home_score"] is not None
             if not useful:
