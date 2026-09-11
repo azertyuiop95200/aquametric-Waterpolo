@@ -66,17 +66,24 @@ def _roi(frame: np.ndarray, rect: tuple[float, float, float, float]) -> np.ndarr
     return frame[y1:y2, x1:x2]
 
 
-def _variants(img: np.ndarray) -> list[np.ndarray]:
+def _iter_variants(img: np.ndarray):
+    """Compute fallback preprocessing only if OCR actually needs it."""
     if img.size == 0:
-        return []
+        return
     scale = 2.0 if img.shape[1] < 900 else 1.35
     enlarged = cv2.resize(img, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
+    yield enlarged
     gray = cv2.cvtColor(enlarged, cv2.COLOR_BGR2GRAY)
     denoise = cv2.bilateralFilter(gray, 7, 45, 45)
     clahe = cv2.createCLAHE(clipLimit=2.3, tileGridSize=(8, 8)).apply(denoise)
+    yield clahe
     otsu = cv2.threshold(clahe, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
-    inv = cv2.bitwise_not(otsu)
-    return [enlarged, clahe, otsu, inv]
+    yield otsu
+    yield cv2.bitwise_not(otsu)
+
+
+def _variants(img: np.ndarray) -> list[np.ndarray]:
+    return list(_iter_variants(img))
 
 
 def _parse_clock(text: str) -> int | None:
@@ -184,15 +191,17 @@ def _ocr_once(variant: np.ndarray, config: str = "--psm 7") -> tuple[str, float]
 def ocr_image(img: np.ndarray) -> tuple[str, float]:
     if not tesseract_available():
         return "", 0.0
-    variants = _variants(img)
-    if not variants:
+    variants = iter(_iter_variants(img))
+    first = next(variants, None)
+    if first is None:
         return "", 0.0
-    text, conf = _ocr_once(variants[0], "--psm 7")
+    text, conf = _ocr_once(first, "--psm 7")
     parsed = parse_scoreboard_text(text)
     if text and (parsed["clock_seconds"] is not None or parsed["period"] is not None or len(parsed["numbers"]) >= 2):
         return text, min(1.0, conf)
     best_text, best_conf, best_utility = text, conf, conf
-    for variant in variants[1:3]:
+    from itertools import islice
+    for variant in islice(variants, 2):
         t, c = _ocr_once(variant, "--psm 7")
         p = parse_scoreboard_text(t)
         utility = c + (0.18 if p["clock_seconds"] is not None else 0) + (0.12 if p["period"] else 0) + (0.08 if len(p["numbers"]) >= 2 else 0)
