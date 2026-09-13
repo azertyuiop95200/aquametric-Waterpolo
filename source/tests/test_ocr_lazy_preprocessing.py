@@ -30,12 +30,12 @@ def test_fallback_pixels_and_result_are_unchanged(monkeypatch):
     assert len(seen)==3
 
 
-def test_reused_live_frame_ocr_keeps_each_observation(monkeypatch):
+def test_reused_live_frame_is_not_independent_score_confirmation(monkeypatch):
     from types import SimpleNamespace
     import services.live_frame_match_analysis as live
-    monkeypatch.setattr(live,'tesseract_available',lambda:True)
+    monkeypatch.setattr(live,'ocr_available',lambda:True)
     monkeypatch.setattr(live,'_ocr_plan',lambda *a:[1.,2.])
-    monkeypatch.setattr(live,'_nearest_record',lambda *a:{'index':1,'path':'frame.jpg'})
+    monkeypatch.setattr(live,'_nearest_record',lambda *a:{'index':1,'path':'frame.jpg','wall_second':1.5})
     monkeypatch.setattr(live.cv2,'imread',lambda *a:np.zeros((100,100,3),dtype=np.uint8))
     calls=[]
     def recognize(image):
@@ -44,5 +44,5 @@ def test_reused_live_frame_ocr_keeps_each_observation(monkeypatch):
     monkeypatch.setattr(live,'ocr_image',recognize)
     observations,meta=live._focused_ocr_from_live_frames([{'index':1}], [SimpleNamespace(x=0,y=0,w=1,h=1,name='score')],source_duration=60,playback_rate=1,segments=1,moments=[],max_samples=2)
     assert len(calls)==1
-    assert [x['second'] for x in observations]==[1.,2.]
+    assert [x['second'] for x in observations]==[1.5]
     assert all(x['raw_text']=='Q1 7:30 2 1' for x in observations)

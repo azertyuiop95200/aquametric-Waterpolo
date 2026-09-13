@@ -16,7 +16,7 @@ from models import (
     AutonomousAnalysis, AutonomousEventCandidate,
 )
 from services.vision_baseline import scan_local_video, VisionBaselineError
-from services.scoreboard_ocr import sample_scoreboard_observations, tesseract_available
+from services.scoreboard_ocr import sample_scoreboard_observations, ocr_available
 from services.autonomous_engine import infer_periods, infer_candidates, build_auto_summary, AutoCandidate, confidence_label
 from services.audio_whistle import detect_whistle_candidates, ffmpeg_available as audio_ffmpeg_available
 
@@ -232,7 +232,7 @@ def run_rapid_analysis(
         match_id=match.id,
         status="complete",
         engine_version="rapid-autonomy-v1",
-        ocr_available=tesseract_available(),
+        ocr_available=ocr_available(),
         observations_json=json.dumps(observations, ensure_ascii=False),
         periods_json=json.dumps(periods, ensure_ascii=False),
         summary_json=json.dumps(summary, ensure_ascii=False),

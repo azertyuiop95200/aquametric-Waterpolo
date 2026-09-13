@@ -137,7 +137,8 @@ def test_completed_vision_report_survives_sequence_enrichment_failure(monkeypatc
     status = client.get(body["status_url"])
     assert status.status_code == 200, status.text
     progress = status.json()["progress"]
-    assert progress["status"] == "complete"
+    assert progress["status"] == "partial"
+    assert progress["report_quality"] == "partial"
     assert progress["analysis_percent"] == 100.0
     assert progress["report_ready"] is True
     assert progress["visual_samples"] == 42
@@ -149,6 +150,6 @@ def test_completed_vision_report_survives_sequence_enrichment_failure(monkeypatc
     try:
         match = db.get(Match, match_id)
         assert match is not None
-        assert match.status == "browser_capture_analyzed"
+        assert match.status == "browser_capture_analyzed_partial"
     finally:
         db.close()

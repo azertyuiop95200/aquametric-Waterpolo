@@ -55,7 +55,7 @@ def _jpeg() -> bytes:
 
 
 def test_v16_publishes_immediately_then_enriches_from_retained_live_frames(monkeypatch):
-    monkeypatch.setattr(live_frame_match_analysis, "tesseract_available", lambda: False)
+    monkeypatch.setattr(live_frame_match_analysis, "ocr_available", lambda: False)
     match_id = _create_match()
     session = client.post(
         f"/matches/{match_id}/analysis/browser-capture/session",
