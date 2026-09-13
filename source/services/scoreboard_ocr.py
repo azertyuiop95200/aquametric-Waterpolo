@@ -11,6 +11,9 @@ from typing import Iterable
 import os
 import re
 import shutil
+import logging
+from functools import lru_cache
+from threading import Lock
 
 import cv2
 import numpy as np
@@ -19,6 +22,40 @@ try:
     import pytesseract
 except Exception:  # pragma: no cover - optional at runtime
     pytesseract = None
+
+log = logging.getLogger(__name__)
+_onnx_lock = Lock()
+
+
+@lru_cache(maxsize=1)
+def _onnx_engine():
+    # The wheel includes the models; no video or frame leaves the server.
+    try:
+        from rapidocr_onnxruntime import RapidOCR
+        return RapidOCR(intra_op_num_threads=1, inter_op_num_threads=1)
+    except Exception:
+        log.exception("scoreboard_ocr_backend_unavailable backend=rapidocr")
+        return None
+
+
+def ocr_available() -> bool:
+    return tesseract_available() or _onnx_engine() is not None
+
+
+def _onnx_image(img: np.ndarray) -> tuple[str, float]:
+    engine = _onnx_engine()
+    if engine is None or img.size == 0:
+        return "", 0.0
+    try:
+        with _onnx_lock:
+            rows, _ = engine(img, use_cls=False)
+        if not rows:
+            return "", 0.0
+        # Preserve the detector's reading order, including spaces between scores.
+        return " ".join(str(row[1]) for row in rows), min(float(row[2]) for row in rows)
+    except Exception:
+        log.exception("scoreboard_ocr_inference_failed backend=rapidocr")
+        return "", 0.0
 
 
 @dataclass
@@ -190,7 +227,7 @@ def _ocr_once(variant: np.ndarray, config: str = "--psm 7") -> tuple[str, float]
 
 def ocr_image(img: np.ndarray) -> tuple[str, float]:
     if not tesseract_available():
-        return "", 0.0
+        return _onnx_image(img)
     variants = iter(_iter_variants(img))
     first = next(variants, None)
     if first is None:
@@ -216,7 +253,7 @@ def sample_scoreboard_observations(
     duration_seconds: float,
     max_samples: int = 48,
 ) -> list[ScoreboardObservation]:
-    if not tesseract_available():
+    if not ocr_available():
         return []
     cap = cv2.VideoCapture(str(video_path))
     if not cap.isOpened() or duration_seconds <= 0:

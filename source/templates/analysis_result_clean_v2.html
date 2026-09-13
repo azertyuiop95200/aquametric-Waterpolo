@@ -46,11 +46,13 @@
     <p class="evidence-note">Conserve ton accès au compte pour retrouver ce dossier. Le mode invité et le stockage temporaire ne garantissent pas sa conservation après redémarrage.</p>
   </section>
   {% endif %}
+  {% include "analysis_scoreboard_evidence.html" %}
+  {% include "analysis_all_measurements.html" %}
   <div class="report-grid">
-    <section class="report-card {% if vision.available %}status-good{% else %}status-warn{% endif %}">
+    <section class="report-card status-warn">
       <h2>État de l’analyse</h2>
       {% if vision.available %}
-        <p><strong>Rapport Vision disponible ✓</strong></p>
+        <p><strong>Pré-analyse visuelle disponible — analyse sportive partielle</strong></p>
         <p>{{vision.sample_count}} images analysées · {{"%.1f"|format(vision.duration_seconds or 0)}} s de capture décodable · confiance {{vision.confidence or "non renseignée"}}.</p>
       {% elif match.status in ["browser_capture_running","browser_capture_finalizing"] %}
         <p><strong>Consolidation en cours…</strong></p>

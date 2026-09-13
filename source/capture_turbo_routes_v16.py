@@ -218,7 +218,7 @@ def _verify_after_publish(
                 playback_rate=rate,
                 parallel_segments=segments,
                 visual_samples=v15.v14.V14_LIVE_VISUAL_SAMPLES,
-                ocr_samples=v15.v14.V14_LIVE_OCR_SAMPLES,
+                ocr_samples=240,
             )
             engine = "live-frame-enriched-v16"
             quality = "verified_live_evidence"
@@ -268,26 +268,28 @@ def _verify_after_publish(
 
         db.commit()
         summary = result.get("summary", {}) or {}
+        # Finishing the worker does not establish exhaustive sporting coverage.
+        outcome = summary.get("analysis_outcome") or ("partial" if summary.get("scoreboard_observations") else "no_measurements")
         elapsed = time.monotonic() - started
         state = _terminal_from_marker(root, _read_state(root))
         state.update({
-            "status": "complete",
+            "status": "partial",
             "analysis_percent": 100.0,
             "read_percent": 100.0,
             "report_ready": True,
-            "phase": "rapport enrichi V16 prêt",
+            "phase": "analyse partielle disponible" if outcome == "partial" else "analyse sans mesures sportives",
             "redirect": f"/matches/{match_id}/analysis/result",
             "finalization_engine": engine,
-            "report_quality": quality,
+            "report_quality": outcome,
             "enrichment_status": "complete",
             "enrichment_elapsed_seconds": round(elapsed, 2),
             "visual_samples": int(summary.get("visual_samples") or state.get("visual_samples") or 0),
-            "scoreboard_observations": int(summary.get("scoreboard_observations") or state.get("scoreboard_observations") or 0),
+            "scoreboard_observations": int(summary.get("scoreboard_observations") or 0),
             "retained_live_frames": int(summary.get("retained_live_frames") or coverage.get("records") or state.get("retained_live_frames") or 0),
         })
         _write_state(root, state)
         _write_report_marker(root, state)
-        match.status = "browser_capture_analyzed"
+        match.status = "browser_capture_analyzed_partial"
         db.commit()
         log.info("V16 enrichment complete match=%s engine=%s elapsed=%.2fs", match_id, engine, elapsed)
     except Exception as exc:

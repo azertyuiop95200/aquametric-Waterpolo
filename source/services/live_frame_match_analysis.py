@@ -13,12 +13,14 @@ the recorded active wall-clock time plus the known parallel-segment mapping.
 from __future__ import annotations
 
 from bisect import bisect_left
+from collections import OrderedDict
 from dataclasses import asdict
 from pathlib import Path
 import copy
 import json
 import math
 import time
+import logging
 
 import cv2
 import numpy as np
@@ -27,7 +29,7 @@ from models import AnalysisJob, VisionAnalysis, VisionSample, AutonomousAnalysis
 from services.autonomous_engine import infer_periods, infer_candidates, build_auto_summary
 from services.mosaic_match_analysis import _pane, _signal
 from services.rapid_match_analysis import RapidAnalysisError, _map_times
-from services.scoreboard_ocr import ScoreboardObservation, ocr_image, parse_scoreboard_text, tesseract_available, _roi
+from services.scoreboard_ocr import ScoreboardObservation, ocr_image, parse_scoreboard_text, ocr_available, _roi
 from services.vision_baseline import (
     VisionBaselineError,
     _classify_video_type,
@@ -35,6 +37,8 @@ from services.vision_baseline import (
     _interesting_moments,
     _scoreboard_candidates,
 )
+
+log = logging.getLogger(__name__)
 
 
 def _timeline_records(root: Path, state: dict) -> list[dict]:
@@ -98,20 +102,12 @@ def _nearest_record(records: list[dict], target_wall: float) -> dict | None:
 
 
 def _ocr_plan(source_duration: float, moments: list[dict], max_samples: int) -> list[float]:
-    cap = max(4, min(12, int(max_samples or 0)))
+    cap = max(4, min(400, int(max_samples or 0)))
     end = max(0.0, float(source_duration) - 0.25)
-    raw = [float(x) for x in np.linspace(0.0, end, max(4, min(8, cap)))]
-    for moment in list(moments or [])[:8]:
-        center = max(0.0, min(end, float(moment.get("second") or 0.0)))
-        raw.extend([center - 0.75, center, center + 0.75])
-    selected: list[float] = []
-    for second in sorted(max(0.0, min(end, x)) for x in raw):
-        if selected and min(abs(second - old) for old in selected) < 1.2:
-            continue
-        selected.append(second)
-        if len(selected) >= cap:
-            break
-    return selected
+    # Never truncate a sorted prefix: that used to spend the entire budget on
+    # the start of a match and omit its ending. Chronological samples are also
+    # needed by the stable-score transition gate.
+    return [float(x) for x in np.linspace(0.0, end, cap)]
 
 
 def _focused_ocr_from_live_frames(
@@ -125,15 +121,22 @@ def _focused_ocr_from_live_frames(
     max_samples: int,
     budget_seconds: float = 8.0,
 ) -> tuple[list[dict], dict]:
-    if not tesseract_available() or not rois or not records:
-        return [], {"targets": 0, "elapsed_seconds": 0.0, "budget_seconds": 0.0, "budget_exhausted": False}
+    reason = "ocr_unavailable" if not ocr_available() else ("no_scoreboard_regions" if not rois else ("no_frames" if not records else ""))
+    if reason:
+        log.warning("scoreboard_pass_skipped reason=%s", reason)
+        return [], {"targets": 0, "elapsed_seconds": 0.0, "budget_seconds": 0.0, "budget_exhausted": False, "reason": reason}
     targets = _ocr_plan(source_duration, moments, max_samples)
     started = time.monotonic()
-    deadline = started + max(3.0, min(10.0, float(budget_seconds)))
+    budget = max(3.0, min(180.0, float(budget_seconds)))
+    deadline = started + budget
     segment_span = source_duration / max(1, segments)
-    cache: dict[int, np.ndarray] = {}
+    # Dense OCR must not retain every full-resolution composite in RAM on the
+    # small web instance. Two decoded frames are enough for adjacent targets.
+    cache: OrderedDict[int, np.ndarray] = OrderedDict()
     ocr_cache: dict[tuple, tuple[str, float]] = {}
     observations: list[dict] = []
+    seen_frames: set[tuple[int, int]] = set()
+    attempted = 0
     exhausted = False
 
     for rel_second in targets:
@@ -147,17 +150,30 @@ def _focused_ocr_from_live_frames(
         if not record:
             continue
         idx = int(record["index"])
+        frame_key = (idx, seg)
+        if frame_key in seen_frames:
+            continue
+        seen_frames.add(frame_key)
+        # Use the actual captured time, never the requested seek time. Reusing
+        # one image must not create artificial evidence of score persistence.
+        actual_second = seg * segment_span + float(record["wall_second"]) * playback_rate
+        if actual_second >= min(source_duration, (seg + 1) * segment_span):
+            continue
         image = cache.get(idx)
         if image is None:
             image = cv2.imread(str(record["path"]), cv2.IMREAD_COLOR)
             if image is None:
                 continue
             cache[idx] = image
+            if len(cache) > 2:
+                cache.popitem(last=False)
+        cache.move_to_end(idx)
         pane = _pane(image, seg, segments)
         if pane.size == 0:
             continue
         best = None
-        for roi_info in list(rois)[:2]:
+        attempted += 1
+        for roi_info in list(rois)[:3]:
             if time.monotonic() >= deadline:
                 exhausted = True
                 break
@@ -171,7 +187,7 @@ def _focused_ocr_from_live_frames(
             if not useful:
                 continue
             obs = ScoreboardObservation(
-                second=round(float(rel_second), 2),
+                second=round(actual_second, 2),
                 roi_name=str(getattr(roi_info, "name", "candidate")),
                 raw_text=text,
                 normalized_text=parsed["normalized_text"],
@@ -190,13 +206,18 @@ def _focused_ocr_from_live_frames(
             if confidence >= 0.45 and parsed["clock_seconds"] is not None:
                 break
         if best:
-            observations.append(best.to_dict())
+            observation = best.to_dict()
+            observation["frame_index"] = idx
+            observation["segment"] = seg
+            observations.append(observation)
 
     return observations, {
-        "targets": len(targets),
+        "targets": attempted,
+        "planned_targets": len(targets),
         "elapsed_seconds": round(time.monotonic() - started, 2),
-        "budget_seconds": round(max(3.0, min(10.0, float(budget_seconds))), 2),
+        "budget_seconds": round(budget, 2),
         "budget_exhausted": exhausted,
+        "reason": "" if observations else "scoreboard_unreadable",
     }
 
 
@@ -210,7 +231,7 @@ def run_live_frame_analysis(
     playback_rate: float = 2.0,
     parallel_segments: int = 4,
     visual_samples: int = 96,
-    ocr_samples: int = 10,
+    ocr_samples: int = 240,
 ):
     root = Path(root)
     state_path = root / "progress.json"
@@ -292,7 +313,7 @@ def run_live_frame_analysis(
             segments=segments,
             moments=moments_rel,
             max_samples=ocr_samples,
-            budget_seconds=8.0,
+            budget_seconds=180.0,
         )
         periods_rel = infer_periods(observations_rel, source_duration)
         candidates_rel = infer_candidates(observations_rel, moments_rel)
@@ -376,14 +397,16 @@ def run_live_frame_analysis(
             "ocr_elapsed_seconds": float(ocr_meta.get("elapsed_seconds") or 0.0),
             "ocr_budget_seconds": float(ocr_meta.get("budget_seconds") or 0.0),
             "ocr_budget_exhausted": bool(ocr_meta.get("budget_exhausted")),
+            "ocr_reason": ocr_meta.get("reason", ""),
+            "analysis_outcome": "partial" if observations else "no_measurements",
             "measurement_strategy": "reuse decoded live frames + targeted OCR verification + confidence-labelled candidate extraction",
             "speed_strategy": "no full WebM rescan when retained live-frame coverage is sufficient",
         })
         autonomy = AutonomousAnalysis(
             match_id=match.id,
-            status="complete",
+            status="partial" if observations else "no_measurements",
             engine_version="live-frame-autonomy-v1",
-            ocr_available=tesseract_available(),
+            ocr_available=ocr_available(),
             observations_json=json.dumps(observations, ensure_ascii=False),
             periods_json=json.dumps(periods, ensure_ascii=False),
             summary_json=json.dumps(summary, ensure_ascii=False),
@@ -409,12 +432,13 @@ def run_live_frame_analysis(
             ))
 
         job.progress = 100
-        job.status = "rapid_analysis_complete"
+        job.status = "analysis_partial" if observations else "analysis_no_measurements"
         job.message = (
-            f"Fast final report ready from {len(records)} retained frames: {len(signals)} visual samples, "
-            f"{len(observations)} scoreboard observations."
+            f"Analyse partielle : {len(signals)} échantillons visuels, "
+            f"{len(observations)} lectures du score. "
+            f"{ocr_meta.get('reason') or 'Les événements sportifs restent à vérifier.'}"
         )
-        match.status = "browser_capture_analyzed"
+        match.status = "browser_capture_analyzed_partial"
         db.commit()
         return {"job": job, "vision": vision, "autonomy": autonomy, "summary": summary, "candidates": candidates}
     except Exception as exc:

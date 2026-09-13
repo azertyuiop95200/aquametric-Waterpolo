@@ -131,7 +131,7 @@ def test_live_progress_routes_are_priority_routes_and_process_real_frames(monkey
 
 
 def test_turbo_finish_analyzes_four_quadrants_and_maps_full_source_timeline(tmp_path, monkeypatch):
-    monkeypatch.setattr(mosaic_match_analysis, "tesseract_available", lambda: False)
+    monkeypatch.setattr(mosaic_match_analysis, "ocr_available", lambda: False)
     match_id, _, source_duration = _register_and_create_match(duration=497.0)
     response = client.post(
         f"/matches/{match_id}/analysis/browser-capture/session",

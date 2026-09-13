@@ -20,7 +20,7 @@ import numpy as np
 
 from models import AnalysisJob, VisionAnalysis, VisionSample, AutonomousAnalysis, AutonomousEventCandidate
 from services.autonomous_engine import infer_periods, infer_candidates, build_auto_summary
-from services.scoreboard_ocr import ScoreboardObservation, ocr_image, parse_scoreboard_text, tesseract_available, _roi
+from services.scoreboard_ocr import ScoreboardObservation, ocr_image, parse_scoreboard_text, ocr_available, _roi
 from services.vision_baseline import (
     FrameSignal,
     VisionBaselineError,
@@ -135,7 +135,7 @@ def _ocr_observations(
     max_samples: int,
     focus_seconds=None,
 ):
-    if not tesseract_available() or not rois:
+    if not ocr_available() or not rois:
         return [], {"targets": 0, "elapsed_seconds": 0.0, "budget_exhausted": False}
     cap = cv2.VideoCapture(str(video_path))
     if not cap.isOpened():
@@ -374,7 +374,7 @@ def run_mosaic_analysis(
             match_id=match.id,
             status="complete",
             engine_version="parallel-mosaic-autonomy-v2",
-            ocr_available=tesseract_available(),
+            ocr_available=ocr_available(),
             observations_json=json.dumps(observations, ensure_ascii=False),
             periods_json=json.dumps(periods, ensure_ascii=False),
             summary_json=json.dumps(summary, ensure_ascii=False),

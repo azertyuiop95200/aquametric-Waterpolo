@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from statistics import mean
 import re
+import math
+from services.event_evidence import verified_events
 
 SHOT_EVENTS = {"goal", "shot_on_target", "shot_off_target", "shot_blocked"}
 PASS_SUCCESS = {"pass_complete", "assist", "key_pass"}
@@ -80,6 +82,8 @@ def note_tags(event) -> dict:
         if key in tags:
             try:
                 tags[key] = float(tags[key].replace(",", "."))
+                if not math.isfinite(tags[key]) or tags[key] < 0:
+                    tags.pop(key, None)
             except (TypeError, ValueError):
                 tags.pop(key, None)
     return tags
@@ -117,12 +121,23 @@ def _basic(events):
         "turnovers": losses,
         "ball_wins": sum(c[k] for k in DEFENSIVE_WINS),
         "exclusions_earned": c["exclusion_earned"],
-        "exclusions_committed": c["exclusion_committed"],
+        "exclusions_committed": c["exclusion_committed"] + c["exclusion"],
         "key_passes": c["key_pass"],
         "actions_created": c["action_created"],
         "duels_won": c["duel_won"],
         "duels_lost": c["duel_lost"],
         "saves": c["save"],
+        "assists": c["assist"],
+        "touches": c["touch"] + c["centre_touch"],
+        "centre_touches": c["centre_touch"],
+        "interceptions": c["interception"],
+        "recoveries": c["recovery"],
+        "blocks": c["block"],
+        "fouls": c["foul"],
+        "penalties_earned": c["penalty_earned"],
+        "penalties_committed": c["penalty_committed"],
+        "fast_recoveries": c["fast_recovery"],
+        "late_recoveries": c["late_recovery"],
     }
 
 
@@ -360,7 +375,7 @@ def possession_report(events):
     for e in candidates:
         pid = note_tags(e).get("possession") or note_tags(e).get("possession_id")
         if pid:
-            groups[str(pid)].append(e)
+            groups[(getattr(e, "match_id", None), str(note_tags(e).get("period", "")), str(pid))].append(e)
     tagged_events = sum(len(v) for v in groups.values())
     if not groups:
         terminal = Counter(e.event_type for e in candidates if e.event_type in TERMINAL_EVENTS)
@@ -521,7 +536,7 @@ def differential(team, opponent):
 
 
 def ultimate_event_report(events, perspective="for"):
-    selected = _events_for(list(events or []), perspective)
+    selected = _events_for(verified_events(events), perspective)
     basic = _basic(selected)
     return {
         "basic": basic,

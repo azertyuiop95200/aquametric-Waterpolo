@@ -33,7 +33,7 @@ RUN apt-get update \
        libcairo2 libpango-1.0-0 libjpeg62-turbo libgif7 librsvg2-2 \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip install --no-cache-dir -r requirements.txt
+RUN python scripts/install_dependencies.py
 
 EXPOSE 10000
 CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-10000}"]

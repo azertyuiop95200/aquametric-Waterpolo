@@ -1,0 +1,16 @@
+{% if snapshot.diagnostics %}
+<section class="report-card status-warn notice" id="analysisMeasurements">
+  <h2>{{ 'Analyse sans mesures sportives' if snapshot.diagnostics.outcome == 'no_measurements' else 'Résultats automatiques partiels' }}</h2>
+  <p>{{ snapshot.diagnostics.message }}</p>
+  <p>{{ snapshot.diagnostics.observations }} lectures du score · {{ snapshot.diagnostics.goal_candidates }} changements de score candidats à vérifier · {{ snapshot.diagnostics.verified_events }} événements confirmés.</p>
+  {% set score = snapshot.diagnostics.latest_repeated_score %}
+  {% if score %}<p><strong>Dernier score relu : {{ score.left }}–{{ score.right }}</strong> à {{ '%.1f'|format(score.second) }} s. Ordre gauche/droite du bandeau, équipes à confirmer. Ce n’est pas nécessairement le score final.</p>{% endif %}
+  {% if snapshot.automatic.observations %}
+  <details><summary>Consulter les lectures horodatées du tableau de score</summary>
+    <table class="metric-table"><thead><tr><th>Temps vidéo</th><th>Lecture OCR</th><th>Confiance</th></tr></thead>
+    <tbody>{% for row in snapshot.automatic.observations %}<tr><td>{{ '%.1f'|format(row.second) }} s</td><td>{{ row.raw_text }}</td><td>{{ '%.0f'|format((row.ocr_confidence or 0)*100) }} %</td></tr>{% endfor %}</tbody></table>
+  </details>
+  {% endif %}
+  <p>La fin du traitement ne signifie pas que toutes les actions ont été reconnues. Les variations visuelles non classifiées ne sont pas comptées comme buts, tirs ou exclusions.</p>
+</section>
+{% endif %}
