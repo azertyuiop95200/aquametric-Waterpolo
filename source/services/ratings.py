@@ -1,4 +1,5 @@
 from collections import Counter
+from services.event_evidence import verified_events
 
 # AquaMetric rating-v3 remains evidence-bound, but reduces volatility from tiny samples.
 # Scores are shrunk toward neutral (50) when action coverage/confidence is limited.
@@ -93,7 +94,7 @@ def _rating_band(overall, confidence):
 
 
 def build_detailed_evaluation(events, role: str = "") -> dict:
-    events = list(events or [])
+    events = verified_events(events)
     counts = Counter(e.event_type for e in events)
     raw = {d: 0.0 for d in DIMENSIONS}
     context_tags = Counter()

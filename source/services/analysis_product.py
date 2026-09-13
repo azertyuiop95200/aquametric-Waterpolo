@@ -341,6 +341,7 @@ def analysis_snapshot(db, match):
         "verified_events": [
             {
                 "id": e.id, "second": float(e.second or 0), "event_type": e.event_type,
+                "player_id": e.player_id, "match_id": e.match_id,
                 "player": e.player.name if e.player else "", "confidence": e.confidence,
                 "source": e.source, "note": e.note,
                 "perspective": getattr(getattr(e, "context_meta", None), "perspective", "for"),
@@ -352,6 +353,8 @@ def analysis_snapshot(db, match):
     }
     from services.analysis_diagnostics import analysis_diagnostics
     snapshot["diagnostics"] = analysis_diagnostics(snapshot["automatic"], snapshot["verified_events"])
+    from services.measurement_report import match_statistics
+    snapshot["statistics"] = match_statistics(match)
     # Basic counters over an empty event set are implementation zeros, not
     # measured match statistics. Apply the same contract to JSON/CSV and HTML.
     for side in ("team", "opponent"):
@@ -432,6 +435,9 @@ def _html_report(match, snapshot) -> str:
         for row in snapshot["automatic"].get("observations", [])
     )
     ocr_html = f"<h2>Lectures du score — à vérifier</h2><table>{observation_rows}</table>" if observation_rows else ""
+    from jinja2 import Environment, FileSystemLoader, select_autoescape
+    env = Environment(loader=FileSystemLoader(Path(__file__).resolve().parents[1] / "templates"), autoescape=select_autoescape())
+    statistics_html = env.get_template("analysis_all_measurements.html").render(snapshot=snapshot, match=match)
     return f"""<!doctype html><html lang='fr'><meta charset='utf-8'><title>AquaMetric analysis</title>
 <style>body{{font-family:Arial,sans-serif;max-width:1000px;margin:40px auto;padding:0 24px;color:#15202b}}table{{border-collapse:collapse;width:100%}}td,th{{border:1px solid #ccd6dd;padding:8px;text-align:left}}small{{color:#657786}}</style>
 <h1>{html.escape(match.team.name)} vs {html.escape(match.opponent)}</h1>
@@ -444,6 +450,7 @@ def _html_report(match, snapshot) -> str:
 <tr><td>Passes réussies</td><td>{team['pass_completion_pct'] if team['pass_completion_pct'] is not None else '—'}%</td><td>{opponent['pass_completion_pct'] if opponent['pass_completion_pct'] is not None else '—'}%</td></tr>
 <tr><td>Pertes</td><td>{measured(team, 'turnovers')}</td><td>{measured(opponent, 'turnovers')}</td></tr></table>
 <h2>Constats coach fondés sur les données</h2><ul>{findings_html}</ul>
+{statistics_html}
 <h2>Preuves</h2><p>{len(snapshot['verified_events'])} événements vérifiés · {len(snapshot['automatic']['candidates'])} candidats automatiques · {len(snapshot['artifacts'])} médias/références.</p>
 <p><small>Les candidats automatiques restent distincts des faits confirmés. Les vidéos tierces ne sont pas copiées dans l'archive.</small></p></html>"""
 
@@ -467,6 +474,15 @@ def build_analysis_zip(db, match, evidence_dir: Path) -> io.BytesIO:
         archive.writestr(f"{root}/00_README.txt", readme)
         archive.writestr(f"{root}/01_report/report.html", _html_report(match, snapshot))
         archive.writestr(f"{root}/01_report/analysis.json", json.dumps(snapshot, ensure_ascii=False, indent=2, default=str))
+        from services.measurement_report import flatten_measurements
+        archive.writestr(f"{root}/02_kpis/all_match_measurements.csv",
+            _csv_text(["perspective", "metric", "value"], [
+                {"perspective": side, **row} for side in ("team", "opponent")
+                for row in flatten_measurements(snapshot["statistics"][side])]))
+        archive.writestr(f"{root}/02_kpis/all_player_measurements.csv",
+            _csv_text(["player_id", "player_name", "perspective", "metric", "value"], [
+                {"player_id": player["player_id"], "player_name": player["name"], "perspective": player["perspective"], **row}
+                for player in snapshot["statistics"]["players"] for row in flatten_measurements(player["report"])]))
 
         for side in ("team", "opponent"):
             basic = snapshot["ultimate"][side]["basic"]
@@ -480,7 +496,7 @@ def build_analysis_zip(db, match, evidence_dir: Path) -> io.BytesIO:
         )
         archive.writestr(
             f"{root}/03_events/events.csv",
-            _csv_text(["id", "second", "event_type", "player", "perspective", "phase", "confidence", "source", "note"], snapshot["verified_events"]),
+            _csv_text(["id", "match_id", "second", "event_type", "player_id", "player", "perspective", "phase", "confidence", "source", "note"], snapshot["verified_events"]),
         )
         archive.writestr(
             f"{root}/04_sequences/auto_candidates.csv",

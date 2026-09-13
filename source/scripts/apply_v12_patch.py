@@ -149,3 +149,11 @@ if 'href="/evidence-coverage"' not in b:
 base.write_text(b, encoding="utf-8")
 
 print("Applied AquaMetric V12 server + shell patch")
+
+# Existing native Render services already invoke this build entry point before
+# pip install. Keep them compatible with the shared headless OCR installation;
+# a code deploy must not silently omit its model wheel.
+import os
+if os.getenv("RENDER_SERVICE_ID"):
+    from install_dependencies import main as install_dependencies
+    install_dependencies()

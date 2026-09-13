@@ -432,7 +432,9 @@ def player_detail(player_id: int, request: Request, db: Session = Depends(get_db
         .order_by(Event.id.desc())
     ).all()
     rating, confidence, evidence = calculate_player_rating(events, role=player.primary_role)
-    return render(request, "player_detail.html", user=user, player=player, events=events, rating=rating, confidence=confidence, evidence=evidence)
+    from services.measurement_report import player_statistics, LABELS
+    return render(request, "player_detail.html", user=user, player=player, events=events, rating=rating, confidence=confidence, evidence=evidence,
+                  player_statistics=player_statistics(events), measurement_labels=LABELS)
 
 
 @app.get("/matches", response_class=HTMLResponse)
@@ -1144,18 +1146,10 @@ def player_data_page(request: Request, db: Session = Depends(get_db)):
     user = require_user(request, db)
     scout_players = db.scalars(select(ScoutingPlayer).order_by(ScoutingPlayer.name)).all()
     library_stats = db.scalars(select(LibraryPlayerMatchStat)).all()
-    by_name = {}
-    for s in library_stats:
-        d=by_name.setdefault(s.player_name,{"matches":0,"goals":0,"saves":0}); d["matches"]+=1; d["goals"]+=int(s.goals or 0); d["saves"]+=int(s.saves or 0)
-    rows=[]; seen=set()
-    for p in scout_players:
-        if p.name in seen: continue
-        seen.add(p.name); d=by_name.get(p.name,{"matches":0,"goals":0,"saves":0})
-        rows.append({"name":p.name,"nationality":p.nationality,"role":p.role,"matches":d["matches"],"goals":d["goals"],"saves":d["saves"],"coverage":"official match stats" if d["matches"] else "roster only — match stats queued"})
-    for name,d in by_name.items():
-        if name not in seen: rows.append({"name":name,"nationality":"","role":"","matches":d["matches"],"goals":d["goals"],"saves":d["saves"],"coverage":"official match stats"})
-    rows.sort(key=lambda r:(-r["matches"],r["name"]))
-    return render(request,"player_data.html",user=user,rows=rows,total_players=len(rows),covered=sum(r["matches"]>0 for r in rows))
+    from services.public_player_statistics import public_player_rows
+    team_names = {team.id: team.name for team in db.scalars(select(ScoutingTeam)).all()}
+    rows = public_player_rows(library_stats, scout_players, team_names)
+    return render(request,"player_data.html",user=user,rows=rows,total_players=len(rows),covered=sum(r["has_data"] for r in rows))
 
 
 @app.get("/player-intelligence", response_class=HTMLResponse)

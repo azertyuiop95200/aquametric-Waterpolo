@@ -1,5 +1,22 @@
 # Empty analysis report recovery
 
+## Match and personal statistics
+
+All recorded event types and structured tags are retained in the complete
+statistics report, even when a custom event has no predefined sporting metric.
+Match HTML, portable HTML, ZIP JSON, full match CSV and full player CSV share
+the same confirmed-event calculations. Player reports are grouped by player ID
+and side, with unassigned actions explicit. Their profiles include shooting,
+passing, losses, duels, touches, discipline, phases, periods, possessions,
+recorded physical measurements and model ratings with their coverage.
+
+Ratings and tactical calculations reject unconfirmed events. Shots include
+goals consistently. Multi-match possession IDs are scoped by match and period.
+Public player totals are scoped by team/name and distinct match; duplicate
+entries do not multiply totals, conflicting values are excluded, and missing
+statistics remain unknown with per-metric match counts. Same-name entries in
+different teams are kept separate rather than merged into one player.
+
 ## Fixed failure paths
 
 - Native Python deployments no longer require a system Tesseract executable:

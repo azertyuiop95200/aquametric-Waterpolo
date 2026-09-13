@@ -6,7 +6,8 @@ separate and all other values render as non measured.
 """
 from __future__ import annotations
 
-from collections import Counter
+from types import SimpleNamespace
+from services.measurement_report import observed_report
 
 from fastapi import Depends, Request
 from fastapi.responses import HTMLResponse
@@ -20,25 +21,12 @@ from services.video import youtube_embed
 
 
 def _verified_side(events: list[dict], perspective: str) -> dict:
-    side = [row for row in events if row.get("perspective") == perspective]
-    counts = Counter(str(row.get("event_type") or "") for row in side)
-
-    def measured(event_types):
-        value = sum(counts.get(kind, 0) for kind in event_types)
-        return value if value > 0 else None
-
-    return {
-        "goals": measured({"goal"}),
-        "shots": measured({"shot_on_target", "shot_off_target", "shot_blocked"}),
-        "saves": measured({"save"}),
-        "turnovers": measured({"turnover", "bad_pass"}),
-        "recoveries": measured({"recovery", "interception"}),
-        "exclusions_earned": measured({"exclusion_earned"}),
-        "exclusions_committed": measured({"exclusion", "exclusion_committed"}),
-        "assists": measured({"assist"}),
-        "key_passes": measured({"key_pass"}),
-        "verified_events": len(side),
-    }
+    rows = [SimpleNamespace(**row) for row in events if row.get("perspective") == perspective]
+    basic = observed_report(rows)["basic"]
+    basic["verified_events"] = basic["events"]
+    total_recoveries = (basic["recoveries"] or 0) + (basic["interceptions"] or 0)
+    basic["recoveries"] = total_recoveries if basic["events"] else None
+    return basic
 
 
 def _period_rows(snapshot: dict) -> list[dict]:
