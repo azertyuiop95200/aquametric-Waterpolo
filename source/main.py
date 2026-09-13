@@ -12,8 +12,9 @@ from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
-from sqlalchemy.orm import Session
-from sqlalchemy import select
+from starlette.middleware.gzip import GZipMiddleware
+from sqlalchemy.orm import Session, selectinload
+from sqlalchemy import select, func
 
 from db import Base, engine, get_db, SessionLocal
 from models import (User, Club, Team, Player, Match, Event, AnalysisJob, MediaArtifact, EventContext,
@@ -40,7 +41,9 @@ from services.player_intelligence import seed_player_intelligence, profile_snaps
 from services.france_intelligence import seed_france_intelligence, france_dashboard
 from services.advanced_metrics import METRIC_GROUPS, event_metric_summary, shot_map_summary
 from services.tactical_chess import DEFENCE_PLAYBOOK, recommend_counter_plan
-from services.simulation import simulate_matchup, SIM_TEAMS
+from services.simulation import simulate_matchup, SIM_TEAMS, absence_availability
+from extensions import install_extensions
+from security import install_security
 
 BASE_DIR = Path(__file__).resolve().parent
 UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", BASE_DIR / "uploads"))
@@ -77,9 +80,16 @@ async def lifespan(app: FastAPI):
             task.cancel()
 
 app = FastAPI(title=APP_NAME, lifespan=lifespan)
+install_security(app)
+app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=5)
+SESSION_SECRET = os.getenv("SECRET_KEY", "").strip()
+if not SESSION_SECRET:
+    if WEB_DEMO_MODE or os.getenv("COOKIE_SECURE", "0") == "1":
+        raise RuntimeError("SECRET_KEY is required for secured web deployments")
+    SESSION_SECRET = "dev-only-local-secret-change-me"
 app.add_middleware(
     SessionMiddleware,
-    secret_key=os.getenv("SECRET_KEY", "dev-secret-change-me"),
+    secret_key=SESSION_SECRET,
     same_site="lax",
     https_only=os.getenv("COOKIE_SECURE", "0") == "1",
 )
@@ -87,6 +97,7 @@ app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
 
 Base.metadata.create_all(engine)
+install_extensions(app)
 
 
 def seed():
@@ -232,6 +243,7 @@ def demo_login(request: Request, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
     ensure_granville_team(db, user.id)
+    request.session.clear()
     request.session["user_id"] = user.id
     request.session["web_demo"] = True
     return RedirectResponse("/my-team", status_code=303)
@@ -254,6 +266,7 @@ def register(request: Request, email: str = Form(...), password: str = Form(...)
     db.add(user)
     db.commit()
     db.refresh(user)
+    request.session.clear()
     request.session["user_id"] = user.id
     return RedirectResponse("/dashboard", status_code=303)
 
@@ -268,6 +281,7 @@ def login(request: Request, email: str = Form(...), password: str = Form(...), d
     user = db.scalar(select(User).where(User.email == email.strip().lower()))
     if not user or not verify_password(password, user.password_hash):
         return render(request, "login.html", error="Invalid credentials.", status_code=400)
+    request.session.clear()
     request.session["user_id"] = user.id
     return RedirectResponse("/dashboard", status_code=303)
 
@@ -301,17 +315,23 @@ def guest_analyze(request: Request, video_url: str = Form("")):
 def dashboard(request: Request, db: Session = Depends(get_db)):
     user = require_user(request, db)
     teams = db.scalars(select(Team).where(Team.owner_id == user.id).order_by(Team.id.desc())).all()
-    matches = db.scalars(select(Match).where(Match.owner_id == user.id).order_by(Match.id.desc())).all()
+    matches = db.scalars(select(Match).where(Match.owner_id == user.id).options(selectinload(Match.team)).order_by(Match.id.desc()).limit(8)).all()
+    match_count = db.scalar(select(func.count(Match.id)).where(Match.owner_id == user.id))
+    team_count = db.scalar(select(func.count(Team.id)).where(Team.owner_id == user.id))
     sources = db.scalars(select(OfficialDataSource).order_by(OfficialDataSource.id)).all()
     structured_records = sum(s.records_count for s in sources)
-    return render(request, "dashboard.html", user=user, teams=teams, matches=matches, sources=sources, structured_records=structured_records)
+    return render(request, "dashboard.html", user=user, teams=teams, matches=matches, sources=sources, structured_records=structured_records, match_count=match_count, team_count=team_count)
 
 
 @app.get("/teams", response_class=HTMLResponse)
 def teams_page(request: Request, db: Session = Depends(get_db)):
     user = require_user(request, db)
     teams = db.scalars(select(Team).where(Team.owner_id == user.id).order_by(Team.id.desc())).all()
-    clubs = db.scalars(select(Club).order_by(Club.country, Club.category, Club.name)).all()
+    clubs = db.scalars(
+        select(Club)
+        .where(Club.owner_id.is_(None) | (Club.owner_id == user.id))
+        .order_by(Club.country, Club.category, Club.name)
+    ).all()
     return render(request, "teams.html", user=user, teams=teams, clubs=clubs)
 
 
@@ -331,7 +351,14 @@ def create_club(
     category = category if category in {"Women", "Men", "Mixed/Other"} else "Mixed/Other"
     if not name or not country:
         raise HTTPException(400, detail="Club name and country are required.")
-    existing = db.scalar(select(Club).where(Club.name == name, Club.country == country, Club.category == category))
+    existing = db.scalar(
+        select(Club).where(
+            Club.name == name,
+            Club.country == country,
+            Club.category == category,
+            Club.owner_id.is_(None) | (Club.owner_id == user.id),
+        )
+    )
     if existing:
         return RedirectResponse(f"/teams?club_exists={existing.id}", status_code=303)
     db.add(Club(name=name, country=country, division=division, category=category, owner_id=user.id))
@@ -343,8 +370,8 @@ def create_club(
 def create_team(request: Request, name: str = Form(...), club_id: int = Form(...), category: str = Form("Women"), db: Session = Depends(get_db)):
     user = require_user(request, db)
     club = db.get(Club, club_id)
-    if not club:
-        raise HTTPException(400, detail="Selected club does not exist.")
+    if not club or (club.owner_id is not None and club.owner_id != user.id):
+        raise HTTPException(400, detail="Selected club does not exist or is not available.")
     name = clean_text(name)
     if not name:
         raise HTTPException(400, detail="Team name is required.")
@@ -404,8 +431,10 @@ def player_detail(player_id: int, request: Request, db: Session = Depends(get_db
         .where(Event.player_id == player.id, Match.owner_id == user.id)
         .order_by(Event.id.desc())
     ).all()
-    rating, confidence, evidence = calculate_player_rating(events)
-    return render(request, "player_detail.html", user=user, player=player, events=events, rating=rating, confidence=confidence, evidence=evidence)
+    rating, confidence, evidence = calculate_player_rating(events, role=player.primary_role)
+    from services.measurement_report import player_statistics, LABELS
+    return render(request, "player_detail.html", user=user, player=player, events=events, rating=rating, confidence=confidence, evidence=evidence,
+                  player_statistics=player_statistics(events), measurement_labels=LABELS)
 
 
 @app.get("/matches", response_class=HTMLResponse)
@@ -489,7 +518,7 @@ def match_detail(match_id: int, request: Request, db: Session = Depends(get_db))
     ratings = []
     for p in players:
         pevents = [e for e in match.events if e.player_id == p.id]
-        rating, conf, evidence = calculate_player_rating(pevents)
+        rating, conf, evidence = calculate_player_rating(pevents, role=p.primary_role)
         ratings.append((p, rating, conf, evidence))
     job = db.scalar(select(AnalysisJob).where(AnalysisJob.match_id == match.id).order_by(AnalysisJob.id.desc()))
     return render(
@@ -997,7 +1026,11 @@ def report_json(match_id: int, request: Request, db: Session = Depends(get_db)):
     if not match or match.owner_id != user.id:
         raise HTTPException(404)
     auto = db.scalar(select(AutonomousAnalysis).where(AutonomousAnalysis.match_id == match.id).order_by(AutonomousAnalysis.id.desc()))
-    candidates = db.scalars(select(AutonomousEventCandidate).where(AutonomousEventCandidate.match_id == match.id).order_by(AutonomousEventCandidate.second)).all() if auto else []
+    candidates = db.scalars(
+        select(AutonomousEventCandidate)
+        .where(AutonomousEventCandidate.analysis_id == auto.id)
+        .order_by(AutonomousEventCandidate.second)
+    ).all() if auto else []
     report = build_match_report(match, auto, candidates)
     return {
         "match": {"team": match.team.name, "opponent": match.opponent, "competition": match.competition, "date": match.match_date},
@@ -1113,18 +1146,10 @@ def player_data_page(request: Request, db: Session = Depends(get_db)):
     user = require_user(request, db)
     scout_players = db.scalars(select(ScoutingPlayer).order_by(ScoutingPlayer.name)).all()
     library_stats = db.scalars(select(LibraryPlayerMatchStat)).all()
-    by_name = {}
-    for s in library_stats:
-        d=by_name.setdefault(s.player_name,{"matches":0,"goals":0,"saves":0}); d["matches"]+=1; d["goals"]+=int(s.goals or 0); d["saves"]+=int(s.saves or 0)
-    rows=[]; seen=set()
-    for p in scout_players:
-        if p.name in seen: continue
-        seen.add(p.name); d=by_name.get(p.name,{"matches":0,"goals":0,"saves":0})
-        rows.append({"name":p.name,"nationality":p.nationality,"role":p.role,"matches":d["matches"],"goals":d["goals"],"saves":d["saves"],"coverage":"official match stats" if d["matches"] else "roster only — match stats queued"})
-    for name,d in by_name.items():
-        if name not in seen: rows.append({"name":name,"nationality":"","role":"","matches":d["matches"],"goals":d["goals"],"saves":d["saves"],"coverage":"official match stats"})
-    rows.sort(key=lambda r:(-r["matches"],r["name"]))
-    return render(request,"player_data.html",user=user,rows=rows,total_players=len(rows),covered=sum(r["matches"]>0 for r in rows))
+    from services.public_player_statistics import public_player_rows
+    team_names = {team.id: team.name for team in db.scalars(select(ScoutingTeam)).all()}
+    rows = public_player_rows(library_stats, scout_players, team_names)
+    return render(request,"player_data.html",user=user,rows=rows,total_players=len(rows),covered=sum(r["has_data"] for r in rows))
 
 
 @app.get("/player-intelligence", response_class=HTMLResponse)
@@ -1186,7 +1211,7 @@ def tactical_chess_page(request: Request, defence: str = "press", db: Session = 
     return render(request,"tactical_chess.html",user=user,playbook=DEFENCE_PLAYBOOK,selected=defence,plan=plan)
 
 @app.get("/simulation", response_class=HTMLResponse)
-def simulation_page(request: Request, team_a: str = "Granville Water Polo", team_b: str = "Lille UC Métropole Water-Polo", tactic_a: str = "balanced", tactic_b: str = "balanced", availability_a: int = 100, availability_b: int = 100, form_a: int = 50, form_b: int = 50, rest_a: int = 3, rest_b: int = 3, venue: str = "neutral", db: Session = Depends(get_db)):
+def simulation_page(request: Request, team_a: str = "Granville Water Polo", team_b: str = "Lille UC Métropole Water-Polo", tactic_a: str = "balanced", tactic_b: str = "balanced", availability_a: int = 100, availability_b: int = 100, form_a: int = 50, form_b: int = 50, rest_a: int = 3, rest_b: int = 3, venue: str = "neutral", absences_a: str = "", absences_b: str = "", scenario_a: str = "auto", scenario_b: str = "auto", db: Session = Depends(get_db)):
     user=require_user(request,db)
     if team_a not in SIM_TEAMS: team_a="Granville Water Polo"
     if team_b not in SIM_TEAMS: team_b="Lille UC Métropole Water-Polo"
@@ -1194,12 +1219,17 @@ def simulation_page(request: Request, team_a: str = "Granville Water Polo", team
     if tactic_a not in allowed: tactic_a="balanced"
     if tactic_b not in allowed: tactic_b="balanced"
     if venue not in {"neutral","team_a_home","team_b_home"}: venue="neutral"
-    availability_a=max(50,min(100,availability_a)); availability_b=max(50,min(100,availability_b))
+    availability_a = absence_availability(SIM_TEAMS[team_a], absences_a[:3000].split("|"))
+    availability_b = absence_availability(SIM_TEAMS[team_b], absences_b[:3000].split("|"))
     form_a=max(30,min(70,form_a)); form_b=max(30,min(70,form_b))
     rest_a=max(0,min(7,rest_a)); rest_b=max(0,min(7,rest_b))
-    result=simulate_matchup(team_a,team_b,tactic_a,tactic_b,n=5000,availability_a=availability_a,availability_b=availability_b,form_a=form_a,form_b=form_b,rest_a=rest_a,rest_b=rest_b,venue=venue)
-    return render(request,"match_simulation.html",user=user,teams=SIM_TEAMS,result=result,tactic_a=tactic_a,tactic_b=tactic_b,availability_a=availability_a,availability_b=availability_b,form_a=form_a,form_b=form_b,rest_a=rest_a,rest_b=rest_b,venue=venue)
+    result=simulate_matchup(team_a,team_b,tactic_a,tactic_b,n=5000,availability_a=availability_a,availability_b=availability_b,form_a=form_a,form_b=form_b,rest_a=rest_a,rest_b=rest_b,venue=venue,scenario_a=scenario_a,scenario_b=scenario_b)
+    return render(request,"match_simulation.html",user=user,teams=SIM_TEAMS,result=result,tactic_a=tactic_a,tactic_b=tactic_b,availability_a=availability_a,availability_b=availability_b,form_a=form_a,form_b=form_b,rest_a=rest_a,rest_b=rest_b,venue=venue,scenario_a=scenario_a,scenario_b=scenario_b)
 
 @app.get("/health")
 def health():
-    return {"ok": True, "app": APP_NAME}
+    payload = {"ok": True, "app": APP_NAME}
+    render_commit = os.getenv("RENDER_GIT_COMMIT", "").strip()
+    if render_commit:
+        payload["git_commit"] = render_commit
+    return payload

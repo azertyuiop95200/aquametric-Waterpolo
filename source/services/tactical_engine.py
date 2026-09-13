@@ -40,7 +40,8 @@ def _pct(n, d):
 
 
 def analyze_match_tactics(match) -> dict:
-    events = sorted(match.events, key=lambda e: e.second)
+    from services.event_evidence import verified_events
+    events = sorted(verified_events(match.events), key=lambda e: e.second)
     tagged = [(e, _meta(e)) for e in events]
     counts_for = Counter(e.event_type for e, m in tagged if m["perspective"] == "for")
     counts_against = Counter(e.event_type for e, m in tagged if m["perspective"] == "against")

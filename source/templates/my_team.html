@@ -8,7 +8,7 @@
   <article class="kpi"><span>2025–26</span><b>#{{ summary.final_position if summary else '—' }}</b><small>Vice-champion N1 · {{ summary.won if summary else 0 }}–{{ summary.lost if summary else 0 }}</small></article>
 </div>
 
-<div class="section-tabs" data-tabs>
+<div class="section-tabs" data-tabs data-drag-scroll>
  <button class="active" data-tab="training">Training</button><button data-tab="calendar">2026–27 Calendar</button><button data-tab="opponents">Next opponents</button><button data-tab="roster">Granville roster</button><button data-tab="history">2025–26</button>
 </div>
 <section data-panel="training" class="tab-panel active">
@@ -24,13 +24,13 @@
 
 <section data-panel="opponents" class="tab-panel">
  <div class="section-title"><div><span class="eyebrow">SCOUTING QUEUE</span><h2>Next opponents</h2></div><a class="btn small secondary" href="/scouting">Open full scouting</a></div>
- <div class="opponent-grid">{% for row in next_opponents %}<a class="opponent-card" href="{% if row.scout %}/scouting/{{ row.scout.id }}{% else %}/scouting{% endif %}"><div class="opponent-date">{{ row.fixture.start_text }}</div><span class="venue-chip">{% if 'Granville' in row.fixture.home_team %}HOME{% else %}AWAY{% endif %}</span><h3>{{ row.opponent }}</h3>{% if row.scout %}<p>{{ row.scout.roster_status|replace('_',' ') }}</p><small>{{ row.scout.source_note }}</small>{% else %}<p>Roster refresh required</p>{% endif %}<div class="card-arrow">View scouting →</div></a>{% endfor %}</div>
+ <div class="opponent-grid">{% for row in next_opponents %}<a class="opponent-card" href="{% if row.scout %}/scouting/{{ row.scout.id }}{% else %}/scouting{% endif %}"><div class="opponent-date">{{ row.fixture.start_text }}</div><span class="venue-chip">{% if 'Granville' in row.fixture.home_team %}HOME{% else %}AWAY{% endif %}</span><h3>{{ row.opponent }}</h3>{% if row.scout %}<p>{{ row.scout.roster_status|replace('_',' ') }}</p><small>{{ row.scout.source_note }}</small>{% else %}<p>Roster confirmation pending</p>{% endif %}<div class="card-arrow">View scouting →</div></a>{% endfor %}</div>
 </section>
 
 <section data-panel="roster" class="tab-panel">
  <div class="section-title"><div><span class="eyebrow">ROSTER TRACKER</span><h2>Granville players observed in 2025–26</h2></div>{% if granville_scout %}<span class="source-pill">{{ granville_scout.roster_status|replace('_',' ') }}</span>{% endif %}</div>
  <div class="notice">This is a historical FFN match-sheet roster used to start 2026–27 tracking. A player only becomes “current confirmed” when a new-season official sheet or club announcement supports it.</div>
- <div class="roster-table"><div class="roster-head"><span>Cap</span><span>Player</span><span>Year</span><span>Nat.</span><span>Role / status</span></div>{% for p in granville_players %}<div class="roster-row"><b>#{{ p.cap_number if p.cap_number is not none else '—' }}</b><strong>{{ p.name }}</strong><span>{{ p.birth_year or '—' }}</span><span>{{ p.nationality or '—' }}</span><small>{{ p.role }} · {{ p.current_status|replace('_',' ') }}</small></div>{% endfor %}</div>
+ <div class="roster-table" data-drag-scroll><div class="roster-head"><span>Cap</span><span>Player</span><span>Year</span><span>Nat.</span><span>Role / status</span></div>{% for p in granville_players %}<a class="roster-row roster-link" href="/intelligence/player?name={{p.name|urlencode}}"><b>#{{ p.cap_number if p.cap_number is not none else '—' }}</b><strong>{{ p.name }} <small>→ profile</small></strong><span>{{ p.birth_year or '—' }}</span><span>{{ p.nationality or '—' }}</span><small>{{ p.role }} · {{ p.current_status|replace('_',' ') }}</small></a>{% endfor %}</div>
 </section>
 
 <section data-panel="history" class="tab-panel">

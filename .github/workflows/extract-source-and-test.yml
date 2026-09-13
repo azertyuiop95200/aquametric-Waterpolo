@@ -1,4 +1,4 @@
-name: Extract AquaMetric source and test
+name: Validate committed AquaMetric source
 
 on:
   push:
@@ -8,40 +8,26 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  extract-test-commit:
+  validate-source:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Reconstruct source bundle
+      - name: Check the committed application
         shell: bash
         run: |
           set -euo pipefail
-          cat bundle_parts/part_* | base64 -d > aquametric.tar.xz
-          rm -rf extracted source
-          mkdir -p extracted
-          tar -xJf aquametric.tar.xz -C extracted
-          test -d extracted/aquametric_v11_2_release
-          cp -a extracted/aquametric_v11_2_release source
+          # The V11.2 bundle is a historical archive. Never replace maintained
+          # source with it or push generated source from this validation job.
           test -f source/main.py
-          echo "Extracted files: $(find source -type f | wc -l)"
-
-      - name: Commit extracted source
-        shell: bash
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add source
-          if git diff --cached --quiet; then
-            echo 'Source already current.'
-          else
-            git commit -m 'Extract AquaMetric V11.2 source [skip ci]'
-            git push
-          fi
+          test -f source/scripts/apply_v12_patch.py
+          test -f source/scripts/install_dependencies.py
+          test -f source/services/measurement_report.py
+          test -f source/analysis_result_clean_v2.py
 
       - name: Set up Python
         uses: actions/setup-python@v5

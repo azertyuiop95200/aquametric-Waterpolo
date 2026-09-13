@@ -42,8 +42,16 @@ def test_granville_profile_is_honest_about_current_season():
         assert rumina.roster_status=='historical_club_confirmed_pending_2627'
         pid=rumina.id
     r=client.get(f'/player-intelligence/{pid}')
-    assert 'no match-level stats yet' in r.text.lower()
+    assert r.status_code==200
+    # Official 2025-26 FFN lineups now add verified appearance evidence. This is
+    # intentionally different from individual performance statistics and does not
+    # create goals, saves or an all-round rating.
+    assert 'appearance' in r.text.lower()
     assert '2025-2026' in r.text
+    with SessionLocal() as db:
+        goals=db.scalars(select(PlayerMatchMetric).where(PlayerMatchMetric.profile_id==pid,PlayerMatchMetric.metric=='goals')).all()
+        saves=db.scalars(select(PlayerMatchMetric).where(PlayerMatchMetric.profile_id==pid,PlayerMatchMetric.metric=='saves')).all()
+        assert goals == [] and saves == []
 
 def test_player_research_request_queue():
     login_user('request-v9@example.com')
