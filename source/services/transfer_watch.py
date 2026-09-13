@@ -1,124 +1,51 @@
-"""Transfer-watch compatibility layer with expanded European and NCAA market data."""
-
 from sqlalchemy import select
-
-from models import TransferSignal
-from services.transfer_watch_core import *  # noqa: F401,F403
-from services import transfer_watch_core as _core
-from services.transfer_market_2026 import (
-    EXTRA_TRANSFER_SIGNALS,
-    OA_MEN_URL,
-    OA_WOMEN_URL,
-    HA10_AUG_URL,
-)
-from services.transfer_market_2026_wave2 import WAVE2_TRANSFER_SIGNALS, JUG_SIMIC_URL
-from services.transfer_market_2026_wave3 import WAVE3_TRANSFER_SIGNALS
-from services.transfer_market_2026_wave4_france import WAVE4_FRANCE_SIGNALS, MWP_PUBLIC
-from services.transfer_market_2026_wave5_official import (
-    WAVE5_TRANSFER_SIGNALS,
-    APOLLON_NEWS,
-    JADRAN_ROSTER,
-    CAL_AMOROSO,
-)
-from services.transfer_market_ncaa_2026 import NCAA_2026_TRANSFER_SIGNALS
-
-
-def _signal_key(item):
-    return (
-        item.get("gender", ""), item.get("player", ""), item.get("from", ""),
-        item.get("to", ""), item.get("date", ""), item.get("source", ""),
-        item.get("season", _core.TRANSFER_SEASON),
-    )
-
-
-def _extend_unique(rows):
-    """Avoid multiplying static datasets if this compatibility module is reloaded."""
-    existing = {_signal_key(item) for item in _core.TRANSFER_SIGNALS}
-    for item in rows:
-        key = _signal_key(item)
-        if key not in existing:
-            _core.TRANSFER_SIGNALS.append(item)
-            existing.add(key)
-
-
-# Keep the original seed/deduplication engine intact and feed it broader datasets.
-_extend_unique(EXTRA_TRANSFER_SIGNALS)
-_extend_unique(WAVE2_TRANSFER_SIGNALS)
-_extend_unique(WAVE3_TRANSFER_SIGNALS)
-_extend_unique(WAVE4_FRANCE_SIGNALS)
-_extend_unique(WAVE5_TRANSFER_SIGNALS)
-_extend_unique(NCAA_2026_TRANSFER_SIGNALS)
-TRANSFER_SIGNALS = _core.TRANSFER_SIGNALS
-
-_EXTRA_SOURCE_WATCHES = [
-    ("OA Sport — A1 men mercato 2026-27", "media", "web", "Italy — Serie A1 men", OA_MEN_URL, "media", 12, "Club-by-club 2026-27 arrivals, departures and retirements; reported evidence until upgraded by club/federation sources."),
-    ("OA Sport — A1 women mercato 2026-27", "media", "web", "Italy — Serie A1 women", OA_WOMEN_URL, "media", 12, "Club-by-club 2026-27 arrivals, departures and retirements; reported evidence until upgraded by club/federation sources."),
-    ("HA10 / LEWaterpolo — Spain mercato", "league_media", "web", "Spain — División de Honor women and men", HA10_AUG_URL, "media", 12, "Relays LEWaterpolo summer-market/new-faces coverage; cross-check with clubs and RFEN when available."),
-    ("VK Jug — official news", "club_official", "web", "VK Jug Dubrovnik", JUG_SIMIC_URL, "primary", 12, "Official club announcements and current first-team roster changes."),
-    ("CN Sabadell — official water polo", "club_official", "web", "CN Sabadell women and men", "https://nataciosabadell.es/seccio-waterpolo/", "primary", 12, "Official club water-polo section; use for roster validation and cross-checking announced signings/exits."),
-    ("CN Terrassa — official water polo", "club_official", "web", "CN Terrassa women and men", "https://clubnatacioterrassa.cat/", "primary", 12, "Official club site for 2026-27 signings, roster continuity and competition context."),
-    ("Montpellier Water-Polo — public club feed", "club_social", "instagram", "Montpellier Water-Polo", MWP_PUBLIC, "club_public", 6, "Public club feed embedded on the official shop; useful for explicit signing and farewell announcements."),
-    ("Apollon Smyrnis — official water polo", "club_official", "web", "Apollon Smyrnis", APOLLON_NEWS, "primary", 6, "Official club signing, renewal and first-team roster announcements. Renewals are not counted as transfers."),
-    ("VK Jadran Split — official water polo", "club_official", "web", "Jadran Split", JADRAN_ROSTER, "primary", 6, "Official first-team roster and reinforcement announcements for the 2026-27 season."),
-    ("UCLA Water Polo — official athletics", "team_official", "web", "NCAA — UCLA women and men", "https://uclabruins.com/sports/water-polo", "primary", 12, "Official UCLA rosters and season previews; primary source for NCAA transfer arrivals."),
-    ("USC Water Polo — official athletics", "team_official", "web", "NCAA — USC women and men", "https://usctrojans.com/", "primary", 12, "Official USC roster and season news; primary source for collegiate transfers."),
-    ("Stanford Water Polo — official athletics", "team_official", "web", "NCAA — Stanford women and men", "https://gostanford.com/", "primary", 12, "Official Stanford transfer announcements and current rosters."),
-    ("California Water Polo — official athletics", "team_official", "web", "NCAA — California women", CAL_AMOROSO, "primary", 12, "Official California Golden Bears transfer announcements and roster news."),
-]
-_existing_source_names = {row[0] for row in _core.SOURCE_WATCHES}
-_core.SOURCE_WATCHES.extend(row for row in _EXTRA_SOURCE_WATCHES if row[0] not in _existing_source_names)
-SOURCE_WATCHES = _core.SOURCE_WATCHES
-
-
-def _apply_explicit_signal_seasons(db):
-    """Move explicitly-seasoned signals out of the default European market season.
-
-    The core seeder predates calendar-year NCAA seasons and initially processes every
-    item under 2026-27. This pass makes `item['season']` authoritative, merges any
-    transient duplicate created by a later application restart, and preserves the
-    strongest evidence. It works for any future non-default market season, not just NCAA.
-    """
-    for item in TRANSFER_SIGNALS:
-        item_season = item.get("season")
-        if not item_season or item_season == _core.TRANSFER_SEASON:
-            continue
-
-        candidates = db.scalars(
-            select(TransferSignal).where(
-                TransferSignal.player_name == item["player"],
-                TransferSignal.to_team == item["to"],
-                TransferSignal.season.in_([_core.TRANSFER_SEASON, item_season]),
-            ).order_by(TransferSignal.id.asc())
-        ).all()
-        if not candidates:
-            continue
-
-        correctly_seasoned = [row for row in candidates if row.season == item_season]
-        signal = correctly_seasoned[0] if correctly_seasoned else candidates[0]
-        signal.season = item_season
-        signal.gender = item["gender"]
-        signal.from_team = item["from"] or signal.from_team
-        signal.to_team = item["to"]
-        dates = [date for date in (signal.published_date, item["date"]) if date]
-        signal.published_date = min(dates) if dates else item["date"]
-        if _core._rank(item["kind"]) >= _core._rank(signal.signal_type):
-            signal.signal_type = item["kind"]
-        if item["confidence"] >= float(signal.confidence_score or 0):
-            signal.source_name = item["source"]
-            signal.source_url = item["url"]
-            signal.source_tier = item["tier"]
-            signal.confidence_score = item["confidence"]
-        signal.note = _core._append_note(signal.note, item.get("note", ""))
-
-        for duplicate in candidates:
-            if duplicate is signal:
-                continue
-            signal.note = _core._append_note(signal.note, duplicate.note)
-            db.delete(duplicate)
-
-    db.commit()
-
-
+from models import SourceWatch, TransferSignal, MatchResearchTarget
+SOURCE_WATCHES=[
+("FFN extraNat — Elite water polo","federation","web","France — Elite clubs","https://www.extranat.fr/waterpolo/","primary",6,"Official fixtures, match sheets, live scoring/statistics when published."),
+("Granville Water Polo — official site","club_official","web","Granville Water Polo","https://www.granvillewaterpolo.com/","primary",12,"Club roster, schedules, announcements and links to public social pages."),
+("Granville Water Polo — Facebook","club_social","facebook","Granville Water Polo","https://www.facebook.com/GRANVILLEWATERPOLO/","club_public",12,"Public club posts only; confirm roster changes with official club/FFN evidence when possible."),
+("Granville Water Polo — Instagram","club_social","instagram","Granville Water Polo","https://www.instagram.com/granvillewaterpolo/","club_public",12,"Public club account listed by Granville/HelloAsso."),
+("Waterpolo 360 — confirmed transfers","media","web","International transfers","https://waterpolo360news.com/confirmed-transfers/","media_confirmed",12,"High-value transfer discovery source; upgrade with club/federation corroboration when available."),
+("Waterpolo 360 — women transfers","media","web","Women's transfers","https://waterpolo360news.com/water-polo-transfers-and-gossip/womens-transfers-and-gossip/","media",12,"Confirmed deals and rumours remain separate evidence states."),
+("Total Waterpolo — transfers","media","web","International transfers","https://total-waterpolo.com/water-polo-transfers/","media_confirmed",12,"Transfer timeline and confirmed/rumour labels."),
+("SO POLO — public social","media_social","instagram","France water polo","https://www.instagram.com/sopolo.news/","media",12,"French water-polo news signal; media reporting, not an official registration source."),
+("World Aquatics — competitions","federation","web","International","https://www.worldaquatics.com/competitions","primary",6,"Official competition pages, reports, videos and event rosters."),
+("European Aquatics — schedule/results","federation","web","Europe","https://europeanaquatics.org/events/schedule-and-results/","primary",6,"Official European calendar/results."),
+("Grand Nancy — official site/social hub","club_official","web","Grand Nancy Aquatique Club","https://www.grandnancyaquatiqueclub.com/contact/","primary",12,"Official site exposes public social links."),
+("Taverny SN95 — official site","club_official","web","Taverny Sports Nautiques 95","https://tsn95.fr/","primary",12,"Official club information and public match posts."),]
+TRANSFER_SIGNALS=[
+("Elena Ruiz","","CN Atlètic-Barceloneta","confirmed","2026-08-04","Waterpolo 360","https://waterpolo360news.com/water-polo-confirmed-transfers-and-gossip/","media_confirmed",.92,"Spain international move signal."),
+("Izabella Chiappini","","Sori Pool Beach","confirmed","2026-08-05","Waterpolo 360","https://waterpolo360news.com/water-polo-confirmed-transfers-and-gossip/","media_confirmed",.92,"Major signing for newly promoted Italian side."),
+("Maryn Dempsey","","CN Atlètic-Barceloneta","confirmed","2026-07-22","Waterpolo 360","https://waterpolo360news.com/confirmed-transfers/","media_confirmed",.92,"USA attacker signed by CNAB."),
+("Anna Pearson","","CE Mediterrani","confirmed","2026-07-21","Waterpolo 360","https://waterpolo360news.com/confirmed-transfers/","media_confirmed",.92,"Women's first-team signing."),
+("Emma Lineback","","CE Mediterrani","confirmed","2026-07-21","Waterpolo 360","https://waterpolo360news.com/confirmed-transfers/","media_confirmed",.92,"Women's first-team signing."),
+("Isabel Williams","CN Sabadell","Rapallo","confirmed","2026-07-17","Waterpolo 360","https://waterpolo360news.com/confirmed-transfers/","media_confirmed",.92,"USA goalkeeper move."),
+("Maxine Schaap","","De Zaan","confirmed","2026-07-15","Waterpolo 360","https://waterpolo360news.com/confirmed-transfers/","media_confirmed",.92,"Return to De Zaan."),
+("Britt van den Dobbelsteen","","De Zaan","confirmed","2026-07-15","Waterpolo 360","https://waterpolo360news.com/confirmed-transfers/","media_confirmed",.92,"Return to De Zaan."),
+("Noa de Vries","","Pallanuoto Trieste","confirmed","2026-07-15","Waterpolo 360","https://waterpolo360news.com/confirmed-transfers/","media_confirmed",.92,"Netherlands centre joins Trieste."),
+("Kata Hajdu","UVSE","Olympiacos","confirmed","2026-07-13","Waterpolo 360","https://waterpolo360news.com/confirmed-transfers/","media_confirmed",.92,"Hungary international move."),
+("Alejandra Aznar","","Pallanuoto Trieste","confirmed","2026-07-13","Waterpolo 360","https://waterpolo360news.com/confirmed-transfers/","media_confirmed",.92,"Spanish left-hander joins Trieste."),
+("Nikoleta Eleftheriadou","","Vouliagmeni","confirmed","2026-07-11","Waterpolo 360","https://waterpolo360news.com/confirmed-transfers/","media_confirmed",.92,"High-profile Greek signing."),
+("Sinia Plotz","","SIS Roma","confirmed","2026-07-08","Waterpolo 360","https://waterpolo360news.com/confirmed-transfers/","media_confirmed",.92,"Women's roster reinforcement."),
+("Iva Rozic","","SIS Roma","confirmed","2026-07-08","Waterpolo 360","https://waterpolo360news.com/confirmed-transfers/","media_confirmed",.92,"Croatian U20 standout joins SIS Roma."),
+("Sofia Giustini","","Pallanuoto Trieste","confirmed","2026-07-01","Waterpolo 360","https://waterpolo360news.com/confirmed-transfers/","media_confirmed",.92,"Italy international signing."),
+("Kamilla Farago","UVSE","CN Sant Andreu","rumour","2026-05-07","Waterpolo 360","https://waterpolo360news.com/water-polo-transfers-and-gossip/womens-transfers-and-gossip/","media_rumour",.55,"Rumour only. Never treat as roster confirmation without later evidence."),]
+MATCH_TARGETS=[
+("WA-WWC-2026-F-USA-ESP","Women’s Water Polo World Cup 2026 — Final","2026","United States","Spain","2026-07-26","13-9","https://www.worldaquatics.com/news/4546786/usa-bolts-to-seventh-womens-world-cup-crown","https://www.worldaquatics.com/videos/4547492/team-usa-takes-home-the-title-water-polo-world-cup-2026-sydney-usa-vs-spain","official_report_available",100,"Priority benchmark: official report and video page available."),
+("WA-WWC-2026-SF-USA-AUS","Women’s Water Polo World Cup 2026 — Final","2026","United States","Australia","2026-07-24","10-6","https://www.worldaquatics.com/news/4544409/italy-and-hungary-win-5-8-womens-semifinals","","official_report_available",95,"Semifinal; official match narrative and score."),
+("WA-WWC-2026-SF-ESP-RUS","Women’s Water Polo World Cup 2026 — Final","2026","Spain","Russia","2026-07-24","15-13 SO","https://www.worldaquatics.com/news/4544409/italy-and-hungary-win-5-8-womens-semifinals","","official_report_available",95,"Semifinal decided by shootout after 10-10 regulation."),
+("WA-WWC-2026-QF-ESP-HUN","Women’s Water Polo World Cup 2026 — Final","2026","Spain","Hungary","2026-07-22","8-7","https://www.worldaquatics.com/news/4540526/russia-stuns-european-champion-in-world-cup-quarterfinals","","official_report_available",90,"Quarterfinal useful for Spain scouting."),
+("WA-WWC-2026-QF-USA-CHN","Women’s Water Polo World Cup 2026 — Final","2026","United States","China","2026-07-22","14-8","https://www.worldaquatics.com/news/4540526/russia-stuns-european-champion-in-world-cup-quarterfinals","","official_report_available",90,"Quarterfinal useful for USA scouting."),
+("WA-U18W-2026-SF-ESP-HUN","World Aquatics U18 Women’s Championships","2026","Spain","Hungary","2026-08-22","13-10","https://www.worldaquatics.com/news/4564707/spain-to-defend-u18-crown-against-australia","","official_report_available",85,"Current youth generation; useful forward-looking U20 scouting."),
+("WA-U18W-2026-SF-AUS-USA","World Aquatics U18 Women’s Championships","2026","Australia","United States","2026-08-22","14-10","https://www.worldaquatics.com/news/4564707/spain-to-defend-u18-crown-against-australia","","official_report_available",85,"Current youth generation; useful forward-looking U20 scouting."),]
 def seed_transfer_watch(db):
-    _core.seed_transfer_watch(db)
-    _apply_explicit_signal_seasons(db)
+    for name,stype,platform,scope,url,trust,hours,note in SOURCE_WATCHES:
+        if not db.scalar(select(SourceWatch).where(SourceWatch.name==name)):
+            db.add(SourceWatch(name=name,source_type=stype,platform=platform,entity_scope=scope,url=url,trust_level=trust,refresh_hours=hours,note=note))
+    for player,fr,to,kind,date,sname,url,tier,conf,note in TRANSFER_SIGNALS:
+        if not db.scalar(select(TransferSignal).where(TransferSignal.player_name==player,TransferSignal.to_team==to,TransferSignal.published_date==date)):
+            db.add(TransferSignal(player_name=player,from_team=fr,to_team=to,signal_type=kind,published_date=date,source_name=sname,source_url=url,source_tier=tier,confidence_score=conf,note=note))
+    for key,comp,season,a,b,date,score,src,video,status,priority,note in MATCH_TARGETS:
+        if not db.scalar(select(MatchResearchTarget).where(MatchResearchTarget.external_key==key)):
+            db.add(MatchResearchTarget(external_key=key,competition=comp,season=season,team_a=a,team_b=b,event_date=date,score_text=score,source_url=src,video_url=video,research_status=status,priority=priority,note=note))
+    db.commit()

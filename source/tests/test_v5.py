@@ -21,17 +21,15 @@ def test_scoreboard_parser_clock_period_and_score():
     assert p["away_score"] == 8
 
 
-def test_autonomous_single_score_change_stays_review_window_until_confirmed():
+def test_autonomous_score_change_becomes_goal_candidate():
     obs = [
         {"second": 10, "home_score": 7, "away_score": 7, "period": 4, "ocr_confidence": .92},
         {"second": 20, "home_score": 8, "away_score": 7, "period": 4, "ocr_confidence": .91},
     ]
     out = infer_candidates(obs, [])
     goals = [c for c in out if c.event_type == "goal_candidate_home"]
-    windows = [c for c in out if c.event_type == "score_change_window_home"]
-    assert goals == []
-    assert len(windows) == 1
-    assert windows[0].confidence_label in {"LOW", "MODERATE"}
+    assert len(goals) == 1
+    assert goals[0].confidence_label in {"MODERATE", "HIGH"}
 
 
 def test_period_inference_never_invents_missing_quarters():

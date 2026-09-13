@@ -8,8 +8,7 @@ def _perspective(event):
 
 
 def build_match_report(match, auto_analysis=None, auto_candidates=None):
-    from services.event_evidence import verified_events
-    events = sorted(verified_events(match.events), key=lambda e: e.second)
+    events = sorted(match.events, key=lambda e: e.second)
     counts = Counter(e.event_type for e in events)
     tactical = analyze_match_tactics(match)
     for_events = [e for e in events if _perspective(e) == 'for']
@@ -20,10 +19,10 @@ def build_match_report(match, auto_analysis=None, auto_candidates=None):
     pp_against = [e for e in against_events if getattr(getattr(e, 'context_meta', None), 'phase_tag', '') == 'power_play']
     team_shots = sum(counts_for.get(x, 0) for x in ('shot_on_target','shot_off_target','shot_blocked','goal'))
     headline = [
-        {"label": "Tagged score", "value": f"{counts_for.get('goal',0) if for_events else '—'}–{counts_against.get('goal',0) if against_events else '—'}", "detail": "confirmed sample only; not the final match score"},
-        {"label": "Team shots", "value": team_shots if for_events else None, "detail": "visible verified attempts, goals included"},
-        {"label": "Turnovers", "value": counts_for.get('turnover', 0) + counts_for.get('bad_pass', 0) if for_events else None, "detail": "team possession losses in confirmed sample"},
-        {"label": "Blocks + steals", "value": counts_for.get('block', 0) + counts_for.get('interception', 0) if for_events else None, "detail": "team defensive events in confirmed sample"},
+        {"label": "Tagged score", "value": f"{counts_for.get('goal',0)}–{counts_against.get('goal',0)}", "detail": "from verified perspective tags"},
+        {"label": "Team shots", "value": team_shots, "detail": "visible verified attempts"},
+        {"label": "Turnovers", "value": counts_for.get('turnover', 0) + counts_for.get('bad_pass', 0), "detail": "team possession losses"},
+        {"label": "Blocks + steals", "value": counts_for.get('block', 0) + counts_for.get('interception', 0), "detail": "team defensive events"},
     ]
     auto_summary = {}
     if auto_analysis:

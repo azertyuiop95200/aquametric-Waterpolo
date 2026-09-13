@@ -11,9 +11,6 @@ from typing import Iterable
 import os
 import re
 import shutil
-import logging
-from functools import lru_cache
-from threading import Lock
 
 import cv2
 import numpy as np
@@ -22,40 +19,6 @@ try:
     import pytesseract
 except Exception:  # pragma: no cover - optional at runtime
     pytesseract = None
-
-log = logging.getLogger(__name__)
-_onnx_lock = Lock()
-
-
-@lru_cache(maxsize=1)
-def _onnx_engine():
-    # The wheel includes the models; no video or frame leaves the server.
-    try:
-        from rapidocr_onnxruntime import RapidOCR
-        return RapidOCR(intra_op_num_threads=1, inter_op_num_threads=1)
-    except Exception:
-        log.exception("scoreboard_ocr_backend_unavailable backend=rapidocr")
-        return None
-
-
-def ocr_available() -> bool:
-    return tesseract_available() or _onnx_engine() is not None
-
-
-def _onnx_image(img: np.ndarray) -> tuple[str, float]:
-    engine = _onnx_engine()
-    if engine is None or img.size == 0:
-        return "", 0.0
-    try:
-        with _onnx_lock:
-            rows, _ = engine(img, use_cls=False)
-        if not rows:
-            return "", 0.0
-        # Preserve the detector's reading order, including spaces between scores.
-        return " ".join(str(row[1]) for row in rows), min(float(row[2]) for row in rows)
-    except Exception:
-        log.exception("scoreboard_ocr_inference_failed backend=rapidocr")
-        return "", 0.0
 
 
 @dataclass
@@ -70,19 +33,9 @@ class ScoreboardObservation:
     numbers: list[int]
     home_score: int | None = None
     away_score: int | None = None
-    is_replay: bool = False
-    is_break: bool = False
-    is_final: bool = False
 
     def to_dict(self):
         return asdict(self)
-
-
-def _ocr_timeout_seconds() -> float:
-    try:
-        return max(0.8, min(8.0, float(os.getenv("AQUAMETRIC_OCR_CALL_TIMEOUT", "2.5"))))
-    except (TypeError, ValueError):
-        return 2.5
 
 
 def tesseract_available() -> bool:
@@ -103,24 +56,17 @@ def _roi(frame: np.ndarray, rect: tuple[float, float, float, float]) -> np.ndarr
     return frame[y1:y2, x1:x2]
 
 
-def _iter_variants(img: np.ndarray):
-    """Compute fallback preprocessing only if OCR actually needs it."""
+def _variants(img: np.ndarray) -> list[np.ndarray]:
     if img.size == 0:
-        return
+        return []
     scale = 2.0 if img.shape[1] < 900 else 1.35
     enlarged = cv2.resize(img, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
-    yield enlarged
     gray = cv2.cvtColor(enlarged, cv2.COLOR_BGR2GRAY)
     denoise = cv2.bilateralFilter(gray, 7, 45, 45)
     clahe = cv2.createCLAHE(clipLimit=2.3, tileGridSize=(8, 8)).apply(denoise)
-    yield clahe
     otsu = cv2.threshold(clahe, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
-    yield otsu
-    yield cv2.bitwise_not(otsu)
-
-
-def _variants(img: np.ndarray) -> list[np.ndarray]:
-    return list(_iter_variants(img))
+    inv = cv2.bitwise_not(otsu)
+    return [enlarged, clahe, otsu, inv]
 
 
 def _parse_clock(text: str) -> int | None:
@@ -148,14 +94,6 @@ def _parse_period(text: str) -> int | None:
     return None
 
 
-def _broadcast_status(text: str) -> tuple[bool, bool, bool]:
-    upper = " ".join((text or "").upper().replace("É", "E").replace("È", "E").split())
-    replay = bool(re.search(r"\b(?:REPLAY|RALENTI|SLOW\s*MOTION|SLOWMO)\b", upper))
-    break_flag = bool(re.search(r"\b(?:BREAK|PAUSE|INTERVAL|HALF\s*TIME|HALFTIME|END\s+OF\s+(?:Q|QUARTER|PERIOD)|QUARTER\s+BREAK)\b", upper))
-    final = bool(re.search(r"\b(?:FINAL|FULL\s*TIME|FIN\s+DU\s+MATCH|MATCH\s+TERMINE|FT)\b", upper))
-    return replay, break_flag, final
-
-
 def _canonical_numeric_tokens(text: str) -> str:
     out = []
     for token in (text or "").split():
@@ -167,6 +105,7 @@ def _canonical_numeric_tokens(text: str) -> str:
 
 def _extract_numbers(text: str) -> list[int]:
     cleaned = _canonical_numeric_tokens(text)
+    # Remove clock and period tokens before score extraction so Q1 does not erase a 1-0 score.
     cleaned = re.sub(r"\d{1,2}\s*[:.]\s*\d{2}", " ", cleaned)
     cleaned = re.sub(r"\b(?:Q|P|PER)\s*[1-4]\b", " ", cleaned, flags=re.I)
     cleaned = re.sub(r"\b[1-4]\s*(?:Q|ST|ND|RD|TH)\b", " ", cleaned, flags=re.I)
@@ -184,8 +123,8 @@ def parse_scoreboard_text(text: str) -> dict:
     period = _parse_period(canonical)
     clock = _parse_clock(canonical)
     numbers = _extract_numbers(canonical)
-    replay, break_flag, final = _broadcast_status(normalized)
     home = away = None
+    # Two score-like numbers plus a clock or period cue are sufficient for a candidate.
     if (period is not None or clock is not None) and len(numbers) >= 2:
         home, away = numbers[0], numbers[1]
     return {
@@ -195,29 +134,19 @@ def parse_scoreboard_text(text: str) -> dict:
         "numbers": numbers,
         "home_score": home,
         "away_score": away,
-        "is_replay": replay,
-        "is_break": break_flag,
-        "is_final": final,
     }
 
 
 def _ocr_once(variant: np.ndarray, config: str = "--psm 7") -> tuple[str, float]:
     try:
-        data = pytesseract.image_to_data(
-            variant,
-            config=config,
-            output_type=pytesseract.Output.DICT,
-            timeout=_ocr_timeout_seconds(),
-        )
+        data = pytesseract.image_to_data(variant, config=config, output_type=pytesseract.Output.DICT)
     except Exception:
         return "", 0.0
     parts, confs = [], []
     for txt, conf in zip(data.get("text", []), data.get("conf", [])):
         txt = (txt or "").strip()
-        try:
-            cf = float(conf)
-        except Exception:
-            cf = -1
+        try: cf = float(conf)
+        except Exception: cf = -1
         if txt:
             parts.append(txt)
             if cf >= 0:
@@ -227,18 +156,19 @@ def _ocr_once(variant: np.ndarray, config: str = "--psm 7") -> tuple[str, float]
 
 def ocr_image(img: np.ndarray) -> tuple[str, float]:
     if not tesseract_available():
-        return _onnx_image(img)
-    variants = iter(_iter_variants(img))
-    first = next(variants, None)
-    if first is None:
         return "", 0.0
-    text, conf = _ocr_once(first, "--psm 7")
+    variants = _variants(img)
+    if not variants:
+        return "", 0.0
+    # Fast path: one OCR call on the enlarged colour/gray image. Broadcast overlays
+    # are usually high contrast. This is essential for 1–2 h matches.
+    text, conf = _ocr_once(variants[0], "--psm 7")
     parsed = parse_scoreboard_text(text)
     if text and (parsed["clock_seconds"] is not None or parsed["period"] is not None or len(parsed["numbers"]) >= 2):
         return text, min(1.0, conf)
+    # Fallback only when the fast pass did not produce useful scoreboard syntax.
     best_text, best_conf, best_utility = text, conf, conf
-    from itertools import islice
-    for variant in islice(variants, 2):
+    for variant in variants[1:3]:
         t, c = _ocr_once(variant, "--psm 7")
         p = parse_scoreboard_text(t)
         utility = c + (0.18 if p["clock_seconds"] is not None else 0) + (0.12 if p["period"] else 0) + (0.08 if len(p["numbers"]) >= 2 else 0)
@@ -253,7 +183,7 @@ def sample_scoreboard_observations(
     duration_seconds: float,
     max_samples: int = 48,
 ) -> list[ScoreboardObservation]:
-    if not ocr_available():
+    if not tesseract_available():
         return []
     cap = cv2.VideoCapture(str(video_path))
     if not cap.isOpened() or duration_seconds <= 0:
@@ -285,7 +215,6 @@ def sample_scoreboard_observations(
                     ocr_confidence=round(confidence, 3), period=parsed["period"],
                     clock_seconds=parsed["clock_seconds"], numbers=parsed["numbers"],
                     home_score=parsed["home_score"], away_score=parsed["away_score"],
-                    is_replay=bool(parsed["is_replay"]), is_break=bool(parsed["is_break"]), is_final=bool(parsed["is_final"]),
                 )
                 if best is None or obs.ocr_confidence > best.ocr_confidence:
                     best = obs
