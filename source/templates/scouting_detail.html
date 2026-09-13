@@ -1,6 +1,167 @@
 {% extends "base.html" %}{% block content %}
-<section class="page-head scout-detail-hero"><div><span class="eyebrow">{{ scout_team.team_type|replace('_',' ') }} · {{ scout_team.country }}</span><h1>{{ scout_team.name }}</h1><p>{{ scout_team.competition }} · {{ scout_team.season_label }}</p></div><div class="trust-badge">{{ scout_team.roster_status|replace('_',' ') }}</div></section>
-<div class="scout-detail-grid"><section class="panel"><span class="eyebrow">ROSTER</span><h2>Players currently in the scouting file</h2><p class="muted">Current-season confirmation is tracked player by player. Empty rosters remain empty rather than guessed.</p>{% if players %}<div class="roster-table"><div class="roster-head"><span>Cap</span><span>Player</span><span>Year</span><span>Nat.</span><span>Evidence status</span></div>{% for p in players %}<div class="roster-row"><b>#{{ p.cap_number if p.cap_number is not none else '—' }}</b><strong>{{ p.name }}</strong><span>{{ p.birth_year or '—' }}</span><span>{{ p.nationality or '—' }}</span><small>{{ p.current_status|replace('_',' ') }}<br>{{ p.role }}</small></div>{% endfor %}</div>{% else %}<div class="empty-state"><b>Roster refresh queued</b><p>AquaMetric has the team/fixture source but no sufficiently reliable player list yet.</p></div>{% endif %}</section>
-<aside class="panel source-card"><span class="eyebrow">SOURCE CONTROL</span><h3>{{ scout_team.roster_status|replace('_',' ') }}</h3><p>{{ scout_team.source_note }}</p><a class="btn secondary small" href="{{ scout_team.source_url }}" target="_blank" rel="noopener">Open source</a><form method="post" action="/scouting/request"><input type="hidden" name="request_type" value="team"><input type="hidden" name="query" value="Refresh {{ scout_team.name }} roster for {{ scout_team.season_label }}"><input type="hidden" name="source_hint" value="{{ scout_team.source_url }}"><button class="btn small">Request refresh</button></form></aside></div>
-{% if fixtures %}<section class="panel"><span class="eyebrow">2026–27</span><h2>Official fixtures involving this team</h2><div class="fixture-list">{% for f in fixtures %}<article class="fixture-row"><div><small>{{ f.start_text }}</small><b>{{ f.home_team }}</b><span>vs</span><b>{{ f.away_team }}</b></div><span class="source-pill">FFN</span></article>{% endfor %}</div></section>{% endif %}
+<style>
+.scouting-resource-kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin:16px 0}.scouting-resource-kpis .metric-card{padding:13px;min-height:92px}.scouting-resource-kpis strong{font-size:1.35rem}.scouting-resource-kpis p{font-size:.78rem}.scouting-leaders{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:14px}.scouting-leader{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--panel2)}.scouting-leader b{display:block}.scouting-leader strong{font-size:1.25rem}.scout-player-rich-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.scout-player-rich{padding:16px;border:1px solid var(--line);border-radius:18px;background:var(--panel2);display:grid;gap:13px}.scout-player-rich-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.scout-player-rich-title{display:flex;gap:12px;align-items:flex-start}.scout-player-rich-title .scout-player-cap{flex:0 0 auto}.scout-player-rich h3{margin:0 0 5px}.resource-status{display:flex;flex-direction:column;align-items:flex-end;gap:4px}.resource-status b{font-size:1.1rem}.resource-status small{text-transform:uppercase;letter-spacing:.05em}.player-context{display:flex;flex-wrap:wrap;gap:7px}.player-context span,.resource-chip,.coverage-chip{display:inline-flex;align-items:center;gap:4px;padding:5px 8px;border:1px solid var(--line);border-radius:999px;font-size:.74rem;background:var(--panel)}.player-context .strong{font-weight:700}.player-resource-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:7px}.player-resource-grid div{padding:9px 7px;border:1px solid var(--line);border-radius:12px;text-align:center;background:var(--panel)}.player-resource-grid b{display:block;font-size:1.02rem}.player-resource-grid small{font-size:.68rem}.documented-stats{display:flex;gap:7px;flex-wrap:wrap}.resource-chip b{font-size:.88rem}.coverage-list{display:flex;gap:6px;flex-wrap:wrap}.coverage-chip.ok{border-color:rgba(38,180,120,.35)}.coverage-chip.missing{opacity:.55}.shot-evidence,.player-evidence-footer{font-size:.78rem}.player-evidence-footer{display:flex;justify-content:space-between;gap:10px;align-items:flex-end;border-top:1px solid var(--line);padding-top:10px}.player-evidence-footer .profile-open{flex:0 0 auto}.player-evidence-note{margin:0}.scouting-policy-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+@media(max-width:1100px){.scouting-resource-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.scouting-leaders{grid-template-columns:repeat(2,minmax(0,1fr))}.player-resource-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:760px){.scout-player-rich-grid{grid-template-columns:1fr}.scouting-policy-grid{grid-template-columns:1fr}.scouting-resource-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.scouting-leaders{grid-template-columns:1fr}.scout-player-rich-head{display:grid}.resource-status{align-items:flex-start}.player-evidence-footer{display:grid}}
+</style>
+
+<section class="page-head scout-detail-hero">
+  <div>
+    <span class="eyebrow">DOSSIER RECRUTEMENT · {{ scout_team.team_type|replace('_',' ') }} · {{ scout_team.country }}</span>
+    <h1>{{ scout_team.name }}</h1>
+    <p>{{ scout_team.competition }} · {{ scout_team.season_label }}</p>
+  </div>
+  <div class="trust-badge">{{ scout_team.roster_status|replace('_',' ') }}</div>
+</section>
+
+<section class="panel">
+  <div class="section-head">
+    <div>
+      <span class="eyebrow">RESSOURCES JOUEUSES · MÊME MOTEUR QUE LA FICHE JOUEUSE</span>
+      <h2>Profondeur du dossier Scouting</h2>
+      <p class="muted">Le dossier équipe réutilise désormais les profils canoniques, sources, preuves de match, métriques, tirs localisés, vidéos attribuées et mouvements disponibles dans les fiches joueuses.</p>
+    </div>
+    <span class="pill">{{ resource_summary.linked_profiles }}/{{ resource_summary.players }} profils reliés</span>
+  </div>
+  <div class="scouting-resource-kpis">
+    <div class="metric-card"><small>Joueuses</small><strong>{{ resource_summary.players }}</strong><p>effectif du dossier</p></div>
+    <div class="metric-card"><small>Sources</small><strong>{{ resource_summary.sources }}</strong><p>preuves rattachées aux joueuses</p></div>
+    <div class="metric-card"><small>Matchs-joueuses</small><strong>{{ resource_summary.documented_player_matches }}</strong><p>présences ou statistiques documentées</p></div>
+    <div class="metric-card"><small>Métriques</small><strong>{{ resource_summary.metrics }}</strong><p>observations individuelles traçables</p></div>
+    <div class="metric-card"><small>Tirs localisés</small><strong>{{ resource_summary.located_shots }}</strong><p>terrain ou cage avec coordonnées</p></div>
+    <div class="metric-card"><small>Preuves vidéo</small><strong>{{ resource_summary.video_evidence }}</strong><p>vidéo réellement attribuée / analysée</p></div>
+  </div>
+  {% if resource_summary.leaders %}
+  <div class="scouting-leaders">
+    {% for leader in resource_summary.leaders %}
+    <a class="scouting-leader" href="{{ leader.profile_url }}"><span><small>{{ leader.label }}</small><b>{{ leader.name }}</b></span><strong>{{ leader.value }}</strong></a>
+    {% endfor %}
+  </div>
+  {% endif %}
+  <div class="scouting-policy-grid">
+    <div class="notice compact"><b>Classements uniquement sur données documentées</b><p>Un leader n'apparaît que lorsqu'une métrique individuelle existe réellement. L'absence de statistique n'est jamais transformée en zéro sportif.</p></div>
+    <div class="notice compact"><b>Couverture visible joueuse par joueuse</b><p>Chaque carte indique ce qui est couvert et ce qui manque : identité, sources, matchs, statistiques, tirs, vidéo, parcours et mouvements.</p></div>
+  </div>
+</section>
+
+<div class="scout-detail-grid">
+  <section class="panel">
+    <span class="eyebrow">1 · EFFECTIF & PROFILS ENRICHIS</span>
+    <h2>Joueuses rattachées à ce dossier</h2>
+    <p class="muted">Chaque carte est une vue compacte de la Fiche joueuse. Ouvrez-la pour retrouver le dossier complet, le détail match par match, la carrière, les sources, les cartes de tirs et l'historique des analyses.</p>
+    {% if players %}
+    <div class="scout-player-rich-grid" data-safe-resolver-prefix="/intelligence/player?name=">
+      {% for p in players %}
+      <article class="scout-player-card scout-player-rich">
+        <div class="scout-player-rich-head">
+          <div class="scout-player-rich-title">
+            <div class="scout-player-cap">#{{ p.cap_number if p.cap_number is not none else '—' }}</div>
+            <div>
+              <h3>{{ p.name }}</h3>
+              <div class="scout-player-meta"><span>{{ p.birth_year or '—' }}</span><span>{{ p.nationality or '—' }}</span><span>{{ p.role }}</span></div>
+            </div>
+          </div>
+          <div class="resource-status"><b>{{ p.coverage_score }}%</b><small>couverture {{ p.coverage_state }}</small><span>{{ (p.confidence*100)|round|int }}% confiance identité</span></div>
+        </div>
+
+        <div class="player-context">
+          {% if p.profile and p.profile.current_club %}<span class="strong">Club · {{ p.profile.current_club }}</span>{% endif %}
+          {% if p.profile and p.profile.current_national_team %}<span>Sélection · {{ p.profile.current_national_team }}</span>{% endif %}
+          {% if p.evidence_seasons %}<span>Saisons preuve · {{ p.evidence_seasons|join(' · ') }}</span>{% endif %}
+          {% if p.competitions %}<span>Compétitions · {{ p.competitions|join(' · ') }}</span>{% endif %}
+        </div>
+
+        <div class="player-resource-grid">
+          <div><b>{{ p.documented_matches }}</b><small>matchs documentés</small></div>
+          <div><b>{{ p.performance_matches }}</b><small>matchs avec stats</small></div>
+          <div><b>{{ p.sources_count }}</b><small>sources</small></div>
+          <div><b>{{ p.metrics_count }}</b><small>métriques</small></div>
+          <div><b>{{ p.shot.located }}</b><small>tirs localisés</small></div>
+          <div><b>{{ p.video_evidence_count }}</b><small>preuves vidéo</small></div>
+        </div>
+
+        {% set mt=p.metric_totals %}
+        {% if mt.goals or mt.assists or mt.shots or mt.steals or mt.saves or mt.exclusion_earned or mt.penalty_earned %}
+        <div>
+          <small class="muted">STATISTIQUES DOCUMENTÉES DANS LA BASE</small>
+          <div class="documented-stats">
+            {% if mt.goals %}<span class="resource-chip"><b>{{ mt.goals|round|int }}</b> buts</span>{% endif %}
+            {% if mt.assists %}<span class="resource-chip"><b>{{ mt.assists|round|int }}</b> passes déc.</span>{% endif %}
+            {% if mt.shots %}<span class="resource-chip"><b>{{ mt.shots|round|int }}</b> tirs</span>{% endif %}
+            {% if mt.steals %}<span class="resource-chip"><b>{{ mt.steals|round|int }}</b> steals</span>{% endif %}
+            {% if mt.saves %}<span class="resource-chip"><b>{{ mt.saves|round|int }}</b> arrêts</span>{% endif %}
+            {% if mt.exclusion_earned %}<span class="resource-chip"><b>{{ mt.exclusion_earned|round|int }}</b> exclusions obtenues</span>{% endif %}
+            {% if mt.penalty_earned %}<span class="resource-chip"><b>{{ mt.penalty_earned|round|int }}</b> penalties obtenus</span>{% endif %}
+          </div>
+        </div>
+        {% endif %}
+
+        {% if p.shot.observations %}
+        <div class="shot-evidence">
+          <b>Intelligence tirs :</b> {{ p.shot.observations }} observation(s), {{ p.shot.located }} localisée(s)
+          {% if p.shot.side_preference %} · tendance {{ p.shot.side_preference }} {{ p.shot.side_share }}%{% endif %}
+          {% if p.shot.efficiency is not none %} · {{ p.shot.efficiency }}% de buts sur {{ p.shot.known_outcomes }} issues connues{% endif %}
+          {% if p.shot.top_contexts %} · contextes {{ p.shot.top_contexts|join(', ') }}{% endif %}
+        </div>
+        {% endif %}
+
+        <div>
+          <small class="muted">COUVERTURE DES RESSOURCES</small>
+          <div class="coverage-list">
+            {% for label, available in p.coverage_dimensions.items() %}<span class="coverage-chip {{ 'ok' if available else 'missing' }}">{{ '✓' if available else '—' }} {{ label }}</span>{% endfor %}
+          </div>
+        </div>
+
+        {% if p.recent_transfers %}
+        <div class="shot-evidence"><b>Mouvements :</b> {% for t in p.recent_transfers %}{{ t.from_team or '—' }} → {{ t.to_team or '—' }} ({{ t.season }}, {{ t.signal_type|replace('_',' ') }}){% if not loop.last %} · {% endif %}{% endfor %}</div>
+        {% endif %}
+
+        <div class="player-evidence-footer">
+          <p class="muted player-evidence-note">{{ p.note or (p.profile.note if p.profile else 'Profil à enrichir avec des preuves supplémentaires.') }}</p>
+          <a class="profile-open" href="{{ p.profile_url }}" aria-label="Ouvrir le profil {{p.name}}"><span>Fiche joueuse complète</span><b>→</b></a>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state"><b>Effectif en attente de confirmation</b><p>Le dossier reste vide tant qu'une liste de joueuses suffisamment fiable n'est pas disponible.</p></div>
+    {% endif %}
+  </section>
+
+  <aside class="panel source-card">
+    <span class="eyebrow">2 · FIABILITÉ DU DOSSIER</span>
+    <h3>{{ scout_team.roster_status|replace('_',' ') }}</h3>
+    <p>{{ scout_team.source_note }}</p>
+    <div class="notice"><b>Principe de recrutement</b><p>Les informations non confirmées restent explicitement marquées comme telles. L'absence de donnée n'est jamais interprétée comme une preuve négative.</p></div>
+    <div class="notice compact"><b>Lecture de la couverture</b><p>Le pourcentage affiché mesure la richesse documentaire disponible, pas le niveau sportif de la joueuse.</p></div>
+    <a class="btn secondary small" href="{{ scout_team.source_url }}" target="_blank" rel="noopener">Ouvrir la source officielle</a>
+  </aside>
+</div>
+
+<section class="panel">
+  <div class="section-head"><div><span class="eyebrow">3 · MOUVEMENTS</span><h2>Arrivées, départs et signaux mercato</h2><p class="muted">Les mouvements sont séparés entre confirmations et informations encore rapportées. Ils alimentent également les cartes joueuses ci-dessus.</p></div><a class="mini-link" href="/transfer-watch">Voir toute la veille mercato →</a></div>
+  <div id="movement-grid" class="evaluation-grid" data-team-id="{{scout_team.id}}"><div class="empty-state"><b>Vérification des mouvements associés…</b></div></div>
+</section>
+
+<section class="panel">
+  <div class="section-head"><div><span class="eyebrow">4 · ENCADREMENT</span><h2>Coach et staff</h2><p class="muted">Le contexte sportif et le staff sont conservés dans le dossier pour mieux interpréter le rôle et la progression des joueuses.</p></div><a class="mini-link" href="/coaches">Tous les coachs →</a></div>
+  <div id="coach-grid" class="evaluation-grid" data-team-id="{{scout_team.id}}"><div class="empty-state"><b>Chargement des informations staff…</b></div></div>
+</section>
+
+{% if fixtures %}
+<section class="panel">
+  <span class="eyebrow">5 · CALENDRIER</span>
+  <h2>Matchs officiels associés à l'équipe</h2>
+  <div class="fixture-list">{% for f in fixtures %}<article class="fixture-row"><div><small>{{ f.start_text }}</small><b>{{ f.home_team }}</b><span>vs</span><b>{{ f.away_team }}</b></div><span class="source-pill">FFN</span></article>{% endfor %}</div>
+</section>
+{% endif %}
+
+<section class="panel">
+  <div class="section-head"><div><span class="eyebrow">DOSSIER RECRUTEMENT</span><h2>Revenir au vivier et aux autres équipes</h2></div><a class="btn secondary small" href="/scouting">← Revenir à Recrutement</a></div>
+</section>
+
+<script>
+(async function(){const box=document.getElementById('coach-grid');if(!box)return;try{const r=await fetch('/api/scouting/'+box.dataset.teamId+'/coaches',{credentials:'same-origin'});const d=await r.json();if(!d.coaches||!d.coaches.length){box.innerHTML='<div class="empty-state"><b>Coach non confirmé</b><p>Aucune affectation suffisamment fiable n’est enregistrée pour le moment.</p></div>';return;}box.innerHTML=d.coaches.map(c=>`<article class="evaluation-card"><div class="evaluation-top"><div><a class="profile-link" href="${c.profile_url}"><b>${c.name}</b></a><small>${c.role} · ${c.season}</small></div><span class="trust-badge">${Math.round(c.confidence*100)}%</span></div><p>${c.status.replaceAll('_',' ')}</p><small>${c.source_tier}</small></article>`).join('');}catch(e){box.innerHTML='<div class="empty-state"><b>Données staff indisponibles</b></div>';}})();
+(async function(){const box=document.getElementById('movement-grid');if(!box)return;try{const r=await fetch('/api/scouting/'+box.dataset.teamId+'/transfers',{credentials:'same-origin'});const d=await r.json();if(!d.movements||!d.movements.length){box.innerHTML='<div class="empty-state"><b>Aucun mouvement associé pour le moment</b><p>Cela ne signifie pas qu’aucun changement n’a eu lieu.</p></div>';return;}box.innerHTML=d.movements.map(m=>`<article class="evaluation-card"><div class="evaluation-top"><div><a class="profile-link" href="${m.profile_url}"><b>${m.player}</b></a><small>${m.date} · ${m.direction==='arrival'?'arrivée':'départ'}</small></div><span class="trust-badge">${Math.round(m.confidence*100)}%</span></div><p>${m.from} → ${m.to}</p><small>${m.status.replaceAll('_',' ')} · ${m.source_tier}</small></article>`).join('');}catch(e){box.innerHTML='<div class="empty-state"><b>Données mercato indisponibles</b></div>';}})();
+</script>
 {% endblock %}

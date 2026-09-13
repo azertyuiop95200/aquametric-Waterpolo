@@ -1,0 +1,56 @@
+{
+  "version": "2026-09-03",
+  "scope": "Women's senior and U20 national-team analyst reference",
+  "world_ranking": {
+    "computed_at": "2026-08-01T08:07:00Z",
+    "source": "https://api.worldaquatics.com/fina/rankings/waterPolo/report/pdf?gender=F&pageSize=200&rankingType=ELITE",
+    "top12": [
+      {"rank":1,"team":"Spain","points":1866.10},
+      {"rank":2,"team":"United States","points":1637.90},
+      {"rank":3,"team":"Netherlands","points":1629.68},
+      {"rank":4,"team":"Hungary","points":1550.90},
+      {"rank":5,"team":"Greece","points":1461.83},
+      {"rank":6,"team":"Australia","points":1339.30},
+      {"rank":7,"team":"Italy","points":1205.83},
+      {"rank":8,"team":"China","points":961.00},
+      {"rank":9,"team":"Canada","points":676.80},
+      {"rank":10,"team":"Great Britain","points":635.13},
+      {"rank":11,"team":"Croatia","points":557.50},
+      {"rank":12,"team":"Russia","points":528.50}
+    ],
+    "priority_outside_top12": [{"rank":14,"team":"France","points":494.90},{"rank":25,"team":"Israel","points":151.73}]
+  },
+  "europe_2026_final": {
+    "source": "https://europeanaquatics.org/funchal-2026-netherlands-retain-european-title-after-defeating-hungary-in-final/",
+    "top12": ["Netherlands","Hungary","Greece","Italy","Spain","Croatia","Israel","France","Great Britain","Serbia","Germany","Portugal"]
+  },
+  "u20_europe_2026": {
+    "source": "https://europeanaquatics.org/oeiras-2026-hungary-u20s-crowned-european-champions-after-edging-epic-shootout-with-spain/",
+    "top12": ["Hungary","Spain","Netherlands","Italy","Neutral Athletes B","Greece","Croatia","Great Britain","Israel","Serbia","France","Portugal"],
+    "priority": {
+      "France": {"rank":11,"reference_results":["Israel 19-9 France","France 27-5 Portugal"]},
+      "Israel": {"rank":9,"reference_results":["Greece 18-13 Israel","Spain 26-10 Israel","Israel 19-9 France","Israel 16-7 Serbia"]},
+      "Russia_NAB": {"rank":5,"reference_results":["Hungary 15-11 NAB","NAB 20-7 Croatia","NAB 14-9 Greece"]}
+    }
+  },
+  "russia_senior_2026": {
+    "world_cup_final_rank": 4,
+    "quarterfinal": "Russia 11-6 Netherlands",
+    "semifinal": "Russia 13-15 Spain after penalty shootout",
+    "bronze": "Australia 12-9 Russia",
+    "division2_final": "Russia 18-17 China",
+    "official_results": "https://www.worldaquatics.com/competitions/5133/women-s-water-polo-world-cup-2026-division-2/results"
+  },
+  "video_reference": [
+    {"label":"USA-Spain World Cup 2026 final","provider":"World Aquatics / YouTube embed","youtube_id":"a5Ja269h5G8","kind":"official_highlights"},
+    {"label":"Russia-Spain World Cup 2026 semifinal","provider":"World Aquatics / YouTube embed","youtube_id":"VvuJSTuuUI8","kind":"official_highlights"},
+    {"label":"France-Israel senior 2026","provider":"public YouTube video","youtube_id":"fWFM4kB8nvw","kind":"public_video"},
+    {"label":"Spain-Greece U20 benchmark","provider":"YouTube embed","youtube_id":"bF-Am10VtF4","kind":"full_match_reference"}
+  ],
+  "evidence_policy": {
+    "third_party_video": "Embed or timestamp only; do not copy the video file.",
+    "real_screenshots": "Generate from owned/uploaded video only.",
+    "pedagogical_diagrams": "Must be labelled reconstruction when they are not a verified frame.",
+    "absolute_speed": "Display only from calibrated or explicitly tagged measurement."
+  }
+}

@@ -1,0 +1,15 @@
+{% macro render(value, labels) -%}
+{% if value is mapping %}
+<table class="metric-table"><tbody>
+{% for key,item in value.items() %}
+<tr><th scope="row">{{ labels.get(key, key|replace('_',' ')) }}</th><td>
+{% if item is mapping or (item is sequence and item is not string) %}
+<details><summary>Voir le détail ({{ item|length }})</summary>{{ render(item, labels) }}</details>
+{% elif item is none %}<span class="unmeasured">— · non mesuré</span>
+{% elif item is sameas true %}Oui{% elif item is sameas false %}Non
+{% else %}{{ item }}{% endif %}
+</td></tr>{% endfor %}</tbody></table>
+{% elif value is sequence and value is not string %}
+{% for item in value %}{{ render(item, labels) }}{% else %}<p>Aucune donnée enregistrée.</p>{% endfor %}
+{% else %}{{ value if value is not none else '— · non mesuré' }}{% endif %}
+{%- endmacro %}

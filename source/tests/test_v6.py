@@ -24,6 +24,7 @@ def test_analysis_library_and_match_tabs():
     r=client.get('/analysis-library')
     assert r.status_code==200
     assert 'Spain' in r.text and 'Greece' in r.text
+    assert "Bibliothèque d'analyse opérationnelle" in r.text
     # find first detail id from known seeded DB by hyperlink
     import re
     m=re.search(r'/analysis-library/(\d+)',r.text)
@@ -32,4 +33,5 @@ def test_analysis_library_and_match_tabs():
     assert d.status_code==200
     assert 'Player stats' in d.text
     assert 'Tactical notes' in d.text
-    assert 'Official report' in d.text
+    assert 'Traçabilité' in d.text
+    assert 'RELECTURE QUART PAR QUART' in d.text

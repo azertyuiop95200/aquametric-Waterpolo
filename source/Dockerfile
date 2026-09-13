@@ -13,7 +13,8 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY scripts/install_dependencies.py scripts/install_dependencies.py
+RUN python scripts/install_dependencies.py
 COPY . .
 
 EXPOSE 10000
