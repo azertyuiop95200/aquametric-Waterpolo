@@ -6,6 +6,7 @@ os.environ.setdefault("DATABASE_URL", "sqlite:///./test_aquametric.db")
 from fastapi.testclient import TestClient
 
 from main import app
+import priority_analysis_routes
 
 client = TestClient(app)
 
@@ -41,4 +42,8 @@ def test_clean_report_uses_non_measured_instead_of_fake_zero():
 def test_clean_report_route_has_priority():
     routes = [r for r in app.routes if getattr(r, "path", None) == "/matches/{match_id}/analysis/result" and "GET" in (getattr(r, "methods", set()) or set())]
     assert routes
-    assert routes[0].endpoint.__module__ == "analysis_result_clean_v2"
+    # The priority wrapper now owns the public route so it can recover an
+    # interrupted browser-capture session before rendering. It must still
+    # delegate the actual report HTML to the canonical clean V2 renderer.
+    assert routes[0].endpoint.__module__ == "priority_analysis_routes"
+    assert priority_analysis_routes._clean_analysis_result_v2.__module__ == "analysis_result_clean_v2"
