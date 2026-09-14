@@ -138,6 +138,7 @@ def _publish_report_first(match_id: int, root: Path) -> dict:
         "report_ready": True,
         "retry_available": False,
         "enrichment_status": "queued",
+        "media_status": "queued",
         "v16_report_published_at": time.time(),
     })
     _write_state(root, state)
@@ -165,6 +166,7 @@ def _publish_report_first(match_id: int, root: Path) -> dict:
         "report_ready": True,
         "retry_available": False,
         "enrichment_status": "queued",
+        "media_status": "queued",
         "v16_report_published_at": float(state.get("v16_report_published_at") or time.time()),
         "finalization_job_status": "partial",
         "finalization_job_progress": 100,

@@ -257,6 +257,10 @@ def _ocr_once(variant: np.ndarray, config: str = "--psm 7") -> tuple[str, float]
 
 
 def ocr_image(img: np.ndarray) -> tuple[str, float]:
+    # Small hosted instances can use the bounded in-process backend instead of
+    # starting many Tesseract subprocesses for every cropped scoreboard.
+    if os.getenv("AQUAMETRIC_OCR_BACKEND", "auto").lower() == "rapidocr" and _onnx_engine() is not None:
+        return _onnx_image(img)
     if not tesseract_available():
         return _onnx_image(img)
     variants = iter(_iter_variants(img))

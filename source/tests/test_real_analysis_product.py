@@ -107,7 +107,7 @@ def test_zip_contract_contains_all_analysis_folders_and_deep_manifest():
         "06_sources/public_reference.json",
     ):
         assert folder in source
-    assert "Les vidéos tierces ne sont pas copiées" in source
+    assert "Les extraits proviennent uniquement des pixels fournis par l'utilisateur" in source
 
     deep = (ROOT / "services" / "deep_analysis_sequences.py").read_text(encoding="utf-8")
     assert "sequence_manifest.csv" in deep

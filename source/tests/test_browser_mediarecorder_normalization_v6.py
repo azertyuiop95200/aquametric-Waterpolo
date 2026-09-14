@@ -49,3 +49,19 @@ def test_streaming_webm_is_normalized_to_seekable_video(tmp_path):
     # Keep the original probe in the assertion path: this test remains useful
     # whether this ffmpeg build writes duration for live WebM or not.
     assert isinstance(original_probe["ok"], bool)
+
+
+def test_native_render_normalizes_stream_without_system_ffmpeg_or_ffprobe(tmp_path, monkeypatch):
+    import services.browser_capture_media as media
+    source = tmp_path / 'native-stream.webm'
+    _make_streaming_webm(source)
+    monkeypatch.setattr(media.shutil, 'which', lambda name: None)
+    normalized, info = media.normalize_browser_capture(source, tmp_path / 'native-derived', fast_analysis=True)
+    assert info['normalization'] in {'not_needed', 'remux_genpts', 'reencode_h264_fast_analysis'}
+    assert info['duration'] > 3 and info['decode_ok'] and info['seekable']
+    cap = cv2.VideoCapture(str(normalized))
+    try:
+        cap.set(cv2.CAP_PROP_POS_MSEC, 2500)
+        assert cap.read()[0]
+    finally:
+        cap.release()

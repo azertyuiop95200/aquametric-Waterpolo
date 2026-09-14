@@ -1,10 +1,11 @@
 """Install result-first analysis routes directly on the FastAPI application."""
 from __future__ import annotations
 
+import os
 from threading import Lock
 
-from fastapi import Depends, File, Form, Request, UploadFile
-from fastapi.responses import HTMLResponse
+from fastapi import BackgroundTasks, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from analysis_library_product_routes import published_ultimate_detail, ultimate_analysis_library
@@ -25,6 +26,7 @@ from db import get_db
 import capture_turbo_routes as _capture_base
 from services.capture_state_io import write_state_atomic
 from services.scoreboard_ocr import tesseract_available
+from services.capture_report_progress import latest_capture_root, report_progress
 
 _capture_base._write_state = write_state_atomic
 
@@ -59,8 +61,9 @@ def turbo_progress_frame(
     with _LIVE_FRAME_OCR_LOCK:
         base_gate = _capture_base.ocr_available
         banner_gate = _capture_v5.ocr_available
-        _capture_base.ocr_available = tesseract_available
-        _capture_v5.ocr_available = tesseract_available
+        live_ocr = (lambda: False) if os.getenv("CAPTURE_LIVE_OCR", "1") == "0" else tesseract_available
+        _capture_base.ocr_available = live_ocr
+        _capture_v5.ocr_available = live_ocr
         try:
             return _turbo_progress_frame_v16(
                 match_id=match_id,
@@ -94,7 +97,10 @@ def turbo_browser_capture_page(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    response = _turbo_browser_capture_page_v16(match_id=match_id, request=request, db=db)
+    try:
+        response = _turbo_browser_capture_page_v16(match_id=match_id, request=request, db=db)
+    except HTTPException as exc:
+        return _unavailable_match_page(request, exc)
     html = bytes(response.body).decode("utf-8")
     return HTMLResponse(
         _patch_capture_failure_redirect(html, match_id),
@@ -110,12 +116,45 @@ def clean_analysis_result(
     # If the browser explicitly reports that its capture session disappeared,
     # clear the persisted running/finalizing flag before rendering. Otherwise the
     # report template would auto-refresh forever after an instance restart.
-    if request.query_params.get("capture_interrupted") == "1":
-        _, match = _owned_match(match_id, request, db)
-        if match.status in {"browser_capture_running", "browser_capture_finalizing"}:
-            match.status = "browser_capture_failed"
-            db.commit()
-    return _clean_analysis_result_v2(match_id=match_id, request=request, db=db)
+    try:
+        if request.query_params.get("capture_interrupted") == "1":
+            _, match = _owned_match(match_id, request, db)
+            if match.status in {"browser_capture_running", "browser_capture_finalizing"}:
+                match.status = "browser_capture_failed"
+                db.commit()
+        return _clean_analysis_result_v2(match_id=match_id, request=request, db=db)
+    except HTTPException as exc:
+        return _unavailable_match_page(request, exc)
+
+
+def _unavailable_match_page(request: Request, exc: HTTPException):
+    if exc.status_code not in {401, 404}:
+        raise exc
+    from analysis_product_routes import TEMPLATES
+    return TEMPLATES.TemplateResponse(request, "analysis_match_unavailable.html",
+        {"request": request, "user": None, "app_name": "AquaMetric"},
+        status_code=exc.status_code, headers={"Cache-Control": "private, no-store"})
+
+
+def saved_report_progress(match_id: int, request: Request, db: Session = Depends(get_db)):
+    _, match = _owned_match(match_id, request, db)
+    return JSONResponse(report_progress(match), headers={"Cache-Control": "private, no-store"})
+
+
+def regenerate_capture_clips(match_id: int, request: Request, background_tasks: BackgroundTasks,
+                             db: Session = Depends(get_db)):
+    _, match = _owned_match(match_id, request, db)
+    root = latest_capture_root(match)
+    if root is None or not (root / "capture.webm").is_file():
+        raise HTTPException(409, "La capture source n'est plus disponible. Il faut fournir de nouveau la vidéo.")
+    if not report_progress(match, root=root)["active"]:
+        import time
+        from capture_turbo_routes_v13 import _enrich_after_report
+        state = _capture_base._read_state(root)
+        state.update(media_status="queued", media_updated_at=time.time())
+        write_state_atomic(root, state)
+        background_tasks.add_task(_enrich_after_report, match.id, str(root))
+    return RedirectResponse(f"/matches/{match_id}/analysis/result#sequences", status_code=303)
 
 
 def install_priority_analysis_routes(app) -> None:
@@ -132,6 +171,8 @@ def install_priority_analysis_routes(app) -> None:
         ("/matches/{match_id}/analysis/browser-capture/status", turbo_capture_status, "GET", None, "turbo_capture_status"),
         ("/matches/{match_id}/analysis/browser-capture/finish", turbo_finish_capture, "POST", None, "turbo_capture_finish"),
         ("/matches/{match_id}/analysis/result", clean_analysis_result, "GET", HTMLResponse, "product_analysis_result"),
+        ("/matches/{match_id}/analysis/progress", saved_report_progress, "GET", None, "saved_report_progress"),
+        ("/matches/{match_id}/analysis/captured-clips", regenerate_capture_clips, "POST", None, "regenerate_capture_clips"),
         ("/matches/{match_id}/analysis/evidence-pack", regenerate_exact_evidence, "POST", None, "product_evidence_pack"),
         ("/matches/{match_id}/analysis/export.zip", export_complete_analysis, "GET", None, "product_analysis_export"),
         ("/analysis-library", ultimate_analysis_library, "GET", HTMLResponse, "product_analysis_library"),

@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import io
 import json
+import os
 import re
 import zipfile
 from pathlib import Path
@@ -448,6 +449,7 @@ def sequence_gallery(db, match, *, max_total: int = 72) -> list[dict]:
     targets = collect_sequence_targets(db, match, max_total=max_total)
     artifacts = list(match.media_artifacts or [])
     cards = []
+    evidence_dir = Path(os.getenv("EVIDENCE_DIR", Path(__file__).resolve().parents[1] / "evidence"))
     for target in targets:
         second = float(target["second"])
         near = [
@@ -455,16 +457,21 @@ def sequence_gallery(db, match, *, max_total: int = 72) -> list[dict]:
             if str(a.source or "").startswith("analysis_deep_")
             and abs(float(a.second or 0) - second) <= 0.55
         ]
-        clip = next((a for a in near if a.artifact_type == "clip" and a.file_path), None)
-        screenshots = [a for a in near if a.artifact_type == "screenshot" and a.file_path]
+        clip = next((a for a in near if a.artifact_type == "clip" and a.file_path
+                     and (evidence_dir / Path(a.file_path).name).is_file()), None)
+        screenshots = [a for a in near if a.artifact_type == "screenshot" and a.file_path
+                       and (evidence_dir / Path(a.file_path).name).is_file()]
         screenshots.sort(key=lambda a: (float(a.start_second or 0), a.id or 0))
         bookmark = next((a for a in near if a.artifact_type == "bookmark" and a.external_url), None)
         start = float(target["start_second"])
         end = float(target["end_second"])
         cards.append({
             **target,
+            "start_second": float(clip.start_second) if clip else start,
+            "end_second": float(clip.end_second) if clip else end,
             "clip_id": clip.id if clip else None,
             "clip_url": f"/matches/{match.id}/evidence/{clip.id}" if clip else "",
+            "clip_note": clip.note if clip else "",
             "screenshot_urls": [f"/matches/{match.id}/evidence/{a.id}" for a in screenshots],
             "screenshot_ids": [a.id for a in screenshots],
             "external_url": bookmark.external_url if bookmark else (timestamped_video_url(match.video_url, start) if match.video_url else ""),

@@ -18,6 +18,7 @@ from analysis_product_routes import TEMPLATES, _owned_match
 from services.analysis_product import analysis_snapshot, youtube_segment_embed
 from services.deep_analysis_sequences import sequence_gallery, sequence_summary
 from services.video import youtube_embed
+from services.capture_report_progress import report_progress
 
 
 def _verified_side(events: list[dict], perspective: str) -> dict:
@@ -67,6 +68,7 @@ def clean_analysis_result(match_id: int, request: Request, db: Session = Depends
             "sequences": sequences,
             "sequence_summary": sequence_summary(sequences),
             "source_embed": source_embed,
+            "capture_progress": report_progress(match),
             "category": getattr(match.team, "category", "") or "Non précisée",
         },
     )
@@ -75,6 +77,8 @@ def clean_analysis_result(match_id: int, request: Request, db: Session = Depends
 def download_analysis_report(match_id: int, request: Request, db: Session = Depends(get_db)):
     """Portable report rebuilt from the authenticated owner's saved evidence."""
     from datetime import datetime, timezone
+    from pathlib import Path
+    from analysis_product_routes import EVIDENCE_DIR
     user, match = _owned_match(match_id, request, db)
     snapshot = analysis_snapshot(db, match)
     return TEMPLATES.TemplateResponse(request, 'analysis_report_portable.html', {
@@ -82,5 +86,8 @@ def download_analysis_report(match_id: int, request: Request, db: Session = Depe
         'generated_at': datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC'),
         'for_verified': _verified_side(snapshot['verified_events'], 'for'),
         'against_verified': _verified_side(snapshot['verified_events'], 'against'),
+        'export_media': [{**row, 'file_url': str(request.base_url).rstrip('/') + f'/matches/{match.id}/evidence/{row["id"]}'}
+                         for row in snapshot['artifacts'] if row.get('artifact_type') == 'clip'
+                         and row.get('file_path') and (EVIDENCE_DIR / Path(row['file_path']).name).is_file()],
     }, headers={'Content-Disposition': f'attachment; filename="rapport-match-{match.id}.html"',
                 'Cache-Control': 'private, no-store'})

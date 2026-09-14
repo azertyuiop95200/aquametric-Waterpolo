@@ -39,7 +39,8 @@ def _run_ffmpeg(args: list[str], timeout: int = 180) -> None:
     if not executable:
         raise MediaGenerationError("FFmpeg is not available on this server.")
     proc = subprocess.run(
-        [executable, "-hide_banner", "-loglevel", "error", "-y", *args],
+        [executable, "-hide_banner", "-loglevel", "error", "-y",
+         "-threads", "1", "-filter_threads", "1", "-filter_complex_threads", "1", *args],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,

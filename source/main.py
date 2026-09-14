@@ -87,6 +87,8 @@ if not SESSION_SECRET:
     if WEB_DEMO_MODE or os.getenv("COOKIE_SECURE", "0") == "1":
         raise RuntimeError("SECRET_KEY is required for secured web deployments")
     SESSION_SECRET = "dev-only-local-secret-change-me"
+from services.session_database_identity import database_bound_session_secret
+SESSION_SECRET = database_bound_session_secret(engine, SESSION_SECRET)
 app.add_middleware(
     SessionMiddleware,
     secret_key=SESSION_SECRET,

@@ -1,0 +1,13 @@
+{% if export_media %}
+<section><h2>Extraits vidéo détaillés</h2>
+{% for clip in export_media %}
+<article style="margin:24px 0;break-inside:avoid">
+  <h3>{{clip.title}}</h3>
+  <p>{{'%.1f'|format(clip.start_second)}}–{{'%.1f'|format(clip.end_second)}} s · moment repéré à {{'%.1f'|format(clip.second)}} s</p>
+  <p>{{clip.note}}</p>
+  <video controls playsinline preload="none" style="width:100%;max-width:760px" src="{{clip.file_url}}"></video>
+  <p><a href="{{clip.file_url}}">Ouvrir le fichier MP4</a></p>
+</article>
+{% endfor %}
+</section>
+{% endif %}
