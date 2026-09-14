@@ -20,7 +20,7 @@ from services.match_statistics import build_match_statistics, reference_player_s
 from services.rapid_match_analysis import run_rapid_analysis, RapidAnalysisError
 from services.tactical_engine import analyze_match_tactics
 from services.ratings import calculate_player_rating
-from services.scoreboard_ocr import tesseract_available
+from services.scoreboard_ocr import ocr_available
 from services.video import youtube_embed
 from analysis_library_routes_v2 import _quarter_review
 
@@ -121,7 +121,7 @@ def match_analysis_workspace(match_id: int, request: Request, db: Session = Depe
         "vision": latest_vision, "auto": latest_auto, "auto_summary": auto_summary,
         "auto_limitations": auto_limitations, "periods": periods, "candidates": candidates,
         "tactical_report": analyze_match_tactics(match), "player_evaluations": player_evaluations,
-        "tesseract_ready": tesseract_available(),
+        "ocr_ready": ocr_available(),
     })
 
 

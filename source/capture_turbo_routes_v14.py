@@ -24,7 +24,7 @@ from capture_turbo_routes import _FAST_CAPTURE_SENTINEL, _read_state, _write_sta
 from db import SessionLocal, get_db
 from models import AutonomousAnalysis, Match, VisionAnalysis
 from services.live_frame_match_analysis import live_frame_coverage, run_live_frame_analysis
-from services.scoreboard_ocr import tesseract_available
+from services.scoreboard_ocr import ocr_available
 
 log = logging.getLogger("aquametric.browser_capture.v14")
 
@@ -137,7 +137,7 @@ def _publish_fallback_report(match_id: int, root_value: str, reason: str) -> dic
             match_id=match.id,
             status="partial",
             engine_version="live-frame-autonomy-resilient-v14",
-            ocr_available=tesseract_available(),
+            ocr_available=ocr_available(),
             observations_json="[]",
             periods_json="[]",
             summary_json=json.dumps(summary, ensure_ascii=False),

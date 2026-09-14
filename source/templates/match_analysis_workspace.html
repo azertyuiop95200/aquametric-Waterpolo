@@ -169,7 +169,7 @@
   <div class="metric-grid">
     <div class="metric-cell"><span>Niveau</span><b>{{ statistics.coverage.level|replace("_"," ") }}</b></div>
     <div class="metric-cell"><span>Joueuses avec données match</span><b>{{ statistics.coverage.player_rows_with_evidence }}/{{ statistics.coverage.player_rows_total }}</b></div>
-    <div class="metric-cell"><span>OCR</span><b>{{ "prêt" if tesseract_ready else "indisponible" }}</b></div>
+    <div class="metric-cell"><span>OCR</span><b>{{ "prêt" if ocr_ready else "indisponible" }}</b></div>
     <div class="metric-cell"><span>Vision</span><b>{{ vision.engine_version if vision else "non lancée" }}</b></div>
   </div>
   {% for limitation in auto_limitations %}<p class="coverage-note">{{ limitation }}</p>{% endfor %}
