@@ -43,9 +43,7 @@ jobs:
           for i in $(seq 1 40); do
             body=$(curl -L --max-time 30 -fsS "$base/health" 2>/dev/null || true)
             echo "deploy check $i/40: ${body:-unavailable}"
-            deployed=$(python -c 'import json,sys; s=sys.stdin.read().strip();
-try: print(json.loads(s).get("git_commit", ""))
-except Exception: print("")' <<<"$body")
+            deployed=$(python -c 'import json,sys; print(json.load(sys.stdin).get("git_commit", ""))' <<<"$body" 2>/dev/null || true)
             if [ "$deployed" = "$TARGET_SHA" ]; then
               echo "Exact target commit is live: $deployed"
               exit 0
@@ -53,9 +51,7 @@ except Exception: print("")' <<<"$body")
             if [[ "$deployed" =~ ^[0-9a-f]{40}$ ]]; then
               compare=$(curl -L --max-time 30 -fsS \
                 "https://api.github.com/repos/$GITHUB_REPOSITORY/compare/$TARGET_SHA...$deployed" 2>/dev/null || true)
-              relation=$(python -c 'import json,sys; s=sys.stdin.read().strip();
-try: print(json.loads(s).get("status", ""))
-except Exception: print("")' <<<"$compare")
+              relation=$(python -c 'import json,sys; print(json.load(sys.stdin).get("status", ""))' <<<"$compare" 2>/dev/null || true)
               if [ "$relation" = "ahead" ] || [ "$relation" = "identical" ]; then
                 echo "A descendant of the target commit is live: $deployed ($relation)"
                 exit 0
