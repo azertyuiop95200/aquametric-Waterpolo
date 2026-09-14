@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card" style="max-width:780px;margin:32px auto;padding:24px">
+  <h1>Dossier de match indisponible</h1>
+  <p>Ce lien ne correspond à aucun match accessible avec ta session actuelle.</p>
+  <p>Connecte-toi au compte utilisé lors de l’analyse, puis retrouve le match dans ta bibliothèque. Les deux adresses AquaMetric ont des comptes et des dossiers séparés.</p>
+  <div style="display:flex;gap:12px;flex-wrap:wrap">
+    <a class="btn" href="/login">Se connecter</a>
+    <a class="btn secondary" href="/analysis-library">Retrouver mes analyses</a>
+    <a class="btn secondary" href="/matches/new">Ajouter une vidéo</a>
+  </div>
+  <p class="muted">Si le dossier a été effacé par le redémarrage d’un hébergement temporaire, son ancien lien ne permet pas de récupérer les données. Il faut restaurer une sauvegarde ou fournir de nouveau la vidéo.</p>
+</section>
+{% endblock %}

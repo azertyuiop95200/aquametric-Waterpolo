@@ -31,12 +31,24 @@
     <p><strong>La capture vidéo est reçue.</strong> AquaMetric termine la consolidation Vision/OCR avant d’afficher le rapport final.</p>
     <p class="evidence-note">Cette page se réactualise automatiquement. Les champs non encore mesurés ne sont pas transformés en zéros.</p>
   </section>
-  <script>setTimeout(()=>location.reload(),1500);</script>
   {% elif match.status == "browser_capture_failed" %}
   <section class="report-card status-failed">
     <h2>La consolidation n’a pas abouti</h2>
     <p><strong>La page n’affiche pas de faux rapport.</strong> Relance l’analyse de la capture afin de produire les données Vision/OCR.</p>
   </section>
+  {% endif %}
+
+  {% if capture_progress.active %}
+  <section class="report-card status-live" role="status" id="captureReportProgress"
+           data-url="/matches/{{match.id}}/analysis/progress"
+           data-enrichment="{{capture_progress.enrichment_status}}" data-clips="{{capture_progress.media_clips}}">
+    <h2>Le rapport se complète</h2>
+    <p data-progress-label>Consolidation des lectures et préparation des extraits vidéo… {{capture_progress.media_clips}} extrait(s) disponible(s).</p>
+    <p class="evidence-note">Les nouvelles données apparaissent automatiquement. Une vidéo en cours de lecture ne sera pas interrompue.</p>
+  </section>
+  <script src="/static/report-progress.js" defer></script>
+  {% elif capture_progress.stale %}
+  <section class="report-card status-warn"><h2>Traitement interrompu</h2><p>La dernière consolidation n’a pas terminé. Les données déjà enregistrées restent consultables ; tu peux relancer les extraits si la capture est encore disponible.</p></section>
   {% endif %}
 
   {% if match.status == "source_link_saved" %}
@@ -145,11 +157,31 @@
       {% else %}<p class="unmeasured">— · aucune identité individuelle suffisamment vérifiée</p>{% endif %}
     </section>
 
-    <section class="report-card">
-      <h2>Séquences et tactique</h2>
+    <section class="report-card section-wide" id="sequences">
+      <h2>Extraits vidéo et séquences détaillées</h2>
+      {% if capture_progress.retry_available and capture_progress.media_status != 'complete' %}
+      <form action="/matches/{{match.id}}/analysis/captured-clips" method="post"><button class="btn" type="submit">Relancer les extraits de la capture</button></form>
+      {% endif %}
       {% if sequences %}
-        <p><strong>{{sequences|length}}</strong> séquence(s) indexée(s).</p>
-        {% for s in sequences[:8] %}<div class="candidate"><strong>{{s.title or s.analysis_type or "Séquence"}}</strong><div class="evidence-note">{{s.note or "Séquence candidate liée à la chronologie."}}</div></div>{% endfor %}
+        <p><strong>{{sequence_summary.downloadable_clips}}</strong> extrait(s) vidéo disponible(s) · {{sequences|length}} séquence(s) indexée(s).</p>
+        <div class="report-grid">
+        {% for s in sequences %}
+        <article class="candidate" id="sequence-{{loop.index}}">
+          <strong>{{"%02d:%02d"|format((s.second//60)|int,(s.second%60)|int)}} · {{s.title}}</strong>
+          <p>{{s.summary}}</p>
+          <p class="confidence">{{'Événement confirmé' if s.kind == 'verified' else 'Séquence à vérifier'}} · confiance {{"%.0f"|format((s.confidence or 0)*100)}} % · {{"%.1f"|format(s.start_second)}}–{{"%.1f"|format(s.end_second)}} s</p>
+          {% if s.clip_url %}
+            <video class="video-frame" controls playsinline preload="none" src="{{s.clip_url}}" {% if s.screenshot_urls %}poster="{{s.screenshot_urls[0]}}"{% endif %} aria-label="{{s.title}}"></video>
+            {% if s.clip_note %}<p class="evidence-note">{{s.clip_note}}</p>{% endif %}
+            <a class="btn secondary" href="/matches/{{match.id}}/evidence/{{s.clip_id}}/download">Télécharger cet extrait MP4</a>
+          {% else %}
+            {% if s.screenshot_urls %}<img class="video-frame" loading="lazy" src="{{s.screenshot_urls[0]}}" alt="Image de la séquence à {{s.second}} secondes">{% endif %}
+            <p class="evidence-note">Extrait vidéo non disponible pour cette séquence.</p>
+          {% endif %}
+          {% if s.external_url %}<a href="{{s.external_url}}" target="_blank" rel="noopener">Voir ce moment dans le replay source</a>{% endif %}
+        </article>
+        {% endfor %}
+        </div>
       {% else %}<p class="unmeasured">— · pas encore de séquence tactique consolidée</p>{% endif %}
     </section>
 

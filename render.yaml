@@ -23,6 +23,10 @@ services:
         value: /tmp/aquametric_evidence
       - key: MAX_UPLOAD_MB
         value: "50"
+      - key: CAPTURE_LIVE_OCR
+        value: "0"
+      - key: AQUAMETRIC_OCR_BACKEND
+        value: rapidocr
       - key: AUTO_REFRESH_OFFICIAL_DATA
         value: "1"
       - key: OFFICIAL_REFRESH_LOOP_MINUTES

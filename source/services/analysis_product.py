@@ -417,7 +417,7 @@ def _csv_text(headers, rows) -> str:
     return buffer.getvalue()
 
 
-def _html_report(match, snapshot) -> str:
+def _html_report(match, snapshot, export_media=None) -> str:
     ultimate = snapshot["ultimate"]
     team = ultimate["team"]["basic"]
     opponent = ultimate["opponent"]["basic"]
@@ -438,6 +438,7 @@ def _html_report(match, snapshot) -> str:
     from jinja2 import Environment, FileSystemLoader, select_autoescape
     env = Environment(loader=FileSystemLoader(Path(__file__).resolve().parents[1] / "templates"), autoescape=select_autoescape())
     statistics_html = env.get_template("analysis_all_measurements.html").render(snapshot=snapshot, match=match)
+    media_html = env.get_template("analysis_export_media.html").render(export_media=export_media or [])
     return f"""<!doctype html><html lang='fr'><meta charset='utf-8'><title>AquaMetric analysis</title>
 <style>body{{font-family:Arial,sans-serif;max-width:1000px;margin:40px auto;padding:0 24px;color:#15202b}}table{{border-collapse:collapse;width:100%}}td,th{{border:1px solid #ccd6dd;padding:8px;text-align:left}}small{{color:#657786}}</style>
 <h1>{html.escape(match.team.name)} vs {html.escape(match.opponent)}</h1>
@@ -451,8 +452,9 @@ def _html_report(match, snapshot) -> str:
 <tr><td>Pertes</td><td>{measured(team, 'turnovers')}</td><td>{measured(opponent, 'turnovers')}</td></tr></table>
 <h2>Constats coach fondés sur les données</h2><ul>{findings_html}</ul>
 {statistics_html}
+{media_html}
 <h2>Preuves</h2><p>{len(snapshot['verified_events'])} événements vérifiés · {len(snapshot['automatic']['candidates'])} candidats automatiques · {len(snapshot['artifacts'])} médias/références.</p>
-<p><small>Les candidats automatiques restent distincts des faits confirmés. Les vidéos tierces ne sont pas copiées dans l'archive.</small></p></html>"""
+<p><small>Les candidats automatiques restent distincts des faits confirmés. Les extraits proviennent uniquement des pixels fournis par l'utilisateur.</small></p></html>"""
 
 
 def build_analysis_zip(db, match, evidence_dir: Path) -> io.BytesIO:
@@ -469,10 +471,13 @@ def build_analysis_zip(db, match, evidence_dir: Path) -> io.BytesIO:
             "04_sequences : candidats automatiques et séquences tactiques\n"
             "05_evidence : clips/images locaux réellement liés aux timestamps + index des références externes\n"
             "06_sources : référence publique/officiale éventuelle et contrat de preuve\n\n"
-            "Important : une source YouTube/tiers n'est jamais copiée dans le ZIP. Les segments exacts sont fournis par URL + bornes temporelles.\n"
+            "Les extraits locaux proviennent des fichiers importés ou de la capture envoyée par l'utilisateur. Un lien tiers seul ne fournit pas de fichier vidéo.\n"
         )
         archive.writestr(f"{root}/00_README.txt", readme)
-        archive.writestr(f"{root}/01_report/report.html", _html_report(match, snapshot))
+        export_media = [{**row, "file_url": "../05_evidence/clips/" + Path(row["file_path"]).name}
+                        for row in snapshot["artifacts"] if row.get("artifact_type") == "clip"
+                        and row.get("file_path") and (Path(evidence_dir) / Path(row["file_path"]).name).is_file()]
+        archive.writestr(f"{root}/01_report/report.html", _html_report(match, snapshot, export_media))
         archive.writestr(f"{root}/01_report/analysis.json", json.dumps(snapshot, ensure_ascii=False, indent=2, default=str))
         from services.measurement_report import flatten_measurements
         archive.writestr(f"{root}/02_kpis/all_match_measurements.csv",

@@ -200,24 +200,15 @@ def _enrich_after_report(match_id: int, root_value: str) -> None:
         if not match:
             return
         try:
-            materialize_deep_sequence_pack(
-                db,
-                match,
-                UPLOAD_DIR,
-                EVIDENCE_DIR,
-                max_targets=24,
-                max_clips=0,
-                max_image_targets=0,
-            )
+            from services.capture_sequence_media import materialize_capture_sequences
+            materialize_capture_sequences(db, match, root, EVIDENCE_DIR)
         except Exception as exc:
             log.warning("V13 secondary enrichment partial match=%s error=%s", match_id, exc)
-        finally:
-            # Delete transient pixels but keep progress.json long enough for the
-            # browser/report page to observe the terminal state.
-            try:
-                v10.v7._cleanup_pixels_keep_state(root)
-            except Exception:
-                pass
+            state = _read_state(root)
+            state.update(media_status="failed", media_updated_at=time.time())
+            _write_state(root, state)
+        # Keep the received source for clip generation/retry. It is private to
+        # this owner and match and is never replaced by a remote URL download.
     finally:
         db.close()
 

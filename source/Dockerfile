@@ -12,10 +12,8 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends ffmpeg tesseract-ocr \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
-COPY scripts/install_dependencies.py scripts/install_dependencies.py
-RUN python scripts/install_dependencies.py
 COPY . .
+RUN python scripts/install_dependencies.py
 
 EXPOSE 10000
 CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-10000}"]

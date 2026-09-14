@@ -3,6 +3,20 @@ import cv2
 import services.scoreboard_ocr as ocr
 
 
+def test_hosted_backend_reads_real_score_without_starting_tesseract(monkeypatch):
+    monkeypatch.setenv('AQUAMETRIC_OCR_BACKEND', 'rapidocr')
+    monkeypatch.setattr(ocr, 'tesseract_available', lambda: True)
+    def forbidden(*args, **kwargs):
+        raise AssertionError('Hosted OCR must not start Tesseract')
+    monkeypatch.setattr(ocr, '_ocr_once', forbidden)
+    pixels = np.full((86, 640, 3), 255, dtype=np.uint8)
+    cv2.putText(pixels, 'Q1 7:30 2 1', (12, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.1, (0, 0, 0), 2)
+    text, confidence = ocr.ocr_image(pixels)
+    parsed = ocr.parse_scoreboard_text(text)
+    assert (parsed['home_score'], parsed['away_score']) == (2, 1)
+    assert confidence > .8
+
+
 def test_readable_first_pass_avoids_unneeded_filters(monkeypatch):
     monkeypatch.setattr(ocr, 'tesseract_available', lambda: True)
     monkeypatch.setattr(ocr, '_ocr_once', lambda *a: ('Q1 7:30 2 1', .91))

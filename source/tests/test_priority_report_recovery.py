@@ -45,3 +45,16 @@ def test_interrupted_capture_clears_infinite_running_report(monkeypatch):
     assert routes.clean_analysis_result(7, request, db) == "report"
     assert match.status == "browser_capture_failed"
     assert commits == [True]
+
+
+def test_hosted_live_frame_skips_ocr_even_when_tesseract_is_installed(monkeypatch):
+    monkeypatch.setenv('CAPTURE_LIVE_OCR', '0')
+    monkeypatch.setattr(routes, 'tesseract_available', lambda: True)
+    seen = []
+    def frame(**kwargs):
+        seen.append(routes._capture_base.ocr_available())
+        seen.append(routes._capture_v5.ocr_available())
+        return 'pixels retained'
+    monkeypatch.setattr(routes, '_turbo_progress_frame_v16', frame)
+    assert routes.turbo_progress_frame(1, SimpleNamespace(), 'session', 0, object(), None) == 'pixels retained'
+    assert seen == [False, False]
