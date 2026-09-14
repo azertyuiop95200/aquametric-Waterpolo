@@ -1,34 +1,121 @@
 """Install result-first analysis routes directly on the FastAPI application."""
 from __future__ import annotations
 
+from threading import Lock
+
+from fastapi import Depends, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse
+from sqlalchemy.orm import Session
 
 from analysis_library_product_routes import published_ultimate_detail, ultimate_analysis_library
 from analysis_input_routes_v2 import create_flexible_uploaded_match
 from analysis_input_routes_v3 import create_flexible_url_analysis
 from analysis_product_routes import (
+    _owned_match,
     export_complete_analysis,
     regenerate_exact_evidence,
     start_real_analysis,
     start_real_url_analysis,
 )
-from analysis_result_clean_v2 import clean_analysis_result, download_analysis_report
+from analysis_result_clean_v2 import clean_analysis_result as _clean_analysis_result_v2, download_analysis_report
+from db import get_db
 
 # Patch the shared capture-state writer before importing V16 and its compatibility
 # chain. Every capture route then receives the same collision-safe atomic writer.
 import capture_turbo_routes as _capture_base
 from services.capture_state_io import write_state_atomic
+from services.scoreboard_ocr import tesseract_available
 
 _capture_base._write_state = write_state_atomic
 
 from capture_turbo_routes_v16 import (
     turbo_append_chunk,
-    turbo_browser_capture_page,
+    turbo_browser_capture_page as _turbo_browser_capture_page_v16,
     turbo_capture_status,
     turbo_create_session,
     turbo_finish_capture,
-    turbo_progress_frame,
+    turbo_progress_frame as _turbo_progress_frame_v16,
 )
+import capture_turbo_routes_v5 as _capture_v5
+
+
+# Native RapidOCR/ONNX remains available to the report-first final/enrichment pass,
+# but it must not run inside the live /frame request. On the small Render runtime a
+# native inference failure can terminate the Uvicorn process without a Python
+# traceback, deleting the ephemeral capture session before /finish is reached.
+# The live loop therefore uses only system Tesseract when it is available; pixel
+# coverage and retained JPEG evidence continue regardless of OCR availability.
+_LIVE_FRAME_OCR_LOCK = Lock()
+
+
+def turbo_progress_frame(
+    match_id: int,
+    request: Request,
+    session_id: str = Form(...),
+    wall_second: float = Form(...),
+    frame: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    with _LIVE_FRAME_OCR_LOCK:
+        base_gate = _capture_base.ocr_available
+        banner_gate = _capture_v5.ocr_available
+        _capture_base.ocr_available = tesseract_available
+        _capture_v5.ocr_available = tesseract_available
+        try:
+            return _turbo_progress_frame_v16(
+                match_id=match_id,
+                request=request,
+                session_id=session_id,
+                wall_second=wall_second,
+                frame=frame,
+                db=db,
+            )
+        finally:
+            _capture_base.ocr_available = base_gate
+            _capture_v5.ocr_available = banner_gate
+
+
+def _patch_capture_failure_redirect(html: str, match_id: int) -> str:
+    """Never leave the capture Studio stranded after a lost/restarted session."""
+    old = "catch(err){leaveStudio();setStatus(`Échec de l’analyse Vision : ${err.message||err}`)}"
+    if old not in html:
+        return html
+    new = (
+        "catch(err){leaveStudio();setStatus(`Échec de l’analyse Vision : ${err.message||err}. "
+        "Ouverture du rapport de diagnostic…`);"
+        f"setTimeout(()=>location.href='/matches/{int(match_id)}/analysis/result?capture_interrupted=1',600)"
+        "}"
+    )
+    return html.replace(old, new, 1)
+
+
+def turbo_browser_capture_page(
+    match_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    response = _turbo_browser_capture_page_v16(match_id=match_id, request=request, db=db)
+    html = bytes(response.body).decode("utf-8")
+    return HTMLResponse(
+        _patch_capture_failure_redirect(html, match_id),
+        status_code=response.status_code,
+    )
+
+
+def clean_analysis_result(
+    match_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    # If the browser explicitly reports that its capture session disappeared,
+    # clear the persisted running/finalizing flag before rendering. Otherwise the
+    # report template would auto-refresh forever after an instance restart.
+    if request.query_params.get("capture_interrupted") == "1":
+        _, match = _owned_match(match_id, request, db)
+        if match.status in {"browser_capture_running", "browser_capture_finalizing"}:
+            match.status = "browser_capture_failed"
+            db.commit()
+    return _clean_analysis_result_v2(match_id=match_id, request=request, db=db)
 
 
 def install_priority_analysis_routes(app) -> None:
