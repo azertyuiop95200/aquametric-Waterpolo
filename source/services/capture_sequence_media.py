@@ -43,7 +43,7 @@ def create_capture_clip(source: Path, destination: Path, window: dict) -> Path:
         filters.append(f"crop=trunc(iw/4)*2:trunc(ih/2)*2:{'iw/2' if pane else '0'}:0")
     elif segments == 4:
         filters.append(f"crop=trunc(iw/4)*2:trunc(ih/4)*2:{'iw/2' if pane % 2 else '0'}:{'ih/2' if pane >= 2 else '0'}")
-    filters += [f"setpts={window['rate']:.6f}*(PTS-STARTPTS)", "scale=w='min(960,iw)':h=-2"]
+    filters += [f"setpts={window['rate']:.6f}*(PTS-STARTPTS)", "scale=w='trunc(min(960,iw)/2)*2':h=-2"]
     try:
         _run_ffmpeg(["-threads", "1", "-ss", f"{window['capture_start']:.3f}",
                      "-t", f"{window['capture_duration']:.3f}", "-i", str(source),

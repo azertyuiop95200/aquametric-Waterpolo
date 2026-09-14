@@ -13,6 +13,7 @@ import math
 import shutil
 import subprocess
 from pathlib import Path
+from services.media import ffmpeg_executable
 
 
 def _float(value, default=0.0) -> float:
@@ -24,8 +25,10 @@ def _float(value, default=0.0) -> float:
 
 def ffprobe_video(path: Path) -> dict:
     ffprobe = shutil.which("ffprobe")
-    if not ffprobe or not Path(path).exists():
+    if not Path(path).exists():
         return {"ok": False, "duration": 0.0, "width": 0, "height": 0, "fps": 0.0}
+    if not ffprobe:
+        return _opencv_metadata(path)
     cmd = [
         ffprobe, "-v", "error", "-select_streams", "v:0",
         "-show_entries", "stream=width,height,avg_frame_rate,duration:format=duration",
@@ -49,6 +52,23 @@ def ffprobe_video(path: Path) -> dict:
         }
     except Exception:
         return {"ok": False, "duration": 0.0, "width": 0, "height": 0, "fps": 0.0}
+
+
+def _opencv_metadata(path: Path) -> dict:
+    """Native Render has bundled FFmpeg but no standalone ffprobe binary."""
+    import cv2
+    cap = cv2.VideoCapture(str(path))
+    try:
+        fps = _float(cap.get(cv2.CAP_PROP_FPS))
+        count = _float(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        duration = count / fps if fps > 0 and count > 0 else 0.0
+        if not math.isfinite(duration) or not 0 < duration <= 24 * 3600:
+            duration = 0.0
+        width, height = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        return {"ok": bool(cap.isOpened() and duration > 0 and width > 0 and height > 0),
+                "duration": duration, "width": width, "height": height, "fps": fps}
+    finally:
+        cap.release()
 
 
 def opencv_readability(path: Path, duration_hint: float = 0.0) -> dict:
@@ -202,7 +222,7 @@ def normalize_browser_capture(
     if original.get("ok") and original.get("decode_ok"):
         return source_path, {**original, "normalization": "not_needed"}
 
-    ffmpeg = shutil.which("ffmpeg")
+    ffmpeg = ffmpeg_executable()
     if not ffmpeg:
         return source_path, {**original, "normalization": "ffmpeg_unavailable"}
 
@@ -222,6 +242,7 @@ def normalize_browser_capture(
     encoded = derived_dir / "capture-normalized.mp4"
     encode_cmd = [
         ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
+        "-threads", "1", "-filter_threads", "1",
         "-fflags", "+genpts+discardcorrupt", "-i", str(source_path),
         "-map", "0:v:0", "-an",
     ]
@@ -236,7 +257,7 @@ def normalize_browser_capture(
         encode_cmd += ["-c:v", "libx264", "-preset", "veryfast", "-crf", "25"]
         encode_timeout = 300
         normalization = "reencode_h264"
-    encode_cmd += ["-pix_fmt", "yuv420p", "-movflags", "+faststart", str(encoded)]
+    encode_cmd += ["-threads", "1", "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(encoded)]
 
     if _run(encode_cmd, timeout=encode_timeout) and _usable_file(encoded):
         probe = _verified_probe(encoded)

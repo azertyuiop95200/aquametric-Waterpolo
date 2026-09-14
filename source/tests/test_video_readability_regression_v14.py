@@ -33,7 +33,7 @@ def test_metadata_does_not_bypass_failed_decode_check(monkeypatch, tmp_path: Pat
             "seekable": False,
         },
     )
-    monkeypatch.setattr(media.shutil, "which", lambda _name: None)
+    monkeypatch.setattr(media, "ffmpeg_executable", lambda: None)
 
     normalized, info = media.normalize_browser_capture(source, tmp_path / "derived")
 
