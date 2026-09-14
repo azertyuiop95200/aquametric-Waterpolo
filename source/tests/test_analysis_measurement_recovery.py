@@ -77,6 +77,20 @@ def test_native_ocr_runs_during_capture_and_is_throttled(tmp_path, monkeypatch):
         SimpleNamespace(team=SimpleNamespace(name="Test home"), opponent="Test away"))["banner_text_samples"]) == 1
 
 
+def test_native_detector_bounds_wide_and_thin_scoreboard_inputs():
+    engine = ocr._onnx_engine()
+    assert engine is not None
+    # The old minimum-side resize turned a 640x86 crop into ~5500x736 and
+    # consumed over 790 MiB with the app loaded. Check the actual model input.
+    for height, width in [(86, 640), (24, 3840), (360, 1920)]:
+        image = np.full((height, width, 3), 255, dtype=np.uint8)
+        prepared, _, _ = engine.preprocess(ocr._bounded_onnx_input(image))
+        padded, _ = engine.maybe_add_letterbox(prepared, {})
+        tensor = engine.text_det.get_preprocess(max(padded.shape[:2]))(padded)
+        assert max(tensor.shape[2:]) <= 960, tensor.shape
+    assert engine.text_rec.rec_batch_num == 1
+
+
 def test_real_onnx_pixels_create_score_observations_and_goal_candidate(tmp_path, monkeypatch):
     import rapidocr_onnxruntime  # Required in CI: do not silently skip the real backend.
     # Deliberately disable Tesseract: exercise the backend needed on the native host.
