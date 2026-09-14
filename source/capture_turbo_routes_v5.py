@@ -29,7 +29,7 @@ from capture_turbo_routes import turbo_append_chunk as _append_chunk
 from capture_turbo_routes import turbo_capture_status as _capture_status
 from capture_turbo_routes import turbo_create_session as _create_session
 from capture_turbo_routes_v4 import turbo_finish_capture as _finish_capture
-from services.scoreboard_ocr import ocr_image, tesseract_available
+from services.scoreboard_ocr import ocr_image, ocr_available
 
 
 def _json_body(response) -> dict:
@@ -78,10 +78,10 @@ def _source_second_for_pane(state: dict, wall_second: float, pane_index: int, se
 
 def _observe_match_banners(root, image: np.ndarray, wall_second: float, match) -> dict:
     state = _read_state(root)
-    if not state or not tesseract_available():
+    if not state:
         return state
     last = _number(state.get("last_banner_ocr_wall_second"), -999.0)
-    if wall_second - last < 15.0:
+    if wall_second - last < 15.0 or not ocr_available():
         return state
     segments = 4 if int(state.get("parallel_segments") or 1) >= 4 else (2 if int(state.get("parallel_segments") or 1) >= 2 else 1)
     team_a = _team_tokens(getattr(match.team, "name", ""))

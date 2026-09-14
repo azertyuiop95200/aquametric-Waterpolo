@@ -30,7 +30,7 @@ from services.tactical_engine import analyze_match_tactics
 from services.official_data import seed_official_sources, refresh_due_sources, recurring_refresh_loop
 from services.benchmark_matches import BENCHMARK_MATCHES
 from services.vision_baseline import scan_local_video, VisionBaselineError
-from services.scoreboard_ocr import sample_scoreboard_observations, tesseract_available
+from services.scoreboard_ocr import sample_scoreboard_observations, ocr_available
 from services.autonomous_engine import infer_periods, infer_candidates, build_auto_summary
 from services.reporting import build_match_report
 from services.audio_whistle import detect_whistle_candidates, ffmpeg_available as audio_ffmpeg_available
@@ -971,7 +971,7 @@ def run_autonomous_analysis(match_id: int, request: Request, db: Session = Depen
         "Pass, shot, foul, exclusion and tactical-shape classification require dedicated player/ball/audio models.",
     ]
     analysis = AutonomousAnalysis(match_id=match.id, status="complete", engine_version="autonomy-v0.1",
-        ocr_available=tesseract_available(), observations_json=json.dumps(observations), periods_json=json.dumps(periods),
+        ocr_available=ocr_available(), observations_json=json.dumps(observations), periods_json=json.dumps(periods),
         summary_json=json.dumps(summary), limitations_json=json.dumps(limitations))
     db.add(analysis); db.flush()
     for c in candidates:
@@ -1002,7 +1002,7 @@ def autonomy_page(match_id: int, request: Request, db: Session = Depends(get_db)
         except Exception: pass
         candidates = db.scalars(select(AutonomousEventCandidate).where(AutonomousEventCandidate.analysis_id == analysis.id).order_by(AutonomousEventCandidate.second)).all()
     return render(request, "autonomy.html", user=user, match=match, analysis=analysis, observations=observations,
-                  periods=periods, summary=summary, limitations=limitations, candidates=candidates, ocr_ready=tesseract_available())
+                  periods=periods, summary=summary, limitations=limitations, candidates=candidates, ocr_ready=ocr_available())
 
 
 @app.get("/matches/{match_id}/report", response_class=HTMLResponse)

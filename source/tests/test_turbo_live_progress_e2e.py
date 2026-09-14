@@ -82,7 +82,7 @@ def _make_mosaic_webm(path: Path, seconds: int = 4) -> bytes:
 
 
 def test_live_progress_routes_are_priority_routes_and_process_real_frames(monkeypatch):
-    monkeypatch.setattr(capture_turbo_routes, "tesseract_available", lambda: False)
+    monkeypatch.setattr(capture_turbo_routes, "ocr_available", lambda: False)
     match_id, location, source_duration = _register_and_create_match(duration=497.0)
 
     page = client.get(location)

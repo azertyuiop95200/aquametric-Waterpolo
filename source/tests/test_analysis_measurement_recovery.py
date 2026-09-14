@@ -50,6 +50,33 @@ def test_duplicate_timestamps_cannot_confirm_a_score():
     assert analysis_diagnostics({"observations": [row, row]}, [])["latest_repeated_score"] is None
 
 
+def test_native_ocr_runs_during_capture_and_is_throttled(tmp_path, monkeypatch):
+    import capture_turbo_routes as capture
+    import capture_turbo_routes_v5 as banners
+
+    monkeypatch.setattr(ocr, "tesseract_available", lambda: False)
+    capture._write_state(tmp_path, {"status": "running", "parallel_segments": 1,
+                                  "playback_rate": 1, "source_duration_seconds": 60})
+    frame = np.full((360, 640, 3), (160, 90, 20), dtype=np.uint8)
+    frame[:80] = 255
+    cv2.putText(frame, "Q1 7:30 2 1", (12, 60), cv2.FONT_HERSHEY_SIMPLEX, 1.4, (0, 0, 0), 3)
+    state = capture._progressive_frame_analysis(tmp_path, frame, 0.)
+    assert state["progressive_ocr_hits"] == 1
+    assert "7:30" in state["latest_live_ocr"][0]
+    state = banners._observe_match_banners(tmp_path, frame, 0.,
+        SimpleNamespace(team=SimpleNamespace(name="Test home"), opponent="Test away"))
+    assert state["banner_text_samples"][0]["second"] == 0
+    assert "7:30" in state["banner_text_samples"][0]["text"]
+
+    def unexpected_ocr(*args, **kwargs):
+        pytest.fail("A throttled frame must not run OCR again, including after timestamp zero")
+    monkeypatch.setattr(capture, "ocr_image", unexpected_ocr)
+    monkeypatch.setattr(banners, "ocr_image", unexpected_ocr)
+    assert capture._progressive_frame_analysis(tmp_path, frame, 1.)["progressive_ocr_hits"] == 1
+    assert len(banners._observe_match_banners(tmp_path, frame, 1.,
+        SimpleNamespace(team=SimpleNamespace(name="Test home"), opponent="Test away"))["banner_text_samples"]) == 1
+
+
 def test_real_onnx_pixels_create_score_observations_and_goal_candidate(tmp_path, monkeypatch):
     import rapidocr_onnxruntime  # Required in CI: do not silently skip the real backend.
     # Deliberately disable Tesseract: exercise the backend needed on the native host.

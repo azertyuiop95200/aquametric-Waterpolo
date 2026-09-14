@@ -27,7 +27,7 @@ from services.deep_analysis_sequences import materialize_deep_sequence_pack
 from services.mosaic_match_analysis import run_mosaic_analysis
 from services.rapid_match_analysis import RapidAnalysisError, run_rapid_analysis
 from services.reference_match_rosters import roster_payload
-from services.scoreboard_ocr import ocr_image, parse_scoreboard_text, tesseract_available
+from services.scoreboard_ocr import ocr_image, parse_scoreboard_text, ocr_available
 from services.vision_baseline import _pool_ratio
 
 
@@ -107,8 +107,9 @@ def _progressive_frame_analysis(root: Path, frame: np.ndarray, wall_second: floa
         state["progressive_frame_batches"] = n + 1
 
     # OCR is intentionally throttled: one real scoreboard pre-pass about every 12 s.
-    last_ocr_wall = float(state.get("last_live_ocr_wall_second") or -999.0)
-    if tesseract_available() and wall_second - last_ocr_wall >= 12.0:
+    previous_ocr_wall = state.get("last_live_ocr_wall_second")
+    last_ocr_wall = float(-999.0 if previous_ocr_wall is None else previous_ocr_wall)
+    if wall_second - last_ocr_wall >= 12.0 and ocr_available():
         hits = 0
         texts = []
         for pane in panes:
