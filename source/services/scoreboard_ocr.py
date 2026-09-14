@@ -25,30 +25,61 @@ except Exception:  # pragma: no cover - optional at runtime
 
 log = logging.getLogger(__name__)
 _onnx_lock = Lock()
+_onnx_init_lock = Lock()
 
 
 @lru_cache(maxsize=1)
-def _onnx_engine():
+def _load_onnx_engine():
     # The wheel includes the models; no video or frame leaves the server.
     try:
         from rapidocr_onnxruntime import RapidOCR
-        return RapidOCR(intra_op_num_threads=1, inter_op_num_threads=1)
+        # The default detector enlarges the SHORT side to 736 pixels. A
+        # 640x86 scoreboard then becomes ~5500x736 and exceeds 512 MB during
+        # inference. Bound the LONG side instead, keeping normal crops intact.
+        return RapidOCR(intra_op_num_threads=1, inter_op_num_threads=1,
+                        max_side_len=960, min_side_len=1, det_limit_side_len=960,
+                        det_limit_type="max", rec_batch_num=1)
     except Exception:
         log.exception("scoreboard_ocr_backend_unavailable backend=rapidocr")
         return None
+
+
+def _onnx_engine():
+    # lru_cache alone allows concurrent cold misses to construct several models.
+    with _onnx_init_lock:
+        return _load_onnx_engine()
 
 
 def ocr_available() -> bool:
     return tesseract_available() or _onnx_engine() is not None
 
 
+def _bounded_onnx_input(img: np.ndarray) -> np.ndarray:
+    height, width = img.shape[:2]
+    if max(height, width) > 960:
+        scale = 960.0 / max(height, width)
+        img = cv2.resize(img, (max(1, round(width * scale)), max(1, round(height * scale))),
+                         interpolation=cv2.INTER_AREA)
+    # RapidOCR rounds dimensions to multiples of 32. Pad extremely thin crops
+    # instead of letting that rounding create a zero-sized model input.
+    height, width = img.shape[:2]
+    vertical, horizontal = max(0, 32 - height), max(0, 32 - width)
+    if vertical or horizontal:
+        img = cv2.copyMakeBorder(img, vertical // 2, vertical - vertical // 2,
+                                horizontal // 2, horizontal - horizontal // 2,
+                                cv2.BORDER_CONSTANT, value=(255, 255, 255))
+    return img
+
+
 def _onnx_image(img: np.ndarray) -> tuple[str, float]:
+    if img is None or img.size == 0:
+        return "", 0.0
     engine = _onnx_engine()
-    if engine is None or img.size == 0:
+    if engine is None:
         return "", 0.0
     try:
         with _onnx_lock:
-            rows, _ = engine(img, use_cls=False)
+            rows, _ = engine(_bounded_onnx_input(img), use_cls=False)
         if not rows:
             return "", 0.0
         # Preserve the detector's reading order, including spaces between scores.
