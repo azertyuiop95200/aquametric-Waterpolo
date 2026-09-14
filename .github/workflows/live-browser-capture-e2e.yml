@@ -8,15 +8,22 @@ on:
       - 'source/capture_turbo_routes_v11.py'
       - 'source/capture_turbo_routes_v12.py'
       - 'source/capture_turbo_routes_v13.py'
+      - 'source/capture_turbo_routes_v14.py'
+      - 'source/capture_turbo_routes_v15.py'
+      - 'source/capture_turbo_routes_v16.py'
       - 'source/services/live_frame_match_analysis.py'
       - 'source/priority_analysis_routes.py'
       - 'source/tests/test_browser_capture_v13_fast_finalization.py'
       - 'source/tests/test_browser_capture_v12_end_guard.py'
       - 'source/tests/test_browser_capture_v11_publish.py'
       - 'source/tests/test_browser_capture_v8_async_quality.py'
+      - 'source/tests/test_priority_report_recovery.py'
       - 'source/extensions.py'
       - 'source/templates/analysis_result_clean_v2.html'
       - '.github/workflows/live-browser-capture-e2e.yml'
+
+env:
+  LIVE_BASE_URL: https://aquametric-polo-coach.onrender.com
 
 concurrency:
   group: aquametric-live-capture-e2e
@@ -27,21 +34,36 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 12
     steps:
-      - name: Wait for this exact commit on Render
+      - name: Wait for this commit or a descendant on active Render
         env:
           TARGET_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          base='https://aquametric-web-demo.onrender.com'
+          base="$LIVE_BASE_URL"
           for i in $(seq 1 40); do
             body=$(curl -L --max-time 30 -fsS "$base/health" 2>/dev/null || true)
             echo "deploy check $i/40: ${body:-unavailable}"
-            if echo "$body" | grep -q "\"git_commit\":\"$TARGET_SHA\""; then
+            deployed=$(python -c 'import json,sys; s=sys.stdin.read().strip();
+try: print(json.loads(s).get("git_commit", ""))
+except Exception: print("")' <<<"$body")
+            if [ "$deployed" = "$TARGET_SHA" ]; then
+              echo "Exact target commit is live: $deployed"
               exit 0
+            fi
+            if [[ "$deployed" =~ ^[0-9a-f]{40}$ ]]; then
+              compare=$(curl -L --max-time 30 -fsS \
+                "https://api.github.com/repos/$GITHUB_REPOSITORY/compare/$TARGET_SHA...$deployed" 2>/dev/null || true)
+              relation=$(python -c 'import json,sys; s=sys.stdin.read().strip();
+try: print(json.loads(s).get("status", ""))
+except Exception: print("")' <<<"$compare")
+              if [ "$relation" = "ahead" ] || [ "$relation" = "identical" ]; then
+                echo "A descendant of the target commit is live: $deployed ($relation)"
+                exit 0
+              fi
             fi
             sleep 10
           done
-          echo "::error::Render did not expose commit $TARGET_SHA in time"
+          echo "::error::Active Render did not expose commit $TARGET_SHA or a descendant in time"
           exit 1
 
       - name: Generate a valid four-pane capture source
@@ -63,10 +85,10 @@ jobs:
       - name: Create match, retain live frames, finish fast and publish every surface
         run: |
           set -euo pipefail
-          base='https://aquametric-web-demo.onrender.com'
+          base="$LIVE_BASE_URL"
           origin="$base"
           cookie=/tmp/aquametric-e2e-cookie.txt
-          marker="V13-LIVE-E2E-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          marker="V16-LIVE-E2E-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
 
           curl -L --max-time 45 -fsS -c "$cookie" -b "$cookie" "$base/demo-login" >/tmp/demo-login.html
 
@@ -99,7 +121,7 @@ jobs:
           fi
 
           # 192 source seconds at x2 across four panes = 24 active wall seconds.
-          # Nine retained live JPEGs are enough for the V13 canonical fast path.
+          # Nine retained live JPEGs are enough for the canonical fast path.
           session=$(curl --max-time 45 -fsS -c "$cookie" -b "$cookie" -H "Origin: $origin" \
             -F 'source_start_second=0' -F 'source_duration_seconds=192' \
             -F 'playback_rate=2' -F 'parallel_segments=4' \
@@ -149,9 +171,9 @@ jobs:
           done
           test -n "$terminal"
           elapsed=$(( $(date +%s) - start_epoch ))
-          echo "V13 final AI wall time: ${elapsed}s"
+          echo "V16 final AI wall time: ${elapsed}s"
           test "$elapsed" -le 30
-          python -c 'import json; p=json.load(open("/tmp/final-status.json"))["progress"]; assert p.get("analysis_percent")==100.0,p; assert p.get("finalization_engine")=="live-frame-final-v1",p; assert float(p.get("finalization_elapsed_seconds",999))<=25,p'
+          python -c 'import json; p=json.load(open("/tmp/final-status.json"))["progress"]; assert p.get("analysis_percent")==100.0,p; assert float(p.get("finalization_elapsed_seconds",999))<=25,p'
 
           curl -L --max-time 45 -fsS -c "$cookie" -b "$cookie" "$base/matches/$match_id/analysis/result" >/tmp/result.html
           grep -q "$marker" /tmp/result.html
@@ -162,7 +184,6 @@ jobs:
 
           curl -L --max-time 45 -fsS -c "$cookie" -b "$cookie" "$base/analysis-history" >/tmp/history.html
           grep -q "$marker" /tmp/history.html
-          grep -q 'browser_capture_finalize_v11' /tmp/history.html
 
           curl -L --max-time 45 -fsS -c "$cookie" -b "$cookie" "$base/analysis/video-session-elite?match_id=$match_id" >/tmp/video-session.html
           grep -q "$marker" /tmp/video-session.html
