@@ -11,6 +11,9 @@ on:
 permissions:
   contents: read
 
+env:
+  LIVE_BASE_URL: https://aquametric-polo-coach.onrender.com
+
 jobs:
   verify-live:
     if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
@@ -23,7 +26,7 @@ jobs:
           EVENT_TARGET_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
         run: |
           set -euo pipefail
-          base='https://aquametric-web-demo.onrender.com'
+          base="$LIVE_BASE_URL"
           marker='AQUAMETRIC_V12_2_ULTIMATE_MATCH_VIDEO_INTELLIGENCE_2026_09_05'
           target=$(git ls-remote "https://github.com/${GITHUB_REPOSITORY}.git" refs/heads/main | awk '{print $1}')
           if [ -z "$target" ]; then
@@ -58,7 +61,7 @@ jobs:
         if: ${{ steps.live.outputs.deployed == 'true' }}
         run: |
           set -euo pipefail
-          base='https://aquametric-web-demo.onrender.com'
+          base="$LIVE_BASE_URL"
           curl -L --max-time 30 -fsS "$base/security-status" | tee /tmp/security.json
           grep -q '"security_headers":true' /tmp/security.json
           grep -q '"api_docs_public":false' /tmp/security.json
@@ -78,7 +81,7 @@ jobs:
         if: ${{ steps.live.outputs.deployed == 'true' }}
         run: |
           set -euo pipefail
-          base='https://aquametric-web-demo.onrender.com'
+          base="$LIVE_BASE_URL"
           cookie=/tmp/aquametric-analysis-cookie.txt
           curl -L --max-time 45 -fsS -c "$cookie" -b "$cookie" "$base/demo-login" >/tmp/demo.html
           curl -L --max-time 45 -fsS -c "$cookie" -b "$cookie" "$base/analysis-library" >/tmp/analysis-library.html
@@ -95,7 +98,7 @@ jobs:
         if: ${{ steps.live.outputs.deployed == 'true' }}
         run: |
           set -euo pipefail
-          base='https://aquametric-web-demo.onrender.com'
+          base="$LIVE_BASE_URL"
           cookie=/tmp/aquametric-ultimate-cookie.txt
           curl -L --max-time 45 -fsS -c "$cookie" -b "$cookie" "$base/demo-login" >/tmp/demo.html
           curl -L --max-time 45 -fsS -c "$cookie" -b "$cookie" "$base/analysis-history" >/tmp/history.html
@@ -112,7 +115,7 @@ jobs:
         if: ${{ steps.live.outputs.deployed == 'true' }}
         run: |
           set -euo pipefail
-          base='https://aquametric-web-demo.onrender.com'
+          base="$LIVE_BASE_URL"
           cookie=/tmp/aquametric-cookie.txt
           curl -L --max-time 45 -fsS -c "$cookie" -b "$cookie" "$base/demo-login" >/tmp/demo.html
           curl -L --max-time 45 -fsS -c "$cookie" -b "$cookie" "$base/coaches" >/tmp/coaches.html
