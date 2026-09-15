@@ -1,6 +1,7 @@
 """Install result-first analysis routes directly on the FastAPI application."""
 from __future__ import annotations
 
+import logging
 import os
 from threading import Lock
 
@@ -30,6 +31,7 @@ from services.capture_report_progress import latest_capture_root, report_progres
 
 _capture_base._write_state = write_state_atomic
 
+import capture_turbo_routes_v16 as _capture_v16
 from capture_turbo_routes_v16 import (
     turbo_append_chunk,
     turbo_browser_capture_page as _turbo_browser_capture_page_v16,
@@ -39,6 +41,41 @@ from capture_turbo_routes_v16 import (
     turbo_progress_frame as _turbo_progress_frame_v16,
 )
 import capture_turbo_routes_v5 as _capture_v5
+
+
+# V13's proven report finalizer used 10 targeted OCR checks. V16 accidentally
+# requested 240, which can hold the only small Render instance in OCR for minutes
+# before any visual candidates or action-engine work become visible. Keep V16's
+# report-first behavior, but bound only its post-publication OCR pass back to the
+# known-fast target count. The original function still owns all evidence rules.
+if not getattr(_capture_v16.run_live_frame_analysis, "_aquametric_v16_bounded_ocr", False):
+    _V16_ORIGINAL_RUN_LIVE_FRAME_ANALYSIS = _capture_v16.run_live_frame_analysis
+
+    def _v16_bounded_live_frame_analysis(*args, **kwargs):
+        try:
+            requested = int(kwargs.get("ocr_samples", 10) or 10)
+        except (TypeError, ValueError):
+            requested = 10
+        kwargs["ocr_samples"] = max(4, min(10, requested))
+        return _V16_ORIGINAL_RUN_LIVE_FRAME_ANALYSIS(*args, **kwargs)
+
+    _v16_bounded_live_frame_analysis._aquametric_v16_bounded_ocr = True
+    _capture_v16.run_live_frame_analysis = _v16_bounded_live_frame_analysis
+
+
+# Log only boolean/configuration metadata. Never emit credentials.
+try:
+    from services.video_action_provider import provider_configuration as _video_action_configuration
+    _video_action_config = _video_action_configuration()
+    logging.getLogger("aquametric.video_actions").warning(
+        "video_action_readiness enabled=%s configured=%s code=%s model=%s",
+        bool(_video_action_config.get("enabled")),
+        bool(_video_action_config.get("configured")),
+        str(_video_action_config.get("availability_code") or "unknown"),
+        str(_video_action_config.get("model") or ""),
+    )
+except Exception:
+    logging.getLogger("aquametric.video_actions").exception("video_action_readiness diagnostic failed")
 
 
 # Native RapidOCR/ONNX remains available to the report-first final/enrichment pass,
