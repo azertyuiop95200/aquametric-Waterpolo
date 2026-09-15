@@ -99,6 +99,28 @@ if not getattr(_capture_v16._publish_report_first, "_aquametric_visual_prepublic
     _capture_v16._publish_report_first = _v16_publish_report_with_visual_review
 
 
+# V16's immediate response remains API-compatible with earlier capture versions.
+# Report-first made some evidence fields implicit in progress.json, which caused
+# the production E2E (and any client using those fields) to treat a successful
+# finish as incomplete. Re-expose only already-persisted metadata; no extra work
+# is performed here, so the fast redirect remains non-blocking.
+if not getattr(_capture_v16._finish_payload, "_aquametric_evidence_metadata", False):
+    _V16_ORIGINAL_FINISH_PAYLOAD = _capture_v16._finish_payload
+
+    def _v16_finish_payload_with_evidence(match_id, session_id, progress):
+        payload = _V16_ORIGINAL_FINISH_PAYLOAD(match_id, session_id, progress)
+        payload.update({
+            "retained_live_frames": int(progress.get("retained_live_frames") or progress.get("saved_live_frames") or 0),
+            "visual_samples": int(progress.get("visual_samples") or progress.get("progressive_samples") or 0),
+            "scoreboard_observations": int(progress.get("scoreboard_observations") or progress.get("progressive_ocr_hits") or 0),
+            "finalization_elapsed_seconds": float(progress.get("finalization_elapsed_seconds") or 0.0),
+        })
+        return payload
+
+    _v16_finish_payload_with_evidence._aquametric_evidence_metadata = True
+    _capture_v16._finish_payload = _v16_finish_payload_with_evidence
+
+
 # Log only boolean/configuration metadata. Never emit credentials.
 try:
     from services.video_action_provider import provider_configuration as _video_action_configuration
