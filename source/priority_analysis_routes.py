@@ -141,6 +141,19 @@ def saved_report_progress(match_id: int, request: Request, db: Session = Depends
     return JSONResponse(report_progress(match, db=db), headers={"Cache-Control": "private, no-store"})
 
 
+def video_action_readiness():
+    """Public, secret-free provider readiness for deployment diagnostics."""
+    from services.video_action_provider import provider_configuration
+    config = provider_configuration()
+    return JSONResponse({
+        "ok": True,
+        "enabled": bool(config.get("enabled")),
+        "configured": bool(config.get("configured")),
+        "availability_code": str(config.get("availability_code") or "unknown"),
+        "model": str(config.get("model") or ""),
+    }, headers={"Cache-Control": "no-store"})
+
+
 def regenerate_capture_clips(match_id: int, request: Request, background_tasks: BackgroundTasks,
                              db: Session = Depends(get_db)):
     _, match = _owned_match(match_id, request, db)
@@ -161,6 +174,7 @@ def install_priority_analysis_routes(app) -> None:
     from video_action_routes import router as video_action_router
     app.include_router(video_action_router)
     registrations = [
+        ("/health/video-actions", video_action_readiness, "GET", None, "video_action_readiness"),
         ("/matches/{match_id}/analysis/report.html", download_analysis_report, "GET", HTMLResponse, "download_analysis_report"),
         ("/analysis/url/create", create_flexible_url_analysis, "POST", None, "product_create_url_analysis"),
         ("/matches", create_flexible_uploaded_match, "POST", None, "product_create_uploaded_match"),
