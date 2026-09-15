@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import math
+import time
 from pathlib import Path
 
 import cv2
@@ -23,6 +24,30 @@ from models import AutonomousAnalysis, AutonomousEventCandidate, Match, VisionAn
 from services.live_frame_match_analysis import _even_records, _timeline_records
 from services.mosaic_match_analysis import _pane, _signal
 from services.vision_baseline import _classify_video_type, _group_windows, _interesting_moments
+
+
+def _persist_publication_latency(root: Path, state: dict) -> None:
+    """Keep the fast terminal timing in mutable state used by /status."""
+    try:
+        started = float(
+            state.get("v14_finalization_started_at")
+            or state.get("v16_report_published_at")
+            or state.get("published_at")
+            or time.time()
+        )
+        elapsed = max(0.0, time.time() - started)
+        if not math.isfinite(elapsed):
+            elapsed = 0.0
+        state["finalization_elapsed_seconds"] = round(elapsed, 3)
+        # Imported lazily to avoid extending the capture-route import chain.
+        # priority_analysis_routes patches this shared writer to the collision-
+        # safe atomic implementation before V16 is installed.
+        from capture_turbo_routes import _write_state
+        _write_state(root, state)
+    except Exception:
+        # This timing field is diagnostic only and must never make report
+        # publication fail.
+        pass
 
 
 def publish_report_first_visual(match_id: int, root_value: str | Path, state: dict | None = None) -> dict:
@@ -188,3 +213,4 @@ def publish_report_first_visual(match_id: int, root_value: str | Path, state: di
         return {"published": False, "reason": "visual_prepublication_failed"}
     finally:
         db.close()
+        _persist_publication_latency(root, state)
