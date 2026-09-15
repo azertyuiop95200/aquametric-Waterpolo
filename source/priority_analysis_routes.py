@@ -63,6 +63,42 @@ if not getattr(_capture_v16.run_live_frame_analysis, "_aquametric_v16_bounded_oc
     _capture_v16.run_live_frame_analysis = _v16_bounded_live_frame_analysis
 
 
+# V16 intentionally publishes before OCR/provider enrichment. The fallback report
+# used to contain only a sample count, so the user could reach a technically valid
+# but visually empty report for several minutes. Add one small provider-free pass
+# before returning /finish: it publishes generic visual review timestamps from the
+# JPEGs already received. It never invents a sporting action and is superseded by
+# the newer full Vision/Autonomy rows when enrichment finishes.
+if not getattr(_capture_v16._publish_report_first, "_aquametric_visual_prepublication", False):
+    _V16_ORIGINAL_PUBLISH_REPORT_FIRST = _capture_v16._publish_report_first
+
+    def _v16_publish_report_with_visual_review(match_id, root):
+        state = _V16_ORIGINAL_PUBLISH_REPORT_FIRST(match_id, root)
+        if not state:
+            return state
+        try:
+            from services.report_first_visual import publish_report_first_visual
+            quick = publish_report_first_visual(match_id, root, state)
+            logging.getLogger("aquametric.report_first_visual").warning(
+                "report_first_visual match=%s published=%s samples=%s candidates=%s reason=%s",
+                match_id,
+                bool(quick.get("published")),
+                int(quick.get("visual_samples") or 0),
+                int(quick.get("candidates") or 0),
+                str(quick.get("reason") or "ok"),
+            )
+        except Exception:
+            # The immediate report must remain available even if this optional
+            # local pre-publication fails; OCR/provider enrichment still follows.
+            logging.getLogger("aquametric.report_first_visual").exception(
+                "report_first_visual prepublication failed match=%s", match_id
+            )
+        return state
+
+    _v16_publish_report_with_visual_review._aquametric_visual_prepublication = True
+    _capture_v16._publish_report_first = _v16_publish_report_with_visual_review
+
+
 # Log only boolean/configuration metadata. Never emit credentials.
 try:
     from services.video_action_provider import provider_configuration as _video_action_configuration
