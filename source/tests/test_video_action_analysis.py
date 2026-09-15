@@ -168,6 +168,25 @@ def test_runner_resumes_only_failed_segments_and_preserves_checkpoints(db_match,
     assert not db.scalars(select(Event)).all()  # automatic results never masquerade as verified actions
 
 
+def test_native_capture_actions_recover_missing_webm_duration(db_match, tmp_path, monkeypatch):
+    import subprocess
+    import services.browser_capture_media as media
+    import services.video_action_runner as runner
+    from services.media import ffmpeg_executable
+    db,match=db_match
+    source=tmp_path/"native-mediarecorder.webm"
+    subprocess.run([ffmpeg_executable(),"-hide_banner","-loglevel","error","-y","-f","lavfi","-i",
+        "testsrc2=size=320x180:rate=16:duration=4","-c:v","libvpx-vp9","-b:v","400k","-an","-f","webm","-live","1",str(source)],check=True,timeout=40)
+    monkeypatch.setenv("GEMINI_API_KEY","fixture");monkeypatch.setenv("AQUAMETRIC_VIDEO_ACTIONS","1")
+    monkeypatch.setattr(media.shutil,"which",lambda _:None)
+    monkeypatch.setattr(runner,"analyze_video_segment",lambda *args,**kwargs:payload())
+    run=run_video_actions(db,match,source,capture_state={"source_start_second":0,"source_duration_seconds":4,"playback_rate":1,"parallel_segments":1})
+    assert run.status == "complete",run.message
+    report=action_report(db,match)
+    assert report["coverage_percent"] >= 95 and report["team"]["basic"]["goals"] == 1
+    assert Path(run.source_path).is_file()
+
+
 def test_all_action_types_appear_in_report_with_separate_teams_caps_and_no_false_identity(db_match):
     db,match=db_match
     actions=[action(kind,second=index+1) for index,kind in enumerate(EVENT_LABELS)]

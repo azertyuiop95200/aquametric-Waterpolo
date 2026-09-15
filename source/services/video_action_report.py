@@ -46,7 +46,7 @@ def run_progress(db, match, *, run=None):
                 "availability_code": config["availability_code"]}
     segments = json.loads(run.segments_json or "[]")
     completed = sum(s.get("status") == "complete" for s in segments)
-    stale = run.status in {"running", "queued"} and time.time() - run.updated_at > 150
+    stale = run.status in {"running", "queued"} and time.time() - run.updated_at > 300
     return {"run_id": run.id, "status": "interrupted" if stale else run.status,
             "active": not stale and run.status in {"queued", "running"}, "completed": completed,
             "total": len(segments), "revision": f"{run.id}:{run.status}:{completed}:{stale}",

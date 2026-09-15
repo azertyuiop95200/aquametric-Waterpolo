@@ -13,7 +13,7 @@ from threading import Lock
 
 from sqlalchemy import select
 from models import VideoActionAnalysis
-from services.browser_capture_media import ffprobe_video
+from services.browser_capture_media import ffprobe_video, normalize_browser_capture
 from services.media import _run_ffmpeg
 from services.video_action_provider import VideoActionError, analyze_video_segment, provider_configuration
 from services.video_action_schema import VERSION, SegmentObservation
@@ -157,12 +157,22 @@ def run_video_actions(db, match, source: Path, *, capture_state: dict | None = N
             _save(db, run, plan)
             return run
         try:
+            run.status, run.message = "running", "Préparation des séquences vidéo et vérification de leur durée."
+            _save(db, run, plan)
             if not plan:
                 meta = ffprobe_video(source)
+                if not meta.get("ok") and source.is_file():
+                    # MediaRecorder WebM may omit duration entirely, especially
+                    # on native Render without ffprobe. Recover real metadata
+                    # from a remux/re-encode; never use the claimed match length.
+                    source, meta = normalize_browser_capture(source, source.parent / f"actions-normalized-{run.id}", fast_analysis=True)
+                    run.source_path = str(source)
                 if not meta.get("ok"):
                     raise VideoActionError("source_unavailable", "Le fichier vidéo reçu n’est plus disponible ou sa durée est illisible.")
                 plan, duration = segment_plan(meta["duration"], capture_state)
                 run.duration_seconds = duration
+            elif run.source_path and Path(run.source_path).is_file():
+                source = Path(run.source_path)
             run.status, run.message = "running", "Reconnaissance des actions dans les séquences vidéo."
             _save(db, run, plan)
             try:
