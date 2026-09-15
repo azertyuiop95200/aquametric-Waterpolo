@@ -194,6 +194,15 @@ def _dedupe_targets(rows: list[dict], *, min_gap: float = 2.0, max_total: int = 
 def collect_sequence_targets(db, match, *, max_total: int = 72) -> list[dict]:
     """Build the densest evidence-first review timeline available for one match."""
     rows: list[dict] = []
+    from services.video_action_report import action_report
+    actions = action_report(db, match)
+    for action in sorted(actions["events"], key=lambda row: row["confidence"], reverse=True)[:72]:
+        if not action["counted"]:
+            continue
+        rows.append(_target(kind="automatic", second=action["second"],
+                            title=f"{action['label']} · {action['identity']} · automatique",
+                            summary=action["evidence"], confidence=action["confidence"],
+                            phase=action["phase"], source="video_action_model"))
 
     for event in sorted(list(match.events or []), key=lambda e: float(e.second or 0)):
         if event.event_type not in INTERESTING_EVENTS:

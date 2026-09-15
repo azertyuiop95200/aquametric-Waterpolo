@@ -54,10 +54,25 @@ def test_browser_capture_streams_small_chunks_instead_of_buffering_whole_match()
     assert "chunks.push" not in template
 
 
-def test_uploaded_video_keeps_dense_evidence_generation():
-    routes = (ROOT / "analysis_product_routes.py").read_text(encoding="utf-8")
-    start_body = routes.split('def start_real_analysis', 1)[1].split('@router.post("/matches/{match_id}/url-analysis/start")', 1)[0]
-    assert "run_complete_analysis" in start_body
-    assert "max_targets=72" in start_body
-    assert "max_clips=48" in start_body
-    assert "max_image_targets=72" in start_body
+def test_uploaded_video_keeps_dense_evidence_generation_in_background(monkeypatch):
+    from contextlib import contextmanager
+    from types import SimpleNamespace
+    import video_action_routes as routes
+    import services.complete_analysis_runner as complete
+    import services.deep_analysis_sequences as sequences
+    from models import Match
+    match, job = SimpleNamespace(id=1), SimpleNamespace(status="queued", progress=0, message="")
+    calls = []
+    @contextmanager
+    def session():
+        yield SimpleNamespace(get=lambda model, key: match if model is Match else job,
+                              commit=lambda: None, rollback=lambda: None)
+    monkeypatch.setattr(routes, "SessionLocal", session)
+    monkeypatch.setattr(complete, "run_complete_analysis", lambda *args, **kw: calls.append(("analysis", kw)))
+    monkeypatch.setattr(sequences, "materialize_deep_sequence_pack", lambda *args, **kw: calls.append(("media", kw)))
+    routes.upload_analysis_background(1, 2, False)
+    assert [kind for kind, options in calls] == ["analysis", "media"]
+    assert calls[0][1]["include_audio"] is False
+    assert calls[1][1]["max_targets"] == 72 and calls[1][1]["max_clips"] == 48
+    assert calls[1][1]["max_image_targets"] == 72
+    assert job.status == "complete" and job.progress == 100

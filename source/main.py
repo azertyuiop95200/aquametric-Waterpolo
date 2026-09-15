@@ -435,8 +435,10 @@ def player_detail(player_id: int, request: Request, db: Session = Depends(get_db
     ).all()
     rating, confidence, evidence = calculate_player_rating(events, role=player.primary_role)
     from services.measurement_report import player_statistics, LABELS
+    from services.video_action_report import automatic_player_history, AUTO_LABELS
     return render(request, "player_detail.html", user=user, player=player, events=events, rating=rating, confidence=confidence, evidence=evidence,
-                  player_statistics=player_statistics(events), measurement_labels=LABELS)
+                  player_statistics=player_statistics(events), measurement_labels=LABELS,
+                  automatic_player_history=automatic_player_history(db, player, user.id), automatic_labels=AUTO_LABELS)
 
 
 @app.get("/matches", response_class=HTMLResponse)

@@ -537,6 +537,11 @@ def differential(team, opponent):
 
 def ultimate_event_report(events, perspective="for"):
     selected = _events_for(verified_events(events), perspective)
+    return descriptive_event_report(selected)
+
+
+def descriptive_event_report(selected):
+    """Pure summaries. The caller must state whether input is verified or automatic."""
     basic = _basic(selected)
     return {
         "basic": basic,

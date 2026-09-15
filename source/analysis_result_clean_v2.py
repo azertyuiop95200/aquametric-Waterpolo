@@ -60,6 +60,7 @@ def clean_analysis_result(match_id: int, request: Request, db: Session = Depends
             "app_name": "AquaMetric",
             "match": match,
             "snapshot": snapshot,
+            "interactive_report": True,
             "vision": snapshot.get("vision") or {},
             "automatic": snapshot.get("automatic") or {},
             "for_verified": _verified_side(events, "for"),
@@ -68,7 +69,7 @@ def clean_analysis_result(match_id: int, request: Request, db: Session = Depends
             "sequences": sequences,
             "sequence_summary": sequence_summary(sequences),
             "source_embed": source_embed,
-            "capture_progress": report_progress(match),
+            "capture_progress": report_progress(match, db=db),
             "category": getattr(match.team, "category", "") or "Non précisée",
         },
     )
@@ -81,13 +82,17 @@ def download_analysis_report(match_id: int, request: Request, db: Session = Depe
     from analysis_product_routes import EVIDENCE_DIR
     user, match = _owned_match(match_id, request, db)
     snapshot = analysis_snapshot(db, match)
+    base_url = str(request.base_url).rstrip('/')
+    from services.video_action_report import attach_export_clips
+    export_media = [{**row, 'file_url': base_url + f'/matches/{match.id}/evidence/{row["id"]}'}
+                    for row in snapshot['artifacts'] if row.get('artifact_type') == 'clip'
+                    and row.get('file_path') and (EVIDENCE_DIR / Path(row['file_path']).name).is_file()]
+    attach_export_clips(snapshot['video_actions'], export_media)
     return TEMPLATES.TemplateResponse(request, 'analysis_report_portable.html', {
         'match': match, 'snapshot': snapshot,
         'generated_at': datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC'),
         'for_verified': _verified_side(snapshot['verified_events'], 'for'),
         'against_verified': _verified_side(snapshot['verified_events'], 'against'),
-        'export_media': [{**row, 'file_url': str(request.base_url).rstrip('/') + f'/matches/{match.id}/evidence/{row["id"]}'}
-                         for row in snapshot['artifacts'] if row.get('artifact_type') == 'clip'
-                         and row.get('file_path') and (EVIDENCE_DIR / Path(row['file_path']).name).is_file()],
+        'export_media': export_media,
     }, headers={'Content-Disposition': f'attachment; filename="rapport-match-{match.id}.html"',
                 'Cache-Control': 'private, no-store'})

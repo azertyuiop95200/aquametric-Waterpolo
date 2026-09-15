@@ -1,0 +1,57 @@
+{% from 'measurement_tables.html' import render %}
+{% from 'analysis_shot_maps.html' import maps %}
+{% set actions = snapshot.video_actions %}
+<section class="report-card section-wide" id="automaticActionStatistics">
+  <h2>Analyse automatique des actions</h2>
+  <p role="status"><strong>{{ actions.message }}</strong></p>
+  {% if actions.status == 'not_configured' %}
+  <p>Les tirs, passes, duels et actions individuelles ne peuvent pas être reconnus tant que ce moteur n’est pas connecté. Les lectures du tableau de score et les extraits déjà obtenus restent disponibles.</p>
+  {% endif %}
+  {% if actions.duration_seconds %}
+  <p>{{ actions.completed }}/{{ actions.total }} séquences traitées · {{ actions.processed_seconds|round(1) }} s sur {{ actions.duration_seconds|round(1) }} s · {{ actions.coverage_percent }} % de durée traitée.</p>
+  {% endif %}
+  {% if actions.events %}
+  <p>{{ actions.event_count }} détection(s) retenue(s) · {{ actions.excluded_count }} observation(s) écartée(s) des calculs pour incertitude ou contradiction.</p>
+  <p>{{ actions.note }}</p>
+  <div style="overflow-x:auto"><table class="metric-table"><thead><tr><th>Mesure automatique</th><th>{{ match.team.name }}</th><th>{{ match.opponent }}</th><th>Équipe indéterminée</th></tr></thead><tbody>
+  {% for key,value in actions.team.basic.items() %}<tr><td>{{ actions.labels.get(key,key) }}</td>
+  {% for side in ['team','opponent','unassigned'] %}<td>{{ actions[side].basic[key] if actions[side].basic[key] is not none else '— · non observé' }}</td>{% endfor %}</tr>{% endfor %}
+  </tbody></table></div>
+  {% for side,name in [('team',match.team.name),('opponent',match.opponent),('unassigned','Équipe indéterminée')] %}
+  <details><summary>{{ name }} · toutes les actions et leurs contextes</summary>
+  {{ maps(actions[side]) }}
+  {% for key,data in actions[side].items() if key != 'basic' %}<h4>{{ actions.labels.get(key,key) }}</h4>{{ render(data,actions.labels) }}{% endfor %}
+  </details>{% endfor %}
+  <h3>Statistiques individuelles automatiques</h3>
+  <p>L’équipe et le bonnet proviennent d’indices visuels proposés par le modèle. Un bonnet illisible reste indéterminé ; aucun nom n’est inventé.</p>
+  {% for person in actions.players %}<details><summary>{{ person.name }} · {{ match.team.name if person.side == 'for' else (match.opponent if person.side == 'against' else 'Équipe indéterminée') }}</summary>
+  {{ maps(person.report) }}{{ render(person.report,actions.labels) }}</details>{% endfor %}
+  <details id="automaticActionTimeline"><summary>Toutes les actions horodatées ({{ actions.events|length }}) et leurs extraits</summary>
+  {% for action in actions.events %}<article class="candidate" id="action-{{ action.key }}">
+    <strong>{{ '%02d:%02d'|format((action.second//60)|int,(action.second%60)|int) }} · {{ action.label }} · {{ action.identity }}</strong>
+    <p>{{ match.team.name if action.side == 'for' else (match.opponent if action.side == 'against' else 'Équipe indéterminée') }} · {{ 'retenue dans les statistiques automatiques' if action.counted else 'à revoir · exclue des calculs' }}</p>
+    <p>{{ action.evidence }}</p>
+    {% if action.conflict %}<p>{{ action.conflict }}</p>{% endif %}
+    {% if action.identity_evidence %}<p>Bonnet : {{ action.identity_evidence }}</p>{% endif %}
+    {% if action.team_evidence %}<p>Équipe : {{ action.team_evidence }}</p>{% endif %}
+    {% if interactive_report|default(false) %}
+    <details><summary>Lire l’extrait de cette action</summary><video controls playsinline preload="none" style="width:100%;max-width:800px" src="{{ action.clip_url }}"></video><p><a href="{{ action.clip_url }}" download>Télécharger l’extrait</a></p></details>
+    {% elif action.export_clip_url %}<video controls preload="none" style="width:100%;max-width:800px" src="{{ action.export_clip_url }}"></video>
+    {% else %}<p>Horodatage dans la vidéo source : {{ action.second }} s. L’extrait peut être généré depuis le rapport en ligne.</p>{% endif %}
+  </article>{% endfor %}</details>
+  {% endif %}
+  {% if actions.segments %}<details><summary>Compte rendu de chaque séquence et interruptions</summary>
+  {% for segment in actions.segments %}<p><b>{{ segment.start|round(1) }}–{{ segment.end|round(1) }} s</b> · {{ {'complete':'traitée','pending':'en attente','running':'en cours','failed':'à reprendre'}.get(segment.status,segment.status) }} : {{ segment.summary or segment.error or 'Aucune observation disponible pour cette séquence.' }}</p>{% endfor %}
+  </details>{% endif %}
+  {% if actions.families %}<details><summary>Visibilité de chaque famille de mesures</summary>
+  {% for family in actions.families %}<h4>{{ family.label }}</h4>
+    {% for observation in family.observations %}<p>{{ observation.start|round(1) }}–{{ observation.end|round(1) }} s · {{ {'visible':'visible','limited':'visibilité partielle','not_visible':'non visible'}.get(observation.status,observation.status) }} : {{ observation.reason }}</p>
+    {% else %}<p>Cette famille n’a pas été évaluée par le moteur.</p>{% endfor %}
+  {% endfor %}</details>{% endif %}
+  <details><summary>Mesures physiques et évaluations nécessitant un autre dispositif</summary>
+  <table class="metric-table"><tbody>{% for metric in actions.physical %}<tr><th>{{ metric.label }}</th><td>Non mesuré</td><td>{{ metric.reason }}</td></tr>{% endfor %}</tbody></table>
+  </details>
+  {% if interactive_report|default(false) and actions.configured and not actions.active and actions.status != 'complete' %}
+  <form action="/matches/{{ match.id }}/analysis/actions/start" method="post"><button class="btn" type="submit">{{ 'Reprendre les séquences manquantes' if actions.status in ['partial','failed','interrupted'] else 'Analyser les actions de la vidéo' }}</button></form>
+  {% endif %}
+</section>

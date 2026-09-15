@@ -1,4 +1,5 @@
 {% from 'measurement_tables.html' import render %}
+{% if snapshot.video_actions is defined %}{% include 'analysis_video_actions.html' %}{% endif %}
 {% if snapshot.statistics is defined %}
 <section class="report-card section-wide" id="completeMatchStatistics">
 <h2>Toutes les statistiques du match</h2>

@@ -12,6 +12,11 @@ function vision(v){
  if(!v)return `<div class="aqm-panel"><h3>Mesures automatiques vidéo</h3><div class="aqm-note warn"><b>Aucun scan Vision disponible</b><div>La vidéo locale ou l’URL vidéo accessible doit d’abord passer par l’analyse Vision/OCR.</div></div></div>`;
  return `<div class="aqm-panel" id="aqm-auto-video"><h3>Mesures automatiques réellement extraites de la vidéo</h3><p>Ces valeurs viennent des images effectivement décodées par le moteur Vision. Elles restent distinctes des statistiques joueuses validées.</p><div class="aqm-kpis">${kpi('Durée analysée',`${v.duration_minutes} min`,`${v.duration_seconds} s réellement lus`)}${kpi('Cadence vidéo',`${v.fps} fps`,`${v.width}×${v.height}`)}${kpi('Images analysées',v.sample_count,`intervalle ≈ ${v.sample_interval_seconds} s`)}${kpi('Type vidéo',v.video_type,`confiance ${v.confidence}`)}${kpi('Activité estimée',`${v.active_minutes_estimate} min`,`${v.active_windows_count} fenêtres actives`)}${kpi('Motion moyenne',v.avg_motion_score,'score visuel relatif')}${kpi('Présence bassin',v.avg_pool_ratio,'ratio visuel moyen')}${kpi('Coupes scène',v.scene_cut_rate,'taux relatif')}${kpi('Moments intéressants',v.interesting_moments_count,'candidats visuels')}${kpi('Zones scoreboard',v.scoreboard_roi_candidates,'candidats ROI')}</div></div>`;
 }
+function videoActions(a,matchId){
+ if(!a)return '';
+ const body=Object.keys(a.team?.basic||{}).map(key=>`<tr><td>${esc(a.labels?.[key]||key)}</td><td>${esc(a.team.basic[key]??'—')}</td><td>${esc(a.opponent?.basic?.[key]??'—')}</td></tr>`);
+ return `<div class="aqm-panel"><h3>Reconnaissance vidéo des actions</h3><p>${esc(a.message)}</p>${a.available?`<p>${esc(a.event_count)} détections retenues · ${esc(a.coverage_percent)} % de durée traitée.</p><p>${esc(a.note)}</p>${table(['Détections IA','Équipe','Adversaire'],body)}`:''}<a href="/matches/${Number(matchId)}/analysis/result#automaticActionStatistics">Rapport par équipe et bonnet, zones de tir et extraits</a></div>`;
+}
 function autonomy(a){
  if(!a)return `<div class="aqm-panel"><h3>OCR, périodes et événements candidats</h3><div class="aqm-note warn"><b>Analyse autonome non disponible</b><div>Aucune observation scoreboard/OCR n’a encore été enregistrée pour ce match.</div></div></div>`;
  const counts=Object.entries(a.candidate_counts||{}).map(([type,n])=>`<tr><td>${esc(type)}</td><td>${esc(n)}</td></tr>`);
@@ -81,7 +86,7 @@ async function init(){
   for(let i=0;i<30&&!host;i++){await new Promise(res=>setTimeout(res,100));host=document.getElementById('aq-measured-analysis');}
   if(!host||document.getElementById('aqm-measurement-matrix'))return;
   const auto=d.automatic_analysis||{};
-  const fragment=document.createElement('div');fragment.className='aqm-shell';fragment.innerHTML=matrix(d)+vision(auto.vision)+autonomy(auto.autonomy)+jobs(auto.jobs);
+  const fragment=document.createElement('div');fragment.className='aqm-shell';fragment.innerHTML=videoActions(auto.actions,d.match.id)+matrix(d)+vision(auto.vision)+autonomy(auto.autonomy)+jobs(auto.jobs);
   const firstPanel=host.querySelector('.aqm-panel');
   if(firstPanel)firstPanel.insertAdjacentElement('beforebegin',fragment);else host.appendChild(fragment);
  }catch(_e){}
