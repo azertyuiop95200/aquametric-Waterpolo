@@ -22,10 +22,16 @@ def latest_capture_root(match, base: Path | None = None) -> Path | None:
     return max(roots, default=(0, None), key=lambda row: row[0])[1]
 
 
-def report_progress(match, *, root: Path | None = None, now: float | None = None) -> dict:
+def report_progress(match, *, root: Path | None = None, now: float | None = None, db=None) -> dict:
     root = root or latest_capture_root(match)
     result = {"active": False, "enrichment_status": "", "media_status": "", "media_clips": 0,
               "media_targets": 0, "retry_available": False, "stale": False, "revision": ""}
+    if db is not None:
+        from services.video_action_report import run_progress
+        from video_action_routes import workflow_active
+        result["actions"] = run_progress(db, match)
+        result["workflow_active"] = workflow_active(db, match.id)
+        result["active"] = result["actions"]["active"] or result["workflow_active"]
     if root is None:
         return result
     try:
@@ -40,7 +46,7 @@ def report_progress(match, *, root: Path | None = None, now: float | None = None
                         or (root / "progress.json").stat().st_mtime)
         stale = (time.time() if now is None else now) - updated > 600
         active = not stale and (enrichment in {"queued", "running"} or media in {"queued", "running"})
-        result.update(active=active, enrichment_status=enrichment, media_status=media,
+        result.update(active=active or result["active"], enrichment_status=enrichment, media_status=media,
                       media_clips=int(state.get("media_clips") or 0),
                       media_targets=int(state.get("media_targets") or 0), stale=stale,
                       retry_available=not active and (root / "capture.webm").is_file())

@@ -41,7 +41,8 @@
   {% if capture_progress.active %}
   <section class="report-card status-live" role="status" id="captureReportProgress"
            data-url="/matches/{{match.id}}/analysis/progress"
-           data-enrichment="{{capture_progress.enrichment_status}}" data-clips="{{capture_progress.media_clips}}">
+           data-enrichment="{{capture_progress.enrichment_status}}" data-clips="{{capture_progress.media_clips}}"
+           data-actions-revision="{{capture_progress.actions.revision if capture_progress.actions is defined else ''}}">
     <h2>Le rapport se complète</h2>
     <p data-progress-label>Consolidation des lectures et préparation des extraits vidéo… {{capture_progress.media_clips}} extrait(s) disponible(s).</p>
     <p class="evidence-note">Les nouvelles données apparaissent automatiquement. Une vidéo en cours de lecture ne sera pas interrompue.</p>

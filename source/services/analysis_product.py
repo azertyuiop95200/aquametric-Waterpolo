@@ -355,6 +355,8 @@ def analysis_snapshot(db, match):
     snapshot["diagnostics"] = analysis_diagnostics(snapshot["automatic"], snapshot["verified_events"])
     from services.measurement_report import match_statistics
     snapshot["statistics"] = match_statistics(match)
+    from services.video_action_report import action_report
+    snapshot["video_actions"] = action_report(db, match)
     # Basic counters over an empty event set are implementation zeros, not
     # measured match statistics. Apply the same contract to JSON/CSV and HTML.
     for side in ("team", "opponent"):
@@ -418,6 +420,9 @@ def _csv_text(headers, rows) -> str:
 
 
 def _html_report(match, snapshot, export_media=None) -> str:
+    from services.video_action_report import attach_export_clips
+    if "video_actions" in snapshot:
+        attach_export_clips(snapshot["video_actions"], export_media or [])
     ultimate = snapshot["ultimate"]
     team = ultimate["team"]["basic"]
     opponent = ultimate["opponent"]["basic"]
@@ -480,6 +485,19 @@ def build_analysis_zip(db, match, evidence_dir: Path) -> io.BytesIO:
         archive.writestr(f"{root}/01_report/report.html", _html_report(match, snapshot, export_media))
         archive.writestr(f"{root}/01_report/analysis.json", json.dumps(snapshot, ensure_ascii=False, indent=2, default=str))
         from services.measurement_report import flatten_measurements
+        auto_report = snapshot["video_actions"]
+        archive.writestr(f"{root}/03_events/automatic_video_actions.csv", _csv_text(
+            ["key", "second", "event_type", "side", "cap_number", "confidence", "counted", "phase", "period", "zone", "cage_zone", "hand", "shot_type", "pass_type", "cause", "pressure", "decision", "evidence", "identity_evidence", "team_evidence", "clip_url"], auto_report["events"]))
+        archive.writestr(f"{root}/02_kpis/automatic_team_measurements.csv", _csv_text(
+            ["perspective", "scope", "metric", "value"], [
+                {"perspective": side, "scope": "automatic_detections", **row}
+                for side in ("team", "opponent", "unassigned") for row in flatten_measurements(auto_report[side])]))
+        archive.writestr(f"{root}/02_kpis/automatic_player_measurements.csv", _csv_text(
+            ["side", "cap_number", "scope", "metric", "value"], [
+                {"side": p["side"], "cap_number": p["cap_number"], "scope": "automatic_detections", **row}
+                for p in auto_report["players"] for row in flatten_measurements(p["report"])]))
+        archive.writestr(f"{root}/04_sequences/action_coverage.json", json.dumps(
+            {key: auto_report[key] for key in ("segments", "families", "coverage_percent", "physical")}, ensure_ascii=False, indent=2))
         archive.writestr(f"{root}/02_kpis/all_match_measurements.csv",
             _csv_text(["perspective", "metric", "value"], [
                 {"perspective": side, **row} for side in ("team", "opponent")

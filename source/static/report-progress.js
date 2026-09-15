@@ -4,7 +4,8 @@
   const label = panel.querySelector('[data-progress-label]');
   const initialClips = Number(panel.dataset.clips || 0);
   const initialEnrichment = panel.dataset.enrichment;
-  const deadline = Date.now() + 10 * 60 * 1000;
+  const initialActions = panel.dataset.actionsRevision || '';
+  const deadline = Date.now() + 20 * 60 * 1000;
   let stopped = false;
   async function refresh() {
     if (stopped) return;
@@ -23,8 +24,9 @@
       }
       if (!response.ok) throw new Error('HTTP ' + response.status);
       const state = await response.json();
-      label.textContent = `${state.media_clips} extrait(s) prêt(s)${state.media_targets ? ' sur ' + state.media_targets : ''}. ${state.enrichment_status === 'complete' ? 'Lectures du score consolidées.' : 'Vérification des lectures en cours.'}`;
-      const changed = !state.active || state.enrichment_status !== initialEnrichment || (!initialClips && state.media_clips > 0);
+      const actions = state.actions || {};
+      label.textContent = `${state.media_clips} extrait(s) prêt(s)${state.media_targets ? ' sur ' + state.media_targets : ''}. ${actions.active ? 'Actions : ' + actions.completed + '/' + actions.total + ' séquences traitées.' : (actions.message || (state.enrichment_status === 'complete' ? 'Lectures du score consolidées.' : 'Lecture vidéo en cours.'))}`;
+      const changed = !state.active || state.enrichment_status !== initialEnrichment || (!initialClips && state.media_clips > 0) || (actions.revision || '') !== initialActions;
       const playing = [...document.querySelectorAll('video')].some(video => !video.paused && !video.ended);
       if (changed && !playing) { location.reload(); return; }
     } catch (_) {

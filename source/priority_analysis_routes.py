@@ -138,7 +138,7 @@ def _unavailable_match_page(request: Request, exc: HTTPException):
 
 def saved_report_progress(match_id: int, request: Request, db: Session = Depends(get_db)):
     _, match = _owned_match(match_id, request, db)
-    return JSONResponse(report_progress(match), headers={"Cache-Control": "private, no-store"})
+    return JSONResponse(report_progress(match, db=db), headers={"Cache-Control": "private, no-store"})
 
 
 def regenerate_capture_clips(match_id: int, request: Request, background_tasks: BackgroundTasks,
@@ -158,6 +158,8 @@ def regenerate_capture_clips(match_id: int, request: Request, background_tasks: 
 
 
 def install_priority_analysis_routes(app) -> None:
+    from video_action_routes import router as video_action_router
+    app.include_router(video_action_router)
     registrations = [
         ("/matches/{match_id}/analysis/report.html", download_analysis_report, "GET", HTMLResponse, "download_analysis_report"),
         ("/analysis/url/create", create_flexible_url_analysis, "POST", None, "product_create_url_analysis"),

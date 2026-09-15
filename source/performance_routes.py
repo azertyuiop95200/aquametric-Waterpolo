@@ -42,6 +42,8 @@ def _json(value, fallback):
 
 
 def _automatic_video_report(db: Session, match: Match, vision: VisionAnalysis | None) -> dict:
+    from services.video_action_report import action_report
+    video_actions = action_report(db, match)
     autonomy = db.scalar(
         select(AutonomousAnalysis)
         .where(AutonomousAnalysis.match_id == match.id)
@@ -140,6 +142,7 @@ def _automatic_video_report(db: Session, match: Match, vision: VisionAnalysis | 
 
     return {
         "vision": vision_report,
+        "actions": video_actions,
         "autonomy": autonomy_report,
         "jobs": [
             {
@@ -195,6 +198,9 @@ def _measurement_matrix(match: Match, team_report: dict, ultimate: dict, automat
     for item in rows:
         if not item["available"] and item["status"] not in {"AUTO", "CANDIDAT AUTO"}:
             item["status"] = "NON MESURÉ"
+    actions = automatic.get("actions") or {}
+    rows.append(row("Actions reconnues dans les séquences vidéo", "ESTIMATION IA" if actions.get("available") else "NON MESURÉ",
+                    "Moteur vidéo", actions.get("message", "Moteur vidéo non lancé."), actions.get("available")))
     return rows
 
 

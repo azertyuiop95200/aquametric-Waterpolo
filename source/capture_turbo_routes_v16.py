@@ -439,6 +439,8 @@ def turbo_finish_capture(
         rate,
         segments,
     )
+    from video_action_routes import run_capture_actions
+    background_tasks.add_task(run_capture_actions, match_id, str(root))
     background_tasks.add_task(v15.v14.v13._enrich_after_report, match_id, str(root))
     return JSONResponse(_finish_payload(match_id, session_id, published))
 

@@ -1,4 +1,10 @@
 {% from 'measurement_tables.html' import render %}
+{% if automatic_player_history %}
+<section class="panel" id="automaticPlayerStatistics"><h2>Détections vidéo associées au bonnet</h2>
+<p>Association provisoire au numéro de bonnet de cette fiche dans cette équipe. Elle peut changer d’un match à l’autre ; ces chiffres ne sont pas ajoutés aux statistiques confirmées.</p>
+{% for row in automatic_player_history %}<details><summary>Match {{row.match_id}} · {{row.opponent}} · bonnet {{row.cap_number}} · {{row.coverage_percent}} % de durée traitée</summary>
+<a href="/matches/{{row.match_id}}/analysis/result#automaticActionStatistics">Ouvrir le rapport et les preuves vidéo</a>{{ render(row.report,automatic_labels) }}</details>{% endfor %}
+</section>{% endif %}
 {% if player_statistics is defined %}
 <section class="panel" id="completePlayerStatistics"><h2>Statistiques personnelles détaillées</h2>
 <p>{{ player_statistics.match_count }} match(s) avec des actions confirmées attribuées. Totaux sur l’échantillon enregistré, sans extrapolation aux minutes ou actions non observées.</p>

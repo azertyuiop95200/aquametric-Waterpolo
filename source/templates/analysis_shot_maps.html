@@ -1,0 +1,21 @@
+{% macro maps(report) -%}
+{% if report.shots.total %}
+<div style="display:flex;gap:16px;flex-wrap:wrap">
+<figure style="margin:0;max-width:460px;flex:1 1 300px"><figcaption>Zones de tir proposées · buts / tirs détectés</figcaption>
+<svg viewBox="0 0 420 280" role="img" aria-label="Répartition des tirs détectés par zone du bassin" style="width:100%;background:#092b3a;border-radius:12px">
+<rect x="12" y="12" width="396" height="255" fill="none" stroke="#78c6d7"/><path d="M165 13V30H255V13 M12 75H408 M12 145H408" fill="none" stroke="#78c6d7" stroke-dasharray="4 4"/>
+{% for key,x,y,label in [('wing_left',48,68,'Aile G'),('flat_left',110,160,'Gauche'),('point',210,225,'Pointe'),('flat_right',310,160,'Droite'),('wing_right',372,68,'Aile D'),('centre',210,91,'Centre')] %}
+{% set rows = report.shots.zones|selectattr('key','equalto',key)|list %}{% set row = rows[0] if rows else none %}
+<circle cx="{{x}}" cy="{{y}}" r="26" fill="{{ '#167690' if row else '#204754' }}" stroke="#8cdae9"/>
+<text x="{{x}}" y="{{y+5}}" text-anchor="middle" fill="white" font-size="16">{{ (row.goals|string)+'/'+(row.shots|string) if row else '—' }}</text><text x="{{x}}" y="{{y+40}}" text-anchor="middle" fill="#c3e6ef" font-size="12">{{label}}</text>
+{% endfor %}</svg>
+<p>Positions schématiques, sans distance mesurée. Les autres zones et tirs non localisés figurent dans le détail.</p></figure>
+<figure style="margin:0;max-width:420px;flex:1 1 280px"><figcaption>Impacts proposés dans la cage · nombre de tirs détectés</figcaption>
+<svg viewBox="0 0 330 220" role="img" aria-label="Répartition des impacts détectés dans les neuf zones de la cage" style="width:100%;background:#092b3a;border-radius:12px">
+{% for key in ['top_left','top_centre','top_right','middle_left','middle_centre','middle_right','bottom_left','bottom_centre','bottom_right'] %}
+{% set x = 15+(loop.index0%3)*100 %}{% set y = 15+(loop.index0//3)*62 %}
+<rect x="{{x}}" y="{{y}}" width="100" height="62" fill="{{ '#167690' if report.cage_zones.get(key) else '#204754' }}" stroke="#8cdae9"/>
+<text x="{{x+50}}" y="{{y+38}}" text-anchor="middle" fill="white" font-size="20">{{ report.cage_zones.get(key,'—') }}</text>
+{% endfor %}</svg><p>Un impact invisible reste non localisé. Les détections IA peuvent être erronées.</p></figure>
+</div>{% endif %}
+{%- endmacro %}

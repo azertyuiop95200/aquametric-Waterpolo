@@ -105,6 +105,22 @@ class AnalysisJob(Base):
     message: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
+class VideoActionAnalysis(Base):
+    """Checkpointed model observations; never implicitly confirmed Event rows."""
+    __tablename__ = "video_action_analyses"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    match_id: Mapped[int] = mapped_column(ForeignKey("matches.id"), index=True)
+    fingerprint: Mapped[str] = mapped_column(String(64), unique=True)
+    status: Mapped[str] = mapped_column(String(40), default="queued")
+    model: Mapped[str] = mapped_column(String(100), default="")
+    source_kind: Mapped[str] = mapped_column(String(30), default="")
+    source_path: Mapped[str] = mapped_column(Text, default="")
+    duration_seconds: Mapped[float] = mapped_column(Float, default=0)
+    message: Mapped[str] = mapped_column(Text, default="")
+    segments_json: Mapped[str] = mapped_column(Text, default="[]")
+    updated_at: Mapped[float] = mapped_column(Float, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+
 class OfficialDataSource(Base):
     __tablename__ = "official_data_sources"
     id: Mapped[int] = mapped_column(primary_key=True)

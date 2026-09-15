@@ -7,7 +7,7 @@ import shutil
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select
@@ -223,31 +223,21 @@ def create_real_url_analysis(
 def start_real_analysis(
     match_id: int,
     request: Request,
+    background_tasks: BackgroundTasks,
     include_audio: str = Form("1"),
     db: Session = Depends(get_db),
 ):
     _, match = _owned_match(match_id, request, db)
     if _is_owned_upload(match):
-        try:
-            run_complete_analysis(
-                db,
-                match,
-                UPLOAD_DIR,
-                EVIDENCE_DIR,
-                include_audio=include_audio.lower() in {"1", "true", "on", "yes"},
-            )
-            materialize_deep_sequence_pack(
-                db,
-                match,
-                UPLOAD_DIR,
-                EVIDENCE_DIR,
-                max_targets=72,
-                max_clips=48,
-                max_image_targets=72,
-                triple_frames=48,
-            )
-        except RapidAnalysisError as exc:
-            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        from models import AnalysisJob
+        from video_action_routes import upload_analysis_background, workflow_active
+        if not workflow_active(db, match.id):
+            job = AnalysisJob(match_id=match.id, stage="video_workflow", status="queued", progress=0,
+                              message="Analyse en attente : lecture du fichier vidéo.")
+            db.add(job)
+            db.commit()
+            background_tasks.add_task(upload_analysis_background, match.id, job.id,
+                                      include_audio.lower() in {"1", "true", "on", "yes"})
         return RedirectResponse(f"/matches/{match_id}/analysis/result", status_code=303)
     if match.video_url:
         match.status = "url_capture_required"
