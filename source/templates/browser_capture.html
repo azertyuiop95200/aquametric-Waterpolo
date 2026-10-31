@@ -134,7 +134,7 @@
     try{
       const u = new URL(url, location.href), host = u.hostname.toLowerCase();
       if(host === 'youtu.be') return u.pathname.split('/').filter(Boolean)[0] || '';
-      if(host.endsWith('youtube.com')){
+      if(['youtube.com','www.youtube.com','m.youtube.com'].includes(host)){
         if(u.pathname === '/watch') return u.searchParams.get('v') || '';
         const p = u.pathname.split('/').filter(Boolean); if(['embed','shorts','live'].includes(p[0])) return p[1] || '';
       }
