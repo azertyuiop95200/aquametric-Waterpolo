@@ -20,6 +20,7 @@ def youtube_embed(url: str) -> str | None:
         r"(?:www\.)?youtu\.be/([A-Za-z0-9_-]{6,})",
         r"(?:www\.)?youtube\.com/embed/([A-Za-z0-9_-]{6,})",
         r"(?:www\.)?youtube\.com/shorts/([A-Za-z0-9_-]{6,})",
+        r"(?:www\.)?youtube\.com/live/([A-Za-z0-9_-]{6,})",
     ]
     host = (urlparse(url).hostname or "").lower()
     if host not in {"youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"}:
