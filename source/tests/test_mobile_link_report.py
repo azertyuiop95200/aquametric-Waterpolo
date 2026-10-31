@@ -44,7 +44,9 @@ def test_phone_link_saves_without_desktop_capture_and_reopens():
 
 def test_desktop_capture_and_invalid_input():
     client = registered()
-    assert '/analysis/browser-capture?' in create(client, 'desktop').headers['location']
+    assert '/analysis/browser-capture?' in create(client, 'desktop', 'https://www.youtube.com/watch?v=Guo_UU282pI').headers['location']
+    generic = create(client, 'desktop', 'https://example.com/match-test')
+    assert generic.headers['location'].endswith('/analysis/result')
     assert create(client, 'phone', 'javascript:alert(1)').status_code == 400
     assert create(client, 'unsupported').status_code == 400
 
