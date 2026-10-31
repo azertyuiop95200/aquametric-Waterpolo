@@ -10,7 +10,8 @@
     <h1>Lecture + analyse en parallèle</h1>
     <p>AquaMetric commence la pré-analyse pendant que le match est encore en lecture. Le mode Turbo découpe la chronologie en <b>4 segments lus simultanément à x2</b>, puis remet automatiquement toutes les mesures dans l’ordre du match.</p>
     <div class="capture-permission" id="permissionState"><b>Vérification de l’autorisation navigateur…</b></div>
-    <div class="capture-warning"><b>Objectif produit : rapport poussé en ≤15 min</b> sur un match de durée courante et une machine/réseau suffisants. AquaMetric affiche le temps réel de lecture et le temps réel d’analyse ; il ne masque pas un ralentissement éventuel.</div>
+    <div class="capture-warning"><b>Objectif indicatif : rapport en ≤15 min</b> sous réserve des performances de lecture, de la connexion et de la disponibilité du serveur. Aucun délai ni événement sportif détecté n’est garanti.</div>
+    <div class="capture-warning" id="actionEngineReadiness" role="status"><b>Reconnaissance des actions :</b> vérification du moteur IA… Les images et le score OCR ne suffisent pas à attribuer des tirs, des pertes de balle ou des transitions aux joueuses.</div>
   </section>
 
   <section class="capture-panel studio-panel">
@@ -105,6 +106,15 @@
   const preview = document.getElementById('capturePreview');
   const canvas = document.getElementById('captureCanvas');
   const rawVideoUrl = {{ match.video_url|tojson }};
+  const actionEngineReadiness = document.getElementById('actionEngineReadiness');
+  fetch('/health/video-actions', {cache:'no-store'})
+    .then(response => {if (!response.ok) throw new Error('readiness unavailable'); return response.json();})
+    .then(data => {
+      actionEngineReadiness.textContent = data.configured
+        ? 'Moteur IA connecté : les actions détectées restent des candidates à vérifier. La couverture du match peut être partielle.'
+        : 'Moteur IA de reconnaissance des actions non connecté : seul le rapport Vision/OCR partiel est disponible. Aucune statistique individuelle ne sera inventée.';
+    })
+    .catch(() => { actionEngineReadiness.textContent = 'État du moteur IA inconnu : les mesures non prouvées resteront indisponibles.'; });
 
   let mode = 'turbo';
   let playbackRate = 2;
