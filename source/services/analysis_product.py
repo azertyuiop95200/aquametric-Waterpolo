@@ -351,6 +351,35 @@ def analysis_snapshot(db, match):
             if str(e.confidence or "").upper() in {"CONFIRMED", "VERIFIED"}
         ],
     }
+    # The browser can successfully record a YouTube anti-bot page. In that
+    # case neither motion candidates nor apparent scoreboard OCR are sports
+    # observations, regardless of capture progress reaching 100%.
+    from services.source_match_facts import declared_match_facts
+    snapshot["source_facts"] = declared_match_facts(match.video_url or "")
+    snapshot["capture_source_quality"] = {}
+    if match.video_source == "youtube":
+        try:
+            from services.capture_report_progress import latest_capture_root
+            from services.capture_source_quality import capture_source_quality, capture_is_unverified
+            capture_root = latest_capture_root(match)
+            if capture_root:
+                marker = _safe_json((capture_root / ".v16-report-ready.json").read_text(encoding="utf-8"), {})
+                quality = marker.get("capture_source_quality") or capture_source_quality(capture_root, {})
+                snapshot["capture_source_quality"] = quality
+                if capture_is_unverified(quality):
+                    snapshot["vision"]["available"] = False
+                    snapshot["vision"]["limitations"].append(
+                        "Capture non validée : images statiques ou écran de vérification du lecteur. "
+                        "Les échantillons reçus ne prouvent pas la présence d'un match."
+                    )
+                    snapshot["vision"]["interesting_moments"] = []
+                    snapshot["vision"]["active_windows"] = []
+                    snapshot["automatic"]["candidates"] = []
+                    snapshot["automatic"]["observations"] = []
+                    snapshot["automatic"]["periods"] = []
+                    snapshot["automatic"]["summary"]["analysis_outcome"] = "source_unverified"
+        except (OSError, ValueError, TypeError, KeyError):
+            pass
     from services.analysis_diagnostics import analysis_diagnostics
     snapshot["diagnostics"] = analysis_diagnostics(snapshot["automatic"], snapshot["verified_events"])
     from services.measurement_report import match_statistics
