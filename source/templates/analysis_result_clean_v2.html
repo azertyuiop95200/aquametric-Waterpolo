@@ -25,6 +25,149 @@
     </div>
   </section>
 
+  {% if snapshot.source_facts %}
+  <section class="report-card status-warn" id="sourcedScore">
+    <h2>Résultat annoncé par la source — distinct des mesures vidéo</h2>
+    <p><strong style="font-size:25px">{{snapshot.source_facts.home_goals}} – {{snapshot.source_facts.away_goals}}</strong>
+       · {{snapshot.source_facts.home_team}} – {{snapshot.source_facts.away_team}}
+       · écart {{snapshot.source_facts.goal_difference_home}} buts</p>
+    <p class="evidence-note">Source : <a href="{{snapshot.source_facts.source_url}}" target="_blank" rel="noopener">{{snapshot.source_facts.score_source}}</a>
+      (« {{snapshot.source_facts.source_title}} »). Rencontre au calendrier fédéral : <a href="{{snapshot.source_facts.fixture_source}}" target="_blank" rel="noopener">FFN / extraNat</a>
+      · {{snapshot.source_facts.match_date}}. <b>Ces nombres sont annoncés dans le titre, pas mesurés à partir d'actions vidéo et ne remplissent jamais artificiellement les colonnes de tirs, joueuses ou exclusions.</b></p>
+  </section>
+  {% endif %}
+
+  {% if snapshot.capture_source_quality.get("status") in ["blocked", "static_unverified"] %}
+  <section class="report-card status-failed" id="captureQualityBlock" role="alert">
+    <h2>Source vidéo non exploitable pour les statistiques automatiques</h2>
+    <p>La capture reçue montre un écran presque immobile{% if snapshot.capture_source_quality.get("status") == "blocked" %} reconnu comme une demande de vérification du lecteur{% endif %}. Elle ne constitue pas une preuve de jeu de water-polo.</p>
+    <p><strong>Correction appliquée :</strong> les faux pics d'activité, périodes et lectures OCR sont retirés du rapport sportif. Aucune action individuelle n'est inventée.</p>
+    <p class="evidence-note">Contrôle : {{snapshot.capture_source_quality.frames_checked}} images comparées · variation moyenne {{snapshot.capture_source_quality.mean_frame_delta}} (sur 255). Pour produire une véritable analyse automatique, importer un MP4/MOV accessible ou utiliser la capture dans un navigateur où le match est réellement visible.</p>
+    <div class="actions"><a class="btn" href="/matches/new">Importer une vidéo</a><a class="btn secondary" href="#annotation">Annoter le replay visible</a></div>
+  </section>
+  {% endif %}
+
+  <section class="report-card section-wide" id="annotation">
+    <div class="hero-top">
+      <div><span class="eyebrow">POSTE D'ANALYSE · ACTIONS HORODATÉES</span><h2>Mesurer le match action par action</h2></div>
+      <span class="chip">{{review_metrics.verified_count}} action(s) confirmée(s)</span>
+    </div>
+    <p class="evidence-note">Comme dans les outils de marquage sportif : lis la vidéo, arrête-toi sur l'action, sélectionne l'équipe et éventuellement la joueuse, puis confirme l'événement. AquaMetric met à jour immédiatement les statistiques, les phases et les comparaisons. Aucune action n'est ajoutée automatiquement si la vidéo est bloquée.</p>
+    {% if source_embed %}
+      <iframe id="reviewVideo" class="video-frame" style="max-width:900px" src="{{source_embed}}&rel=0" title="Replay à annoter : {{match.team.name}} contre {{match.opponent}}" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+      <p class="evidence-note">Si YouTube demande une vérification, <a href="{{match.video_url}}" target="_blank" rel="noopener">ouvre le replay dans YouTube</a>, puis recopie le temps sous la vidéo. Le dossier conservera le timestamp exact.</p>
+    {% endif %}
+    <form id="reviewTagForm" action="/matches/{{match.id}}/events" method="post">
+      <input name="return_to" type="hidden" value="report">
+      <div class="formgrid">
+        <label>Instant de la vidéo (secondes)
+          <input type="number" id="reviewSecond" name="second" value="0" min="0" max="43200" step="0.1" required>
+          <small id="reviewTimeText">00:00 · modification possible</small>
+        </label>
+        <label>Équipe qui réalise l'action
+          <select name="perspective" id="reviewPerspective">
+            <option value="for">{{match.team.name}}</option>
+            <option value="against">{{match.opponent}}</option>
+          </select>
+        </label>
+        <label>Joueuse (facultatif, pour {{match.team.name}})
+          <select name="player_id" id="reviewPlayer">
+            <option value="">Non attribuée / adversaire</option>
+            {% for p in players %}
+            <option value="{{p.id}}">#{{p.cap_number or "—"}} · {{p.name}}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>Contexte de l'action
+          <select name="phase_tag">
+            <option value="auto">Non déterminé</option>
+            <option value="even_attack">6 contre 6</option>
+            <option value="power_play">Supériorité 6 contre 5</option>
+            <option value="counterattack">Contre-attaque</option>
+            <option value="penalty_kill">Infériorité numérique</option>
+            <option value="centre_play">Jeu au centre</option>
+          </select>
+        </label>
+      </div>
+      <label>Observation complémentaire
+        <input name="note" maxlength="500" placeholder="Ex. tir depuis l'aile droite, ballon dévié par la gardienne">
+      </label>
+      <label style="display:block;margin:12px 0"><input type="checkbox" name="observed" value="1" required> J'ai réellement observé cet événement dans la vidéo ou sur une feuille de match vérifiable.</label>
+      <div class="actions" style="gap:9px">
+        <button class="btn" type="submit" name="event_type" value="goal">But</button>
+        <button class="btn secondary" type="submit" name="event_type" value="shot_on_target">Tir arrêté / cadré</button>
+        <button class="btn secondary" type="submit" name="event_type" value="shot_off_target">Tir manqué</button>
+        <button class="btn secondary" type="submit" name="event_type" value="shot_blocked">Tir contré</button>
+        <button class="btn secondary" type="submit" name="event_type" value="save">Arrêt</button>
+        <button class="btn secondary" type="submit" name="event_type" value="turnover">Perte</button>
+        <button class="btn secondary" type="submit" name="event_type" value="recovery">Récupération</button>
+        <button class="btn secondary" type="submit" name="event_type" value="assist">Passe décisive</button>
+        <button class="btn secondary" type="submit" name="event_type" value="exclusion_earned">Exclusion obtenue</button>
+        <button class="btn secondary" type="submit" name="event_type" value="exclusion_committed">Exclusion commise</button>
+      </div>
+    </form>
+    <script>
+      (() => {
+        const second = document.getElementById('reviewSecond'), display = document.getElementById('reviewTimeText');
+        const perspective = document.getElementById('reviewPerspective'), player = document.getElementById('reviewPlayer');
+        const video = document.getElementById('reviewVideo');
+        function updateTime() { const n = Math.max(0,Number(second.value)||0); display.textContent = String(Math.floor(n/60)).padStart(2,'0')+':'+String(Math.floor(n%60)).padStart(2,'0')+' · timestamp de la vidéo'; }
+        second.addEventListener('input',updateTime); updateTime();
+        perspective.addEventListener('change', () => { if(perspective.value==='against') player.value=''; player.disabled=perspective.value==='against'; });
+        if(video){
+          window.addEventListener('message', ev=>{
+            if(!/^https:\/\/(?:www\.)?youtube(?:-nocookie)?\.com$/.test(ev.origin) || ev.source!==video.contentWindow) return;
+            let data=ev.data; if(typeof data==='string'){try{data=JSON.parse(data);}catch(e){return;}}
+            if(data && data.info && Number.isFinite(Number(data.info.currentTime)) && Number(data.info.currentTime)>0){
+              // Do not overwrite an intentional manual timestamp during an edit.
+              if(document.activeElement!==second){second.value=Math.round(Number(data.info.currentTime)*10)/10;updateTime();}
+            }
+          });
+          setInterval(()=>{try{video.contentWindow.postMessage(JSON.stringify({event:'listening',id:'aq-review'}),'*');}catch(e){}},1500);
+        }
+      })();
+    </script>
+  </section>
+
+  <section class="report-card section-wide" id="observedKPIs">
+    <h2>Tableau de bord · données réellement annotées</h2>
+    <p class="evidence-note">Statistiques <b>sur l'échantillon confirmé</b>, pas sur tout le match. Les buts annoncés dans le titre YouTube ne sont pas additionnés aux buts observés.</p>
+    <table class="metric-table">
+      <thead><tr><th>Mesure</th><th>{{match.team.name}}</th><th>{{match.opponent}}</th></tr></thead>
+      <tbody>
+        {% for title,key in [("Actions annotées","tagged_events"),("Buts annotés","tagged_goals"),("Tirs annotés","tagged_shots"),("Conversion des tirs annotés","shot_conversion_pct"),("Pertes / mauvaises passes","tagged_turnovers"),("Arrêts","tagged_saves"),("Exclusions obtenues","tagged_exclusions_earned"),("Exclusions concédées","tagged_exclusions_committed")] %}
+        <tr><td>{{title}}</td>
+          <td>{% if review_metrics.team.tagged_events or key == 'tagged_events' %}{{review_metrics.team[key] if review_metrics.team[key] is not none else '—'}}{% if key == 'shot_conversion_pct' and review_metrics.team[key] is not none %} %{% endif %}{% else %}—{% endif %}</td>
+          <td>{% if review_metrics.opponent.tagged_events or key == 'tagged_events' %}{{review_metrics.opponent[key] if review_metrics.opponent[key] is not none else '—'}}{% if key == 'shot_conversion_pct' and review_metrics.opponent[key] is not none %} %{% endif %}{% else %}—{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% if review_metrics.verified_count %}
+      <h3>Situations de jeu</h3>
+      <table class="metric-table"><thead><tr><th>Phase</th><th>{{match.team.name}}</th><th>{{match.opponent}}</th></tr></thead><tbody>
+      {% for key,phase in review_metrics.phases.items() %}
+        <tr><td>{{phase.label}}</td>
+        {% for side in ['for','against'] %}
+          {% set values=phase[side] %}<td>{{values.tagged_goals}} but(s) / {{values.tagged_shots}} tir(s){% if values.shot_conversion_pct is not none %} · {{values.shot_conversion_pct}} %{% endif %}</td>
+        {% endfor %}</tr>
+      {% endfor %}</tbody></table>
+      {% if review_metrics.players %}
+      <h3>Joueuses annotées · {{match.team.name}}</h3>
+      <table class="metric-table"><thead><tr><th>Joueuse</th><th>Buts</th><th>Tirs</th><th>% tirs</th><th>Passes décisives</th></tr></thead>
+        <tbody>{% for p in review_metrics.players %}<tr><td>{{p.name}}</td><td>{{p.tagged_goals}}</td><td>{{p.tagged_shots}}</td><td>{{p.shot_conversion_pct if p.shot_conversion_pct is not none else '—'}}</td><td>{{p.tagged_events - p.tagged_goals - (p.tagged_shots-p.tagged_goals) - p.tagged_turnovers - p.tagged_saves - p.tagged_exclusions_earned - p.tagged_exclusions_committed if false else 'Voir chronologie'}}</td></tr>{% endfor %}</tbody></table>
+      {% endif %}
+      <h3>Actions vérifiées · accès direct à la preuve</h3>
+      {% for e in review_metrics.timeline %}
+        <div class="event-row"><b>{{"%02d:%02d"|format((e.second//60)|int,(e.second%60)|int)}}</b>
+        <div><strong>{{e.label}}</strong> · {{match.team.name if e.side == 'for' else match.opponent if e.side=='against' else 'Indéterminé'}}{% if e.player %} · {{e.player}}{% endif %}<small style="display:block">{{e.phase|replace('_',' ')}}</small></div>
+        {% if e.url %}<a href="{{e.url}}" target="_blank" rel="noopener">Voir sur la vidéo</a>{% endif %}</div>
+      {% endfor %}
+    {% else %}
+      <p class="evidence-note">Aucune action sportive enregistrée. Les valeurs seront calculées dès qu'un événement réellement observé aura été confirmé.</p>
+    {% endif %}
+  </section>
+
   {% if match.status in ["browser_capture_running","browser_capture_finalizing"] %}
   <section class="report-card status-live" id="finalizationLiveState">
     <h2>Rapport en cours de publication</h2>
