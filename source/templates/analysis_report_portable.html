@@ -4,6 +4,11 @@
 <header><small>AQUAMETRIC · RAPPORT DU DOSSIER SAUVEGARDÉ</small><h1>{{match.team.name}} - {{match.opponent}}</h1><p>{{match.competition or 'Compétition non renseignée'}} · {{match.match_date or 'Date non renseignée'}} · {{match.team.category}}</p><p>Match n°{{match.id}} · Export du {{generated_at}}</p></header>
 {% if match.video_url %}<p>Source enregistrée : <a href="{{match.video_url}}">{{match.video_url}}</a></p>{% endif %}
 {% if not snapshot.vision.available and not snapshot.video_actions.available %}<div class="notice"><b>Vidéo identifiée mais non analysée</b><p>Aucun rapport Vision n’est enregistré pour ce dossier. Le lien seul ne permet pas d’observer le match. Aucune conclusion visuelle ou note de joueuse n’est produite ici.</p></div>{% elif snapshot.vision.available %}<p>Pré-analyse Vision : {{snapshot.vision.sample_count}} images échantillonnées sur {{snapshot.vision.duration_seconds}} secondes de source décodable. Un échantillonnage ne constitue pas une lecture exhaustive du match.</p>{% endif %}
+{% if match.video_source == "cloud" %}
+<div class="notice"><h2>Vidéo volumineuse sauvegardée dans le cloud</h2>
+<p>Le fichier a été reçu et vérifié dans un stockage privé. Le transfert ne prouve aucun but, tir ou autre événement sportif. L'analyse automatique des fichiers cloud sur cet hébergement n'est pas encore configurée. Le codage manuel du replay est possible sur le site AquaMetric.</p>
+</div>
+{% endif %}
 {% if snapshot.source_facts %}
 <div class="notice"><h2>Score déclaré par l'auteur de la vidéo (non mesuré par l'OCR)</h2>
 <p><strong>{{snapshot.source_facts.home_team}} {{snapshot.source_facts.home_goals}} – {{snapshot.source_facts.away_goals}} {{snapshot.source_facts.away_team}}</strong>
