@@ -251,7 +251,14 @@ def demo_login(request: Request, next: str = "", db: Session = Depends(get_db)):
     """
     if not WEB_DEMO_MODE:
         raise HTTPException(status_code=404)
-    destination = _demo_analysis_destination(next)
+    fallback = "/matches/new?" + urlencode({
+        "video_url": os.getenv("AQUAMETRIC_TARGET_VIDEO_URL", ""),
+        "team_name": os.getenv("AQUAMETRIC_TARGET_TEAM_NAME", ""),
+        "opponent": os.getenv("AQUAMETRIC_TARGET_OPPONENT", ""),
+        "competition": os.getenv("AQUAMETRIC_TARGET_COMPETITION", ""),
+        "category": os.getenv("AQUAMETRIC_TARGET_CATEGORY", "Women"),
+    })
+    destination = _demo_analysis_destination(next or fallback)
     current = current_user(request, db)
     if current:
         return RedirectResponse(destination if destination != "/my-team" else "/dashboard", status_code=303)
@@ -473,7 +480,12 @@ def matches_page(request: Request, db: Session = Depends(get_db)):
 def new_match_page(request: Request, db: Session = Depends(get_db)):
     user = require_user(request, db)
     teams = db.scalars(select(Team).where(Team.owner_id == user.id).order_by(Team.name)).all()
-    return render(request, "match_new.html", user=user, teams=teams, max_upload_mb=MAX_UPLOAD_MB)
+    return render(request, "match_new.html", user=user, teams=teams, max_upload_mb=MAX_UPLOAD_MB,
+                  target_video_url=os.getenv("AQUAMETRIC_TARGET_VIDEO_URL", ""),
+                  target_team_name=os.getenv("AQUAMETRIC_TARGET_TEAM_NAME", ""),
+                  target_opponent=os.getenv("AQUAMETRIC_TARGET_OPPONENT", ""),
+                  target_competition=os.getenv("AQUAMETRIC_TARGET_COMPETITION", ""),
+                  target_category=os.getenv("AQUAMETRIC_TARGET_CATEGORY", "Women"))
 
 
 @app.post("/matches")
