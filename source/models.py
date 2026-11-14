@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import String, Integer, Float, ForeignKey, DateTime, Text, Boolean
+from sqlalchemy import String, Integer, BigInteger, Float, ForeignKey, DateTime, Text, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from db import Base
 
@@ -68,8 +68,8 @@ class LargeVideoUpload(Base):
     upload_id: Mapped[str] = mapped_column(Text)
     filename: Mapped[str] = mapped_column(String(255))
     mime_type: Mapped[str] = mapped_column(String(100))
-    total_bytes: Mapped[int] = mapped_column(Integer)
-    part_bytes: Mapped[int] = mapped_column(Integer)
+    total_bytes: Mapped[int] = mapped_column(BigInteger)
+    part_bytes: Mapped[int] = mapped_column(BigInteger)
     metadata_json: Mapped[str] = mapped_column(Text, default="{}")
     status: Mapped[str] = mapped_column(String(32), default="uploading")
     match_id: Mapped[int | None] = mapped_column(ForeignKey("matches.id"), nullable=True)
