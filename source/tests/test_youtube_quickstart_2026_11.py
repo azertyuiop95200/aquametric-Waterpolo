@@ -45,3 +45,24 @@ def test_demo_user_redirect_to_prefilled_page(monkeypatch):
         form = client.get(response.headers["location"])
         assert form.status_code == 200
         assert VIDEO in form.text
+
+
+def test_staging_target_environment_prefills_granville_mar_SE(monkeypatch):
+    monkeypatch.setenv("AQUAMETRIC_TARGET_VIDEO_URL", VIDEO)
+    monkeypatch.setenv("AQUAMETRIC_TARGET_TEAM_NAME", "Granville WP")
+    monkeypatch.setenv("AQUAMETRIC_TARGET_OPPONENT", "CN Marseille")
+    monkeypatch.setenv("AQUAMETRIC_TARGET_COMPETITION", "Élite féminine")
+    monkeypatch.setenv("AQUAMETRIC_TARGET_CATEGORY", "Women")
+    monkeypatch.setattr(main, "WEB_DEMO_MODE", True)
+    with TestClient(app) as client:
+        response = client.get("/demo-login", follow_redirects=False)
+        assert response.status_code == 303
+        redirect = response.headers["location"]
+        assert redirect.startswith("/matches/new?")
+        assert "f_WzRHjybgU" in redirect
+        page = client.get(redirect)
+        assert page.status_code == 200
+        assert 'value="Granville WP"' in page.text
+        assert 'value="CN Marseille"' in page.text
+        assert 'value="Élite féminine"' in page.text
+        assert 'value="' + VIDEO + '"' in page.text
