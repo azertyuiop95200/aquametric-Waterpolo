@@ -52,13 +52,14 @@ jobs:
               await page.waitForTimeout(15000);
               console.log('CAPTURE_STATUS_AFTER_15S',String(await page.locator('#captureStatus').innerText()).slice(0,280));
               console.log('CAPTURE_PERMISSION',String(await page.locator('#permissionState').innerText()).slice(0,280));
-              const canStop=await page.locator('#stopCapture').isEnabled();
+              const canStop=await page.locator('#stopCaptureLive').isEnabled();
               console.log('CAPTURE_STOP_ENABLED',canStop);
               if(canStop){
-                await page.locator('#stopCapture').click();
+                await page.locator('#stopCaptureLive').click({timeout:15000});
                 await page.waitForTimeout(15000);
                 console.log('AFTER_STOP_URL',page.url().replace(/\/matches\/\d+\//,'/matches/[id]/'));
                 console.log('AFTER_STOP_STATUS',String(await page.locator('#captureStatus').innerText().catch(()=>'' )).slice(0,280));
+                console.log('REPORT_HAS_UNMEASURED',await page.locator('body').innerText().then(t=>t.includes('non mesuré')));
               }
               console.log('PAGE_ERRORS',JSON.stringify(errors.slice(-6)));
             }catch(e){
