@@ -27,6 +27,7 @@ from capture_turbo_routes import _FAST_CAPTURE_SENTINEL, _read_state, _write_sta
 from db import SessionLocal, get_db
 from models import Match
 from services.live_frame_match_analysis import live_frame_coverage, run_live_frame_analysis
+from services.capture_source_quality import capture_source_quality, capture_is_unverified
 
 log = logging.getLogger("aquametric.browser_capture.v16")
 
@@ -77,6 +78,7 @@ def _write_report_marker(root: Path, state: dict) -> dict:
         "evidence_coverage_ratio",
         "finalization_job_status",
         "finalization_job_progress",
+        "capture_source_quality",
     ):
         if key in state:
             payload[key] = state[key]
@@ -127,6 +129,11 @@ def _publish_report_first(match_id: int, root: Path) -> dict:
     )
     if not state:
         return {}
+    # Decoding pixels alone is not proof of footage: headless YouTube can show
+    # a bot challenge for the entire 82-minute timeline.
+    quality = capture_source_quality(root, _read_state(root))
+    blocked = capture_is_unverified(quality)
+    state["capture_source_quality"] = quality
     state.update({
         "status": "partial",
         "analysis_percent": 100.0,
@@ -141,6 +148,18 @@ def _publish_report_first(match_id: int, root: Path) -> dict:
         "media_status": "queued",
         "v16_report_published_at": time.time(),
     })
+    if blocked:
+        state.update({
+            "report_quality": "capture_source_unverified",
+            "phase": "Vidéo non visible : écran statique ou vérification du lecteur",
+            "enrichment_status": "skipped",
+            "media_status": "skipped",
+        })
+        with SessionLocal() as db:
+            match = db.get(Match, match_id)
+            if match:
+                match.status = "browser_capture_source_unverified"
+                db.commit()
     _write_state(root, state)
     try:
         v15._clear_start_marker(root)
@@ -171,6 +190,14 @@ def _publish_report_first(match_id: int, root: Path) -> dict:
         "finalization_job_status": "partial",
         "finalization_job_progress": 100,
     })
+    if blocked:
+        state.update({
+            "capture_source_quality": quality,
+            "report_quality": "capture_source_unverified",
+            "phase": "Échec de validation des images : importer un fichier ou annoter le replay",
+            "enrichment_status": "skipped",
+            "media_status": "skipped",
+        })
     _write_state(root, state)
     _write_report_marker(root, state)
     log.info(
@@ -429,6 +456,10 @@ def turbo_finish_capture(
             {"ok": False, "accepted": False, "error": "Le rapport initial n'a pas pu être publié."},
             status_code=500,
         )
+
+    if capture_is_unverified(published.get("capture_source_quality", {})):
+        # Do not run OCR/action recognition over a YouTube verification screen.
+        return JSONResponse(_finish_payload(match_id, session_id, published))
 
     background_tasks.add_task(
         _verify_after_publish,
