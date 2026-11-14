@@ -24,7 +24,7 @@ jobs:
           trap 'rm -rf "$tmp"' EXIT
           for n in $(seq 1 40); do
             health=$(curl -LfsS --max-time 30 "$BASE/health" 2>/dev/null || true)
-            if echo "$health" | grep -q '70acdbbc9274068c75693cf0027e92e134d53ee1'; then
+            if echo "$health" | grep -q 'd94a793860d1a435f75bf783514c2e1a51778bfe'; then
               echo "Validated staging commit: $health"
               break
             fi
@@ -49,6 +49,10 @@ jobs:
           match_id=$(echo "$loc" | sed -n 's#^/matches/\([0-9][0-9]*\)/.*#\1#p')
           test -n "$match_id"
           echo "QA match ID $match_id"
+          curl -sS -L -f --max-time 40 -c "$tmp/cookies" -b "$tmp/cookies" "$BASE$loc" -o "$tmp/capture.html"
+          grep -Fq "/matches/$match_id/analysis/result#annotation" "$tmp/capture.html"
+          grep -Fq 'id="actionEngineReadiness"' "$tmp/capture.html"
+          echo "Studio direct tagging shortcut and IA readiness visible"
           curl -sS -L -f --max-time 40 -c "$tmp/cookies" -b "$tmp/cookies" "$BASE/matches/$match_id/analysis/result" -o "$tmp/report-before.html"
           grep -Fq 'id="annotation"' "$tmp/report-before.html"
           grep -Fq 'id="observedKPIs"' "$tmp/report-before.html"
