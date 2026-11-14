@@ -39,6 +39,12 @@ jobs:
             ]});
             const page=await browser.newPage({viewport:{width:1280,height:800}});
             const errors=[];
+            let captureSession='';
+            page.on('response',async response=>{
+              if(response.url().includes('/analysis/browser-capture/session') && response.request().method()==='POST'){
+                try { captureSession=(await response.json()).session_id||''; }catch(e){}
+              }
+            });
             page.on('pageerror',err=>errors.push(String(err.message).slice(0,180)));
             try {
               let stagingVersion='';
@@ -61,6 +67,7 @@ jobs:
               await page.locator('#startCapture').click({timeout:15000});
               await page.waitForTimeout(15000);
               console.log('CAPTURE_STATUS_AFTER_15S',String(await page.locator('#captureStatus').innerText()).slice(0,280));
+              await page.screenshot({path:'real-capture-live-screen.png'});
               console.log('CAPTURE_PERMISSION',String(await page.locator('#permissionState').innerText()).slice(0,280));
               const canStop=await page.locator('#stopCaptureLive').isEnabled();
               console.log('CAPTURE_STOP_ENABLED',canStop);
@@ -71,6 +78,11 @@ jobs:
                 console.log('AFTER_STOP_STATUS',String(await page.locator('#captureStatus').innerText().catch(()=>'' )).slice(0,280));
                 const marked=await page.locator('#captureQualityBlock').count();
                 console.log('YOUTUBE_BOT_CAPTURE_DETECTED',Boolean(marked));
+                if(captureSession){
+                  const matchId=captureUrl.match(/\/matches\/(\d+)\//)?.[1];
+                  const progress=await page.request.get(process.env.BASE+'/matches/'+matchId+'/analysis/browser-capture/status?session_id='+captureSession);
+                  console.log('SOURCE_QUALITY_STATUS',JSON.stringify((await progress.json())?.progress?.capture_source_quality||{}));
+                }
                 console.log('REPORT_HAS_UNMEASURED',await page.locator('body').innerText().then(t=>t.includes('non mesuré')));
                 if(!marked)throw Error('The real YouTube bot page still appears as valid sports footage');
               }
@@ -89,5 +101,5 @@ jobs:
         if: always()
         with:
           name: granville-marseille-short-capture-probe
-          path: real-capture-probe.png
+          path: real-capture-*.png
           if-no-files-found: ignore
