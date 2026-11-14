@@ -25,6 +25,15 @@
     </div>
   </section>
 
+  {% if match.video_source == "cloud" %}
+  <section class="report-card status-live" id="cloudVideoReceived">
+    <h2>Vidéo volumineuse reçue sur le stockage privé</h2>
+    <p>Le fichier MP4/MOV a été assemblé et sa taille vérifiée auprès du stockage cloud. Aucun tir, but ou événement individuel n'a été mesuré automatiquement par le seul transfert.</p>
+    <p class="evidence-note">Le traitement IA des fichiers cloud n'est pas encore activé sur cet hébergement Render. Tu peux toutefois lire le fichier ci-dessous et enregistrer des actions réellement observées dans le poste d'annotation.</p>
+    <a class="btn secondary" href="#annotation">Ouvrir le poste de codage</a>
+  </section>
+  {% endif %}
+
   {% if snapshot.source_facts %}
   <section class="report-card status-warn" id="sourcedScore">
     <h2>Résultat annoncé par la source — distinct des mesures vidéo</h2>
@@ -53,7 +62,12 @@
       <span class="chip">{{review_metrics.verified_count}} action(s) confirmée(s)</span>
     </div>
     <p class="evidence-note">Comme dans les outils de marquage sportif : lis la vidéo, arrête-toi sur l'action, sélectionne l'équipe et éventuellement la joueuse, puis confirme l'événement. AquaMetric met à jour immédiatement les statistiques, les phases et les comparaisons. Aucune action n'est ajoutée automatiquement si la vidéo est bloquée.</p>
-    {% if source_embed %}
+    {% if match.video_source in ["upload", "cloud"] and match.video_path %}
+      <video id="reviewLocalVideo" class="video-frame" style="max-width:900px" controls preload="metadata" playsinline src="/matches/{{match.id}}/video">
+        Ton navigateur ne prend pas en charge la lecture de ce format vidéo.
+      </video>
+      <p class="evidence-note">Utilise le lecteur pour retrouver l'action, puis sélectionne son type. L'horodatage se synchronise automatiquement au fil de la lecture.</p>
+    {% elif source_embed %}
       <iframe id="reviewVideo" class="video-frame" style="max-width:900px" src="{{source_embed}}&rel=0" title="Replay à annoter : {{match.team.name}} contre {{match.opponent}}" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
       <p class="evidence-note">Si YouTube demande une vérification, <a href="{{match.video_url}}" target="_blank" rel="noopener">ouvre le replay dans YouTube</a>, puis recopie le temps sous la vidéo. Le dossier conservera le timestamp exact.</p>
     {% endif %}
@@ -112,6 +126,12 @@
         const second = document.getElementById('reviewSecond'), display = document.getElementById('reviewTimeText');
         const perspective = document.getElementById('reviewPerspective'), player = document.getElementById('reviewPlayer');
         const video = document.getElementById('reviewVideo');
+        const localVideo = document.getElementById('reviewLocalVideo');
+        if(localVideo) localVideo.addEventListener('timeupdate', () => {
+          if(document.activeElement!==second && Number.isFinite(localVideo.currentTime)){
+            second.value=Math.round(localVideo.currentTime*10)/10;updateTime();
+          }
+        });
         function updateTime() { const n = Math.max(0,Number(second.value)||0); display.textContent = String(Math.floor(n/60)).padStart(2,'0')+':'+String(Math.floor(n%60)).padStart(2,'0')+' · timestamp de la vidéo'; }
         second.addEventListener('input',updateTime); updateTime();
         perspective.addEventListener('change', () => { if(perspective.value==='against') player.value=''; player.disabled=perspective.value==='against'; });
