@@ -59,6 +59,23 @@ class Match(Base):
     events = relationship("Event", back_populates="match", cascade="all, delete-orphan")
     media_artifacts = relationship("MediaArtifact", back_populates="match", cascade="all, delete-orphan")
 
+class LargeVideoUpload(Base):
+    """S3-compatible multipart upload, persisted independently of Render's disk."""
+    __tablename__ = "large_video_uploads"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    object_key: Mapped[str] = mapped_column(String(255), unique=True)
+    upload_id: Mapped[str] = mapped_column(Text)
+    filename: Mapped[str] = mapped_column(String(255))
+    mime_type: Mapped[str] = mapped_column(String(100))
+    total_bytes: Mapped[int] = mapped_column(Integer)
+    part_bytes: Mapped[int] = mapped_column(Integer)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+    status: Mapped[str] = mapped_column(String(32), default="uploading")
+    match_id: Mapped[int | None] = mapped_column(ForeignKey("matches.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
 class Event(Base):
     __tablename__ = "events"
     id: Mapped[int] = mapped_column(primary_key=True)
