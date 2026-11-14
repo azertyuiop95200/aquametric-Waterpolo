@@ -539,6 +539,9 @@ def match_video(match_id: int, request: Request, db: Session = Depends(get_db)):
     match = db.get(Match, match_id)
     if not match or match.owner_id != user.id or not match.video_path:
         raise HTTPException(404)
+    if match.video_source == "cloud":
+        from large_video_routes import cloud_video_redirect
+        return cloud_video_redirect(match)
     path = UPLOAD_DIR / Path(match.video_path).name
     if not path.exists():
         raise HTTPException(404)
