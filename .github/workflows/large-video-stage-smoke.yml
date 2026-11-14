@@ -1,0 +1,49 @@
+name: AquaMetric Large Video Intake Staging Verification
+
+on:
+  push:
+    branches: [fix/youtube-report-intake-2026-11]
+    paths:
+      - '.github/workflows/large-video-stage-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check-large-upload-interface:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      BASE: https://aquametric-youtube-validation.onrender.com
+    steps:
+      - name: Inspect staged upload capability and honest disabled fallback
+        run: |
+          set -euo pipefail
+          echo "Checking Cloud storage capability endpoint"
+          curl --retry 8 --retry-all-errors --retry-delay 7 --max-time 55 -sSf "$BASE/api/large-upload/capabilities" > capabilities.json
+          cat capabilities.json
+          python - <<'PY'
+          import json
+          p=json.load(open('capabilities.json'))
+          assert p['max_gb']>=3, p
+          assert p['part_bytes']==16*1024*1024, p
+          assert 'enabled' in p
+          if not p['enabled']:
+              assert p['reason'], p
+              print('Storage deliberately disabled until private R2/S3 and durable database are configured.')
+          else:
+              print('Private large upload storage enabled.')
+          PY
+          echo "Checking staged match page and browser uploader bundle"
+          tmp=$(mktemp -d)
+          trap 'rm -rf "$tmp"' EXIT
+          curl -sSf -L --max-time 45 -c "$tmp/cookies" -b "$tmp/cookies" "$BASE/demo-login" -o "$tmp/match-form.html"
+          grep -Fq 'id="largeVideoVideo"' "$tmp/match-form.html" && echo 'Unexpected legacy selector' && exit 1 || true
+          grep -Fq 'id="largeUploadVideo"' "$tmp/match-form.html"
+          grep -Fq 'id="largeUploadProgress"' "$tmp/match-form.html"
+          grep -Fq 'large-video-upload.js' "$tmp/match-form.html"
+          curl -sSf --max-time 45 "$BASE/static/large-video-upload.js" -o "$tmp/large-uploader.js"
+          grep -Fq "file.slice(first,last)" "$tmp/large-uploader.js"
+          grep -Fq "localStorage.getItem(cacheKey(file))" "$tmp/large-uploader.js"
+          echo 'STAGED_LARGE_VIDEO_UI_OK'
