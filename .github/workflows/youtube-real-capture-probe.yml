@@ -48,15 +48,15 @@ jobs:
             page.on('pageerror',err=>errors.push(String(err.message).slice(0,180)));
             try {
               let stagingVersion='';
-              for(let attempt=0;attempt<24;attempt++){
+              for(let attempt=0;attempt<40;attempt++){
                 const response=await page.request.get(process.env.BASE+'/health',{timeout:20000}).catch(()=>null);
                 if(response?.ok()){
                   stagingVersion=await response.text();
-                  if(stagingVersion.includes('6d935baea25cf72071ee19cac5b22f9498448dab'))break;
+                  if(stagingVersion.includes('9b1314b073806fa25ff0a1d30ad83108009a369b'))break;
                 }
                 await page.waitForTimeout(5000);
               }
-              if(!stagingVersion.includes('6d935baea25cf72071ee19cac5b22f9498448dab'))throw Error('Latest source-gated staging app not deployed');
+              if(!stagingVersion.includes('9b1314b073806fa25ff0a1d30ad83108009a369b'))throw Error('Latest source-gated staging app not deployed');
               await page.goto(process.env.BASE+'/demo-login',{waitUntil:'domcontentloaded',timeout:60000});
               await page.locator('#desktopAnalyzeSubmit').click({timeout:20000});
               await page.waitForURL(/\/matches\/\d+\/analysis\/browser-capture/,{timeout:30000});
