@@ -872,6 +872,7 @@ def add_event(
     note: str = Form(""),
     perspective: str = Form("for"),
     phase_tag: str = Form("auto"),
+    return_to: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = require_user(request, db)
@@ -909,7 +910,9 @@ def add_event(
     db.flush()
     db.add(EventContext(event_id=event.id, perspective=perspective, phase_tag=phase_tag))
     db.commit()
-    return RedirectResponse(f"/matches/{match_id}", status_code=303)
+    # Only accept this internal destination. Never redirect to user-supplied URLs.
+    target = f"/matches/{match_id}/analysis/result#annotation" if return_to == "report" else f"/matches/{match_id}"
+    return RedirectResponse(target, status_code=303)
 
 
 @app.post("/matches/{match_id}/analysis/start")
