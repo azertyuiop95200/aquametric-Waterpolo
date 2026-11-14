@@ -26,6 +26,8 @@ def _side(rows):
         "tagged_goals":goals,
         "tagged_shots":shots,
         "tagged_saves":saves,
+        "tagged_assists":sum(e.get("event_type")=="assist" for e in rows),
+        "tagged_recoveries":sum(e.get("event_type") in {"recovery","interception"} for e in rows),
         "tagged_turnovers":turnovers,
         "tagged_exclusions_earned":sum(e.get("event_type")=="exclusion_earned" for e in rows),
         "tagged_exclusions_committed":sum(e.get("event_type")=="exclusion_committed" for e in rows),
