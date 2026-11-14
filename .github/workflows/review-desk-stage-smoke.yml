@@ -24,7 +24,7 @@ jobs:
           trap 'rm -rf "$tmp"' EXIT
           for n in $(seq 1 40); do
             health=$(curl -LfsS --max-time 30 "$BASE/health" 2>/dev/null || true)
-            if echo "$health" | grep -q '43f06aa1e3ad169c915d35c0aa5f6d6e8143b128'; then
+            if echo "$health" | grep -q '70acdbbc9274068c75693cf0027e92e134d53ee1'; then
               echo "Validated staging commit: $health"
               break
             fi
