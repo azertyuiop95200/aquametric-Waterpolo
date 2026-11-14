@@ -73,13 +73,15 @@ def create_flexible_url_analysis(
         video_source="youtube" if youtube_embed(url) else "url",
         video_url=url,
         video_path="",
-        status="source_link_saved" if input_device == "phone" else "url_capture_required",
+        status="url_capture_required" if input_device == "desktop" and youtube_embed(url) else "source_link_saved",
     )
     db.add(match)
     db.commit()
     db.refresh(match)
 
-    if input_device == "phone":
+    if input_device == "phone" or not youtube_embed(url):
+        # Generic remote URLs cannot be played in the YouTube-only capture studio.
+        # Keep their reference and expose a truthful, unmeasured report instead.
         return RedirectResponse(f"/matches/{match.id}/analysis/result", status_code=303)
 
     query = _scope_query(scope_mode, scope_start_second, scope_end_second)

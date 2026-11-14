@@ -1,0 +1,56 @@
+name: AquaMetric YouTube Official Embed Accessibility Probe
+
+on:
+  push:
+    branches: [fix/youtube-report-intake-2026-11]
+    paths:
+      - '.github/workflows/granville-marseille-embed-alternatives.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  official-embed-probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Chromium
+        run: |
+          npm init -y >/dev/null
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Test official regular and privacy-enhanced embeds without bypassing any verification
+        run: |
+          node - <<'NODE'
+          const {chromium}=require('playwright');
+          const urls=[
+            'https://www.youtube.com/embed/f_WzRHjybgU?autoplay=1&playsinline=1',
+            'https://www.youtube-nocookie.com/embed/f_WzRHjybgU?autoplay=1&playsinline=1'
+          ];
+          (async()=>{
+            const browser=await chromium.launch({headless:true,args:['--no-sandbox','--autoplay-policy=no-user-gesture-required']});
+            for(let i=0;i<urls.length;i++){
+              const page=await browser.newPage({viewport:{width:960,height:580}});
+              try{
+                console.log('EMBED_URL',urls[i]);
+                await page.goto(urls[i],{waitUntil:'domcontentloaded',timeout:30000});
+                await page.waitForTimeout(9000);
+                const file='embed-'+i+'.png';
+                await page.screenshot({path:file});
+                console.log('IMAGE_SAVED',file,'PAGE_TITLE',await page.title());
+              }catch(e){console.log('PLAYER_ERROR',i,String(e.message).slice(0,220));}
+              await page.close();
+            }
+            await browser.close();
+          })().catch(e=>{console.error(e);process.exit(1)});
+          NODE
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: granville-marseille-official-embed-accessibility
+          path: embed-*.png
+          if-no-files-found: ignore

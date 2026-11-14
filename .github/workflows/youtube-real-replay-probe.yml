@@ -1,0 +1,70 @@
+name: AquaMetric Real YouTube Replay Browser Probe
+
+on:
+  push:
+    branches: [fix/youtube-report-intake-2026-11]
+    paths:
+      - '.github/workflows/youtube-real-replay-probe.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  replay-browser-probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install isolated Playwright Chromium
+        run: |
+          npm init -y >/dev/null
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Test actual YouTube embedded player in capture Studio, no capture or guessed results
+        env:
+          AQUAMETRIC_URL: https://aquametric-youtube-validation.onrender.com
+        run: |
+          node - <<'NODE'
+          const {chromium} = require('playwright');
+          (async()=>{
+            const browser=await chromium.launch({headless:true,args:['--no-sandbox','--autoplay-policy=no-user-gesture-required']});
+            const page=await browser.newPage({viewport:{width:1440,height:900}});
+            let ytMessages=0, errors=[];
+            page.on('pageerror',error=>errors.push(String(error.message).slice(0,180)));
+            page.on('console',msg=>{if(msg.type()==='error')errors.push(msg.text().slice(0,160));});
+            try {
+              const origin=process.env.AQUAMETRIC_URL;
+              await page.goto(origin+'/demo-login',{waitUntil:'domcontentloaded',timeout:60000});
+              console.log('START_URL',page.url());
+              await page.getByRole('button',{name:'Analyser sur ordinateur'}).click({timeout:20000});
+              await page.waitForURL(/\/matches\/\d+\/analysis\/browser-capture/, {timeout:30000});
+              console.log('CAPTURE_URL',page.url().replace(/\/matches\/\d+\//, '/matches/[id]/'));
+              const player=page.locator('#studioPlayer0');
+              await player.waitFor({timeout:10000});
+              console.log('EMBED_SRC',String(await player.getAttribute('src')||'').slice(0,150));
+              for(let i=0;i<4;i++){
+                await page.waitForTimeout(5000);
+                console.log('DURATION_STATUS',i,String(await page.locator('#durationState').innerText()).slice(0,120));
+              }
+              await page.screenshot({path:'youtube-replay-stage.png',fullPage:false});
+              console.log('IFRAME_COUNT',await page.locator('iframe').count());
+              console.log('VIDEO_ID_PRESENT',page.url().includes('f_WzRHjybgU') || (await player.getAttribute('src')||'').includes('f_WzRHjybgU'));
+              console.log('BROWSER_ERRORS',JSON.stringify(errors.slice(-8)));
+            } catch (e) {
+              console.log('REPLAY_BROWSER_PROBE_ERROR',String(e.message).slice(0,350));
+              console.log('BROWSER_ERRORS',JSON.stringify(errors.slice(-8)));
+              await page.screenshot({path:'youtube-replay-stage.png',fullPage:false}).catch(()=>{});
+            } finally {
+              await browser.close();
+            }
+          })().catch(e=>{console.error(e);process.exit(1)});
+          NODE
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: granville-marseille-youtube-playback-probe
+          path: youtube-replay-stage.png
+          if-no-files-found: ignore

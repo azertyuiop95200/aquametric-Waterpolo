@@ -5,7 +5,7 @@ import asyncio
 import json
 from contextlib import asynccontextmanager
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs, urlencode
 
 from fastapi import FastAPI, Request, Depends, Form, UploadFile, File, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
@@ -222,8 +222,28 @@ def knowledge_page(request: Request, db: Session = Depends(get_db)):
     )
 
 
+def _demo_analysis_destination(value: str) -> str:
+    """Only permit a prefilled new-match form, never an external redirect."""
+    parsed = urlparse(value or "")
+    if parsed.scheme or parsed.netloc or parsed.path != "/matches/new":
+        return "/my-team"
+    video_url = parse_qs(parsed.query).get("video_url", [""])[0]
+    if not youtube_embed(video_url):
+        return "/my-team"
+    params = {"video_url": video_url}
+    fields = parse_qs(parsed.query)
+    for field in ("team_name", "opponent", "competition"):
+        value = fields.get(field, [""])[0].strip()[:160]
+        if value:
+            params[field] = value
+    category = fields.get("category", [""])[0]
+    if category in {"Women", "Men", "Mixed/Other"}:
+        params["category"] = category
+    return "/matches/new?" + urlencode(params)
+
+
 @app.get("/demo-login")
-def demo_login(request: Request, db: Session = Depends(get_db)):
+def demo_login(request: Request, next: str = "", db: Session = Depends(get_db)):
     """Create an isolated temporary demo workspace for this browser session.
 
     Intended for free/ephemeral web deployments. No password is required and
@@ -231,9 +251,17 @@ def demo_login(request: Request, db: Session = Depends(get_db)):
     """
     if not WEB_DEMO_MODE:
         raise HTTPException(status_code=404)
+    fallback = "/matches/new?" + urlencode({
+        "video_url": os.getenv("AQUAMETRIC_TARGET_VIDEO_URL", ""),
+        "team_name": os.getenv("AQUAMETRIC_TARGET_TEAM_NAME", ""),
+        "opponent": os.getenv("AQUAMETRIC_TARGET_OPPONENT", ""),
+        "competition": os.getenv("AQUAMETRIC_TARGET_COMPETITION", ""),
+        "category": os.getenv("AQUAMETRIC_TARGET_CATEGORY", "Women"),
+    })
+    destination = _demo_analysis_destination(next or fallback)
     current = current_user(request, db)
     if current:
-        return RedirectResponse("/dashboard", status_code=303)
+        return RedirectResponse(destination if destination != "/my-team" else "/dashboard", status_code=303)
     token = uuid.uuid4().hex[:12]
     user = User(
         email=f"webdemo-{token}@aquametric.local",
@@ -248,7 +276,7 @@ def demo_login(request: Request, db: Session = Depends(get_db)):
     request.session.clear()
     request.session["user_id"] = user.id
     request.session["web_demo"] = True
-    return RedirectResponse("/my-team", status_code=303)
+    return RedirectResponse(destination, status_code=303)
 
 @app.get("/register", response_class=HTMLResponse)
 def register_page(request: Request):
@@ -452,7 +480,12 @@ def matches_page(request: Request, db: Session = Depends(get_db)):
 def new_match_page(request: Request, db: Session = Depends(get_db)):
     user = require_user(request, db)
     teams = db.scalars(select(Team).where(Team.owner_id == user.id).order_by(Team.name)).all()
-    return render(request, "match_new.html", user=user, teams=teams, max_upload_mb=MAX_UPLOAD_MB)
+    return render(request, "match_new.html", user=user, teams=teams, max_upload_mb=MAX_UPLOAD_MB,
+                  target_video_url=os.getenv("AQUAMETRIC_TARGET_VIDEO_URL", ""),
+                  target_team_name=os.getenv("AQUAMETRIC_TARGET_TEAM_NAME", ""),
+                  target_opponent=os.getenv("AQUAMETRIC_TARGET_OPPONENT", ""),
+                  target_competition=os.getenv("AQUAMETRIC_TARGET_COMPETITION", ""),
+                  target_category=os.getenv("AQUAMETRIC_TARGET_CATEGORY", "Women"))
 
 
 @app.post("/matches")
@@ -506,6 +539,9 @@ def match_video(match_id: int, request: Request, db: Session = Depends(get_db)):
     match = db.get(Match, match_id)
     if not match or match.owner_id != user.id or not match.video_path:
         raise HTTPException(404)
+    if match.video_source == "cloud":
+        from large_video_routes import cloud_video_redirect
+        return cloud_video_redirect(match)
     path = UPLOAD_DIR / Path(match.video_path).name
     if not path.exists():
         raise HTTPException(404)
@@ -839,6 +875,8 @@ def add_event(
     note: str = Form(""),
     perspective: str = Form("for"),
     phase_tag: str = Form("auto"),
+    return_to: str = Form(""),
+    observed: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = require_user(request, db)
@@ -847,6 +885,8 @@ def add_event(
         raise HTTPException(404)
     if event_type not in EVENT_TYPES:
         raise HTTPException(400, detail="Unsupported event type.")
+    if return_to == "report" and observed != "1":
+        raise HTTPException(400, detail="Confirmer que cet événement a réellement été observé avant de l’ajouter.")
     if second < 0 or second > 12 * 60 * 60:
         raise HTTPException(400, detail="Event time is outside the supported range.")
 
@@ -876,7 +916,9 @@ def add_event(
     db.flush()
     db.add(EventContext(event_id=event.id, perspective=perspective, phase_tag=phase_tag))
     db.commit()
-    return RedirectResponse(f"/matches/{match_id}", status_code=303)
+    # Only accept this internal destination. Never redirect to user-supplied URLs.
+    target = f"/matches/{match_id}/analysis/result#annotation" if return_to == "report" else f"/matches/{match_id}"
+    return RedirectResponse(target, status_code=303)
 
 
 @app.post("/matches/{match_id}/analysis/start")

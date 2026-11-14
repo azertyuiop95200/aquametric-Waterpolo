@@ -76,6 +76,11 @@ if not getattr(_capture_v16._publish_report_first, "_aquametric_visual_prepublic
         state = _V16_ORIGINAL_PUBLISH_REPORT_FIRST(match_id, root)
         if not state:
             return state
+        from services.capture_source_quality import capture_is_unverified
+        if capture_is_unverified(state.get("capture_source_quality", {})):
+            # A static YouTube anti-bot challenge is not a water-polo event.
+            # Avoid creating false Vision rows and candidate moments at source.
+            return state
         try:
             from services.report_first_visual import publish_report_first_visual
             quick = publish_report_first_visual(match_id, root, state)

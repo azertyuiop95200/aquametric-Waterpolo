@@ -10,19 +10,19 @@
     <input type="hidden" id="analysisInputDevice" name="input_device" value="desktop">
     <div class="formgrid">
       <label>Équipe à analyser
-        <input name="team_name" list="analysis-team-catalog" value="{{default_team_name or ''}}" placeholder="Ex. Granville, Barceloneta, Vouliagmeni…" autocomplete="off" required>
+        <input name="team_name" list="analysis-team-catalog" value="{{request.query_params.get('team_name', target_team_name or default_team_name or '')}}" placeholder="Ex. Granville, Barceloneta, Vouliagmeni…" autocomplete="off" required>
       </label>
       <label>Adversaire
-        <input name="opponent" list="analysis-team-catalog" placeholder="Nom libre, même absent de la base" autocomplete="off" required>
+        <input name="opponent" list="analysis-team-catalog" value="{{request.query_params.get('opponent', target_opponent or '')}}" placeholder="Nom libre, même absent de la base" autocomplete="off" required>
       </label>
       <label>Catégorie
         <select name="category" required>
-          <option value="Women">Féminin</option>
-          <option value="Men">Masculin</option>
-          <option value="Mixed/Other">Mixte / autre</option>
+          <option value="Women" {% if request.query_params.get('category', target_category or 'Women') == 'Women' %}selected{% endif %}>Féminin</option>
+          <option value="Men" {% if request.query_params.get('category') == 'Men' %}selected{% endif %}>Masculin</option>
+          <option value="Mixed/Other" {% if request.query_params.get('category') == 'Mixed/Other' %}selected{% endif %}>Mixte / autre</option>
         </select>
       </label>
-      <label>Compétition<input name="competition" placeholder="Facultatif"></label>
+      <label>Compétition<input name="competition" value="{{request.query_params.get('competition', target_competition or '')}}" placeholder="Facultatif"></label>
       <label>Date<input type="date" name="match_date"></label>
     </div>
     <datalist id="analysis-team-catalog">
@@ -48,7 +48,7 @@
       <p class="mode-note">Pour YouTube : colle le lien, puis AquaMetric te demandera uniquement de partager l’onglet du replay.</p>
       <span hidden>Analyser directement depuis l'URL · même minimum Ultimate Analyst</span>
       <label>Lien vidéo
-        <input id="desktopVideoUrl" type="url" name="video_url" autocapitalize="none" spellcheck="false" placeholder="https://www.youtube.com/watch?v=..." inputmode="url">
+        <input id="desktopVideoUrl" type="url" name="video_url" value="{{ request.query_params.get('video_url', target_video_url or '') }}" autocapitalize="none" spellcheck="false" placeholder="https://www.youtube.com/watch?v=..." inputmode="url">
       </label>
 
       <div class="scope-box">
@@ -82,7 +82,7 @@
       <h3>Analyse sur téléphone</h3>
       <label>Source sur téléphone<select id="phoneSource"><option value="link">Coller un lien vidéo</option><option value="file">Importer un fichier vidéo</option></select></label>
       <div id="phoneLinkPanel">
-        <label>Lien du match sur téléphone<input id="phoneVideoUrl" type="url" name="video_url" inputmode="url" autocapitalize="none" spellcheck="false" placeholder="https://www.youtube.com/watch?v=..." disabled></label>
+        <label>Lien du match sur téléphone<input id="phoneVideoUrl" type="url" name="video_url" value="{{ request.query_params.get('video_url', target_video_url or '') }}" inputmode="url" autocapitalize="none" spellcheck="false" placeholder="https://www.youtube.com/watch?v=..." disabled></label>
         <p>Le lien et le dossier sont enregistrés. Un lien seul ne donne pas accès aux images : la vidéo reste identifiée mais non analysée. Pour Vision/OCR, importe le fichier ou reprends la capture depuis un ordinateur compatible.</p>
         <button class="btn intelligence-cta" type="submit" id="phoneLinkSubmit" formaction="/analysis/url/create" formenctype="application/x-www-form-urlencoded">Enregistrer le lien et ouvrir le dossier</button>
       </div>
@@ -97,8 +97,25 @@
       </div>
       </div>
     </section>
+
+    <section class="panel" id="largeVideoPanel" style="margin-top:20px;border:1px solid var(--border,#294754);border-radius:16px;padding:18px">
+      <span class="eyebrow">VIDÉO MP4 / MOV · PLUSIEURS GO</span>
+      <h2>Importer un match volumineux</h2>
+      <p>Jusqu'à <strong><span id="largeUploadLimit">5</span> Go</strong> via un stockage cloud privé. Le fichier est envoyé directement par morceaux de 16 Mo : pas de requête de 3 Go vers AquaMetric, reprise possible si la connexion coupe.</p>
+      <label>Choisir un fichier vidéo local (MP4, MOV, WebM, M4V, MKV)
+        <input type="file" id="largeUploadVideo" accept=".mp4,.mov,.webm,.m4v,.mkv,video/mp4,video/quicktime,video/webm">
+      </label>
+      <p id="largeUploadStatus" role="status" aria-live="polite">Vérification du stockage vidéo disponible…</p>
+      <progress id="largeUploadProgress" value="0" max="100" style="display:block;width:100%;height:19px;margin:12px 0"></progress>
+      <div class="actions compact">
+        <button type="button" class="btn intelligence-cta" id="largeUploadStart" disabled>Envoyer le gros fichier</button>
+        <button type="button" class="btn secondary" id="largeUploadCancel" hidden>Annuler l'envoi</button>
+      </div>
+      <small>Le stockage cloud et l'analyse vidéo sont deux étapes distinctes : une vidéo reçue n'est pas considérée comme analysée. L'import cloud doit être configuré par l'administrateur. Un stockage Render gratuit ne suffit pas à conserver de gros fichiers.</small>
+    </section>
   </form>
 </div>
 <script defer src="/static/analysis-input-mobile.js"></script>
+<script defer src="/static/large-video-upload.js"></script>
 <!-- Default device selection: selectMode(mobileLike ? 'phone' : 'desktop') -->
 {% endblock %}
