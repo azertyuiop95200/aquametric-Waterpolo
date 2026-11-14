@@ -104,6 +104,9 @@ def test_real_match_can_be_manually_tagged_from_its_report():
             follow_redirects=False)
         assert created.status_code==303
         match_id=int(created.headers["location"].split("/matches/")[1].split("/")[0])
+        capture=client.get(created.headers["location"])
+        assert capture.status_code==200
+        assert f'/matches/{match_id}/analysis/result#annotation' in capture.text
         url=f"/matches/{match_id}/analysis/result"
         before=client.get(url)
         assert before.status_code==200, before.text[:300]
