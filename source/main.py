@@ -230,7 +230,16 @@ def _demo_analysis_destination(value: str) -> str:
     video_url = parse_qs(parsed.query).get("video_url", [""])[0]
     if not youtube_embed(video_url):
         return "/my-team"
-    return "/matches/new?" + urlencode({"video_url": video_url})
+    params = {"video_url": video_url}
+    fields = parse_qs(parsed.query)
+    for field in ("team_name", "opponent", "competition"):
+        value = fields.get(field, [""])[0].strip()[:160]
+        if value:
+            params[field] = value
+    category = fields.get("category", [""])[0]
+    if category in {"Women", "Men", "Mixed/Other"}:
+        params["category"] = category
+    return "/matches/new?" + urlencode(params)
 
 
 @app.get("/demo-login")
