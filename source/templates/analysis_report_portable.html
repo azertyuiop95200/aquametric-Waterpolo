@@ -4,6 +4,32 @@
 <header><small>AQUAMETRIC · RAPPORT DU DOSSIER SAUVEGARDÉ</small><h1>{{match.team.name}} - {{match.opponent}}</h1><p>{{match.competition or 'Compétition non renseignée'}} · {{match.match_date or 'Date non renseignée'}} · {{match.team.category}}</p><p>Match n°{{match.id}} · Export du {{generated_at}}</p></header>
 {% if match.video_url %}<p>Source enregistrée : <a href="{{match.video_url}}">{{match.video_url}}</a></p>{% endif %}
 {% if not snapshot.vision.available and not snapshot.video_actions.available %}<div class="notice"><b>Vidéo identifiée mais non analysée</b><p>Aucun rapport Vision n’est enregistré pour ce dossier. Le lien seul ne permet pas d’observer le match. Aucune conclusion visuelle ou note de joueuse n’est produite ici.</p></div>{% elif snapshot.vision.available %}<p>Pré-analyse Vision : {{snapshot.vision.sample_count}} images échantillonnées sur {{snapshot.vision.duration_seconds}} secondes de source décodable. Un échantillonnage ne constitue pas une lecture exhaustive du match.</p>{% endif %}
+{% if snapshot.source_facts %}
+<div class="notice"><h2>Score déclaré par l'auteur de la vidéo (non mesuré par l'OCR)</h2>
+<p><strong>{{snapshot.source_facts.home_team}} {{snapshot.source_facts.home_goals}} – {{snapshot.source_facts.away_goals}} {{snapshot.source_facts.away_team}}</strong>
+ · écart {{snapshot.source_facts.goal_difference_home}} buts</p>
+<p>Source : <a href="{{snapshot.source_facts.source_url}}">{{snapshot.source_facts.source_title}}</a>.
+Date de rencontre indiquée au <a href="{{snapshot.source_facts.fixture_source}}">calendrier fédéral</a> : {{snapshot.source_facts.match_date}}.
+Ce résultat annoncé ne prouve ni les tirs, ni les exclusions, ni les statistiques par joueuse.</p></div>
+{% endif %}
+{% if snapshot.capture_source_quality.get("status") in ["blocked","static_unverified"] %}
+<div class="notice"><h2>Capture vidéo inexploitable</h2>
+<p>La vidéo enregistrée montre un écran de contrôle du lecteur ou une image fixe.
+Les moments d'activité et les lectures OCR de cette capture ne sont pas des faits sportifs et ont été écartés. Importez un fichier vidéo lisible ou annotez manuellement une vidéo accessible.</p></div>
+{% endif %}
+<h2>Analyse réellement annotée · échantillon vérifié</h2>
+<p>{{review_metrics.verified_count}} action(s) confirmée(s) et datée(s). Les statistiques suivantes sont partielles, jamais extrapolées au match complet.</p>
+<table><thead><tr><th>Mesure</th><th>{{match.team.name}}</th><th>{{match.opponent}}</th></tr></thead><tbody>
+{% for title,key in [("Buts observés","tagged_goals"),("Tirs observés","tagged_shots"),("Conversion tirs (%)","shot_conversion_pct"),("Pertes","tagged_turnovers"),("Arrêts","tagged_saves"),("Exclusions obtenues","tagged_exclusions_earned"),("Exclusions concédées","tagged_exclusions_committed"),("Récupérations","tagged_recoveries")] %}
+<tr><td>{{title}}</td><td>{{review_metrics.team[key] if review_metrics.team.tagged_events and review_metrics.team[key] is not none else '—'}}</td><td>{{review_metrics.opponent[key] if review_metrics.opponent.tagged_events and review_metrics.opponent[key] is not none else '—'}}</td></tr>
+{% endfor %}
+</tbody></table>
+{% if review_metrics.players %}
+<h2>Joueuses avec actions réellement attribuées</h2>
+<table><thead><tr><th>Joueuse</th><th>Buts</th><th>Tirs</th><th>Passes décisives</th></tr></thead><tbody>
+{% for player in review_metrics.players %}<tr><td>{{player.name}}</td><td>{{player.tagged_goals}}</td><td>{{player.tagged_shots}}</td><td>{{player.tagged_assists}}</td></tr>{% endfor %}
+</tbody></table>
+{% endif %}
 {% include "analysis_scoreboard_evidence.html" %}
 {% include "analysis_all_measurements.html" %}
 {% include "analysis_export_media.html" %}
