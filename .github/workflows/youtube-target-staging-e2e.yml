@@ -62,12 +62,25 @@ jobs:
           id=$(echo "$location" | sed -n 's#^/matches/\([0-9][0-9]*\)/.*#\1#p')
           test -n "$id"
           curl -sS -L -f --max-time 40 -c "$tmp/cookies" -b "$tmp/cookies" "$BASE$location" -o "$tmp/capture.html"
-          grep -q 'Démarrer l’analyse dans cet onglet' "$tmp/capture.html"
-          grep -q 'f_WzRHjybgU' "$tmp/capture.html"
+          echo "Capture HTML received $(wc -c < "$tmp/capture.html") bytes"
+          for expected in 'Démarrer l’analyse dans cet onglet' 'f_WzRHjybgU'; do
+            grep -Fq "$expected" "$tmp/capture.html" || {
+              echo "::error::Missing capture page marker: $expected"
+              grep -Eo '<h1[^>]*>[^<]*|<title>[^<]*' "$tmp/capture.html" | head -5 || true
+              exit 1
+            }
+          done
+          echo "Capture page verified for match $id"
           curl -sS -L -f --max-time 40 -c "$tmp/cookies" -b "$tmp/cookies" "$BASE/matches/$id/analysis/result" -o "$tmp/result.html"
-          grep -q 'Granville WP' "$tmp/result.html"
-          grep -q 'CN Marseille' "$tmp/result.html"
-          grep -q 'non mesuré' "$tmp/result.html"
+          echo "Result HTML received $(wc -c < "$tmp/result.html") bytes"
+          for expected in 'Granville WP' 'CN Marseille' 'non mesuré'; do
+            grep -Fq "$expected" "$tmp/result.html" || {
+              echo "::error::Missing report page marker: $expected"
+              grep -Eo '<h1[^>]*>[^<]*|<h2[^>]*>[^<]*' "$tmp/result.html" | head -8 || true
+              exit 1
+            }
+          done
+          echo "No invented metrics on report page"
           # No capture initiated by CI: its pixels were never read, so the report must be non-measured.
           curl -sS -f --max-time 40 -c "$tmp/cookies" -b "$tmp/cookies" "$BASE/matches/$id/analysis/report.html" -o "$tmp/report.html"
           grep -q 'Granville WP' "$tmp/report.html"
