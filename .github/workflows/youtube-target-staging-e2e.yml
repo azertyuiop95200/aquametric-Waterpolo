@@ -63,7 +63,7 @@ jobs:
           test -n "$id"
           curl -sS -L -f --max-time 40 -c "$tmp/cookies" -b "$tmp/cookies" "$BASE$location" -o "$tmp/capture.html"
           echo "Capture HTML received $(wc -c < "$tmp/capture.html") bytes"
-          for expected in 'Démarrer l’analyse dans cet onglet' 'f_WzRHjybgU'; do
+          for expected in 'id="startCapture"' 'f_WzRHjybgU'; do
             grep -Fq "$expected" "$tmp/capture.html" || {
               echo "::error::Missing capture page marker: $expected"
               grep -Eo '<h1[^>]*>[^<]*|<title>[^<]*' "$tmp/capture.html" | head -5 || true
