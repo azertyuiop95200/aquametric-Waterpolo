@@ -873,6 +873,7 @@ def add_event(
     perspective: str = Form("for"),
     phase_tag: str = Form("auto"),
     return_to: str = Form(""),
+    observed: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = require_user(request, db)
@@ -881,6 +882,8 @@ def add_event(
         raise HTTPException(404)
     if event_type not in EVENT_TYPES:
         raise HTTPException(400, detail="Unsupported event type.")
+    if return_to == "report" and observed != "1":
+        raise HTTPException(400, detail="Confirmer que cet événement a réellement été observé avant de l’ajouter.")
     if second < 0 or second > 12 * 60 * 60:
         raise HTTPException(400, detail="Event time is outside the supported range.")
 
