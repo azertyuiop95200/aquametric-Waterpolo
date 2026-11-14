@@ -1,0 +1,68 @@
+name: AquaMetric Granville Marseille Source Frame Samples
+
+on:
+  push:
+    branches: [fix/youtube-report-intake-2026-11]
+    paths:
+      - '.github/workflows/granville-marseille-sampled-frames.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  observe-sampled-video:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Chromium
+        run: |
+          npm init -y >/dev/null
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Save source-player frames from the requested match for evidence inspection
+        env:
+          BASE: https://aquametric-youtube-validation.onrender.com
+        run: |
+          node - <<'NODE'
+          const {chromium}=require('playwright');
+          const fs=require('fs');
+          const seconds=[120,900,1800,2700,3600,4700];
+          (async()=>{
+            const browser=await chromium.launch({headless:true,args:['--no-sandbox','--autoplay-policy=no-user-gesture-required']});
+            const page=await browser.newPage({viewport:{width:1600,height:1000}});
+            try {
+              await page.goto(process.env.BASE+'/demo-login',{waitUntil:'domcontentloaded',timeout:60000});
+              await page.locator('#desktopAnalyzeSubmit').click({timeout:20000});
+              await page.waitForURL(/\/matches\/\d+\/analysis\/browser-capture/,{timeout:30000});
+              await page.waitForTimeout(6500);
+              const player=page.locator('#studioPlayer0');
+              console.log('PLAYER_SRC',await player.getAttribute('src'));
+              fs.mkdirSync('sampled-frames',{recursive:true});
+              for(const second of seconds){
+                try{
+                  await page.evaluate(second=>{
+                    const frame=document.getElementById('studioPlayer0');
+                    frame.contentWindow.postMessage(JSON.stringify({event:'command',func:'seekTo',args:[second,true]}),'*');
+                    frame.contentWindow.postMessage(JSON.stringify({event:'command',func:'playVideo',args:[]}),'*');
+                  },second);
+                  await page.waitForTimeout(7000);
+                  const target='sampled-frames/at-'+second+'s.png';
+                  await player.screenshot({path:target,timeout:15000});
+                  console.log('SOURCE_FRAME_SAVED',second,fs.statSync(target).size);
+                }catch(e){console.log('SOURCE_FRAME_FAILED',second,String(e.message).slice(0,130));}
+              }
+              console.log('END',seconds.length);
+            }catch(e){console.log('SAMPLE_WORKFLOW_ERROR',String(e.message).slice(0,400));}
+            await browser.close();
+          })().catch(e=>{console.error(e);process.exit(1)});
+          NODE
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: granville-marseille-source-frame-samples
+          path: sampled-frames/
+          if-no-files-found: ignore
