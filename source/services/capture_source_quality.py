@@ -67,12 +67,16 @@ def capture_source_quality(root: Path, state: dict, *, records=None, ocr=None) -
         from services.live_frame_match_analysis import _timeline_records
         records = _timeline_records(root, state)
     count = len(records)
-    if count < 6:
+    # Short sessions can retain 3–5 JPEGs and still contain a perfectly clear
+    # YouTube sign-in challenge. Do not call them valid match footage merely
+    # because fewer than six frames were available for comparison.
+    if count < 3:
         return {"status":"insufficient", "frames_checked":count, "reason":"not_enough_retained_frames"}
-    selected = [records[round(i*(count-1)/5)] for i in range(6)]
+    sample_count = min(6, count)
+    selected = [records[round(i*(count-1)/(sample_count-1))] for i in range(sample_count)]
     images = [_read_frame(Path(row["path"])) for row in selected]
     images = [im for im in images if im is not None]
-    if len(images) < 4:
+    if len(images) < 3:
         return {"status":"insufficient", "frames_checked":len(images), "reason":"frames_unreadable"}
     # Compare full captured tab across long-spaced records, at fixed resolution.
     previews=[]
