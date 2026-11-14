@@ -364,7 +364,8 @@ def analysis_snapshot(db, match):
             capture_root = latest_capture_root(match)
             if capture_root:
                 marker = _safe_json((capture_root / ".v16-report-ready.json").read_text(encoding="utf-8"), {})
-                quality = marker.get("capture_source_quality") or capture_source_quality(capture_root, {})
+                state = _safe_json((capture_root / "progress.json").read_text(encoding="utf-8"), {})
+                quality = marker.get("capture_source_quality") or capture_source_quality(capture_root, state)
                 snapshot["capture_source_quality"] = quality
                 if capture_is_unverified(quality):
                     snapshot["vision"]["available"] = False
