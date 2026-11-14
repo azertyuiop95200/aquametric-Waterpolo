@@ -48,7 +48,7 @@
       <p class="mode-note">Pour YouTube : colle le lien, puis AquaMetric te demandera uniquement de partager l’onglet du replay.</p>
       <span hidden>Analyser directement depuis l'URL · même minimum Ultimate Analyst</span>
       <label>Lien vidéo
-        <input id="desktopVideoUrl" type="url" name="video_url" autocapitalize="none" spellcheck="false" placeholder="https://www.youtube.com/watch?v=..." inputmode="url">
+        <input id="desktopVideoUrl" type="url" name="video_url" value="{{ request.query_params.get('video_url', '') }}" autocapitalize="none" spellcheck="false" placeholder="https://www.youtube.com/watch?v=..." inputmode="url">
       </label>
 
       <div class="scope-box">
@@ -82,7 +82,7 @@
       <h3>Analyse sur téléphone</h3>
       <label>Source sur téléphone<select id="phoneSource"><option value="link">Coller un lien vidéo</option><option value="file">Importer un fichier vidéo</option></select></label>
       <div id="phoneLinkPanel">
-        <label>Lien du match sur téléphone<input id="phoneVideoUrl" type="url" name="video_url" inputmode="url" autocapitalize="none" spellcheck="false" placeholder="https://www.youtube.com/watch?v=..." disabled></label>
+        <label>Lien du match sur téléphone<input id="phoneVideoUrl" type="url" name="video_url" value="{{ request.query_params.get('video_url', '') }}" inputmode="url" autocapitalize="none" spellcheck="false" placeholder="https://www.youtube.com/watch?v=..." disabled></label>
         <p>Le lien et le dossier sont enregistrés. Un lien seul ne donne pas accès aux images : la vidéo reste identifiée mais non analysée. Pour Vision/OCR, importe le fichier ou reprends la capture depuis un ordinateur compatible.</p>
         <button class="btn intelligence-cta" type="submit" id="phoneLinkSubmit" formaction="/analysis/url/create" formenctype="application/x-www-form-urlencoded">Enregistrer le lien et ouvrir le dossier</button>
       </div>
