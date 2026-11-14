@@ -8,6 +8,8 @@
   <section class="capture-panel">
     <span class="eyebrow">ANALYSE VIDÉO · VISION</span>
     <h1>Lecture + analyse en parallèle</h1>
+    <p>Si YouTube demande de confirmer que tu n'es pas un robot, tu peux <a class="btn secondary" href="/matches/{{match.id}}/analysis/result#annotation">ouvrir directement le poste de codage des actions</a> et annoter le replay sans enregistrer un écran de vérification.</p>
+    <div class="capture-warning" id="actionEngineReadiness" role="status"><b>Reconnaissance individuelle :</b> vérification de la connexion au moteur IA…</div>
     <p>Les numéros de bonnet et les identités ne sont plus préchargés depuis une liste manuelle. AquaMetric doit les déterminer à partir des images et conserver « indéterminé » quand la preuve visuelle n’est pas suffisante.</p>
     <div class="capture-permission" id="permissionState"><b>Vérification de l’autorisation navigateur…</b></div>
     <div class="capture-warning"><b>Rapport prioritaire :</b> une analyse Vision terminée reste disponible même si un enrichissement secondaire (séquences avancées, galerie) échoue ensuite.</div>
@@ -78,6 +80,13 @@
 <video id="capturePreview" autoplay muted playsinline></video><canvas id="captureCanvas"></canvas>
 <script>
 (() => {
+  const readiness = document.getElementById('actionEngineReadiness');
+  fetch('/health/video-actions', {cache:'no-store'})
+    .then(r => {if (!r.ok) throw Error('unavailable');return r.json()})
+    .then(result => {readiness.textContent = result.configured
+      ? 'Moteur de reconnaissance d’actions connecté : les détections restent à vérifier.'
+      : 'Moteur de reconnaissance d’actions non connecté : tirs, passes et statistiques individuelles ne seront pas inventés. Le poste d’annotation reste disponible.'})
+    .catch(() => {readiness.textContent = 'État du moteur IA inconnu : seules les observations vérifiables seront comptabilisées.'});
   const captureShell=document.getElementById('captureShell'),grid=document.getElementById('studioGrid');
   const tiles=[0,1,2,3].map(i=>document.getElementById(`tile${i}`)),labels=[0,1,2,3].map(i=>document.getElementById(`segLabel${i}`));
   const mode1=document.getElementById('mode1'),mode2=document.getElementById('mode2'),modeTurbo=document.getElementById('modeTurbo');
