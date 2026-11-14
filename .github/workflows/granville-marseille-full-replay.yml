@@ -1,0 +1,118 @@
+name: AquaMetric Granville Marseille Full Replay Analysis
+
+on:
+  push:
+    branches: [fix/youtube-report-intake-2026-11]
+    paths:
+      - '.github/workflows/granville-marseille-full-replay.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  analyze-actual-replay:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 21
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Chromium
+        run: |
+          npm init -y >/dev/null
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Analyze genuine match capture and save truthful accessible report HTML
+        env:
+          BASE: https://aquametric-youtube-validation.onrender.com
+        run: |
+          node - <<'NODE'
+          const {chromium}=require('playwright');
+          const fs=require('fs');
+          (async()=>{
+            const browser=await chromium.launch({headless:true,args:[
+              '--no-sandbox','--autoplay-policy=no-user-gesture-required',
+              '--enable-usermedia-screen-capturing',
+              '--auto-select-desktop-capture-source=AquaMetric',
+              '--auto-select-tab-capture-source-by-title=AquaMetric',
+              '--use-fake-ui-for-media-stream'
+            ]});
+            const page=await browser.newPage({viewport:{width:1600,height:900}});
+            const base=process.env.BASE;
+            let matchId='', captured=false;
+            const errors=[];
+            page.on('pageerror',err=>errors.push(String(err.message).slice(0,200)));
+            try{
+              await page.goto(base+'/demo-login',{waitUntil:'domcontentloaded',timeout:60000});
+              await page.locator('#desktopAnalyzeSubmit').click({timeout:25000});
+              await page.waitForURL(/\/matches\/\d+\/analysis\/browser-capture/,{timeout:45000});
+              matchId=page.url().match(/\/matches\/(\d+)\//)[1];
+              console.log('SOURCE_VIDEO', 'https://www.youtube.com/watch?v=f_WzRHjybgU');
+              console.log('MATCH_ID',matchId);
+              await page.waitForFunction(()=>document.querySelector('#durationState')?.textContent?.includes('durée détectée'),
+                {timeout:30000}).catch(()=>{});
+              console.log('SOURCE_DURATION',String(await page.locator('#durationState').innerText()).slice(0,120));
+              await page.locator('#startCapture').click({timeout:30000});
+              await page.waitForTimeout(5000);
+              console.log('CAPTURE_INIT',String(await page.locator('#captureStatus').innerText()).slice(0,180));
+              const began=Date.now();
+              let checks=0;
+              while(Date.now()-began < 15*60*1000){
+                await page.waitForTimeout(30000);
+                checks++;
+                if(page.url().includes('/analysis/result')){
+                  captured=true;
+                  console.log('AUTOMATIC_REDIRECT_TO_REPORT',checks);
+                  break;
+                }
+                const status=await page.locator('#captureStatus').innerText({timeout:2000}).catch(()=>'<status unavailable>');
+                const meta=await page.locator('#analysisMeta').innerText({timeout:2000}).catch(()=>'');
+                console.log('CAPTURE_PROGRESS',checks,'wall_seconds',Math.round((Date.now()-began)/1000),status.slice(0,180),meta.slice(0,120));
+                if(status.startsWith('Impossible de démarrer')||status.startsWith('Échec de l’analyse'))break;
+              }
+              if(!captured && page.url().includes('/analysis/browser-capture')){
+                console.log('FULL_REPLAY_TIMEOUT: publish available partial capture without fabricating coverage');
+                const stop=page.locator('#stopCaptureLive');
+                if(await stop.isEnabled().catch(()=>false)) await stop.click({timeout:15000}).catch(e=>console.log('STOP_ERROR',String(e).slice(0,160)));
+              }
+              await page.waitForURL(/\/analysis\/result/,{timeout:90000}).catch(()=>{});
+              captured=page.url().includes('/analysis/result');
+              console.log('RESULT_PAGE_REACHED',captured);
+              console.log('PAGE_ERRORS',JSON.stringify(errors.slice(-12)));
+              await page.screenshot({path:'granville-marseille-analysis.png',fullPage:false}).catch(()=>{});
+              if(matchId){
+                const ctx=page.context().request;
+                const url=base+'/matches/'+matchId+'/analysis/';
+                for(const [suffix,name] of [['report.html','granville-marseille-rapport.html'],['progress','granville-marseille-progress.json'],['actions/status','granville-marseille-actions.json']]){
+                  try {
+                    const response=await ctx.get(url+suffix,{timeout:45000});
+                    console.log('REPORT_ENDPOINT',suffix,'HTTP',response.status());
+                    if(response.ok()){
+                      const body=await response.body();
+                      fs.writeFileSync(name,body);
+                      if(name.endsWith('.json'))console.log('REPORT_STATUS',name,body.toString().slice(0,1200));
+                    }
+                  }catch(e){console.log('REPORT_ENDPOINT_ERROR',suffix,String(e).slice(0,200));}
+                }
+              }
+            }catch(e){
+              console.log('FULL_REPLAY_ERROR',String(e.message).slice(0,450));
+              console.log('PAGE_ERRORS',JSON.stringify(errors.slice(-12)));
+              await page.screenshot({path:'granville-marseille-analysis.png',fullPage:false}).catch(()=>{});
+            }finally{
+              console.log('FINAL_MATCH_ID',matchId);
+              await browser.close();
+            }
+          })().catch(e=>{console.error(e);process.exit(1)});
+          NODE
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: granville-marseille-real-replay-report
+          path: |
+            granville-marseille-rapport.html
+            granville-marseille-progress.json
+            granville-marseille-actions.json
+            granville-marseille-analysis.png
+          if-no-files-found: ignore
