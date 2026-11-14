@@ -135,7 +135,7 @@
     <table class="metric-table">
       <thead><tr><th>Mesure</th><th>{{match.team.name}}</th><th>{{match.opponent}}</th></tr></thead>
       <tbody>
-        {% for title,key in [("Actions annotées","tagged_events"),("Buts annotés","tagged_goals"),("Tirs annotés","tagged_shots"),("Conversion des tirs annotés","shot_conversion_pct"),("Pertes / mauvaises passes","tagged_turnovers"),("Arrêts","tagged_saves"),("Exclusions obtenues","tagged_exclusions_earned"),("Exclusions concédées","tagged_exclusions_committed")] %}
+        {% for title,key in [("Actions annotées","tagged_events"),("Buts annotés","tagged_goals"),("Tirs annotés","tagged_shots"),("Conversion des tirs annotés","shot_conversion_pct"),("Pertes / mauvaises passes","tagged_turnovers"),("Récupérations / interceptions","tagged_recoveries"),("Arrêts","tagged_saves"),("Exclusions obtenues","tagged_exclusions_earned"),("Exclusions concédées","tagged_exclusions_committed")] %}
         <tr><td>{{title}}</td>
           <td>{% if review_metrics.team.tagged_events or key == 'tagged_events' %}{{review_metrics.team[key] if review_metrics.team[key] is not none else '—'}}{% if key == 'shot_conversion_pct' and review_metrics.team[key] is not none %} %{% endif %}{% else %}—{% endif %}</td>
           <td>{% if review_metrics.opponent.tagged_events or key == 'tagged_events' %}{{review_metrics.opponent[key] if review_metrics.opponent[key] is not none else '—'}}{% if key == 'shot_conversion_pct' and review_metrics.opponent[key] is not none %} %{% endif %}{% else %}—{% endif %}</td>
@@ -155,7 +155,7 @@
       {% if review_metrics.players %}
       <h3>Joueuses annotées · {{match.team.name}}</h3>
       <table class="metric-table"><thead><tr><th>Joueuse</th><th>Buts</th><th>Tirs</th><th>% tirs</th><th>Passes décisives</th></tr></thead>
-        <tbody>{% for p in review_metrics.players %}<tr><td>{{p.name}}</td><td>{{p.tagged_goals}}</td><td>{{p.tagged_shots}}</td><td>{{p.shot_conversion_pct if p.shot_conversion_pct is not none else '—'}}</td><td>{{p.tagged_events - p.tagged_goals - (p.tagged_shots-p.tagged_goals) - p.tagged_turnovers - p.tagged_saves - p.tagged_exclusions_earned - p.tagged_exclusions_committed if false else 'Voir chronologie'}}</td></tr>{% endfor %}</tbody></table>
+        <tbody>{% for p in review_metrics.players %}<tr><td>{{p.name}}</td><td>{{p.tagged_goals}}</td><td>{{p.tagged_shots}}</td><td>{{p.shot_conversion_pct if p.shot_conversion_pct is not none else '—'}}</td><td>{{p.tagged_assists}}</td></tr>{% endfor %}</tbody></table>
       {% endif %}
       <h3>Actions vérifiées · accès direct à la preuve</h3>
       {% for e in review_metrics.timeline %}
