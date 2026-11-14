@@ -44,6 +44,15 @@ def test_static_youtube_challenge_is_blocked(tmp_path):
     assert found["frames_checked"]==6
 
 
+def test_short_blocked_capture_is_rejected_with_only_four_frames(tmp_path):
+    records=_screens(tmp_path)[:4]
+    found=capture_source_quality(tmp_path,{},records=records,
+                                 ocr=lambda image:"Sign in to confirm you're not a bot")
+    assert found["status"]=="blocked"
+    assert found["frames_checked"]==4
+    assert capture_is_unverified(found)
+
+
 def test_static_unknown_content_is_not_marked_as_measured_game(tmp_path):
     found=capture_source_quality(tmp_path,{},records=_screens(tmp_path),ocr=lambda image:"")
     assert found["status"]=="static_unverified"
