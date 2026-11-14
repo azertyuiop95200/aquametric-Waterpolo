@@ -77,6 +77,7 @@
             <option value="{{p.id}}">#{{p.cap_number or "—"}} · {{p.name}}</option>
             {% endfor %}
           </select>
+          <small><a href="/teams/{{match.team_id}}" target="_blank" rel="noopener">Compléter la liste des joueuses et numéros de bonnet</a></small>
         </label>
         <label>Contexte de l'action
           <select name="phase_tag">
