@@ -5,7 +5,7 @@ import asyncio
 import json
 from contextlib import asynccontextmanager
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs, urlencode
 
 from fastapi import FastAPI, Request, Depends, Form, UploadFile, File, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
@@ -222,8 +222,19 @@ def knowledge_page(request: Request, db: Session = Depends(get_db)):
     )
 
 
+def _demo_analysis_destination(value: str) -> str:
+    """Only permit a prefilled new-match form, never an external redirect."""
+    parsed = urlparse(value or "")
+    if parsed.scheme or parsed.netloc or parsed.path != "/matches/new":
+        return "/my-team"
+    video_url = parse_qs(parsed.query).get("video_url", [""])[0]
+    if not youtube_embed(video_url):
+        return "/my-team"
+    return "/matches/new?" + urlencode({"video_url": video_url})
+
+
 @app.get("/demo-login")
-def demo_login(request: Request, db: Session = Depends(get_db)):
+def demo_login(request: Request, next: str = "", db: Session = Depends(get_db)):
     """Create an isolated temporary demo workspace for this browser session.
 
     Intended for free/ephemeral web deployments. No password is required and
@@ -231,9 +242,10 @@ def demo_login(request: Request, db: Session = Depends(get_db)):
     """
     if not WEB_DEMO_MODE:
         raise HTTPException(status_code=404)
+    destination = _demo_analysis_destination(next)
     current = current_user(request, db)
     if current:
-        return RedirectResponse("/dashboard", status_code=303)
+        return RedirectResponse(destination if destination != "/my-team" else "/dashboard", status_code=303)
     token = uuid.uuid4().hex[:12]
     user = User(
         email=f"webdemo-{token}@aquametric.local",
@@ -248,7 +260,7 @@ def demo_login(request: Request, db: Session = Depends(get_db)):
     request.session.clear()
     request.session["user_id"] = user.id
     request.session["web_demo"] = True
-    return RedirectResponse("/my-team", status_code=303)
+    return RedirectResponse(destination, status_code=303)
 
 @app.get("/register", response_class=HTMLResponse)
 def register_page(request: Request):
