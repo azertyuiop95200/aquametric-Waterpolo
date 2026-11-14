@@ -10,19 +10,19 @@
     <input type="hidden" id="analysisInputDevice" name="input_device" value="desktop">
     <div class="formgrid">
       <label>Équipe à analyser
-        <input name="team_name" list="analysis-team-catalog" value="{{request.query_params.get('team_name', default_team_name or '')}}" placeholder="Ex. Granville, Barceloneta, Vouliagmeni…" autocomplete="off" required>
+        <input name="team_name" list="analysis-team-catalog" value="{{request.query_params.get('team_name', target_team_name or default_team_name or '')}}" placeholder="Ex. Granville, Barceloneta, Vouliagmeni…" autocomplete="off" required>
       </label>
       <label>Adversaire
-        <input name="opponent" list="analysis-team-catalog" value="{{request.query_params.get('opponent', '')}}" placeholder="Nom libre, même absent de la base" autocomplete="off" required>
+        <input name="opponent" list="analysis-team-catalog" value="{{request.query_params.get('opponent', target_opponent or '')}}" placeholder="Nom libre, même absent de la base" autocomplete="off" required>
       </label>
       <label>Catégorie
         <select name="category" required>
-          <option value="Women" {% if request.query_params.get('category', 'Women') == 'Women' %}selected{% endif %}>Féminin</option>
+          <option value="Women" {% if request.query_params.get('category', target_category or 'Women') == 'Women' %}selected{% endif %}>Féminin</option>
           <option value="Men" {% if request.query_params.get('category') == 'Men' %}selected{% endif %}>Masculin</option>
           <option value="Mixed/Other" {% if request.query_params.get('category') == 'Mixed/Other' %}selected{% endif %}>Mixte / autre</option>
         </select>
       </label>
-      <label>Compétition<input name="competition" value="{{request.query_params.get('competition', '')}}" placeholder="Facultatif"></label>
+      <label>Compétition<input name="competition" value="{{request.query_params.get('competition', target_competition or '')}}" placeholder="Facultatif"></label>
       <label>Date<input type="date" name="match_date"></label>
     </div>
     <datalist id="analysis-team-catalog">
@@ -48,7 +48,7 @@
       <p class="mode-note">Pour YouTube : colle le lien, puis AquaMetric te demandera uniquement de partager l’onglet du replay.</p>
       <span hidden>Analyser directement depuis l'URL · même minimum Ultimate Analyst</span>
       <label>Lien vidéo
-        <input id="desktopVideoUrl" type="url" name="video_url" value="{{ request.query_params.get('video_url', '') }}" autocapitalize="none" spellcheck="false" placeholder="https://www.youtube.com/watch?v=..." inputmode="url">
+        <input id="desktopVideoUrl" type="url" name="video_url" value="{{ request.query_params.get('video_url', target_video_url or '') }}" autocapitalize="none" spellcheck="false" placeholder="https://www.youtube.com/watch?v=..." inputmode="url">
       </label>
 
       <div class="scope-box">
@@ -82,7 +82,7 @@
       <h3>Analyse sur téléphone</h3>
       <label>Source sur téléphone<select id="phoneSource"><option value="link">Coller un lien vidéo</option><option value="file">Importer un fichier vidéo</option></select></label>
       <div id="phoneLinkPanel">
-        <label>Lien du match sur téléphone<input id="phoneVideoUrl" type="url" name="video_url" value="{{ request.query_params.get('video_url', '') }}" inputmode="url" autocapitalize="none" spellcheck="false" placeholder="https://www.youtube.com/watch?v=..." disabled></label>
+        <label>Lien du match sur téléphone<input id="phoneVideoUrl" type="url" name="video_url" value="{{ request.query_params.get('video_url', target_video_url or '') }}" inputmode="url" autocapitalize="none" spellcheck="false" placeholder="https://www.youtube.com/watch?v=..." disabled></label>
         <p>Le lien et le dossier sont enregistrés. Un lien seul ne donne pas accès aux images : la vidéo reste identifiée mais non analysée. Pour Vision/OCR, importe le fichier ou reprends la capture depuis un ordinateur compatible.</p>
         <button class="btn intelligence-cta" type="submit" id="phoneLinkSubmit" formaction="/analysis/url/create" formenctype="application/x-www-form-urlencoded">Enregistrer le lien et ouvrir le dossier</button>
       </div>
