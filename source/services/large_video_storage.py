@@ -26,7 +26,7 @@ VIDEO_MIME = {
 }
 
 
-def configured() -> bool:
+def object_storage_configured() -> bool:
     return all(os.getenv(key, "").strip() for key in (
         "AQUAMETRIC_OBJECT_BUCKET",
         "AQUAMETRIC_OBJECT_ENDPOINT",
@@ -35,19 +35,37 @@ def configured() -> bool:
     ))
 
 
+def durable_match_metadata() -> bool:
+    # S3 persists the pixels, not the match/upload ID. An ephemeral Render
+    # SQLite file would lose the user's 3 GB video association after sleep.
+    url = os.getenv("DATABASE_URL", "").strip().lower()
+    return url.startswith(("postgresql://", "postgresql+psycopg://", "postgres://")) or (
+        os.getenv("AQUAMETRIC_PERSISTENT_UPLOAD_METADATA", "") == "1"
+    )
+
+
+def configured() -> bool:
+    return object_storage_configured() and durable_match_metadata()
+
+
 def capabilities() -> dict:
     enabled = configured()
+    if enabled:
+        reason = ""
+    elif not object_storage_configured():
+        reason = "Stockage cloud privé R2/S3 non configuré. L'administrateur doit connecter un bucket."
+    else:
+        reason = "Base des matchs non persistante. Configurer PostgreSQL ou un disque persistant pour ne pas perdre les vidéos à un redémarrage Render."
     return {
         "enabled": enabled, "max_bytes": MAX_BYTES,
         "max_gb": MAX_GB, "part_bytes": PART_BYTES,
-        "resume_supported": enabled,
-        "reason": "" if enabled else "Stockage cloud privé non configuré sur le serveur (R2/S3). Aucun fichier de plusieurs Go ne peut être sauvegardé durablement ici.",
+        "resume_supported": enabled, "reason": reason,
     }
 
 
 def bucket() -> str:
     if not configured():
-        raise HTTPException(503, "Stockage vidéo de grande taille indisponible. Configurer un bucket privé S3/R2 sur Render.")
+        raise HTTPException(503, "Envoi de gros fichiers indisponible : configurer un bucket privé R2/S3 ET une base de données persistante.")
     return os.environ["AQUAMETRIC_OBJECT_BUCKET"].strip()
 
 
