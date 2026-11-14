@@ -51,6 +51,8 @@ def clean_analysis_result(match_id: int, request: Request, db: Session = Depends
     events = list(snapshot.get("verified_events") or [])
     sequences = sequence_gallery(db, match, max_total=72)
     source_embed = youtube_embed(match.video_url) if match.video_url else ""
+    from services.quick_tag_analytics import reviewed_match_metrics
+    review_metrics = reviewed_match_metrics(events, match.video_url or "")
     return TEMPLATES.TemplateResponse(
         request,
         "analysis_result_clean_v2.html",
@@ -69,6 +71,8 @@ def clean_analysis_result(match_id: int, request: Request, db: Session = Depends
             "sequences": sequences,
             "sequence_summary": sequence_summary(sequences),
             "source_embed": source_embed,
+            "players": sorted(match.team.players, key=lambda p: (p.cap_number or 99, p.name)),
+            "review_metrics": review_metrics,
             "capture_progress": report_progress(match, db=db),
             "category": getattr(match.team, "category", "") or "Non précisée",
         },
