@@ -10,19 +10,19 @@
     <input type="hidden" id="analysisInputDevice" name="input_device" value="desktop">
     <div class="formgrid">
       <label>Équipe à analyser
-        <input name="team_name" list="analysis-team-catalog" value="{{default_team_name or ''}}" placeholder="Ex. Granville, Barceloneta, Vouliagmeni…" autocomplete="off" required>
+        <input name="team_name" list="analysis-team-catalog" value="{{request.query_params.get('team_name', default_team_name or '')}}" placeholder="Ex. Granville, Barceloneta, Vouliagmeni…" autocomplete="off" required>
       </label>
       <label>Adversaire
-        <input name="opponent" list="analysis-team-catalog" placeholder="Nom libre, même absent de la base" autocomplete="off" required>
+        <input name="opponent" list="analysis-team-catalog" value="{{request.query_params.get('opponent', '')}}" placeholder="Nom libre, même absent de la base" autocomplete="off" required>
       </label>
       <label>Catégorie
         <select name="category" required>
-          <option value="Women">Féminin</option>
-          <option value="Men">Masculin</option>
-          <option value="Mixed/Other">Mixte / autre</option>
+          <option value="Women" {% if request.query_params.get('category', 'Women') == 'Women' %}selected{% endif %}>Féminin</option>
+          <option value="Men" {% if request.query_params.get('category') == 'Men' %}selected{% endif %}>Masculin</option>
+          <option value="Mixed/Other" {% if request.query_params.get('category') == 'Mixed/Other' %}selected{% endif %}>Mixte / autre</option>
         </select>
       </label>
-      <label>Compétition<input name="competition" placeholder="Facultatif"></label>
+      <label>Compétition<input name="competition" value="{{request.query_params.get('competition', '')}}" placeholder="Facultatif"></label>
       <label>Date<input type="date" name="match_date"></label>
     </div>
     <datalist id="analysis-team-catalog">
