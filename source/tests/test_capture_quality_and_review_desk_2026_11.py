@@ -110,6 +110,11 @@ def test_real_match_can_be_manually_tagged_from_its_report():
         assert 'id="annotation"' in before.text
         assert "Résultat annoncé par la source" in before.text
         assert "Les buts annoncés dans le titre YouTube ne sont pas additionnés" in before.text
+        denied=client.post(f"/matches/{match_id}/events",
+            data={"event_type":"goal","second":"124.5","perspective":"for",
+                  "phase_tag":"power_play","return_to":"report"},
+            follow_redirects=False)
+        assert denied.status_code==400
         result=client.post(f"/matches/{match_id}/events",
             data={"event_type":"goal","second":"124.5","perspective":"for",
                   "phase_tag":"power_play","observed":"1","return_to":"report"},
