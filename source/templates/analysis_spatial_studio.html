@@ -14,6 +14,14 @@
           <small>{{'Fichier cloud' if part.source_type=='cloud' else 'Fichier importé' if part.source_type=='upload' else 'YouTube' if part.source_type=='youtube' else 'Lien externe'}}</small>
           {% if part.video_url %}<a href="{{part.video_url}}" rel="noopener" target="_blank">Ouvrir la source</a>{% endif %}
           {% if part.play_url %}<a href="{{part.play_url}}" target="_blank">Lire le fichier</a>{% endif %}
+          {% if part.id is not none and part.source_type == 'youtube' %}
+          <form action="/matches/{{match.id}}/segments/{{part.id}}/youtube/direct" method="post" class="segment-direct-form">
+            <label>Durée du clip (minutes)
+              <input type="number" name="duration_minutes" min="0.1" max="240" step="0.1" required placeholder="Ex. 8">
+            </label>
+            <button class="btn secondary" type="submit" {% if not snapshot.video_actions.configured %}disabled{% endif %}>Analyser Q{{part.period}} par IA</button>
+          </form>
+          {% endif %}
         </div>
       {% endfor %}
     </div>
@@ -28,6 +36,10 @@
       </label>
       <label>Nom de la partie<input name="label" placeholder="Ex. Q2 · seconde caméra" maxlength="100"></label>
       <label>Lien YouTube / vidéo distante<input name="video_url" type="url" placeholder="https://www.youtube.com/watch?v=..."></label>
+      <label>Durée du clip YouTube (minutes, facultatif)
+        <input type="number" name="youtube_duration_minutes" min="0" max="240" step="0.1" placeholder="Ex. 8.0">
+      </label>
+      <p class="evidence-note">Si le moteur vidéo est connecté et que la durée est renseignée, cette partie YouTube publique sera analysée automatiquement dès son ajout.</p>
       <label>Ou petit fichier (limite de l'import direct sur ce serveur)
         <input name="video_file" type="file" accept=".mp4,.mov,.webm,.m4v,video/mp4,video/quicktime,video/webm">
       </label>
