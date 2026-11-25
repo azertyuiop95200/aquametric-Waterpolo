@@ -61,6 +61,23 @@
   const mobileLike = window.matchMedia('(max-width: 700px)').matches ||
     /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
   selectMode(mobileLike ? 'phone' : 'desktop');
+  const quickOpen = kind => {
+    const isPhone = mobileLike;
+    selectMode(isPhone ? 'phone' : 'desktop');
+    const selector = $(isPhone ? 'phoneSource' : 'desktopSource');
+    selector.value = kind === 'youtube' ? 'link' : 'file';
+    selector.dispatchEvent(new Event('change', {bubbles:true}));
+    const field = $(isPhone
+      ? (kind === 'youtube' ? 'phoneVideoUrl' : 'phoneVideoFile')
+      : (kind === 'youtube' ? 'desktopVideoUrl' : 'desktopVideoFile'));
+    field.scrollIntoView({behavior:'smooth',block:'center'});
+    field.focus({preventScroll:true});
+    // Do not submit or upload until the user has selected an actual source.
+    // The required team fields and format validation remain enforced.
+  };
+  $('quickYoutubeAnalysis')?.addEventListener('click', () => quickOpen('youtube'));
+  $('quickFileAnalysis')?.addEventListener('click', () => quickOpen('file'));
+
   form.addEventListener('submit', event => {
     // Enter from any text field must submit the currently selected video source.
     if (!event.submitter) {
