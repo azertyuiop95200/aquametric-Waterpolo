@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="panel narrow" style="max-width:550px;margin:auto">
+  <h1>Associer ton compte AquaMetric à Google</h1>
+  <p>Google a vérifié l’identité <strong>{{email}}</strong>. Pour conserver l’accès à ton ancien espace AquaMetric, confirme une seule fois son mot de passe. Tu pourras ensuite utiliser « Continuer avec Google ».</p>
+  {% if error %}<p class="error">{{error}}</p>{% endif %}
+  <form method="post" action="/auth/google/link">
+    <label>Mot de passe AquaMetric actuel
+      <input type="password" name="password" autocomplete="current-password" required></label>
+    <button class="btn primary" type="submit">Associer et retrouver mes matchs</button>
+  </form>
+  <p><a href="/login">Annuler et utiliser l’identifiant habituel</a></p>
+</section>
+{% endblock %}
