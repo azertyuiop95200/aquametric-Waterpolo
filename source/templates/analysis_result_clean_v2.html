@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
 <style>
-.report-shell{max-width:1280px;margin:0 auto;display:grid;gap:18px}.hero-report{padding:24px;border:1px solid var(--border,#284654);border-radius:24px;background:linear-gradient(145deg,rgba(14,165,233,.08),rgba(34,197,94,.04))}.hero-top{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;flex-wrap:wrap}.match-title{font-size:clamp(28px,4vw,48px);margin:7px 0}.chips{display:flex;gap:8px;flex-wrap:wrap}.chip{padding:7px 10px;border-radius:999px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.11);font-size:13px}.report-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.report-card{padding:18px;border:1px solid var(--border,#284654);border-radius:18px;background:var(--panel,#0b202b)}.report-card h2{margin-top:0}.status-good{border-left:4px solid #22c55e}.status-warn{border-left:4px solid #f59e0b}.status-live{border-left:4px solid #38bdf8;background:rgba(56,189,248,.07)}.status-failed{border-left:4px solid #ef4444;background:rgba(239,68,68,.06)}.metric-table{width:100%;border-collapse:collapse}.metric-table th,.metric-table td{padding:11px 8px;border-bottom:1px solid rgba(255,255,255,.08);text-align:left}.metric-table th:nth-child(n+2),.metric-table td:nth-child(n+2){text-align:center}.metric-value{font-weight:900;font-size:18px}.unmeasured{opacity:.58;font-size:13px}.candidate{padding:11px 12px;border-radius:12px;background:rgba(255,255,255,.035);margin:8px 0}.candidate strong{display:block}.evidence-note{font-size:13px;opacity:.78;line-height:1.5}.periods{display:flex;gap:8px;flex-wrap:wrap}.period-pill{padding:9px 11px;border-radius:12px;background:rgba(56,189,248,.08);border:1px solid rgba(56,189,248,.18)}.video-frame{aspect-ratio:16/9;width:100%;border:0;border-radius:15px;background:#000}.actions{display:flex;gap:10px;flex-wrap:wrap}.event-list{display:grid;gap:8px}.event-row{display:grid;grid-template-columns:80px 1fr auto;gap:10px;align-items:start;padding:10px;border-bottom:1px solid rgba(255,255,255,.07)}.confidence{font-size:12px;opacity:.7}.section-wide{grid-column:1/-1}@media(max-width:820px){.report-grid{grid-template-columns:1fr}.section-wide{grid-column:auto}.event-row{grid-template-columns:65px 1fr}.event-row .confidence{grid-column:2}}
+.report-shell{max-width:1280px;margin:0 auto;display:grid;gap:18px}.hero-report{padding:24px;border:1px solid var(--border,#284654);border-radius:24px;background:linear-gradient(145deg,rgba(14,165,233,.08),rgba(34,197,94,.04))}.hero-top{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;flex-wrap:wrap}.match-title{font-size:clamp(28px,4vw,48px);margin:7px 0}.chips{display:flex;gap:8px;flex-wrap:wrap}.chip{padding:7px 10px;border-radius:999px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.11);font-size:13px}.report-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.report-card{padding:18px;border:1px solid var(--border,#284654);border-radius:18px;background:var(--panel,#0b202b)}.report-card h2{margin-top:0}.status-good{border-left:4px solid #22c55e}.status-warn{border-left:4px solid #f59e0b}.status-live{border-left:4px solid #38bdf8;background:rgba(56,189,248,.07)}.status-failed{border-left:4px solid #ef4444;background:rgba(239,68,68,.06)}.metric-table{width:100%;border-collapse:collapse}.metric-table th,.metric-table td{padding:11px 8px;border-bottom:1px solid rgba(255,255,255,.08);text-align:left}.metric-table th:nth-child(n+2),.metric-table td:nth-child(n+2){text-align:center}.metric-value{font-weight:900;font-size:18px}.unmeasured{opacity:.58;font-size:13px}.candidate{padding:11px 12px;border-radius:12px;background:rgba(255,255,255,.035);margin:8px 0}.candidate strong{display:block}.evidence-note{font-size:13px;opacity:.78;line-height:1.5}.periods{display:flex;gap:8px;flex-wrap:wrap}.period-pill{padding:9px 11px;border-radius:12px;background:rgba(56,189,248,.08);border:1px solid rgba(56,189,248,.18)}.video-frame{aspect-ratio:16/9;width:100%;border:0;border-radius:15px;background:#000}.actions{display:flex;gap:10px;flex-wrap:wrap}.event-list{display:grid;gap:8px}.event-row{display:grid;grid-template-columns:80px 1fr auto;gap:10px;align-items:start;padding:10px;border-bottom:1px solid rgba(255,255,255,.07)}.confidence{font-size:12px;opacity:.7}.section-wide{grid-column:1/-1}.segment-list{display:grid;gap:8px;margin:12px 0}.segment-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 10px;border:1px solid rgba(120,180,200,.25);border-radius:10px}.segment-row small{opacity:.75}.source-forms{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:16px}.source-forms form{padding:14px;border:1px solid rgba(120,180,200,.24);border-radius:12px}.source-forms label{display:block;margin:8px 0}.source-forms input,.source-forms select{width:100%}.map-filters{display:grid;grid-template-columns:repeat(5,minmax(120px,1fr));gap:9px;margin:13px 0}.map-filters label{font-size:13px}.map-filters select{width:100%}.map-layout{display:grid;grid-template-columns:minmax(0,1.8fr) minmax(230px,1fr);gap:16px}.map-figure svg{width:100%;max-height:530px;display:block}.map-legend{display:flex;gap:15px;flex-wrap:wrap;font-size:12px}.legend-goal{color:#f97316}.legend-saved{color:#38bdf8}.legend-miss{color:#d946ef}.map-evidence{margin-top:16px}.map-sidebar{padding:10px}.segment-review-player{max-width:900px;margin:14px 0}.segment-review-player iframe,.segment-review-player video{width:100%}@media(max-width:900px){.source-forms,.map-layout{grid-template-columns:1fr}.map-filters{grid-template-columns:repeat(2,1fr)}}@media(max-width:820px){.report-grid{grid-template-columns:1fr}.section-wide{grid-column:auto}.event-row{grid-template-columns:65px 1fr}.event-row .confidence{grid-column:2}}
 </style>
 <div class="report-shell">
   <section class="hero-report">
@@ -56,24 +56,38 @@
   </section>
   {% endif %}
 
+  {% include "analysis_spatial_studio.html" %}
+
   <section class="report-card section-wide" id="annotation">
     <div class="hero-top">
       <div><span class="eyebrow">POSTE D'ANALYSE · ACTIONS HORODATÉES</span><h2>Mesurer le match action par action</h2></div>
       <span class="chip">{{review_metrics.verified_count}} action(s) confirmée(s)</span>
     </div>
     <p class="evidence-note">Comme dans les outils de marquage sportif : lis la vidéo, arrête-toi sur l'action, sélectionne l'équipe et éventuellement la joueuse, puis confirme l'événement. AquaMetric met à jour immédiatement les statistiques, les phases et les comparaisons. Aucune action n'est ajoutée automatiquement si la vidéo est bloquée.</p>
-    {% if match.video_source in ["upload", "cloud"] and match.video_path %}
-      <video id="reviewLocalVideo" class="video-frame" style="max-width:900px" controls preload="metadata" playsinline src="/matches/{{match.id}}/video">
-        Ton navigateur ne prend pas en charge la lecture de ce format vidéo.
-      </video>
-      <p class="evidence-note">Utilise le lecteur pour retrouver l'action, puis sélectionne son type. L'horodatage se synchronise automatiquement au fil de la lecture.</p>
+    {% if video_segments %}
+      <label>Choisir la vidéo à analyser (les temps sont locaux à cette partie)
+        <select id="reviewSegmentSelect">
+        {% for part in video_segments %}<option value="{{loop.index0}}">Q{{part.period}} · {{part.label}} · Partie {{part.part_index}}</option>{% endfor %}
+        </select>
+      </label>
+      <div id="reviewSegmentPlayer" class="segment-review-player" aria-live="polite"></div>
+      <p class="evidence-note">Choisis d'abord la partie vidéo et la période. Le timestamp conservé avec l'action correspond exactement à cette vidéo, sans concaténation arbitraire des quatre quart-temps.</p>
+    {% elif match.video_source in ["upload","cloud"] and match.video_path %}
+      <video id="reviewLocalVideo" class="video-frame" controls preload="metadata" playsinline src="/matches/{{match.id}}/video">Lecture non prise en charge.</video>
     {% elif source_embed %}
-      <iframe id="reviewVideo" class="video-frame" style="max-width:900px" src="{{source_embed}}&rel=0" title="Replay à annoter : {{match.team.name}} contre {{match.opponent}}" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
-      <p class="evidence-note">Si YouTube demande une vérification, <a href="{{match.video_url}}" target="_blank" rel="noopener">ouvre le replay dans YouTube</a>, puis recopie le temps sous la vidéo. Le dossier conservera le timestamp exact.</p>
+      <iframe id="reviewVideo" class="video-frame" src="{{source_embed}}&rel=0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen title="Replay du match"></iframe>
     {% endif %}
     <form id="reviewTagForm" action="/matches/{{match.id}}/events" method="post">
       <input name="return_to" type="hidden" value="report">
+      <input id="reviewSegmentId" name="segment_id" type="hidden" value="">
+      <input id="coordX" name="coord_x" type="hidden" value="">
+      <input id="coordY" name="coord_y" type="hidden" value="">
       <div class="formgrid">
+        <label>Quart-temps / période
+          <select id="reviewPeriod" name="period">
+          {% for q in range(1,9) %}<option value="{{q}}">Q{{q}}</option>{% endfor %}
+          </select>
+        </label>
         <label>Instant de la vidéo (secondes)
           <input type="number" id="reviewSecond" name="second" value="0" min="0" max="43200" step="0.1" required>
           <small id="reviewTimeText">00:00 · modification possible</small>
@@ -107,6 +121,7 @@
       <label>Observation complémentaire
         <input name="note" maxlength="500" placeholder="Ex. tir depuis l'aile droite, ballon dévié par la gardienne">
       </label>
+      <p class="evidence-note">Position du tir (facultative) : sélectionne un point sur la <a href="#spatialDashboard">carte du bassin</a> juste au-dessus. Sans point réellement observé, l'action reste enregistrée sans coordonnées et n'est pas affichée sur la heatmap.</p>
       <label style="display:block;margin:12px 0"><input type="checkbox" name="observed" value="1" required> J'ai réellement observé cet événement dans la vidéo ou sur une feuille de match vérifiable.</label>
       <div class="actions" style="gap:9px">
         <button class="btn" type="submit" name="event_type" value="goal">But</button>
