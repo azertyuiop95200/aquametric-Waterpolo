@@ -112,6 +112,8 @@ def start_actions(match_id: int, request: Request, background_tasks: BackgroundT
     from analysis_product_routes import UPLOAD_DIR
     from services.capture_report_progress import latest_capture_root
     _, match = _owned(match_id, request, db)
+    from services.guest_ultimate import prohibit_paid_analysis
+    prohibit_paid_analysis(request)
     if not provider_configuration()["configured"]:
         raise HTTPException(503, detail=provider_configuration()["message"])
     if not run_progress(db, match)["active"]:
@@ -154,6 +156,8 @@ def start_public_youtube_direct(
     )
     from services.video_action_provider import VideoActionError
     _,match=_owned(match_id,request,db)
+    from services.guest_ultimate import prohibit_paid_analysis
+    prohibit_paid_analysis(request)
     if match.video_source!="youtube" or not match.video_url:
         raise HTTPException(400,"Une vidéo YouTube valide est nécessaire.")
     try:
