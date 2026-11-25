@@ -8,7 +8,9 @@
   if (!fileInput) return;
   const start = $('largeUploadStart'), cancel = $('largeUploadCancel');
   const status = $('largeUploadStatus'), progress = $('largeUploadProgress');
-  const limit = $('largeUploadLimit'), form = $('analysisForm');
+  const limit = $('largeUploadLimit'), form = $('segmentUploadForm') || $('analysisForm');
+  if (!form) return;
+  const targetMatchId = form.dataset.targetMatchId ? Number(form.dataset.targetMatchId) : null;
   let config = null, busy = false, abortController = null, currentId = '', currentKey = '';
 
   function say(text) { status.textContent = text; }
@@ -16,7 +18,7 @@
   function cacheKey(file) {
     // Match the *same* local file on resume; the server independently enforces
     // ownership, filename, byte count and every uploaded part.
-    return 'aquametric-large-upload:' + file.name + ':' + file.size + ':' + file.lastModified;
+    return 'aquametric-large-upload:' + (targetMatchId || 'new') + ':' + file.name + ':' + file.size + ':' + file.lastModified;
   }
   async function jsonApi(path, opts) {
     const response = await fetch(path, {
@@ -109,7 +111,9 @@
             filename:file.name, size_bytes:file.size,
             team_name:nameValue('team_name'),opponent:nameValue('opponent'),
             category:nameValue('category') || 'Women',
-            competition:nameValue('competition'),match_date:nameValue('match_date')
+            competition:nameValue('competition'),match_date:nameValue('match_date'),
+            match_id:targetMatchId, period:Number(nameValue('period') || 1),
+            segment_label:nameValue('segment_label')
           }),
         });
         session = created.upload_id;
