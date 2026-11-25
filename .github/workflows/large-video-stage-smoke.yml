@@ -21,7 +21,7 @@ jobs:
           set -euo pipefail
           for n in $(seq 1 55); do
             if curl -fsSL --max-time 30 "$BASE/static/analysis-input-mobile.js" -o analysis-input.js &&
-               grep -Fq 'desktopFile.disabled = !desktopUpload' analysis-input.js &&
+               grep -Fq "quickOpen('youtube')" analysis-input.js &&
                curl -fsSL --max-time 30 "$BASE/api/large-upload/capabilities" -o capabilities.json; then
               echo "Updated staging UI is online"
               exit 0
@@ -55,7 +55,9 @@ jobs:
           for needle in 'id="analysisForm"' 'id="desktopSource"' 'id="desktopVideoFile"' \
             'id="desktopFileAnalyzeSubmit"' 'id="desktopVideoUrl"' 'id="phoneVideoFile"' \
             'id="largeUploadVideo"' 'id="youtubeDurationMinutes"' \
-            'value="file">Importer un fichier MP4'; do
+            'value="file">Importer un fichier MP4' \
+            'id="quickYoutubeAnalysis"' 'id="quickFileAnalysis"' \
+            'id="quickReports"' 'id="largeUploadLocalFallback"'; do
             grep -Fq "$needle" "$temp/analyze.html" || { echo "Missing Analyze form: $needle"; exit 1; }
           done
           curl -fsSL --max-time 35 "$BASE/static/live-auto-stats.js" -o "$temp/live.js"
@@ -77,9 +79,19 @@ jobs:
           curl -fsSL --max-time 40 -c "$temp/cookies" -b "$temp/cookies" \
             "$BASE/matches/$mid/analysis/result" -o "$temp/report.html"
           for needle in 'id="liveAutomaticStats"' 'id="spatialDashboard"' 'id="spatialPitch"' \
-            'id="sources"' 'id="directYoutubeAnalysis"'; do
+            'id="sources"' 'id="directYoutubeAnalysis"' 'id="reportQuickActions"' \
+            'id="quickTagMatch"' 'id="quickShowStatistics"' 'id="quickAddPart"' \
+            'id="quickDownloadReport"' 'id="largeUploadLocalFallback"'; do
             grep -Fq "$needle" "$temp/report.html" || { echo "Missing report: $needle"; exit 1; }
           done
+          curl -fsSL --max-time 35 -c "$temp/cookies" -b "$temp/cookies" \
+            "$BASE/matches/$mid/analysis/browser-capture" -o "$temp/capture.html"
+          for needle in 'id="finishCaptureAnytime"' 'id="viewCaptureReport"' \
+            'Terminer et ouvrir mon rapport' 'capture_not_started=1' \
+            "v12ForcedFinishReason='manual_stop'"; do
+            grep -Fq "$needle" "$temp/capture.html" || { echo "Missing stop/report action: $needle"; exit 1; }
+          done
+          echo 'STAGING_YOUTUBE_STOP_AND_REPORT_CONTROLS_OK'
           curl -fsSL --max-time 35 -c "$temp/cookies" -b "$temp/cookies" \
             "$BASE/matches/$mid/analysis/actions/live" -o "$temp/live.json"
           python - "$temp/live.json" <<'PY'
@@ -116,11 +128,12 @@ jobs:
               -D "$temp/file.headers" \
               -F 'team_name=Test technique MP4' \
               -F 'opponent=Image synthétique' -F 'category=Women' \
-              -F 'input_device=desktop' \
+              -F 'input_device=desktop' -F 'return_to_report=1' \
               -F "video_file=@$temp/test.mp4;filename=q1.mp4;type=video/mp4" \
               "$BASE/matches" -o "$temp/file.body"
             grep -qE '^HTTP/[0-9.]+ 303' "$temp/file.headers"
             filelocation=$(grep -i '^location:' "$temp/file.headers" | tail -1 | tr -d '\r')
+            case "$filelocation" in *"/analysis/result"*) ;; *) echo 'MP4 upload did not return to report'; exit 1;; esac
             filemid=$(printf '%s' "$filelocation" | sed -nE 's|.*[/]matches/([0-9]+)(/analysis/result)?([?#].*)?$|\1|p')
             test -n "$filemid"
             curl -fsSL --max-time 40 -c "$temp/cookies" -b "$temp/cookies" \
