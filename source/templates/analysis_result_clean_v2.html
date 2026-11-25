@@ -25,6 +25,37 @@
     </div>
   </section>
 
+  {% if match.video_source in ['upload', 'youtube', 'cloud'] %}
+  <section class="report-card section-wide {% if snapshot.video_actions.configured %}status-live{% else %}status-warn{% endif %}" id="matchAnalysisReadiness">
+    <h2>État réel du rapport de ce match</h2>
+    <p><strong>Source enregistrée :</strong>
+      {% if match.video_source == 'youtube' %}lien YouTube
+      {% elif match.video_source == 'cloud' %}fichier volumineux dans le stockage privé
+      {% else %}fichier vidéo local{% endif %}
+      · <strong>Traitement :</strong> {{match.status|replace('_',' ')}}.</p>
+    {% if not snapshot.video_actions.configured %}
+      <p><strong>Reconnaissance automatique des buts, tirs et actions indisponible sur ce serveur :</strong>
+      la clé du moteur d'analyse vidéo n'est pas configurée. La réception ou la lecture d'une vidéo ne produit donc pas de statistiques sportives à elle seule.
+      Les colonnes sans actions confirmées restent non mesurées.</p>
+      <p class="evidence-note">Tu peux toujours lire la vidéo, pointer les tirs sur le bassin, confirmer des actions observées et télécharger immédiatement le rapport des observations présentes.</p>
+    {% else %}
+      <p>Le moteur de détection des actions est configuré. Consulte la progression réelle et les statistiques provisoires dans le tableau ci-dessous ; une vidéo reçue n'est pas nécessairement une vidéo entièrement analysée.</p>
+    {% endif %}
+    <div class="actions">
+      <a class="btn primary" href="#liveAutomaticStats">Voir les statistiques et la progression</a>
+      <a class="btn secondary" href="#annotation">Lire la vidéo et relever les actions</a>
+      <a class="btn secondary" href="/matches/{{match.id}}/analysis/report.html">Télécharger le rapport disponible</a>
+      {% if match.video_source == 'youtube' %}<a class="btn secondary" href="/matches/{{match.id}}/analysis/browser-capture">Reprendre la capture YouTube</a>{% endif %}
+    </div>
+    {% if request.query_params.get('capture_not_started') %}
+      <p class="evidence-note">Le visionnage a été terminé sans capture vidéo enregistrée. Il est normal qu'aucune statistique de match ne soit apparue automatiquement.</p>
+    {% endif %}
+    {% if request.query_params.get('capture_interrupted') %}
+      <p class="evidence-note">La capture a été interrompue avant publication. Le dossier est conservé ; seules les observations vraiment enregistrées figurent dans le rapport.</p>
+    {% endif %}
+  </section>
+  {% endif %}
+
   {% if match.video_source == "cloud" %}
   <section class="report-card status-live" id="cloudVideoReceived">
     <h2>Vidéo volumineuse reçue sur le stockage privé</h2>
