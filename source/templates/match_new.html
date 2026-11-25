@@ -7,6 +7,7 @@
   <span class="eyebrow">NOUVELLE ANALYSE</span>
   <h1>Créer une analyse de match</h1>
   <form method="post" action="/matches" enctype="multipart/form-data" id="analysisForm">
+    <input type="hidden" name="return_to_report" value="1">
     <input type="hidden" id="analysisInputDevice" name="input_device" value="desktop">
     <div class="formgrid">
       <label>Équipe à analyser
@@ -125,8 +126,9 @@
 
     <section class="panel" id="largeVideoPanel" style="margin-top:20px;border:1px solid var(--border,#294754);border-radius:16px;padding:18px">
       <span class="eyebrow">VIDÉO MP4 / MOV · PLUSIEURS GO</span>
-      <h2>Importer un match volumineux</h2>
+      <h2>Fichier volumineux — stockage cloud optionnel</h2>
       <p>Jusqu'à <strong><span id="largeUploadLimit">5</span> Go</strong> via un stockage cloud privé. Le fichier est envoyé directement par morceaux de 16 Mo : pas de requête de 3 Go vers AquaMetric, reprise possible si la connexion coupe.</p>
+      <div id="largeUploadCloudControls">
       <label>Choisir un fichier vidéo local (MP4, MOV, WebM, M4V, MKV)
         <input type="file" id="largeUploadVideo" accept=".mp4,.mov,.webm,.m4v,.mkv,video/mp4,video/quicktime,video/webm">
       </label>
@@ -137,6 +139,12 @@
         <button type="button" class="btn secondary" id="largeUploadCancel" hidden>Annuler l'envoi</button>
       </div>
       <small>Le stockage cloud et l'analyse vidéo sont deux étapes distinctes : une vidéo reçue n'est pas considérée comme analysée. L'import cloud doit être configuré par l'administrateur. Un stockage Render gratuit ne suffit pas à conserver de gros fichiers.</small>
+      </div>
+      <div id="largeUploadLocalFallback" class="notice" hidden>
+        <strong>Le stockage de plusieurs Go n'est pas disponible sur ce serveur.</strong>
+        <p>Tu peux toutefois importer un fichier vidéo classique jusqu’à {{max_upload_mb}} Mo, ou déposer les quart-temps séparément dans le rapport. L'absence de bucket ne bloque pas l'import local.</p>
+        <button class="btn primary" id="chooseRegularUpload" type="button">Utiliser l'import MP4 classique</button>
+      </div>
     </section>
   </form>
 </div>
