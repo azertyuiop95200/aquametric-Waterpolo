@@ -116,7 +116,8 @@ def test_prediction_endpoint_validates_image_and_owner_and_never_records_goals(m
               files={"image":("frame.jpg",pixels.tobytes(),"image/jpeg")})
         assert response.status_code==200,response.text
         assert response.json()["count"]==1
-        assert response.json()["video_events_confirmed_automatically"] if False else True
+        assert response.json()["status"]=="unverified_object_candidates"
+        assert response.json()["detections"][0]["class"]=="ball"
         report=a.get(f"/api/matches/{mid}/shot-map").json()
         assert report["points"]==[]
         assert report["events_reviewed"]==0
