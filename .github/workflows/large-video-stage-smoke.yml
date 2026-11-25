@@ -103,6 +103,11 @@ jobs:
           PY
           # Real small MP4 through the same desktop multipart endpoint. This is
           # a generated blank test card, never presented as a real match.
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            python -m pip install -q 'imageio-ffmpeg>=0.6,<1'
+            ln -s "$(python -c 'import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())')" "$temp/ffmpeg"
+            export PATH="$temp:$PATH"
+          fi
           if command -v ffmpeg >/dev/null 2>&1; then
             ffmpeg -hide_banner -loglevel error -y \
               -f lavfi -i color=c=blue:s=320x240:r=5 -t 1.2 \
