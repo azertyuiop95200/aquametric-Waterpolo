@@ -42,6 +42,8 @@ from services.france_intelligence import seed_france_intelligence, france_dashbo
 from services.advanced_metrics import METRIC_GROUPS, event_metric_summary, shot_map_summary
 from services.tactical_chess import DEFENCE_PLAYBOOK, recommend_counter_plan
 from services.simulation import simulate_matchup, SIM_TEAMS, absence_availability
+from models import GoogleIdentity  # register OIDC mapping table before create_all
+from google_oauth_routes import router as google_oauth_router, google_ready
 from extensions import install_extensions
 from security import install_security
 
@@ -99,6 +101,7 @@ app.add_middleware(
     https_only=os.getenv("COOKIE_SECURE", "0") == "1",
 )
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
+app.include_router(google_oauth_router)
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
 
 Base.metadata.create_all(engine)
@@ -148,7 +151,9 @@ def require_user(request: Request, db: Session):
 
 
 def ctx(**kwargs):
-    return {"app_name": APP_NAME, "web_demo_mode": WEB_DEMO_MODE, **kwargs}
+    return {"app_name": APP_NAME, "web_demo_mode": WEB_DEMO_MODE,
+            "google_login_enabled": google_ready(), "guest_ultimate_enabled": GUEST_ULTIMATE_ENABLED,
+            **kwargs}
 
 
 def render(request: Request, template_name: str, status_code: int = 200, **kwargs):
