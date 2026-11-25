@@ -57,7 +57,9 @@ def _write_report_marker(root: Path, state: dict) -> dict:
     payload = {
         "status": str(state.get("status") or "partial"),
         "analysis_percent": 100.0,
-        "read_percent": max(100.0, float(state.get("read_percent") or 0.0)),
+        # Finished processing (analysis_percent=100) is NOT equivalent to
+        # watching the whole video (read_percent may be 35 for manual stop).
+        "read_percent": max(0.0, min(100.0, float(state.get("read_percent") or 0.0))),
         "phase": str(state.get("phase") or "rapport disponible"),
         "redirect": str(state.get("redirect") or ""),
         "finalization_engine": str(state.get("finalization_engine") or "report-first-v16"),
@@ -79,6 +81,9 @@ def _write_report_marker(root: Path, state: dict) -> dict:
         "finalization_job_status",
         "finalization_job_progress",
         "capture_source_quality",
+        "source_coverage_percent",
+        "client_finish_reason",
+        "client_finish_read_percent",
     ):
         if key in state:
             payload[key] = state[key]
