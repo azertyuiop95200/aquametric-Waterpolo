@@ -105,6 +105,7 @@ def append_segment(db:Session, match:Match, *, period:int, label:str, source_typ
 @router.post("/matches/{match_id}/segments")
 def add_video_segment(match_id:int, request:Request, background_tasks:BackgroundTasks,
                       period:int=Form(1),label:str=Form(""),video_url:str=Form(""),
+                      youtube_duration_minutes:float=Form(0.0,ge=0,le=240),
                       video_file:Optional[UploadFile]=File(None),
                       db:Session=Depends(get_db)):
     user,match=_owned(match_id,request,db)
@@ -127,11 +128,25 @@ def add_video_segment(match_id:int, request:Request, background_tasks:Background
         segment=append_segment(db,match,period=period,label=label,source_type=source,
                        video_path=path,video_url=url)
         db.commit()
-        if source == "upload":
+        if source in {"upload","youtube"}:
             from services.video_action_provider import provider_configuration
             if provider_configuration()["configured"]:
-                from video_action_routes import run_segment_actions
-                background_tasks.add_task(run_segment_actions, match_id, segment.id)
+                if source=="upload":
+                    from video_action_routes import run_segment_actions
+                    background_tasks.add_task(run_segment_actions, match_id, segment.id)
+                elif youtube_duration_minutes>0:
+                    from services.youtube_direct_actions import (
+                        prepare_run, run_direct_youtube_actions,
+                    )
+                    try:
+                        run,scheduled=prepare_run(db,match,round(youtube_duration_minutes*60,3),
+                                                  video_url=url)
+                        if scheduled:
+                            background_tasks.add_task(run_direct_youtube_actions,match_id,run.id)
+                    except ValueError:
+                        # URL saved for manual replay: no false inference if it
+                        # is not a canonical public YouTube video.
+                        pass
     except Exception:
         db.rollback()
         if file_provided:
@@ -169,3 +184,27 @@ def shot_map_api(match_id:int,request:Request,db:Session=Depends(get_db)):
     _,match=_owned(match_id,request,db)
     from services.spatial_match_analysis import spatial_match_dashboard
     return spatial_match_dashboard(db,match,segment_rows(db,match))
+
+@router.post("/matches/{match_id}/segments/{segment_id}/youtube/direct")
+def analyze_youtube_quarter(
+    match_id:int, segment_id:int, request:Request, background_tasks:BackgroundTasks,
+    duration_minutes:float=Form(...,gt=0,le=240),
+    db:Session=Depends(get_db),
+):
+    _,match=_owned(match_id,request,db)
+    segment=db.get(MatchVideoSegment,segment_id)
+    if not segment or segment.match_id!=match.id or segment.source_type!="youtube":
+        raise HTTPException(404,"Extrait YouTube introuvable.")
+    from services.youtube_direct_actions import (
+        canonical_public_youtube, prepare_run, run_direct_youtube_actions,
+    )
+    from services.video_action_provider import VideoActionError
+    try:
+        canonical_public_youtube(segment.video_url)
+        run,scheduled=prepare_run(db,match,round(duration_minutes*60,3),
+                                  video_url=segment.video_url)
+    except (ValueError,VideoActionError) as exc:
+        raise HTTPException(400 if isinstance(exc,ValueError) else 503,str(exc)) from None
+    if scheduled:
+        background_tasks.add_task(run_direct_youtube_actions,match.id,run.id)
+    return RedirectResponse(f"/matches/{match.id}/analysis/result#liveAutomaticStats",status_code=303)
