@@ -12,7 +12,7 @@ from pathlib import Path
 import json
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
@@ -221,7 +221,7 @@ def _link_finished_object(row: LargeVideoUpload, db: Session) -> str:
 
 
 @router.post("/api/large-upload/{upload_id}/complete")
-def complete_large_upload(upload_id: str, request: Request, db: Session = Depends(get_db)):
+def complete_large_upload(upload_id: str, request: Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     row = _owned_upload(upload_id, request, db)
     if row.status == "complete" and row.match_id:
         return {"status":"complete","match_url":f"/matches/{row.match_id}/analysis/result"}
@@ -267,7 +267,15 @@ def complete_large_upload(upload_id: str, request: Request, db: Session = Depend
             raise HTTPException(502, "La taille finale ne correspond pas au fichier sélectionné.")
 
     match_url = _link_finished_object(row, db)
-    return {"status":"complete", "match_url":match_url, "total_bytes":row.total_bytes}
+    # Only after the provider confirms every part and final size do we begin
+    # AI inference. The worker streams small seekable ranges of this private
+    # object; it never downloads the 5 GiB body into the Render web process.
+    from services.video_action_provider import provider_configuration
+    if provider_configuration()["configured"]:
+        from services.cloud_video_actions import run_cloud_video_actions
+        background_tasks.add_task(run_cloud_video_actions,row.match_id,row.object_key)
+    return {"status":"complete", "match_url":match_url, "total_bytes":row.total_bytes,
+            "analysis_queued":provider_configuration()["configured"]}
 
 
 @router.delete("/api/large-upload/{upload_id}")
