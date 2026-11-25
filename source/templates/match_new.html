@@ -31,6 +31,14 @@
     <small>Tu peux écrire n’importe quel nom d’équipe. Le catalogue AquaMetric sert uniquement de suggestion et ne bloque jamais l’analyse.</small>
     <span hidden>Search any club or national team</span>
 
+    <section class="scope-box" id="youtubeDirectDuration">
+      <h2>Analyse automatique des vidéos YouTube publiques</h2>
+      <p class="mode-note">Si le moteur vidéo est connecté au serveur, AquaMetric peut analyser une vidéo YouTube publique directement à partir de son lien, minute par minute, <strong>sans téléchargement ni partage d'écran</strong>. Les détections alimentent progressivement le rapport, avec des contrôles de qualité. Si le lien n'est pas accessible au moteur, la capture d'onglet reste une solution de secours.</p>
+      <label>Durée réelle de la vidéo YouTube en minutes (facultatif, indiquée sous la vidéo)
+        <input type="number" id="youtubeDurationMinutes" name="youtube_duration_minutes" min="0" max="240" step="0.1" placeholder="Ex. 82.5">
+      </label>
+      <small>Renseigner la durée lance automatiquement l'analyse directe si le moteur est configuré. Sinon, tu pourras l'indiquer dans le dossier du match. La durée n'est pas une garantie de couverture ou de résultats sportifs.</small>
+    </section>
     <h2 style="margin-top:22px">Choisis ton appareil</h2>
     <div class="device-choice" role="group" aria-label="Choix du mode d’analyse">
       <button type="button" id="desktopAnalysisMode" data-analysis-mode="desktop" aria-pressed="false">
@@ -45,7 +53,7 @@
 
     <section class="analysis-mode" id="desktopModePanel" data-mode-panel="desktop">
       <h3>Analyse sur ordinateur</h3>
-      <p class="mode-note">Pour YouTube : colle le lien, puis AquaMetric te demandera uniquement de partager l’onglet du replay.</p>
+      <p class="mode-note">Pour YouTube public : colle le lien. Si le moteur IA est connecté et que tu indiques la durée, l'analyse démarre directement par intervalles ; sinon, le studio te proposera la capture d'onglet comme secours.</p>
       <span hidden>Analyser directement depuis l'URL · même minimum Ultimate Analyst</span>
       <label>Lien vidéo
         <input id="desktopVideoUrl" type="url" name="video_url" value="{{ request.query_params.get('video_url', target_video_url or '') }}" autocapitalize="none" spellcheck="false" placeholder="https://www.youtube.com/watch?v=..." inputmode="url">
@@ -83,7 +91,7 @@
       <label>Source sur téléphone<select id="phoneSource"><option value="link">Coller un lien vidéo</option><option value="file">Importer un fichier vidéo</option></select></label>
       <div id="phoneLinkPanel">
         <label>Lien du match sur téléphone<input id="phoneVideoUrl" type="url" name="video_url" value="{{ request.query_params.get('video_url', target_video_url or '') }}" inputmode="url" autocapitalize="none" spellcheck="false" placeholder="https://www.youtube.com/watch?v=..." disabled></label>
-        <p>Le lien et le dossier sont enregistrés. Un lien seul ne donne pas accès aux images : la vidéo reste identifiée mais non analysée. Pour Vision/OCR, importe le fichier ou reprends la capture depuis un ordinateur compatible.</p>
+        <p>Le lien et le dossier sont enregistrés. Pour un YouTube public, l'analyse automatique directe est lancée si le moteur IA et la durée sont disponibles ; sinon, aucun événement n'est inventé. Tu peux aussi importer le fichier ou utiliser le Studio sur ordinateur.</p>
         <button class="btn intelligence-cta" type="submit" id="phoneLinkSubmit" formaction="/analysis/url/create" formenctype="application/x-www-form-urlencoded">Enregistrer le lien et ouvrir le dossier</button>
       </div>
       <div id="phoneFilePanel" hidden>
