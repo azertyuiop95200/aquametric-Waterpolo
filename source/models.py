@@ -59,6 +59,34 @@ class Match(Base):
     events = relationship("Event", back_populates="match", cascade="all, delete-orphan")
     media_artifacts = relationship("MediaArtifact", back_populates="match", cascade="all, delete-orphan")
 
+class MatchVideoSegment(Base):
+    """One real video belonging to a match (quarter, period, or other recording)."""
+    __tablename__ = "match_video_segments"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    match_id: Mapped[int] = mapped_column(ForeignKey("matches.id"), index=True)
+    period: Mapped[int] = mapped_column(Integer, default=1)
+    part_index: Mapped[int] = mapped_column(Integer, default=1)
+    label: Mapped[str] = mapped_column(String(100), default="")
+    source_type: Mapped[str] = mapped_column(String(20))  # youtube | url | upload | cloud
+    video_url: Mapped[str] = mapped_column(Text, default="")
+    video_path: Mapped[str] = mapped_column(Text, default="")
+    duration_seconds: Mapped[float] = mapped_column(Float, default=0.0)
+    match = relationship("Match")
+
+
+class EventPosition(Base):
+    """Measured/reviewed shot or action coordinate, never inferred from a title."""
+    __tablename__ = "event_positions"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    event_id: Mapped[int] = mapped_column(ForeignKey("events.id"), unique=True, index=True)
+    segment_id: Mapped[int | None] = mapped_column(ForeignKey("match_video_segments.id"), nullable=True)
+    period: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    segment_second: Mapped[float | None] = mapped_column(Float, nullable=True)
+    x_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
+    y_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
+    provenance: Mapped[str] = mapped_column(String(50), default="manual_verified")
+
+
 class LargeVideoUpload(Base):
     """S3-compatible multipart upload, persisted independently of Render's disk."""
     __tablename__ = "large_video_uploads"
