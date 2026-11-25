@@ -34,7 +34,7 @@ def test_studio_has_permanent_stop_and_report_actions_even_without_capture():
         for required in (
             'id="finishCaptureAnytime"', 'id="viewCaptureReport"',
             'id="stopCapture"', 'id="stopCaptureLive"',
-            "Terminer le visionnage et voir mon rapport",
+            "Terminer et ouvrir mon rapport",
             "if(recorder&&recorder.state==='recording')",
             "v12ForcedFinishReason='manual_stop'",
             "/analysis/result?capture_not_started=1",
