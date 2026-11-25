@@ -22,6 +22,8 @@ jobs:
           for n in $(seq 1 55); do
             if curl -fsSL --max-time 30 "$BASE/static/analysis-input-mobile.js" -o analysis-input.js &&
                grep -Fq "quickOpen('youtube')" analysis-input.js &&
+               curl -fsSL --max-time 30 "$BASE/guest" -o guest.html &&
+               grep -Fq 'id="guestUltimateLaunch"' guest.html &&
                curl -fsSL --max-time 30 "$BASE/api/large-upload/capabilities" -o capabilities.json; then
               echo "Updated staging UI is online"
               exit 0
@@ -144,3 +146,34 @@ jobs:
           else
             echo 'FFmpeg not installed on test runner; real MP4 upload covered by CI only'
           fi
+          # Real guest Ultimate navigation without a password, scoped owner, and
+          # paid AI forbidden: tested directly on Render, not a local mock.
+          curl -fsSL --max-time 35 "$BASE/login" -o "$temp/login.html"
+          grep -Fq 'Continuer avec Google' "$temp/login.html"
+          curl -fsS --max-time 35 -c "$temp/guest.cookies" -b "$temp/guest.cookies" \
+            -D "$temp/guest.headers" "$BASE/guest/ultimate" -o "$temp/guest.body"
+          grep -qE '^HTTP/[0-9.]+ 303' "$temp/guest.headers"
+          curl -fsSL --max-time 40 -b "$temp/guest.cookies" \
+            "$BASE/matches/new" -o "$temp/guest-analyze.html"
+          grep -Fq 'id="quickFileAnalysis"' "$temp/guest-analyze.html"
+          curl -fsS --max-time 35 -b "$temp/guest.cookies" -c "$temp/guest.cookies" \
+            -D "$temp/guest-match.headers" \
+            --data-urlencode 'team_name=Guest Ultimate Check' \
+            --data-urlencode 'opponent=Visitor Rival' \
+            --data-urlencode 'input_device=phone' \
+            --data-urlencode 'video_url=https://www.youtube.com/watch?v=f_WzRHjybgU' \
+            "$BASE/analysis/url/create" -o "$temp/guest-match.body"
+          grep -qE '^HTTP/[0-9.]+ 303' "$temp/guest-match.headers"
+          glocation=$(grep -i '^location:' "$temp/guest-match.headers" | tail -1 | tr -d '\r')
+          gid=$(printf '%s' "$glocation" | sed -nE 's|.*[/]matches/([0-9]+)/analysis/result.*|\1|p')
+          test -n "$gid"
+          curl -fsSL --max-time 40 -b "$temp/guest.cookies" \
+            "$BASE/matches/$gid/analysis/result" -o "$temp/guest-report.html"
+          grep -Fq 'id="liveAutomaticStats"' "$temp/guest-report.html"
+          grep -Fq 'id="spatialDashboard"' "$temp/guest-report.html"
+          grep -Fq 'En invité' "$temp/guest-report.html"
+          code=$(curl -sS --max-time 30 -o "$temp/denied.json" -w '%{http_code}' \
+            -b "$temp/guest.cookies" -X POST \
+            -d 'duration_minutes=2' "$BASE/matches/$gid/analysis/youtube/direct")
+          test "$code" = 403
+          echo 'STAGING_GUEST_ULTIMATE_PRIVATE_REPORT_AND_PAID_AI_FORBIDDEN_OK'
