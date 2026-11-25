@@ -160,3 +160,54 @@ def test_direct_youtube_without_provider_never_fabricates_stats(monkeypatch):
         assert empty["counted_events"]==0
         assert empty["sides"]["for"]["goals"]==0
         assert empty["accuracy_verified"] is False
+
+
+def test_separate_youtube_quarters_preserved_without_double_counting_primary_capture(monkeypatch):
+    monkeypatch.setenv("AQUAMETRIC_VIDEO_ACTIONS","1")
+    monkeypatch.setenv("GEMINI_API_KEY","unit-test-placeholder")
+    def provider(url,segment,*,team,opponent,timeout):
+        return normalize_observations({
+            "scene":"water_polo","actions":[observation("goal",second=7)],
+            "observability":[],"summary":"Point synthétique pour la suite de tests"},
+            segment)
+    monkeypatch.setattr(yt,"analyze_public_youtube_segment",provider)
+    with TestClient(app) as client:
+        login(client);mid=create_match(client)
+        # Simulate a valid prior browser capture of the PRIMARY YouTube only.
+        plan=yt.action_plan(60)
+        plan[0]["status"]="complete"
+        plan[0]["result"]=normalize_observations({
+            "scene":"water_polo","actions":[observation("goal",second=7)],
+            "observability":[],"summary":"Capture fictive primaire"},plan[0])
+        with SessionLocal() as db:
+            db.add(VideoActionAnalysis(match_id=mid,fingerprint=uuid.uuid4().hex,
+                status="complete",model="synthetic-fixture",
+                source_kind="browser_capture",source_path="/tmp/capture-primary.webm",
+                segments_json=json.dumps(plan),duration_seconds=60,updated_at=time.time()))
+            db.commit()
+        link="https://www.youtube.com/watch?v=abc123XYZ_2"
+        added=client.post(f"/matches/{mid}/segments",data={
+            "period":"2","label":"Q2","video_url":link,
+            "youtube_duration_minutes":"1"},follow_redirects=False)
+        assert added.status_code==303,added.text
+        rows=client.get(f"/api/matches/{mid}/segments").json()["segments"]
+        q2=next(s for s in rows if s["period"]==2)
+        assert q2["source_type"]=="youtube"
+        stats=client.get(f"/matches/{mid}/analysis/actions/live").json()
+        assert stats["completed"]==2
+        assert stats["sides"]["for"]["goals"]==2  # primary capture + Q2 direct, two different quarters
+        report=client.get(f"/matches/{mid}/analysis/result")
+        assert report.status_code==200
+        assert f"/matches/{mid}/segments/{q2['id']}/youtube/direct" in report.text
+        # The direct route for appended Q2 is idempotent.
+        again=client.post(f"/matches/{mid}/segments/{q2['id']}/youtube/direct",
+            data={"duration_minutes":"1"},follow_redirects=False)
+        assert again.status_code==303
+        # Primary direct analysis supersedes primary capture, but NOT Q2.
+        primary=client.post(f"/matches/{mid}/analysis/youtube/direct",
+            data={"duration_minutes":"1"},follow_redirects=False)
+        assert primary.status_code==303
+        after=client.get(f"/matches/{mid}/analysis/actions/live").json()
+        assert after["completed"]==2
+        assert after["sides"]["for"]["goals"]==2
+        assert len(after["sources"])==2
