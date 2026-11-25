@@ -2,9 +2,17 @@
 {% block content %}
 <style>
 .capture-shell{max-width:1120px;margin:0 auto;display:grid;gap:18px}.capture-panel{border:1px solid var(--border,#294754);border-radius:22px;background:var(--panel,#0b202b);padding:20px}.capture-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.capture-status{padding:14px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);white-space:pre-wrap}.capture-help{opacity:.8}.capture-warning{padding:12px 14px;border-left:3px solid #fb923c;background:rgba(251,146,60,.08);border-radius:0 12px 12px 0}.capture-good{padding:12px 14px;border-left:3px solid #4ade80;background:rgba(74,222,128,.08);border-radius:0 12px 12px 0}.capture-permission{padding:12px 14px;border-left:3px solid #38bdf8;background:rgba(56,189,248,.08);border-radius:0 12px 12px 0}.capture-time{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.capture-time input{width:130px;padding:9px 10px;border-radius:10px;border:1px solid rgba(255,255,255,.18);background:#06131b;color:inherit}.mode-choice{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:14px 0}.mode-btn{padding:14px;border:1px solid rgba(255,255,255,.16);border-radius:14px;background:rgba(255,255,255,.04);color:inherit;text-align:left;cursor:pointer}.mode-btn.active{outline:2px solid #38bdf8;background:rgba(56,189,248,.12)}.mode-btn:disabled{opacity:.45;cursor:not-allowed}.mode-btn b{display:block;font-size:17px}.progress-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.progress-card{padding:14px;border:1px solid rgba(255,255,255,.1);border-radius:14px;background:rgba(255,255,255,.03)}.progress-head{display:flex;justify-content:space-between;gap:12px;font-weight:800;margin-bottom:8px}.progress-track{height:12px;background:rgba(255,255,255,.08);border-radius:999px;overflow:hidden}.progress-fill{height:100%;width:0%;background:linear-gradient(90deg,#0ea5e9,#22c55e);transition:width .35s ease}.progress-meta{font-size:12px;opacity:.75;margin-top:7px}.studio-wrap{display:grid;gap:12px}.studio-player-grid{position:relative;aspect-ratio:16/9;background:#02070a;border-radius:18px;overflow:hidden;border:1px solid rgba(255,255,255,.12);display:grid;grid-template-columns:1fr;grid-template-rows:1fr}.studio-player-grid.turbo{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;aspect-ratio:16/9}.studio-tile{position:relative;min-width:0;min-height:0;background:#000;border:1px solid rgba(255,255,255,.08);overflow:hidden}.studio-tile iframe{width:100%;height:100%;border:0;display:block}.studio-tile .seg-label{position:absolute;left:8px;top:8px;z-index:3;background:rgba(0,0,0,.65);padding:4px 7px;border-radius:8px;font-size:11px}.studio-fallback{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:28px;z-index:5;background:#02070a}.capture-live-hud{display:none}.capture-shell.studio-live{max-width:none;margin:0}.capture-shell.studio-live>.capture-panel:not(.studio-panel){display:none}.capture-shell.studio-live .studio-panel{position:fixed;inset:0;z-index:9999;border:0;border-radius:0;padding:0;background:#000}.capture-shell.studio-live .studio-wrap{height:100%;display:block}.capture-shell.studio-live .studio-player-grid{position:absolute;inset:0;aspect-ratio:auto;border:0;border-radius:0}.capture-shell.studio-live .studio-info{display:none}.capture-shell.studio-live .capture-live-hud{display:block;position:fixed;z-index:10002;left:10px;right:10px;bottom:10px;padding:10px;border-radius:14px;background:rgba(4,13,18,.9);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.16)}.capture-shell.studio-live .capture-live-hud .progress-grid{grid-template-columns:1fr 1fr auto}.capture-shell.studio-live .capture-live-hud .progress-card{padding:8px 10px}.capture-shell.studio-live .capture-live-hud .capture-status{padding:8px 10px;margin-top:8px}.roster-meta{display:block;opacity:.75;margin-top:3px}.cap-red{display:inline-block;margin-left:5px;padding:1px 6px;border-radius:999px;background:#7f1d1d;color:#fecaca;font-size:11px}#capturePreview,#captureCanvas{display:none}
+.capture-quick-exit{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 14px;border:1px solid rgba(56,189,248,.4);border-radius:14px;background:#102938}
+.capture-shell.studio-live .capture-quick-exit{display:flex;position:fixed;top:12px;right:12px;left:12px;z-index:10012;justify-content:flex-end;background:rgba(4,13,18,.94);box-shadow:0 6px 30px #0009}
+.capture-quick-exit .btn{min-height:44px;white-space:normal}
+@media(max-width:650px){.capture-shell.studio-live .capture-quick-exit{left:6px;right:6px;top:6px;padding:5px}.capture-quick-exit .btn{font-size:12px;padding:10px}}
 @media(max-width:820px){.mode-choice,.progress-grid{grid-template-columns:1fr}.capture-shell.studio-live .capture-live-hud .progress-grid{grid-template-columns:1fr}.capture-shell.studio-live .capture-live-hud{max-height:45vh;overflow:auto}.studio-player-grid.turbo{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}}
 </style>
 <div class="capture-shell" id="captureShell">
+  <div class="capture-quick-exit" role="group" aria-label="Terminer le visionnage ou voir le rapport">
+    <button id="finishCaptureAnytime" type="button" class="btn primary">Terminer le visionnage et voir mon rapport</button>
+    <a id="viewCaptureReport" class="btn secondary" href="/matches/{{match.id}}/analysis/result">Voir le rapport, même partiel</a>
+  </div>
   <section class="capture-panel">
     <span class="eyebrow">ANALYSE VIDÉO · TURBO</span>
     <h1>Lecture + analyse en parallèle</h1>
@@ -99,6 +107,8 @@
   const startBtn = document.getElementById('startCapture');
   const stopBtn = document.getElementById('stopCapture');
   const stopLiveBtn = document.getElementById('stopCaptureLive');
+  const finishAnytimeBtn = document.getElementById('finishCaptureAnytime');
+  const reportUrl = '/matches/{{match.id}}/analysis/result';
   const permissionState = document.getElementById('permissionState');
   const status = document.getElementById('captureStatus');
   const statusStatic = document.getElementById('captureStatusStatic');
@@ -130,6 +140,7 @@
   let tick = null, statusTick = null, frameTick = null, listenTick = null;
   let chunkIndex = 0, uploadedBytes = 0, uploadError = null, uploadChain = Promise.resolve();
   let frameBusy = false, stopping = false, analysisPercent = 0;
+  let stoppedReadPercent = 0;
 
   function youtubeId(url){
     try{
@@ -254,12 +265,35 @@
   function captureErrorMessage(err){const n=String(err&&err.name||'');if(n==='NotAllowedError')return'Partage annulé ou refusé.';if(n==='InvalidStateError')return'La demande doit être lancée directement depuis un clic.';if(n==='NotReadableError')return'Le système bloque actuellement la capture.';if(n==='NotFoundError')return'Aucune source de partage disponible.';if(n==='AbortError')return'La sélection a été annulée.';return err&&err.message?err.message:String(err||'Erreur inconnue')}
 
   async function finishAnalysis(){
-    await uploadChain;if(uploadError)throw uploadError;analysisPercent=Math.max(analysisPercent,88);setBars(100,analysisPercent,'Lecture terminée','Consolidation finale Vision/OCR + tactique…');
-    const f=new FormData();f.append('session_id',sessionId);f.append('source_start_second',String(sourceStart));f.append('source_duration_seconds',String(sourceDuration));f.append('playback_rate',String(playbackRate));f.append('parallel_segments',String(parallelSegments));
+    await uploadChain;
+    if(uploadError)throw uploadError;
+    const observed=Math.max(0,Math.min(100,stoppedReadPercent));
+    analysisPercent=Math.max(analysisPercent,88);
+    setBars(observed,analysisPercent,'Visionnage arrêté : '+Math.round(observed)+' % de durée estimée','Publication du rapport avec couverture réellement disponible…');
+    const f=new FormData();
+    f.append('session_id',sessionId);
+    f.append('source_start_second',String(sourceStart));
+    f.append('source_duration_seconds',String(sourceDuration));
+    f.append('playback_rate',String(playbackRate));
+    f.append('parallel_segments',String(parallelSegments));
+    f.append('client_read_percent',String(observed));
+    f.append('client_finish_reason',observed>=99.5?'normal':'manual_stop');
     return jsonFetch('/matches/{{match.id}}/analysis/browser-capture/finish',{method:'POST',body:f});
   }
   function requestStop(){
-    if(stopping)return;stopping=true;pausePlayers();if(recorder&&recorder.state==='recording'){stopBtn.disabled=true;stopLiveBtn.disabled=true;setStatus('Lecture terminée. Finalisation de l’analyse…');recorder.stop();}
+    if(stopping)return;
+    // If YouTube is merely playing, there is no recording to finalize.
+    // The report is still reachable, clearly labelled without measured events.
+    if(!recorder||recorder.state!=='recording'){
+      location.href=reportUrl+'?capture_not_started=1';
+      return;
+    }
+    stopping=true;
+    stoppedReadPercent=localReadPercent();
+    pausePlayers();
+    stopBtn.disabled=true;stopLiveBtn.disabled=true;finishAnytimeBtn.disabled=true;
+    setStatus('Capture arrêtée · '+Math.round(stoppedReadPercent)+' % parcourus. Publication du rapport…');
+    recorder.stop();
   }
 
   async function waitForDuration(ms=6000){
@@ -297,6 +331,7 @@
   });
 
   stopBtn.addEventListener('click',requestStop);stopLiveBtn.addEventListener('click',requestStop);
+  finishAnytimeBtn.addEventListener('click',requestStop);
   sourceStartInput.addEventListener('change',()=>{sourceStart=Math.max(0,Number(sourceStartInput.value||0));if(mode==='turbo'&&sourceDuration>sourceStart+30)prepareTurbo();else prepareSingle()});
 
   function init(){
