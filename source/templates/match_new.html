@@ -2,10 +2,21 @@
 {% block content %}
 <style>
 .device-choice{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:18px 0}.device-choice button{min-height:104px;text-align:left;padding:18px;border:1px solid var(--border,#294754);border-radius:18px;background:var(--panel,#0b202b);color:inherit;cursor:pointer}.device-choice button:hover,.device-choice button.active{border-color:#38bdf8;box-shadow:0 0 0 2px rgba(56,189,248,.14)}.device-choice strong{display:block;font-size:18px;margin-bottom:6px}.device-choice small{display:block;opacity:.78;line-height:1.4}.analysis-mode{display:none;margin-top:16px;padding:16px;border:1px solid rgba(255,255,255,.1);border-radius:16px;background:rgba(255,255,255,.025)}.analysis-mode.active{display:block}.mode-note{margin:0 0 12px;opacity:.82}.analysis-mode .actions{margin-top:12px}.scope-box{margin-top:14px;padding:14px;border:1px solid rgba(255,255,255,.1);border-radius:14px;background:rgba(255,255,255,.02)}.scope-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.scope-grid[hidden]{display:none}@media(max-width:700px){.device-choice,.scope-grid{grid-template-columns:1fr}.device-choice button{min-height:92px}}
+.analysis-quickstart{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:16px 0 22px}
+.analysis-quickstart button,.analysis-quickstart a{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:5px;min-height:84px;padding:14px;border-radius:14px;border:1px solid rgba(56,189,248,.34);background:rgba(56,189,248,.09);color:inherit;font:inherit;text-align:left;text-decoration:none;cursor:pointer}
+.analysis-quickstart button:hover,.analysis-quickstart button:focus-visible,.analysis-quickstart a:hover,.analysis-quickstart a:focus-visible{outline:2px solid #38bdf8;outline-offset:2px}
+.analysis-quickstart small{font-size:12px;line-height:1.4;opacity:.8}
+@media(max-width:650px){.analysis-quickstart{grid-template-columns:1fr}.analysis-quickstart button,.analysis-quickstart a{min-height:62px}}
 </style>
 <div class="panel">
   <span class="eyebrow">NOUVELLE ANALYSE</span>
   <h1>Créer une analyse de match</h1>
+  <div class="analysis-quickstart" role="group" aria-label="Accès rapide à l'analyse du match">
+    <button id="quickYoutubeAnalysis" type="button"><strong>1. Lien YouTube</strong><small>Coller une vidéo publique et créer le dossier d'analyse</small></button>
+    <button id="quickFileAnalysis" type="button"><strong>2. Importer une vidéo</strong><small>MP4/MOV/WebM classique, sans bucket R2/S3</small></button>
+    <a id="quickReports" href="/analysis-history"><strong>3. Mes rapports</strong><small>Revoir les matchs enregistrés et leurs statistiques</small></a>
+  </div>
+
   <form method="post" action="/matches" enctype="multipart/form-data" id="analysisForm">
     <input type="hidden" name="return_to_report" value="1">
     <input type="hidden" id="analysisInputDevice" name="input_device" value="desktop">
