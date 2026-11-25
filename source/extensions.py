@@ -29,6 +29,7 @@ from evidence_coverage_routes import router as evidence_coverage_router
 from tactical_media_routes import router as tactical_media_router, enrich_sequence_cards, build_tactical_study_pack
 from video_session_routes import router as video_session_router
 from large_video_routes import router as large_video_router
+from match_video_segments_routes import router as match_video_segments_router
 from performance_routes import match_performance_api
 from priority_analysis_routes import install_priority_analysis_routes
 from url_analysis_routes import (
@@ -327,6 +328,7 @@ def install_extensions(app):
     app.include_router(tactical_media_router)
     app.include_router(video_session_router)
     app.include_router(large_video_router)
+    app.include_router(match_video_segments_router)
 
     # Defensive explicit registration: nested APIRouter additions made after an
     # include_router() call are not copied into the already-included router.
