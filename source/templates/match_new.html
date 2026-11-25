@@ -43,7 +43,7 @@
     <div class="device-choice" role="group" aria-label="Choix du mode d’analyse">
       <button type="button" id="desktopAnalysisMode" data-analysis-mode="desktop" aria-pressed="false">
         <strong>💻 Analyse sur ordinateur</strong>
-        <small>Colle le lien YouTube. AquaMetric ouvre le Studio puis analyse l’onglet vidéo partagé par le navigateur.</small>
+        <small>Choisis clairement entre un lien YouTube public et un fichier vidéo local. Le rapport se remplit à mesure que les séquences sont analysées.</small>
       </button>
       <button type="button" id="phoneAnalysisMode" data-analysis-mode="phone" aria-pressed="false">
         <strong>📱 Analyse sur téléphone</strong>
@@ -55,9 +55,25 @@
       <h3>Analyse sur ordinateur</h3>
       <p class="mode-note">Pour YouTube public : colle le lien. Si le moteur IA est connecté et que tu indiques la durée, l'analyse démarre directement par intervalles ; sinon, le studio te proposera la capture d'onglet comme secours.</p>
       <span hidden>Analyser directement depuis l'URL · même minimum Ultimate Analyst</span>
-      <label>Lien vidéo
-        <input id="desktopVideoUrl" type="url" name="video_url" value="{{ request.query_params.get('video_url', target_video_url or '') }}" autocapitalize="none" spellcheck="false" placeholder="https://www.youtube.com/watch?v=..." inputmode="url">
+      <label for="desktopSource"><strong>Comment fournir le match ?</strong>
+        <select id="desktopSource">
+          <option value="link">Coller un lien YouTube</option>
+          <option value="file">Importer un fichier MP4, MOV ou WebM</option>
+        </select>
       </label>
+      <div id="desktopLinkPanel">
+        <label>Lien YouTube
+          <input id="desktopVideoUrl" type="url" name="video_url" value="{{ request.query_params.get('video_url', target_video_url or '') }}" autocapitalize="none" spellcheck="false" placeholder="https://www.youtube.com/watch?v=..." inputmode="url">
+        </label>
+        <div class="notice">YouTube public : renseigne la durée ci-dessus pour lancer l’analyse directe si le moteur IA est connecté. Sinon, utilise la capture depuis le navigateur.</div>
+      </div>
+      <div id="desktopFilePanel" hidden>
+        <label>Choisir la vidéo sur ton ordinateur
+          <input id="desktopVideoFile" name="video_file" type="file" disabled
+            accept=".mp4,.mov,.m4v,.webm,video/mp4,video/quicktime,video/webm">
+        </label>
+        <p class="mode-note">Fichier direct : {{max_upload_mb}} Mo maximum. Pour un match de plusieurs Go, utilise « Importer un match volumineux » ci-dessous. Après import, les actions IA démarrent automatiquement si le moteur est configuré.</p>
+      </div>
 
       <div class="scope-box">
         <h4 style="margin-top:0">La vidéo contient-elle plusieurs matchs ?</h4>
@@ -82,7 +98,8 @@
 
       <div class="notice"><b>Analyse depuis URL = minimum Ultimate Analyst.</b> Les métriques non prouvées restent « — » et ne sont jamais transformées en faux zéros.</div>
       <div class="actions compact">
-        <button class="btn intelligence-cta" type="submit" id="desktopAnalyzeSubmit" formaction="/analysis/url/create" formenctype="application/x-www-form-urlencoded">Analyser sur ordinateur</button>
+        <button class="btn intelligence-cta" type="submit" id="desktopAnalyzeSubmit" formaction="/analysis/url/create" formenctype="application/x-www-form-urlencoded">Analyser le lien YouTube</button>
+        <button class="btn intelligence-cta" type="submit" id="desktopFileAnalyzeSubmit" formaction="/matches" formenctype="multipart/form-data" hidden disabled>Importer et analyser le fichier</button>
       </div>
     </section>
 
