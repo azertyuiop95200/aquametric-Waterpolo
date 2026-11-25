@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from urllib.parse import urlencode
 
-from fastapi import Depends, Form, HTTPException, Request
+from fastapi import BackgroundTasks, Depends, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -40,6 +40,7 @@ def _scope_query(scope_mode: str, scope_start_second: float, scope_end_second: f
 
 def create_flexible_url_analysis(
     request: Request,
+    background_tasks: BackgroundTasks,
     team_name: str = Form(""),
     opponent: str = Form(...),
     category: str = Form("Women"),
@@ -50,6 +51,7 @@ def create_flexible_url_analysis(
     scope_mode: str = Form("auto"),
     scope_start_second: float = Form(0.0),
     scope_end_second: float = Form(0.0),
+    youtube_duration_minutes: float = Form(0.0, ge=0, le=240),
     db: Session = Depends(get_db),
 ):
     user = _user(request, db)
@@ -78,6 +80,23 @@ def create_flexible_url_analysis(
     db.add(match)
     db.commit()
     db.refresh(match)
+
+    if match.video_source=="youtube":
+        from services.video_action_provider import provider_configuration
+        if provider_configuration()["configured"]:
+            # A public YouTube URL can be analyzed without browser screen
+            # capture. The user-supplied full video duration defines exactly
+            # the intervals to request. If unknown, the report offers a form.
+            if youtube_duration_minutes > 0:
+                from services.youtube_direct_actions import prepare_run, run_direct_youtube_actions
+                try:
+                    run,scheduled=prepare_run(db,match,round(youtube_duration_minutes*60,3))
+                    if scheduled:
+                        background_tasks.add_task(run_direct_youtube_actions,match.id,run.id)
+                except ValueError:
+                    # No guessed duration or fabricated analysis.
+                    raise HTTPException(400,"La durée YouTube indiquée n'est pas valide.") from None
+            return RedirectResponse(f"/matches/{match.id}/analysis/result#directYoutubeAnalysis",status_code=303)
 
     if input_device == "phone" or not youtube_embed(url):
         # Generic remote URLs cannot be played in the YouTube-only capture studio.
