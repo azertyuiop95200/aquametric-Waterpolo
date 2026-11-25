@@ -6,7 +6,7 @@ from pathlib import Path
 from threading import Lock
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Form, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -125,6 +125,32 @@ def start_actions(match_id: int, request: Request, background_tasks: BackgroundT
     return RedirectResponse(f"/matches/{match.id}/analysis/result?action_queued=1", status_code=303)
 
 
+@router.post("/matches/{match_id}/analysis/youtube/direct")
+def start_public_youtube_direct(
+    match_id: int, request: Request, background_tasks: BackgroundTasks,
+    duration_minutes: float = Form(..., gt=0, le=240),
+    db: Session = Depends(get_db),
+):
+    """No YouTube download/capture; provider reads allowed public video URL."""
+    from services.youtube_direct_actions import (
+        action_plan, canonical_public_youtube, prepare_run, run_direct_youtube_actions,
+    )
+    from services.video_action_provider import VideoActionError
+    _,match=_owned(match_id,request,db)
+    if match.video_source!="youtube" or not match.video_url:
+        raise HTTPException(400,"Une vidéo YouTube valide est nécessaire.")
+    try:
+        canonical_public_youtube(match.video_url)
+        duration=round(duration_minutes*60,3)
+        action_plan(duration)
+        run,scheduled=prepare_run(db,match,duration)
+    except (ValueError,VideoActionError) as exc:
+        raise HTTPException(400 if isinstance(exc,ValueError) else 503,str(exc)) from None
+    if scheduled:
+        background_tasks.add_task(run_direct_youtube_actions,match.id,run.id)
+    return RedirectResponse(f"/matches/{match.id}/analysis/result#liveAutomaticStats",status_code=303)
+
+
 @router.get("/matches/{match_id}/analysis/actions/{run_id}/{action_key}/clip")
 def action_clip(match_id: int, run_id: int, action_key: str, request: Request, db: Session = Depends(get_db)):
     from analysis_product_routes import EVIDENCE_DIR
@@ -138,6 +164,14 @@ def action_clip(match_id: int, run_id: int, action_key: str, request: Request, d
     action = next((a for a in report["events"] if a["key"] == action_key), None)
     if not action:
         raise HTTPException(404, detail="Action introuvable.")
+    if run.source_kind=="youtube_direct":
+        from services.youtube_direct_actions import canonical_public_youtube
+        from services.video import timestamped_video_url
+        try:
+            url=canonical_public_youtube(run.source_path)
+        except ValueError:
+            raise HTTPException(410,"La référence YouTube a changé.") from None
+        return RedirectResponse(timestamped_video_url(url,action["second"]),status_code=307)
     source_name = f"video_actions_{run.id}"
     marker = f"action_key={action_key} "
     with _CLIP_LOCK:
