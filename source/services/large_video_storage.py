@@ -65,7 +65,7 @@ def capabilities() -> dict:
 
 def bucket() -> str:
     if not configured():
-        raise HTTPException(503, "Envoi de gros fichiers indisponible : configurer un bucket privé R2/S3 ET une base de données persistante.")
+        raise HTTPException(503, "Stockage vidéo indisponible : configurer un bucket privé R2/S3 ET une base de données persistante.")
     return os.environ["AQUAMETRIC_OBJECT_BUCKET"].strip()
 
 
