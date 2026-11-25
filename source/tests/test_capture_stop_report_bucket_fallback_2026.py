@@ -35,12 +35,12 @@ def test_studio_has_permanent_stop_and_report_actions_even_without_capture():
             'id="finishCaptureAnytime"', 'id="viewCaptureReport"',
             'id="stopCapture"', 'id="stopCaptureLive"',
             "Terminer le visionnage et voir mon rapport",
-            "if(!recorder||recorder.state!=='recording')",
-            "reportUrl+'?capture_not_started=1'",
-            "finishAnytimeBtn.addEventListener('click',requestStop)",
-            "f.append('client_finish_reason',observed>=99.5?'normal':'manual_stop')",
-            "f.append('client_read_percent',String(observed))",
-            "stoppedReadPercent=localReadPercent()",
+            "if(recorder&&recorder.state==='recording')",
+            "v12ForcedFinishReason='manual_stop'",
+            "/analysis/result?capture_not_started=1",
+            "document.getElementById('finishCaptureAnytime').addEventListener('click'",
+            "f.append('client_finish_reason',v12ForcedFinishReason||'normal')",
+            "f.append('client_read_percent',String(localReadPercent()))",
             ".capture-shell.studio-live .capture-quick-exit",
         ):
             assert required in html,required
