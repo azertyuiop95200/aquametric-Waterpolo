@@ -6,6 +6,7 @@ owner-scoped by the authenticated API route.
 """
 from __future__ import annotations
 
+import json
 from collections import Counter
 from sqlalchemy import select
 
@@ -44,6 +45,21 @@ def live_action_dashboard(db, match) -> dict:
     for run in all_runs:
         unique.setdefault(run.source_path or f"run:{run.id}", run)
     runs = sorted(unique.values(), key=lambda r: r.id)
+    # The same YouTube replay can be sent through two different acquisition
+    # paths: a completed direct public-URL inference and an old browser capture.
+    # They MUST NOT be added to each other as if two matches were played.
+    # Prefer a direct run once it has real completed clips; otherwise retain
+    # the browser results until the new direct run provides observations.
+    has_direct_clips=any(
+        run.source_kind=="youtube_direct" and any(
+            s.get("status")=="complete" for s in json.loads(run.segments_json or "[]")
+        )
+        for run in runs
+    ) if match.video_source=="youtube" else False
+    if has_direct_clips:
+        runs=[run for run in runs if run.source_kind!="browser_capture"]
+    elif match.video_source=="youtube" and any(run.source_kind=="browser_capture" for run in runs):
+        runs=[run for run in runs if run.source_kind!="youtube_direct"]
     all_rows = []
     public_runs = []
     completed, total = 0, 0
