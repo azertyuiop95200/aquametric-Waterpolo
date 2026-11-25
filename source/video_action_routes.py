@@ -80,6 +80,17 @@ def actions_status(match_id: int, request: Request, db: Session = Depends(get_db
     return JSONResponse(progress, headers={"Cache-Control": "private, no-store"})
 
 
+@router.get("/matches/{match_id}/analysis/actions/live")
+def live_actions(match_id: int, request: Request, db: Session = Depends(get_db)):
+    """Per-sequence automatic provisional counters, without a page reload."""
+    _, match = _owned(match_id, request, db)
+    from services.live_action_dashboard import live_action_dashboard
+    return JSONResponse(live_action_dashboard(db, match), headers={
+        "Cache-Control": "private, no-store",
+        "X-Content-Type-Options": "nosniff",
+    })
+
+
 @router.post("/matches/{match_id}/analysis/actions/start")
 def start_actions(match_id: int, request: Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     from analysis_product_routes import UPLOAD_DIR
