@@ -149,7 +149,12 @@ jobs:
           # Real guest Ultimate navigation without a password, scoped owner, and
           # paid AI forbidden: tested directly on Render, not a local mock.
           curl -fsSL --max-time 35 "$BASE/login" -o "$temp/login.html"
-          grep -Fq 'Continuer avec Google' "$temp/login.html"
+          if grep -Fq 'id="googleLoginAction"' "$temp/login.html"; then
+            echo 'STAGING_GOOGLE_LOGIN_OAUTH_READY'
+          else
+            grep -Fq 'La connexion Google sera proposée' "$temp/login.html"
+            echo 'STAGING_GOOGLE_LOGIN_AWAITING_GOOGLE_CLIENT'
+          fi
           curl -fsS --max-time 35 -c "$temp/guest.cookies" -b "$temp/guest.cookies" \
             -D "$temp/guest.headers" "$BASE/guest/ultimate" -o "$temp/guest.body"
           grep -qE '^HTTP/[0-9.]+ 303' "$temp/guest.headers"
