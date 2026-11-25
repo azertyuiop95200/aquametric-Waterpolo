@@ -55,6 +55,9 @@ MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "1024"))
 MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024
 AUTO_REFRESH_OFFICIAL_DATA = os.getenv("AUTO_REFRESH_OFFICIAL_DATA", "0") == "1"
 WEB_DEMO_MODE = os.getenv("WEB_DEMO_MODE", "0") == "1"
+# Guest Ultimate is explicitly opt-in; enabling on validation must NOT make
+# private production accounts or their matches publicly accessible.
+GUEST_ULTIMATE_ENABLED = WEB_DEMO_MODE or os.getenv("AQUAMETRIC_GUEST_ULTIMATE", "0") == "1"
 OFFICIAL_REFRESH_LOOP_MINUTES = int(os.getenv("OFFICIAL_REFRESH_LOOP_MINUTES", "30"))
 ALLOWED_VIDEO_EXTENSIONS = {".mp4", ".webm", ".mov", ".m4v", ".ogv", ".ogg"}
 EVENT_TYPES = (
@@ -149,6 +152,8 @@ def ctx(**kwargs):
 
 
 def render(request: Request, template_name: str, status_code: int = 200, **kwargs):
+    kwargs.setdefault("web_demo_mode", WEB_DEMO_MODE or bool(request.session.get("web_demo")))
+    kwargs.setdefault("guest_ultimate_enabled", GUEST_ULTIMATE_ENABLED)
     return templates.TemplateResponse(request, template_name, ctx(**kwargs), status_code=status_code)
 
 
@@ -229,6 +234,8 @@ def _demo_analysis_destination(value: str) -> str:
         return "/my-team"
     video_url = parse_qs(parsed.query).get("video_url", [""])[0]
     if not youtube_embed(video_url):
+        if parsed.path == "/matches/new" and not video_url:
+            return "/matches/new"
         return "/my-team"
     params = {"video_url": video_url}
     fields = parse_qs(parsed.query)
@@ -249,7 +256,7 @@ def demo_login(request: Request, next: str = "", db: Session = Depends(get_db)):
     Intended for free/ephemeral web deployments. No password is required and
     the data is allowed to disappear when the free host restarts.
     """
-    if not WEB_DEMO_MODE:
+    if not GUEST_ULTIMATE_ENABLED:
         raise HTTPException(status_code=404)
     fallback = "/matches/new?" + urlencode({
         "video_url": os.getenv("AQUAMETRIC_TARGET_VIDEO_URL", ""),
@@ -276,6 +283,7 @@ def demo_login(request: Request, next: str = "", db: Session = Depends(get_db)):
     request.session.clear()
     request.session["user_id"] = user.id
     request.session["web_demo"] = True
+    request.session["guest_ultimate"] = True
     return RedirectResponse(destination, status_code=303)
 
 @app.get("/register", response_class=HTMLResponse)
@@ -322,9 +330,17 @@ def logout(request: Request):
     return RedirectResponse("/", status_code=303)
 
 
+@app.get("/guest/ultimate")
+def guest_ultimate(request: Request, db: Session = Depends(get_db)):
+    """Start an isolated guest session and go straight to Ultimate analysis."""
+    if not GUEST_ULTIMATE_ENABLED:
+        raise HTTPException(status_code=404, detail="L'accès invité Ultimate est désactivé.")
+    return demo_login(request, next="/matches/new", db=db)
+
+
 @app.get("/guest", response_class=HTMLResponse)
-def guest(request: Request):
-    return render(request, "guest.html", demo=None)
+def guest(request: Request, db: Session = Depends(get_db)):
+    return render(request, "guest.html", demo=None, user=current_user(request, db))
 
 
 @app.post("/guest", response_class=HTMLResponse)
