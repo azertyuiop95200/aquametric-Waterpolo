@@ -89,8 +89,10 @@ def run_fingerprint(match, url: str, duration: float, start: float, end: float) 
     return hashlib.sha256(json.dumps(identity,ensure_ascii=False).encode()).hexdigest()
 
 
-def prepare_run(db, match, duration: float, *,start=0.0, end=None) -> tuple[VideoActionAnalysis, bool]:
-    url=canonical_public_youtube(match.video_url)
+def prepare_run(db, match, duration: float, *,start=0.0, end=None, video_url: str | None = None) -> tuple[VideoActionAnalysis, bool]:
+    # A match may consist of several independent public YouTube quarter clips.
+    # Keep a distinct fingerprint/clock for each source video.
+    url=canonical_public_youtube(video_url or match.video_url)
     config=provider_configuration()
     if not config["configured"]:
         raise VideoActionError("not_configured",config["message"])
