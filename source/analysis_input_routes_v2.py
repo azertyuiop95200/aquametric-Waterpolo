@@ -102,6 +102,8 @@ def create_flexible_url_analysis(
     db: Session = Depends(get_db),
 ):
     user = _user(request, db)
+    from services.guest_ultimate import enforce_new_match_limit, guest_session
+    enforce_new_match_limit(request, db, user)
     url = (video_url or "").strip()
     if not url or not is_http_url(url):
         raise HTTPException(status_code=400, detail="Un lien vidéo http/https valide est obligatoire.")
@@ -127,7 +129,7 @@ def create_flexible_url_analysis(
     return RedirectResponse(f"/matches/{match.id}/analysis/browser-capture?{query}", status_code=303)
 
 
-def _save_upload(upload: UploadFile, user_id: int, team_id: int) -> str:
+def _save_upload(upload: UploadFile, user_id: int, team_id: int, max_bytes: int = MAX_UPLOAD_BYTES) -> str:
     original = Path(upload.filename or "video").name
     suffix = Path(original).suffix.lower()
     if suffix not in ALLOWED_VIDEO_EXTENSIONS:
@@ -147,8 +149,8 @@ def _save_upload(upload: UploadFile, user_id: int, team_id: int) -> str:
                 if not chunk:
                     break
                 total += len(chunk)
-                if total > MAX_UPLOAD_BYTES:
-                    raise HTTPException(status_code=413, detail=f"La vidéo dépasse {MAX_UPLOAD_MB} MB.")
+                if total > max_bytes:
+                    raise HTTPException(status_code=413, detail="Vidéo trop volumineuse : 30 Mo maximum en mode invité.")
                 out.write(chunk)
     except Exception:
         target.unlink(missing_ok=True)
@@ -177,12 +179,15 @@ def create_flexible_uploaded_match(
     db: Session = Depends(get_db),
 ):
     user = _user(request, db)
+    from services.guest_ultimate import enforce_new_match_limit, guest_session, upload_byte_limit
+    enforce_new_match_limit(request, db, user)
     opponent = (opponent or "").strip()[:160]
     if not opponent:
         raise HTTPException(status_code=400, detail="Le nom de l'adversaire est obligatoire.")
     team = _free_team(db, user, team_name, competition, category)
     if video_file and video_file.filename:
-        stored = _save_upload(video_file, user.id, team.id)
+        stored = _save_upload(video_file, user.id, team.id,
+                              max_bytes=upload_byte_limit(request, MAX_UPLOAD_BYTES))
         source = "upload"
         url = ""
     else:
@@ -211,7 +216,7 @@ def create_flexible_uploaded_match(
         # appear on the live report while the other minutes are processed.
         # Disabled/unconfigured servers never claim to have analyzed a clip.
         from services.video_action_provider import provider_configuration
-        if provider_configuration()["configured"]:
+        if not guest_session(request) and provider_configuration()["configured"]:
             from video_action_routes import run_upload_actions
             background_tasks.add_task(run_upload_actions, match.id)
         return RedirectResponse(f"/matches/{match.id}/analysis/result", status_code=303)
