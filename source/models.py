@@ -13,6 +13,15 @@ class User(Base):
     preferred_language: Mapped[str] = mapped_column(String(10), default="en")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
+class GoogleIdentity(Base):
+    """Stable Google OpenID Connect subject mapping; never use email as ID."""
+    __tablename__ = "google_identities"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    sub: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
 class Club(Base):
     __tablename__ = "clubs"
     id: Mapped[int] = mapped_column(primary_key=True)
