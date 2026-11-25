@@ -1,49 +1,92 @@
-name: AquaMetric Large Video Intake Staging Verification
+name: AquaMetric Analyze Staging E2E
 
 on:
   push:
     branches: [fix/youtube-report-intake-2026-11]
-    paths:
-      - '.github/workflows/large-video-stage-smoke.yml'
+    paths: ['.github/workflows/large-video-stage-smoke.yml']
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  check-large-upload-interface:
+  analyze-ui:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 14
     env:
       BASE: https://aquametric-youtube-validation.onrender.com
     steps:
-      - name: Inspect staged upload capability and honest disabled fallback
+      - name: Wait for new version deployed to staging
         run: |
           set -euo pipefail
-          echo "Checking Cloud storage capability endpoint"
-          curl --retry 8 --retry-all-errors --retry-delay 7 --max-time 55 -sSf "$BASE/api/large-upload/capabilities" > capabilities.json
-          cat capabilities.json
+          for n in $(seq 1 55); do
+            if curl -fsSL --max-time 30 "$BASE/static/analysis-input-mobile.js" -o analysis-input.js &&
+               grep -Fq 'desktopFile.disabled = !desktopUpload' analysis-input.js &&
+               curl -fsSL --max-time 30 "$BASE/api/large-upload/capabilities" -o capabilities.json; then
+              echo "Updated staging UI is online"
+              exit 0
+            fi
+            echo "Waiting for Render deployment: $n"
+            sleep 10
+          done
+          exit 1
+      - name: Check authenticated YouTube/file import and live report
+        run: |
+          set -euo pipefail
           python - <<'PY'
           import json
           p=json.load(open('capabilities.json'))
-          assert p['max_gb']>=3, p
-          assert p['part_bytes']==16*1024*1024, p
-          assert 'enabled' in p
+          assert p['max_gb']>=3
+          assert p['part_bytes']==16777216
+          assert isinstance(p['enabled'],bool)
           if not p['enabled']:
-              assert p['reason'], p
-              print('Storage deliberately disabled until private R2/S3 and durable database are configured.')
-          else:
-              print('Private large upload storage enabled.')
+              assert p['reason']
+              print("LARGE_FILE_UPLOAD_SAFELY_DISABLED_UNTIL_STORAGE_READY")
           PY
-          echo "Checking staged match page and browser uploader bundle"
-          tmp=$(mktemp -d)
-          trap 'rm -rf "$tmp"' EXIT
-          curl -sSf -L --max-time 45 -c "$tmp/cookies" -b "$tmp/cookies" "$BASE/demo-login" -o "$tmp/match-form.html"
-          grep -Fq 'id="largeVideoVideo"' "$tmp/match-form.html" && echo 'Unexpected legacy selector' && exit 1 || true
-          grep -Fq 'id="largeUploadVideo"' "$tmp/match-form.html"
-          grep -Fq 'id="largeUploadProgress"' "$tmp/match-form.html"
-          grep -Fq 'large-video-upload.js' "$tmp/match-form.html"
-          curl -sSf --max-time 45 "$BASE/static/large-video-upload.js" -o "$tmp/large-uploader.js"
-          grep -Fq "file.slice(first,last)" "$tmp/large-uploader.js"
-          grep -Fq "localStorage.getItem(cacheKey(file))" "$tmp/large-uploader.js"
-          echo 'STAGED_LARGE_VIDEO_UI_OK'
+          temp=$(mktemp -d)
+          trap 'rm -rf "$temp"' EXIT
+          email="aquametric-stage-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}@example.invalid"
+          curl -fsS --max-time 35 -c "$temp/cookies" -b "$temp/cookies" -D "$temp/signup.headers" \
+            --data-urlencode "email=$email" --data-urlencode 'password=Password123!' \
+            "$BASE/register" -o "$temp/signup.body"
+          grep -qE '^HTTP/[0-9.]+ 303' "$temp/signup.headers"
+          curl -fsSL --max-time 35 -c "$temp/cookies" -b "$temp/cookies" \
+            "$BASE/matches/new" -o "$temp/analyze.html"
+          for needle in 'id="analysisForm"' 'id="desktopSource"' 'id="desktopVideoFile"' \
+            'id="desktopFileAnalyzeSubmit"' 'id="desktopVideoUrl"' 'id="phoneVideoFile"' \
+            'id="largeUploadVideo"' 'id="youtubeDurationMinutes"' \
+            'value="file">Importer un fichier MP4'; do
+            grep -Fq "$needle" "$temp/analyze.html" || { echo "Missing Analyze form: $needle"; exit 1; }
+          done
+          curl -fsSL --max-time 35 "$BASE/static/live-auto-stats.js" -o "$temp/live.js"
+          curl -fsSL --max-time 35 "$BASE/static/large-video-upload.js" -o "$temp/large.js"
+          grep -Fq 'setTimeout(refresh,delay)' "$temp/live.js"
+          grep -Fq 'file.slice(first,last)' "$temp/large.js"
+          curl -fsS --max-time 35 -c "$temp/cookies" -b "$temp/cookies" -D "$temp/match.headers" \
+            --data-urlencode 'team_name=AquaMetric Staging Test' \
+            --data-urlencode 'opponent=Club Test' \
+            --data-urlencode 'category=Women' \
+            --data-urlencode 'video_url=https://www.youtube.com/watch?v=f_WzRHjybgU' \
+            --data-urlencode 'input_device=phone' --data-urlencode 'youtube_duration_minutes=0' \
+            "$BASE/analysis/url/create" -o "$temp/create.body"
+          grep -qE '^HTTP/[0-9.]+ 303' "$temp/match.headers"
+          location=$(grep -i '^location:' "$temp/match.headers" | tail -1 | tr -d '\r')
+          case "$location" in *"/matches/"*"/analysis/result"*) ;; *) echo "Match link not returned"; exit 1;; esac
+          mid=$(printf '%s' "$location" | sed -nE 's|.*[/]matches/([0-9]+)/analysis/result.*|\1|p')
+          test -n "$mid"
+          curl -fsSL --max-time 40 -c "$temp/cookies" -b "$temp/cookies" \
+            "$BASE/matches/$mid/analysis/result" -o "$temp/report.html"
+          for needle in 'id="liveAutomaticStats"' 'id="spatialDashboard"' 'id="spatialPitch"' \
+            'id="sources"' 'id="directYoutubeAnalysis"'; do
+            grep -Fq "$needle" "$temp/report.html" || { echo "Missing report: $needle"; exit 1; }
+          done
+          curl -fsSL --max-time 35 -c "$temp/cookies" -b "$temp/cookies" \
+            "$BASE/matches/$mid/analysis/actions/live" -o "$temp/live.json"
+          python - "$temp/live.json" <<'PY'
+          import json,sys
+          stats=json.load(open(sys.argv[1]))
+          assert stats['counted_events']==0,stats
+          assert stats['scope']=='automatic_provisional_only'
+          assert 'sources' in stats and 'sides' in stats
+          print("STAGING_AUTHENTICATED_ANALYZE_AND_REPORT_PASS")
+          PY
