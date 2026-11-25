@@ -1,0 +1,48 @@
+{# Independent automatic detection channel: refreshed in-place while replay plays. #}
+<section class="report-card section-wide status-live" id="liveAutomaticStats"
+         data-url="/matches/{{match.id}}/analysis/actions/live">
+  <div class="hero-top">
+    <div>
+      <span class="eyebrow">ANALYSE AUTOMATIQUE · MISE À JOUR PROGRESSIVE</span>
+      <h2>Statistiques détectées pendant le traitement</h2>
+    </div>
+    <span class="chip" id="liveAutoStatus">Vérification du moteur…</span>
+  </div>
+  <p id="liveAutoMessage" role="status" aria-live="polite">Connexion aux résultats des séquences vidéo…</p>
+  <p class="evidence-note"><strong>Ce tableau est provisoire.</strong> Les détections sont calculées sur les séquences effectivement traitées, et ne sont pas des actions confirmées par un entraîneur. Les valeurs ne sont jamais ajoutées automatiquement aux statistiques vérifiées ou à la carte des tirs.</p>
+  <p class="evidence-note"><strong id="liveAutoProgress">0 / 0 séquences traitées</strong>
+     · <span id="liveAutoDetected">Aucune détection disponible</span>
+     · Les statistiques se réactualisent sans arrêter le lecteur vidéo.</p>
+  <div style="overflow-x:auto">
+    <table class="metric-table" id="liveAutoTable">
+      <thead><tr><th>Mesure détectée par IA</th>
+      <th>{{match.team.name}}</th><th>{{match.opponent}}</th><th>Équipe indéterminée</th></tr></thead>
+      <tbody>
+      {% for label,key in [("Buts","goals"),("Tirs (buts inclus)","shots"),("Arrêts","saves"),("Pertes de balle","turnovers"),("Passes décisives","assists"),("Exclusions obtenues","exclusions_earned"),("Exclusions commises","exclusions_committed"),("Efficacité au tir (%)","efficiency_pct")] %}
+      <tr><th>{{label}}</th>
+        {% for side in ["for","against","unknown"] %}
+          <td data-auto-side="{{side}}" data-auto-field="{{key}}" class="unmeasured">—</td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <h3>Progression par vidéo</h3>
+  <div id="liveAutoSources" class="event-list">
+    <p class="unmeasured">Aucune séquence traitée.</p>
+  </div>
+  <h3>Dernières actions détectées (à contrôler)</h3>
+  <div id="liveAutoTimeline" class="event-list">
+    <p class="unmeasured">Aucune action sportive reconnue pour le moment.</p>
+  </div>
+  <div class="actions" id="liveAutoStartAction" hidden>
+    {% if match.video_source == "upload" %}
+    <form action="/matches/{{match.id}}/analysis/actions/start" method="post">
+      <button class="btn secondary" type="submit">Analyser automatiquement le fichier importé</button>
+    </form>
+    {% endif %}
+  </div>
+  <p class="evidence-note" id="liveAutoPrivacyNote">Sans vidéo lisible ou moteur d'analyse configuré, aucun chiffre ne sera simulé.</p>
+</section>
+<script defer src="/static/live-auto-stats.js"></script>
