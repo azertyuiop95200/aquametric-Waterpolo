@@ -33,6 +33,9 @@ class StartUpload(BaseModel):
     competition: str = Field(default="", max_length=160)
     category: str = Field(default="Women", max_length=30)
     match_date: str = Field(default="", max_length=32)
+    match_id: int | None = Field(default=None, ge=1)
+    period: int = Field(default=1, ge=1, le=8)
+    segment_label: str = Field(default="", max_length=100)
 
 
 class PartNumber(BaseModel):
@@ -75,6 +78,9 @@ def _safe_meta(value: StartUpload) -> dict:
         "team_name": team, "opponent": opponent,
         "competition": value.competition.strip(), "category": value.category,
         "match_date": value.match_date.strip(),
+        "target_match_id": value.match_id,
+        "period": value.period,
+        "segment_label": value.segment_label.strip(),
     }
 
 
@@ -87,6 +93,12 @@ def large_upload_capabilities():
 def start_large_upload(value: StartUpload, request: Request, db: Session = Depends(get_db)):
     user = _owner(request, db)
     name, mime_type = storage.allowed_video(value.filename)
+    if value.match_id is not None:
+        target=db.get(Match,value.match_id)
+        if target is None or target.owner_id != user.id:
+            raise HTTPException(404, "Match cible introuvable.")
+        if target.team.name != value.team_name.strip() or target.opponent != value.opponent.strip():
+            raise HTTPException(400, "Les équipes fournies ne correspondent pas au match cible.")
     if value.size_bytes > storage.MAX_BYTES:
         raise HTTPException(413, f"Fichier trop volumineux : limite {storage.MAX_GB} Go.")
     api = storage.client()
@@ -183,15 +195,25 @@ def _link_finished_object(row: LargeVideoUpload, db: Session) -> str:
     user = db.get(User, row.owner_id)
     if not user:
         raise HTTPException(404, "Compte de transfert introuvable.")
-    team = _free_team(db, user, metadata["team_name"], metadata["competition"], metadata["category"])
-    match = Match(
-        owner_id=row.owner_id, team_id=team.id,
-        opponent=metadata["opponent"], competition=metadata["competition"],
-        match_date=metadata["match_date"], video_source="cloud",
-        video_path=row.object_key, video_url="", status="cloud_video_received",
-    )
-    db.add(match)
-    db.flush()
+    target_match_id=metadata.get("target_match_id")
+    if target_match_id is not None:
+        match=db.get(Match,int(target_match_id))
+        if match is None or match.owner_id != row.owner_id:
+            raise HTTPException(404, "Match cible introuvable.")
+        from match_video_segments_routes import append_segment
+        append_segment(db,match,period=int(metadata.get("period",1)),
+            label=metadata.get("segment_label",""),source_type="cloud",
+            video_path=row.object_key)
+    else:
+        team = _free_team(db, user, metadata["team_name"], metadata["competition"], metadata["category"])
+        match = Match(
+            owner_id=row.owner_id, team_id=team.id,
+            opponent=metadata["opponent"], competition=metadata["competition"],
+            match_date=metadata["match_date"], video_source="cloud",
+            video_path=row.object_key, video_url="", status="cloud_video_received",
+        )
+        db.add(match)
+        db.flush()
     row.status = "complete"
     row.match_id = match.id
     db.commit()
