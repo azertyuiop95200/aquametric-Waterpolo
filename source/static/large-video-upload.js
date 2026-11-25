@@ -184,6 +184,12 @@
   });
   const chooseRegular = $('chooseRegularUpload');
   if (chooseRegular) chooseRegular.addEventListener('click', () => {
+    const quarterFile = $('addMatchPartForm')?.querySelector('[name="video_file"]');
+    if (quarterFile) {
+      quarterFile.scrollIntoView({behavior:'smooth',block:'center'});
+      quarterFile.focus({preventScroll:true});
+      return;
+    }
     if (window.matchMedia('(max-width:700px)').matches) {
       $('phoneAnalysisMode')?.click();
       const source = $('phoneSource');
