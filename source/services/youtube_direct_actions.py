@@ -19,7 +19,7 @@ import httpx
 from sqlalchemy import select
 
 from models import VideoActionAnalysis
-from services.video_action_provider import VideoActionError, provider_configuration
+from services.video_action_provider import VideoActionError, provider_configuration, request_gemini_interaction
 from services.video_action_runner import normalize_observations
 from services.video_action_schema import VERSION, SegmentObservation, extraction_prompt
 
@@ -162,9 +162,7 @@ def analyze_public_youtube_segment(url: str, segment: dict, *,team: str, opponen
         "response_format":{"type":"text","mime_type":"application/json",
             "schema":SegmentObservation.model_json_schema()}}
     try:
-        with httpx.Client(timeout=httpx.Timeout(timeout,connect=min(timeout,10)),follow_redirects=False) as client:
-            response=client.post("https://generativelanguage.googleapis.com/v1beta/interactions",
-                headers={"x-goog-api-key":os.environ["GEMINI_API_KEY"]},json=body)
+        response=request_gemini_interaction(body,timeout)
         if response.status_code in {401,403}:
             raise VideoActionError("credentials","Le fournisseur vidéo refuse la configuration du compte.")
         if response.status_code==429:
