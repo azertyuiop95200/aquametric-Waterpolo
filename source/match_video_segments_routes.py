@@ -157,3 +157,10 @@ def open_video_segment(match_id:int,segment_id:int,request:Request,db:Session=De
 def segments_api(match_id:int,request:Request,db:Session=Depends(get_db)):
     _,match=_owned(match_id,request,db)
     return {"match_id":match.id,"segments":segment_rows(db,match)}
+
+@router.get("/api/matches/{match_id}/shot-map")
+def shot_map_api(match_id:int,request:Request,db:Session=Depends(get_db)):
+    """Owner-scoped verified coordinates with an explicit coverage denominator."""
+    _,match=_owned(match_id,request,db)
+    from services.spatial_match_analysis import spatial_match_dashboard
+    return spatial_match_dashboard(db,match,segment_rows(db,match))
