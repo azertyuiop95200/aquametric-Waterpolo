@@ -261,7 +261,7 @@ def demo_login(request: Request, next: str = "", db: Session = Depends(get_db)):
     Intended for free/ephemeral web deployments. No password is required and
     the data is allowed to disappear when the free host restarts.
     """
-    if not GUEST_ULTIMATE_ENABLED:
+    if not (GUEST_ULTIMATE_ENABLED or WEB_DEMO_MODE):
         raise HTTPException(status_code=404)
     fallback = "/matches/new?" + urlencode({
         "video_url": os.getenv("AQUAMETRIC_TARGET_VIDEO_URL", ""),
