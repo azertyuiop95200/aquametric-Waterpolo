@@ -115,7 +115,24 @@ def start_actions(match_id: int, request: Request, background_tasks: BackgroundT
     if not provider_configuration()["configured"]:
         raise HTTPException(503, detail=provider_configuration()["message"])
     if not run_progress(db, match)["active"]:
-        if match.video_source == "upload" and match.video_path and (UPLOAD_DIR / Path(match.video_path).name).is_file():
+        from services.video_action_report import latest_run
+        previous=latest_run(db,match.id)
+        if previous and previous.source_kind=="youtube_direct":
+            from services.youtube_direct_actions import prepare_run,run_direct_youtube_actions
+            from services.video_action_provider import VideoActionError
+            try:
+                run,scheduled=prepare_run(db,match,previous.duration_seconds)
+            except (ValueError,VideoActionError) as exc:
+                raise HTTPException(422,"La reprise YouTube nécessite une durée de vidéo valide.") from None
+            if scheduled:
+                background_tasks.add_task(run_direct_youtube_actions,match.id,run.id)
+        elif previous and previous.source_kind=="cloud":
+            from services.cloud_video_actions import run_cloud_video_actions
+            background_tasks.add_task(run_cloud_video_actions,match.id,previous.source_path)
+        elif match.video_source=="cloud" and match.video_path:
+            from services.cloud_video_actions import run_cloud_video_actions
+            background_tasks.add_task(run_cloud_video_actions,match.id,match.video_path)
+        elif match.video_source == "upload" and match.video_path and (UPLOAD_DIR / Path(match.video_path).name).is_file():
             background_tasks.add_task(run_upload_actions, match.id)
         else:
             root = latest_capture_root(match)
@@ -172,6 +189,18 @@ def action_clip(match_id: int, run_id: int, action_key: str, request: Request, d
         except ValueError:
             raise HTTPException(410,"La référence YouTube a changé.") from None
         return RedirectResponse(timestamped_video_url(url,action["second"]),status_code=307)
+    if run.source_kind=="cloud":
+        from services import large_video_storage as storage
+        from models import LargeVideoUpload
+        row=db.scalar(select(LargeVideoUpload).where(
+            LargeVideoUpload.owner_id==match.owner_id,
+            LargeVideoUpload.match_id==match.id,
+            LargeVideoUpload.object_key==run.source_path,
+            LargeVideoUpload.status=="complete"))
+        if not row:
+            raise HTTPException(404,"Vidéo cloud non associée au match.")
+        destination=storage.signed_video_url(run.source_path)
+        return RedirectResponse(destination+f"#t={max(0,int(action['second']))}",status_code=307)
     source_name = f"video_actions_{run.id}"
     marker = f"action_key={action_key} "
     with _CLIP_LOCK:
