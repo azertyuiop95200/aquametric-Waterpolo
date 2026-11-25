@@ -58,7 +58,7 @@
     if(start){
       const initialLocal=start.dataset.source==='upload' && data.status==='awaiting_video';
       const retry=data.status==='partial'||data.status==='failed';
-      start.hidden=!(data.configured && !data.active && (initialLocal||retry) && start.querySelector('form'));
+      start.hidden=!(start.dataset.guest!=='1' && data.configured && !data.active && (initialLocal||retry) && start.querySelector('form'));
     }
     update($('liveAutoPrivacyNote'),data.configured
       ? 'Les chiffres IA sont provisoires ; seules les annotations vérifiées servent au rapport officiel et aux points du bassin.'
