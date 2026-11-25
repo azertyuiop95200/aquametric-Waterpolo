@@ -36,10 +36,10 @@
   <div id="liveAutoTimeline" class="event-list">
     <p class="unmeasured">Aucune action sportive reconnue pour le moment.</p>
   </div>
-  <div class="actions" id="liveAutoStartAction" hidden>
-    {% if match.video_source == "upload" %}
+  <div class="actions" id="liveAutoStartAction" data-source="{{match.video_source}}" hidden>
+    {% if match.video_source in ["upload","cloud","youtube"] %}
     <form action="/matches/{{match.id}}/analysis/actions/start" method="post">
-      <button class="btn secondary" type="submit">Analyser automatiquement le fichier importé</button>
+      <button class="btn secondary" type="submit">Analyser ou reprendre les intervalles manquants</button>
     </form>
     {% endif %}
   </div>
