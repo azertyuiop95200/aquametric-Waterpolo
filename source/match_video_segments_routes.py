@@ -8,7 +8,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
@@ -103,7 +103,7 @@ def append_segment(db:Session, match:Match, *, period:int, label:str, source_typ
 
 
 @router.post("/matches/{match_id}/segments")
-def add_video_segment(match_id:int, request:Request,
+def add_video_segment(match_id:int, request:Request, background_tasks:BackgroundTasks,
                       period:int=Form(1),label:str=Form(""),video_url:str=Form(""),
                       video_file:Optional[UploadFile]=File(None),
                       db:Session=Depends(get_db)):
@@ -124,9 +124,14 @@ def add_video_segment(match_id:int, request:Request,
         path=""
         source="youtube" if youtube_embed(url) else "url"
     try:
-        append_segment(db,match,period=period,label=label,source_type=source,
+        segment=append_segment(db,match,period=period,label=label,source_type=source,
                        video_path=path,video_url=url)
         db.commit()
+        if source == "upload":
+            from services.video_action_provider import provider_configuration
+            if provider_configuration()["configured"]:
+                from video_action_routes import run_segment_actions
+                background_tasks.add_task(run_segment_actions, match_id, segment.id)
     except Exception:
         db.rollback()
         if file_provided:
