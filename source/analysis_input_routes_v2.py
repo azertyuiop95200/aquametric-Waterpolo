@@ -11,7 +11,7 @@ import uuid
 from pathlib import Path
 from urllib.parse import urlencode
 
-from fastapi import Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi import BackgroundTasks, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import RedirectResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -163,6 +163,7 @@ def _save_upload(upload: UploadFile, user_id: int, team_id: int) -> str:
 
 def create_flexible_uploaded_match(
     request: Request,
+    background_tasks: BackgroundTasks,
     team_name: str = Form(""),
     opponent: str = Form(...),
     category: str = Form("Women"),
@@ -205,6 +206,14 @@ def create_flexible_uploaded_match(
     db.commit()
     db.refresh(match)
     if source == "upload":
+        # Start inference automatically after the user's actual file upload.
+        # Each video minute is persisted separately, so new measurements can
+        # appear on the live report while the other minutes are processed.
+        # Disabled/unconfigured servers never claim to have analyzed a clip.
+        from services.video_action_provider import provider_configuration
+        if provider_configuration()["configured"]:
+            from video_action_routes import run_upload_actions
+            background_tasks.add_task(run_upload_actions, match.id)
         return RedirectResponse(f"/matches/{match.id}/analysis/result", status_code=303)
     query = _scope_query(scope_mode, scope_start_second, scope_end_second, video_url=url)
     return RedirectResponse(f"/matches/{match.id}/analysis/browser-capture?{query}", status_code=303)
