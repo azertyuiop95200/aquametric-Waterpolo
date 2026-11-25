@@ -9,6 +9,7 @@
   const start = $('largeUploadStart'), cancel = $('largeUploadCancel');
   const status = $('largeUploadStatus'), progress = $('largeUploadProgress');
   const limit = $('largeUploadLimit'), form = $('segmentUploadForm') || $('analysisForm');
+  const cloudControls = $('largeUploadCloudControls'), localFallback = $('largeUploadLocalFallback');
   if (!form) return;
   const targetMatchId = form.dataset.targetMatchId ? Number(form.dataset.targetMatchId) : null;
   let config = null, busy = false, abortController = null, currentId = '', currentKey = '';
@@ -44,8 +45,11 @@
   function onFileChanged() {
     const file = fileInput.files?.[0];
     controls(false);
+    if (!config?.enabled) {
+      say('Le stockage de plusieurs Go est indisponible. Utilise l’import MP4 classique ci-dessous.');
+      return;
+    }
     if (!file) { say('Sélectionne un fichier vidéo.'); return; }
-    if (!config?.enabled) { say(config?.reason || 'Stockage cloud indisponible.'); return; }
     if (file.size > config.max_bytes) {
       say('Fichier trop volumineux : ' + sizeText(file.size) + ' dépasse la limite ' + config.max_gb + ' Go.');
       start.disabled = true; return;
@@ -178,17 +182,42 @@
     currentId='';
     controls(false);
   });
+  const chooseRegular = $('chooseRegularUpload');
+  if (chooseRegular) chooseRegular.addEventListener('click', () => {
+    if (window.matchMedia('(max-width:700px)').matches) {
+      $('phoneAnalysisMode')?.click();
+      const source = $('phoneSource');
+      if (source) {
+        source.value = 'file';
+        source.dispatchEvent(new Event('change', {bubbles:true}));
+      }
+      $('phoneVideoFile')?.scrollIntoView({behavior:'smooth',block:'center'});
+      return;
+    }
+    $('desktopAnalysisMode')?.click();
+    const source = $('desktopSource');
+    if (source) {
+      source.value = 'file';
+      source.dispatchEvent(new Event('change', {bubbles:true}));
+    }
+    $('desktopVideoFile')?.scrollIntoView({behavior:'smooth',block:'center'});
+  });
   jsonApi('/api/large-upload/capabilities')
     .then(result => {
       config = result;
       limit.textContent=String(config.max_gb || 5);
       if (!config.enabled) {
-        say('Import de plusieurs Go non activé : ' + config.reason +
-          ' Le formulaire classique reste disponible pour les petites vidéos.');
+        if (cloudControls) cloudControls.hidden = true;
+        if (localFallback) localFallback.hidden = false;
+        fileInput.disabled = true;
+        say('Pour plusieurs Go, le stockage cloud n’est pas configuré. L’import MP4 classique reste disponible.');
       } else {
+        if (cloudControls) cloudControls.hidden = false;
+        if (localFallback) localFallback.hidden = true;
+        fileInput.disabled = false;
         say('Stockage cloud sécurisé prêt. Sélectionne ton MP4 ou MOV.');
+        onFileChanged();
       }
-      onFileChanged();
     })
     .catch(err => {say('Impossible de vérifier le stockage des gros fichiers : '+err.message);start.disabled=true;});
 })();
