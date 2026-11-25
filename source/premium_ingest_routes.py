@@ -68,7 +68,7 @@ def _resolve_team(db: Session, user: User, team_id: int | None, team_name: str):
     return team
 
 
-def _save_upload(file: UploadFile, user_id: int, team_id: int):
+def _save_upload(file: UploadFile, user_id: int, team_id: int, max_bytes: int = MAX_UPLOAD_BYTES):
     original = Path(file.filename or "video").name
     suffix = Path(original).suffix.lower()
     if suffix not in ALLOWED_VIDEO_EXTENSIONS:
@@ -83,8 +83,8 @@ def _save_upload(file: UploadFile, user_id: int, team_id: int):
                 if not chunk:
                     break
                 total += len(chunk)
-                if total > MAX_UPLOAD_BYTES:
-                    raise HTTPException(status_code=413, detail=f"Video exceeds {MAX_UPLOAD_MB} MB.")
+                if total > max_bytes:
+                    raise HTTPException(status_code=413, detail="La vidéo dépasse la limite de cet espace : 30 Mo en invité ou la limite normale du serveur.")
                 out.write(chunk)
     except Exception:
         target.unlink(missing_ok=True)
@@ -164,6 +164,8 @@ def premium_create_match(
     db: Session = Depends(get_db),
 ):
     user = _user(request, db)
+    from services.guest_ultimate import enforce_new_match_limit, guest_session, upload_byte_limit
+    enforce_new_match_limit(request, db, user)
     team = _resolve_team(db, user, team_id, team_name)
     opponent = _clean(opponent)
     if not opponent:
@@ -174,7 +176,8 @@ def premium_create_match(
 
     video_source = "none"; video_path = ""
     if video_file and video_file.filename:
-        video_path = _save_upload(video_file, user.id, team.id); video_source = "upload"
+        video_path = _save_upload(video_file, user.id, team.id,
+            max_bytes=upload_byte_limit(request, MAX_UPLOAD_BYTES)); video_source = "upload"
     elif video_url:
         video_source = "youtube" if youtube_embed(video_url) else "url"
 
@@ -186,7 +189,12 @@ def premium_create_match(
     )
     db.add(match); db.commit(); db.refresh(match)
 
-    if video_source == "upload":
+    if guest_session(request):
+        # Guests receive a real report and private manual-tag workspace, but
+        # never start costly deep video extraction or provider inference.
+        match.status = "guest_video_received" if video_source == "upload" else "guest_link_saved"
+        db.commit()
+    elif video_source == "upload":
         background_tasks.add_task(_run_owned_video, match.id)
     elif video_url:
         background_tasks.add_task(_run_remote_reference, match.id)
