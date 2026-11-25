@@ -36,7 +36,7 @@
   <div id="liveAutoTimeline" class="event-list">
     <p class="unmeasured">Aucune action sportive reconnue pour le moment.</p>
   </div>
-  <div class="actions" id="liveAutoStartAction" data-source="{{match.video_source}}" hidden>
+  <div class="actions" id="liveAutoStartAction" data-source="{{match.video_source}}" data-guest="{{'1' if request.session.get('web_demo') else '0'}}" hidden>
     {% if match.video_source in ["upload","cloud","youtube"] %}
     <form action="/matches/{{match.id}}/analysis/actions/start" method="post">
       <button class="btn secondary" type="submit">Analyser ou reprendre les intervalles manquants</button>
@@ -51,10 +51,12 @@
       <label>Durée réelle de la vidéo (minutes)
         <input name="duration_minutes" type="number" min="0.1" max="240" step="0.1" placeholder="Ex. 82.5" required>
       </label>
-      <button type="submit" class="btn" {% if not snapshot.video_actions.configured %}disabled{% endif %}>
+      <button type="submit" class="btn" {% if not snapshot.video_actions.configured or request.session.get('web_demo') %}disabled{% endif %}>
         Analyser automatiquement ce replay YouTube
       </button>
-      {% if not snapshot.video_actions.configured %}
+      {% if request.session.get('web_demo') %}
+        <p class="evidence-note">En invité, l'analyse IA payante est désactivée. Tu peux lire le match, annoter les actions réelles et produire un rapport sans compte.</p>
+      {% elif not snapshot.video_actions.configured %}
         <p class="evidence-note">Bouton désactivé : le moteur Gemini doit être connecté sur le serveur avant de pouvoir générer des statistiques automatiques.</p>
       {% else %}
         <p class="evidence-note">La première exécution et les reprises consomment du quota API. Les intervalles terminés sont conservés et ne sont pas retraités lors d'une reprise.</p>
