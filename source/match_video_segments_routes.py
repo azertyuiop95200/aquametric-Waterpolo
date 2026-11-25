@@ -109,6 +109,9 @@ def add_video_segment(match_id:int, request:Request, background_tasks:Background
                       video_file:Optional[UploadFile]=File(None),
                       db:Session=Depends(get_db)):
     user,match=_owned(match_id,request,db)
+    from services.guest_ultimate import guest_session, upload_byte_limit, MAX_GUEST_PARTS
+    if guest_session(request) and len(segment_rows(db,match))>=MAX_GUEST_PARTS:
+        raise HTTPException(429,"L'espace invité accepte quatre parties vidéo maximum par match.")
     _validate_period(period)
     url=(video_url or "").strip()
     file_provided=bool(video_file and video_file.filename)
@@ -117,7 +120,9 @@ def add_video_segment(match_id:int, request:Request, background_tasks:Background
     if file_provided:
         from analysis_input_routes_v2 import _save_upload
         source="upload"
-        path = _save_upload(video_file,user.id,match.team_id)
+        from analysis_input_routes_v2 import MAX_UPLOAD_BYTES
+        path = _save_upload(video_file,user.id,match.team_id,
+                            max_bytes=upload_byte_limit(request,MAX_UPLOAD_BYTES))
         url=""
     else:
         if not is_http_url(url):
@@ -130,7 +135,7 @@ def add_video_segment(match_id:int, request:Request, background_tasks:Background
         db.commit()
         if source in {"upload","youtube"}:
             from services.video_action_provider import provider_configuration
-            if provider_configuration()["configured"]:
+            if not guest_session(request) and provider_configuration()["configured"]:
                 if source=="upload":
                     from video_action_routes import run_segment_actions
                     background_tasks.add_task(run_segment_actions, match_id, segment.id)
@@ -192,6 +197,8 @@ def analyze_youtube_quarter(
     db:Session=Depends(get_db),
 ):
     _,match=_owned(match_id,request,db)
+    from services.guest_ultimate import prohibit_paid_analysis
+    prohibit_paid_analysis(request)
     segment=db.get(MatchVideoSegment,segment_id)
     if not segment or segment.match_id!=match.id or segment.source_type!="youtube":
         raise HTTPException(404,"Extrait YouTube introuvable.")
