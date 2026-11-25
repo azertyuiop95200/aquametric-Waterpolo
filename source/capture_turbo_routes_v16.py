@@ -122,6 +122,12 @@ def _publish_report_first(match_id: int, root: Path) -> dict:
     if existing:
         return _terminal_from_marker(root, _read_state(root))
 
+    received = _read_state(root)
+    manual_stop = received.get("client_finish_reason") == "manual_stop"
+    try:
+        video_read_percent = max(0.0, min(100.0, float(received.get("client_finish_read_percent") or 0)))
+    except (TypeError, ValueError):
+        video_read_percent = 0.0
     state = v15.v14._publish_fallback_report(
         match_id,
         str(root),
@@ -137,7 +143,9 @@ def _publish_report_first(match_id: int, root: Path) -> dict:
     state.update({
         "status": "partial",
         "analysis_percent": 100.0,
-        "read_percent": 100.0,
+        "read_percent": round(video_read_percent, 2) if manual_stop else 100.0,
+        "source_coverage_percent": round(video_read_percent, 2) if manual_stop else 100.0,
+        "client_finish_reason": "manual_stop" if manual_stop else received.get("client_finish_reason", "normal"),
         "phase": "rapport disponible immédiatement · enrichissement IA en arrière-plan",
         "redirect": f"/matches/{match_id}/analysis/result",
         "finalization_engine": "report-first-v16",
@@ -177,7 +185,9 @@ def _publish_report_first(match_id: int, root: Path) -> dict:
     state.update({
         "status": "partial",
         "analysis_percent": 100.0,
-        "read_percent": 100.0,
+        "read_percent": round(video_read_percent, 2) if manual_stop else 100.0,
+        "source_coverage_percent": round(video_read_percent, 2) if manual_stop else 100.0,
+        "client_finish_reason": "manual_stop" if manual_stop else received.get("client_finish_reason", "normal"),
         "phase": "rapport disponible immédiatement · enrichissement IA en arrière-plan",
         "redirect": f"/matches/{match_id}/analysis/result",
         "finalization_engine": "report-first-v16",
