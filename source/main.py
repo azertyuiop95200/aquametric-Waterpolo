@@ -877,6 +877,10 @@ def add_event(
     phase_tag: str = Form("auto"),
     return_to: str = Form(""),
     observed: str = Form(""),
+    period: int = Form(1),
+    segment_id: str = Form(""),
+    coord_x: str = Form(""),
+    coord_y: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = require_user(request, db)
@@ -889,6 +893,28 @@ def add_event(
         raise HTTPException(400, detail="Confirmer que cet événement a réellement été observé avant de l’ajouter.")
     if second < 0 or second > 12 * 60 * 60:
         raise HTTPException(400, detail="Event time is outside the supported range.")
+    if not 1 <= period <= 8:
+        raise HTTPException(400, detail="Période invalide (1 à 8).")
+    from math import isfinite
+    from models import MatchVideoSegment, EventPosition
+    segment = None
+    if segment_id:
+        if not segment_id.isdecimal():
+            raise HTTPException(400, detail="Identifiant de vidéo invalide.")
+        segment=db.get(MatchVideoSegment,int(segment_id))
+        if not segment or segment.match_id!=match.id:
+            raise HTTPException(404, detail="Cette vidéo n'appartient pas au match.")
+        period=segment.period
+    x = y = None
+    if coord_x.strip() or coord_y.strip():
+        if not coord_x.strip() or not coord_y.strip():
+            raise HTTPException(400, detail="Place le point complet sur la carte (X et Y).")
+        try:
+            x,y=float(coord_x),float(coord_y)
+        except (TypeError,ValueError):
+            raise HTTPException(400, detail="Coordonnées non numériques.") from None
+        if not (isfinite(x) and isfinite(y) and 0<=x<=100 and 0<=y<=100):
+            raise HTTPException(400, detail="Le point doit être compris entre 0 et 100 sur chaque axe.")
 
     pid = None
     if player_id:
@@ -915,6 +941,12 @@ def add_event(
     db.add(event)
     db.flush()
     db.add(EventContext(event_id=event.id, perspective=perspective, phase_tag=phase_tag))
+    if return_to == "report" or segment or x is not None:
+        db.add(EventPosition(
+            event_id=event.id,segment_id=segment.id if segment else None,
+            period=period,segment_second=second,
+            x_pct=x,y_pct=y,provenance="manual_verified",
+        ))
     db.commit()
     # Only accept this internal destination. Never redirect to user-supplied URLs.
     target = f"/matches/{match_id}/analysis/result#annotation" if return_to == "report" else f"/matches/{match_id}"
