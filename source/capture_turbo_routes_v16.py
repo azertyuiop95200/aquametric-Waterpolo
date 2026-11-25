@@ -477,6 +477,25 @@ def turbo_finish_capture(
             status_code=500,
         )
 
+    if client_finish_reason == "manual_stop":
+        # The older V15/V14 finishers may have already published their own
+        # 100%-read state before V16 returns. The authenticated finish request
+        # knows precisely the user-observed share and must win over that legacy
+        # state and over any report marker written by older wrappers.
+        from math import isfinite
+        try:
+            percent = float(client_read_percent)
+            percent = max(0.0, min(100.0, percent)) if isfinite(percent) else 0.0
+        except (ValueError, TypeError):
+            percent = 0.0
+        published.update({
+            "read_percent": round(percent, 2),
+            "source_coverage_percent": round(percent, 2),
+            "client_finish_reason": "manual_stop",
+        })
+        _write_state(root, published)
+        _write_report_marker(root, published)
+
     if capture_is_unverified(published.get("capture_source_quality", {})):
         # Do not run OCR/action recognition over a YouTube verification screen.
         return JSONResponse(_finish_payload(match_id, session_id, published))
