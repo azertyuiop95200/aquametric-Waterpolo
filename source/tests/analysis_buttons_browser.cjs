@@ -19,7 +19,7 @@ module.exports = async (page, base, assert) => {
   assert(await page.locator('#phoneVideoUrl').isEnabled(), 'Mobile YouTube URL disabled');
 
   await page.setViewportSize({width:1280,height:850});
-  await page.reload({waitUntil:'networkidle'});
+  await page.reload({waitUntil:'domcontentloaded'});
   await page.locator('#quickFileAnalysis').click();
   assert(await page.locator('#desktopFilePanel').isVisible(), 'Desktop MP4 source not shown');
   assert(await page.locator('#desktopVideoFile').isEnabled(), 'Desktop MP4 disabled');
@@ -47,7 +47,7 @@ module.exports = async (page, base, assert) => {
   const location=created.headers()['location']||'';
   const id=(location.match(/\/matches\/(\d+)\//)||[])[1];
   assert(id,'Match creation did not return match ID');
-  await page.goto(base+'/matches/'+id+'/analysis/browser-capture',{waitUntil:'networkidle'});
+  await page.goto(base+'/matches/'+id+'/analysis/browser-capture',{waitUntil:'domcontentloaded'});
   assert(await page.locator('#finishCaptureAnytime').isVisible(),
     'Finish and report is hidden when capture not started');
   assert(await page.locator('#viewCaptureReport').isVisible(),'Partial report link hidden');
@@ -63,7 +63,7 @@ module.exports = async (page, base, assert) => {
   assert(page.url().endsWith('#annotation'), 'Analyze action does not navigate to video review');
 
   await page.setViewportSize({width:390,height:844});
-  await page.reload({waitUntil:'networkidle'});
+  await page.reload({waitUntil:'domcontentloaded'});
   const dock=page.locator('#reportQuickActions');
   assert(await dock.isVisible(),'Mobile report actions not visible');
   const pos=await dock.evaluate(el=>getComputedStyle(el).position);
