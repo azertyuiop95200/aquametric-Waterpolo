@@ -104,6 +104,19 @@ def _run_owned_video(match_id: int):
         if not match:
             return
         match.status = "analysis_running"; db.commit()
+        # This is the actual import pipeline served by several legacy AquaMetric
+        # routes. Start the model-action checkpoints *before* heavy OCR/clips,
+        # otherwise a coach sees an empty table while the match is processed.
+        # No provider key => no invented automatic events.
+        try:
+            from services.video_action_provider import provider_configuration
+            if provider_configuration()["configured"]:
+                from video_action_routes import run_upload_actions
+                run_upload_actions(match_id)
+        except Exception:
+            # Preserve the source and the regular analysis when the separately
+            # configured action model is unreachable. Its own run logs failures.
+            pass
         try:
             run_complete_analysis(db, match, UPLOAD_DIR, EVIDENCE_DIR, include_audio=True)
             materialize_deep_sequence_pack(
