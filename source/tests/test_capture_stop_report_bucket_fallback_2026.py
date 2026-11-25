@@ -133,3 +133,50 @@ def test_unavailable_cloud_only_disables_large_upload_not_standard_import(monkey
         assert new.status_code==200
         assert 'id="desktopFileAnalyzeSubmit"' in new.text
         assert 'id="largeUploadLocalFallback"' in new.text
+
+
+def test_manual_stop_publishes_partial_coverage_without_claiming_full_video(monkeypatch):
+    import capture_turbo_routes_v16 as v16
+    # The real /finish endpoint is exercised, not just static template content.
+    monkeypatch.setattr(v16,"_verify_after_publish",lambda *args,**kwargs:None)
+    monkeypatch.setattr(v16.v15.v14.v13,"_enrich_after_report",lambda *args,**kwargs:None)
+    with TestClient(app) as client:
+        register(client)
+        mid=create_youtube(client)
+        session=client.post(f"/matches/{mid}/analysis/browser-capture/session",data={
+            "source_start_second":"0",
+            "source_duration_seconds":"1200",
+            "playback_rate":"1",
+            "parallel_segments":"1",
+        })
+        assert session.status_code==200,session.text
+        sid=session.json()["session_id"]
+        sent=client.post(f"/matches/{mid}/analysis/browser-capture/chunk",
+            data={"session_id":sid,"index":"0"},
+            files={"chunk":("clip.webm",b"x"*(80*1024),"video/webm")})
+        assert sent.status_code==200,sent.text
+        finished=client.post(f"/matches/{mid}/analysis/browser-capture/finish",data={
+            "session_id":sid,
+            "source_start_second":"0",
+            "source_duration_seconds":"1200",
+            "playback_rate":"1",
+            "parallel_segments":"1",
+            "client_finish_reason":"manual_stop",
+            "client_read_percent":"35",
+        })
+        assert finished.status_code==200,finished.text
+        payload=finished.json()
+        assert payload["accepted"] is True
+        assert payload["report_ready"] is True
+        assert payload["redirect"]==f"/matches/{mid}/analysis/result"
+        progress=client.get(payload["status_url"])
+        assert progress.status_code==200
+        state=progress.json()["progress"]
+        assert state["report_ready"] is True
+        assert state["analysis_percent"]==100
+        assert state["read_percent"]==35
+        assert state["source_coverage_percent"]==35
+        assert state["client_finish_reason"]=="manual_stop"
+        report=client.get(payload["redirect"])
+        assert report.status_code==200
+        assert 'id="reportQuickActions"' in report.text
