@@ -90,3 +90,39 @@ jobs:
           assert 'sources' in stats and 'sides' in stats
           print("STAGING_AUTHENTICATED_ANALYZE_AND_REPORT_PASS")
           PY
+          # Provider state must be measured from the actual deployed server.
+          curl -fsSL --max-time 30 "$BASE/health/video-actions" -o "$temp/engine.json"
+          python - "$temp/engine.json" <<'PY'
+          import json,sys
+          p=json.load(open(sys.argv[1]))
+          assert p['ok'] is True
+          assert isinstance(p['configured'],bool)
+          assert 'availability_code' in p
+          print("LIVE_VIDEO_ENGINE_CONFIGURED="+str(p['configured']))
+          print("LIVE_VIDEO_ENGINE_STATE="+p['availability_code'])
+          PY
+          # Real small MP4 through the same desktop multipart endpoint. This is
+          # a generated blank test card, never presented as a real match.
+          if command -v ffmpeg >/dev/null 2>&1; then
+            ffmpeg -hide_banner -loglevel error -y \
+              -f lavfi -i color=c=blue:s=320x240:r=5 -t 1.2 \
+              -c:v libx264 -pix_fmt yuv420p "$temp/test.mp4"
+            curl -fsS --max-time 40 -c "$temp/cookies" -b "$temp/cookies" \
+              -D "$temp/file.headers" \
+              -F 'team_name=Test technique MP4' \
+              -F 'opponent=Image synthétique' -F 'category=Women' \
+              -F 'input_device=desktop' \
+              -F "video_file=@$temp/test.mp4;filename=q1.mp4;type=video/mp4" \
+              "$BASE/matches" -o "$temp/file.body"
+            grep -qE '^HTTP/[0-9.]+ 303' "$temp/file.headers"
+            filelocation=$(grep -i '^location:' "$temp/file.headers" | tail -1 | tr -d '\r')
+            filemid=$(printf '%s' "$filelocation" | sed -nE 's|.*[/]matches/([0-9]+)/analysis/result.*|\1|p')
+            test -n "$filemid"
+            curl -fsSL --max-time 40 -c "$temp/cookies" -b "$temp/cookies" \
+              "$BASE/matches/$filemid/analysis/result" -o "$temp/file-report.html"
+            grep -Fq 'id="liveAutomaticStats"' "$temp/file-report.html"
+            grep -Fq 'id="sources"' "$temp/file-report.html"
+            echo 'STAGING_SMALL_MP4_UPLOAD_AND_REPORT_PASS'
+          else
+            echo 'FFmpeg not installed on test runner; real MP4 upload covered by CI only'
+          fi
