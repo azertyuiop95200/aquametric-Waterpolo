@@ -50,6 +50,22 @@ def run_upload_actions(match_id):
             run_video_actions(db, match, UPLOAD_DIR / Path(match.video_path).name)
 
 
+def run_segment_actions(match_id: int, segment_id: int):
+    """Analyze an independently uploaded quarter; keep its own source run."""
+    from analysis_product_routes import UPLOAD_DIR
+    from models import MatchVideoSegment
+    with SessionLocal() as db:
+        match = db.get(Match, match_id)
+        segment = db.get(MatchVideoSegment, segment_id)
+        if not match or not segment or segment.match_id != match.id:
+            return
+        if segment.source_type != "upload" or not segment.video_path:
+            return
+        file_path = UPLOAD_DIR / Path(segment.video_path).name
+        if file_path.is_file():
+            run_video_actions(db, match, file_path)
+
+
 def upload_analysis_background(match_id, job_id, include_audio):
     from analysis_product_routes import UPLOAD_DIR, EVIDENCE_DIR
     from services.complete_analysis_runner import run_complete_analysis
