@@ -55,7 +55,11 @@
     }
     if(!(data.recent_events||[]).length)row(timeline,'Aucun événement automatique identifié dans les séquences traitées.');
     const start=$('liveAutoStartAction');
-    if(start)start.hidden=!(data.configured && !data.active && !data.sources?.length && start.querySelector('form'));
+    if(start){
+      const initialLocal=start.dataset.source==='upload' && data.status==='awaiting_video';
+      const retry=data.status==='partial'||data.status==='failed';
+      start.hidden=!(data.configured && !data.active && (initialLocal||retry) && start.querySelector('form'));
+    }
     update($('liveAutoPrivacyNote'),data.configured
       ? 'Les chiffres IA sont provisoires ; seules les annotations vérifiées servent au rapport officiel et aux points du bassin.'
       : 'Analyse des actions indisponible tant que la clé du modèle vidéo manque. Aucune donnée n’est simulée.');
