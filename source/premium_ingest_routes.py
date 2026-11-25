@@ -160,6 +160,7 @@ def premium_create_match(
     match_date: str = Form(""),
     video_url: str = Form(""),
     video_file: UploadFile | None = File(None),
+    return_to_report: bool = Form(False),
     db: Session = Depends(get_db),
 ):
     user = _user(request, db)
@@ -193,4 +194,8 @@ def premium_create_match(
     # Compatibility: many internal tools parse the match id from this canonical
     # location. The browser then auto-opens the Ultimate result via premium JS
     # whenever analysis is queued/running/ready.
-    return RedirectResponse(f"/matches/{match.id}", status_code=303)
+    destination = (
+        f"/matches/{match.id}/analysis/result"
+        if return_to_report else f"/matches/{match.id}"
+    )
+    return RedirectResponse(destination, status_code=303)
