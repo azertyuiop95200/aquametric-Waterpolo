@@ -104,7 +104,7 @@ def test_live_api_changes_after_new_minute_without_page_reload(monkeypatch):
         js=client.get("/static/live-auto-stats.js")
         assert js.status_code==200
         assert "location.reload()" not in js.text
-        assert "data.autoField" in js.text
+        assert "cell.dataset.autoField" in js.text
         with TestClient(app) as stranger:
             sign_up(stranger)
             assert stranger.get(path).status_code==404
