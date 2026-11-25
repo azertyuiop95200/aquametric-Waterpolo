@@ -40,7 +40,7 @@
         </div>
         <div class="capture-actions" style="margin-top:12px">
           <button id="startCapture" class="btn primary" type="button">Démarrer l’analyse dans cet onglet</button>
-          <button id="stopCapture" class="btn" type="button" disabled>Arrêter et analyser</button>
+          <button id="stopCapture" class="btn" type="button">Terminer et ouvrir mon rapport</button>
           <a id="openReplay" class="btn secondary" href="{{ match.video_url }}" target="_blank" rel="noopener noreferrer">Ouvrir le replay</a>
           <a class="btn secondary" href="/matches/{{match.id}}/analysis/result">Retour aux résultats</a>
         </div>
@@ -327,7 +327,7 @@
       setStatus(`Capture active · ${parallelSegments} segment(s) · x${playbackRate}. Pré-analyse Vision/OCR démarrée.`);
       tick=setInterval(tickUi,500);statusTick=setInterval(pollStatus,1500);frameTick=setInterval(sendProgressFrame,3000);listenTick=setInterval(()=>players.slice(0,parallelSegments).forEach(ytListen),700);
       setTimeout(primePlayers,350);setTimeout(primePlayers,1400);setTimeout(sendProgressFrame,2000);
-    }catch(err){const m=captureErrorMessage(err);leaveStudio();setStatus(`Impossible de démarrer : ${m}`);setPermission(m,false);stopTracks();startBtn.disabled=false;stopBtn.disabled=true;stopLiveBtn.disabled=true;sourceStartInput.disabled=false;[mode1,mode2,modeTurbo].forEach(b=>b.disabled=false)}
+    }catch(err){const m=captureErrorMessage(err);leaveStudio();setStatus(`Impossible de démarrer : ${m}`);setPermission(m,false);stopTracks();startBtn.disabled=false;stopBtn.disabled=false;stopLiveBtn.disabled=true;sourceStartInput.disabled=false;[mode1,mode2,modeTurbo].forEach(b=>b.disabled=false)}
   });
 
   stopBtn.addEventListener('click',requestStop);stopLiveBtn.addEventListener('click',requestStop);
