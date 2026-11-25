@@ -314,7 +314,7 @@ def _verify_after_publish(
         state.update({
             "status": "partial",
             "analysis_percent": 100.0,
-            "read_percent": 100.0,
+            "read_percent": state.get("source_coverage_percent", 100.0) if state.get("client_finish_reason") == "manual_stop" else 100.0,
             "report_ready": True,
             "phase": "analyse partielle disponible" if outcome == "partial" else "analyse sans mesures sportives",
             "redirect": f"/matches/{match_id}/analysis/result",
