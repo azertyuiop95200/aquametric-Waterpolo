@@ -50,16 +50,28 @@ def live_action_dashboard(db, match) -> dict:
     # They MUST NOT be added to each other as if two matches were played.
     # Prefer a direct run once it has real completed clips; otherwise retain
     # the browser results until the new direct run provides observations.
-    has_direct_clips=any(
-        run.source_kind=="youtube_direct" and any(
-            s.get("status")=="complete" for s in json.loads(run.segments_json or "[]")
-        )
-        for run in runs
-    ) if match.video_source=="youtube" else False
-    if has_direct_clips:
-        runs=[run for run in runs if run.source_kind!="browser_capture"]
-    elif match.video_source=="youtube" and any(run.source_kind=="browser_capture" for run in runs):
-        runs=[run for run in runs if run.source_kind!="youtube_direct"]
+    # Direct analysis of an appended Q2 YouTube URL is NOT a duplicate of
+    # the primary Q1 browser capture. Only dedupe alternative *methods*
+    # operating on the primary match.video_url.
+    primary_url = ""
+    if match.video_source=="youtube":
+        from services.youtube_direct_actions import canonical_public_youtube
+        try:
+            primary_url=canonical_public_youtube(match.video_url)
+        except ValueError:
+            pass
+    primary_direct=[r for r in runs if
+                    r.source_kind=="youtube_direct" and r.source_path==primary_url]
+    has_primary_direct_clips=any(
+        any(s.get("status")=="complete" for s in json.loads(run.segments_json or "[]"))
+        for run in primary_direct
+    )
+    if has_primary_direct_clips:
+        runs=[r for r in runs if r.source_kind!="browser_capture"]
+    elif match.video_source=="youtube" and any(r.source_kind=="browser_capture" for r in runs):
+        runs=[r for r in runs if not (
+            r.source_kind=="youtube_direct" and r.source_path==primary_url
+        )]
     all_rows = []
     public_runs = []
     completed, total = 0, 0
