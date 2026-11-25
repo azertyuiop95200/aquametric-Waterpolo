@@ -121,7 +121,7 @@ jobs:
               "$BASE/matches" -o "$temp/file.body"
             grep -qE '^HTTP/[0-9.]+ 303' "$temp/file.headers"
             filelocation=$(grep -i '^location:' "$temp/file.headers" | tail -1 | tr -d '\r')
-            filemid=$(printf '%s' "$filelocation" | sed -nE 's|.*[/]matches/([0-9]+)/analysis/result.*|\1|p')
+            filemid=$(printf '%s' "$filelocation" | sed -nE 's|.*[/]matches/([0-9]+)(/analysis/result)?([?#].*)?$|\1|p')
             test -n "$filemid"
             curl -fsSL --max-time 40 -c "$temp/cookies" -b "$temp/cookies" \
               "$BASE/matches/$filemid/analysis/result" -o "$temp/file-report.html"
