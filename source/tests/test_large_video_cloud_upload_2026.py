@@ -150,7 +150,7 @@ def test_three_gib_multi_part_file_does_not_need_server_disk(monkeypatch):
         report=client.get(url)
         assert report.status_code==200
         assert 'id="cloudVideoReceived"' in report.text
-        assert 'id="reviewLocalVideo"' in report.text
+        assert 'id="reviewSegmentPlayer"' in report.text
         assert "Aucun tir, but ou événement individuel" in report.text
         portable=client.get(url.replace("/result","/report.html"))
         assert portable.status_code==200
