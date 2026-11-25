@@ -138,6 +138,27 @@
   </table>
   <div class="map-evidence" id="spatialProofList"><p class="evidence-note">Les points cliquables et leurs preuves apparaissent ici après annotation.</p></div>
 </section>
+<section class="report-card section-wide" id="poloiqVision">
+  <div class="hero-top">
+    <div><span class="eyebrow">VISION ARTIFICIELLE · BASE D'ENTRAÎNEMENT</span>
+      <h2>PoloIQ · ballon, cage et joueuses</h2></div>
+    <span class="chip" id="poloiqState">Vérification du modèle…</span>
+  </div>
+  <p>Jeu de données <a href="https://universe.roboflow.com/ball-tracking-rrxno/poloiq" target="_blank" rel="noopener">PoloIQ de « ball tracking » sur Roboflow Universe</a> · 4 865 images sources · licence CC BY 4.0 · cinq classes : ballon, cage, gardienne rouge, joueuses foncées et blanches.</p>
+  <p class="evidence-note"><b>Attention :</b> le jeu de données public ne comporte pas de modèle préentraîné publié. Pour activer ce test, il faut entraîner un détecteur, le déployer et configurer ses identifiants sur le serveur. Les éventuelles boîtes visuelles ne prouvent ni un but, ni un tir, ni le numéro d'une joueuse. Le site ne les convertit pas en statistiques sportives sans revue.</p>
+  <div id="poloiqExplain" class="evidence-note" role="status" aria-live="polite">État de la reconnaissance en cours de vérification.</div>
+  <form id="poloiqFrameForm" data-match-id="{{match.id}}">
+    <label>Tester sur une image réellement issue du replay (JPG/PNG/WebP, 6 Mo maximum)
+      <input name="image" id="poloiqFrame" type="file" accept="image/jpeg,image/png,image/webp">
+    </label>
+    <button type="submit" id="poloiqTestBtn" class="btn secondary" disabled>Détecter les objets de cette image</button>
+  </form>
+  <div class="map-figure" style="max-width:800px;margin-top:12px">
+    <canvas id="poloiqPreview" style="width:100%;height:auto;max-height:480px;object-fit:contain" aria-label="Aperçu des objets détectés dans l'image choisie"></canvas>
+  </div>
+  <p class="evidence-note" id="poloiqResult">Aucun résultat visuel. Le rapport statistique reste séparé du test de détection.</p>
+</section>
+<script defer src="/static/poloiq-vision-preview.js"></script>
 <script type="application/json" id="spatialDataset">{{spatial_stats.points|tojson}}</script>
 <script type="application/json" id="videoSegmentsDataset">{{video_segments|tojson}}</script>
 <script defer src="/static/spatial-match-analysis.js"></script>
