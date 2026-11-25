@@ -56,13 +56,20 @@
         <select name="period">{% for i in range(1,9) %}<option value="{{i}}">Q{{i}}</option>{% endfor %}</select>
       </label>
       <label>Nom de la vidéo<input name="segment_label" placeholder="Q3 · film du match"></label>
-      <label>Fichier MP4 / MOV / WebM / MKV
-        <input id="largeUploadVideo" type="file" accept=".mp4,.mov,.webm,.m4v,.mkv,video/mp4,video/quicktime,video/webm">
-      </label>
-      <p class="evidence-note">Taille maximale prévue : <span id="largeUploadLimit">5</span> Go. L'envoi direct en morceaux nécessite un stockage cloud privé et une base durable.</p>
+      <div id="largeUploadCloudControls">
+        <label>Fichier MP4 / MOV / WebM / MKV
+          <input id="largeUploadVideo" type="file" accept=".mp4,.mov,.webm,.m4v,.mkv,video/mp4,video/quicktime,video/webm">
+        </label>
+        <p class="evidence-note">Taille maximale prévue : <span id="largeUploadLimit">5</span> Go. L'envoi direct en morceaux nécessite un stockage cloud privé et une base durable.</p>
+        <progress id="largeUploadProgress" value="0" max="100" style="width:100%;height:14px"></progress>
+        <div class="actions"><button class="btn" type="button" id="largeUploadStart" disabled>Envoyer cette partie</button><button class="btn secondary" type="button" id="largeUploadCancel" hidden>Annuler</button></div>
+      </div>
       <p id="largeUploadStatus" role="status">Vérification du stockage cloud…</p>
-      <progress id="largeUploadProgress" value="0" max="100" style="width:100%;height:14px"></progress>
-      <div class="actions"><button class="btn" type="button" id="largeUploadStart" disabled>Envoyer cette partie</button><button class="btn secondary" type="button" id="largeUploadCancel" hidden>Annuler</button></div>
+      <div id="largeUploadLocalFallback" class="notice" hidden>
+        <strong>Sans bucket, l'import d'une petite vidéo reste disponible.</strong>
+        <p>Dépose les quart-temps un par un avec le formulaire juste à côté. Les fichiers sont associés au même match.</p>
+        <button class="btn primary" type="button" id="chooseRegularUpload">Ajouter un quart-temps classique</button>
+      </div>
     </form>
   </div>
 </section>
