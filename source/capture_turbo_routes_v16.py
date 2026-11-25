@@ -116,16 +116,22 @@ def _terminal_from_marker(root: Path, current: dict | None = None) -> dict:
     return state
 
 
-def _publish_report_first(match_id: int, root: Path) -> dict:
+def _publish_report_first(match_id: int, root: Path, *, client_finish_reason: str = "", client_read_percent: float | None = None) -> dict:
     """Persist a truthful report using only evidence already obtained live."""
     existing = _read_report_marker(root)
     if existing:
         return _terminal_from_marker(root, _read_state(root))
 
     received = _read_state(root)
-    manual_stop = received.get("client_finish_reason") == "manual_stop"
+    # The request parameters are authoritative. An older finalizer can
+    # overwrite progress.json before we publish the report-first marker.
+    final_reason = client_finish_reason or received.get("client_finish_reason") or "normal"
+    manual_stop = final_reason == "manual_stop"
     try:
-        video_read_percent = max(0.0, min(100.0, float(received.get("client_finish_read_percent") or 0)))
+        percentage = client_read_percent if client_read_percent is not None else received.get("client_finish_read_percent")
+        video_read_percent = float(percentage or 0)
+        from math import isfinite
+        video_read_percent = max(0.0, min(100.0, video_read_percent)) if isfinite(video_read_percent) else 0.0
     except (TypeError, ValueError):
         video_read_percent = 0.0
     state = v15.v14._publish_fallback_report(
@@ -459,7 +465,11 @@ def turbo_finish_capture(
     raw_segments = int(state.get("parallel_segments") or parallel_segments or 1)
     segments = 4 if raw_segments >= 4 else (2 if raw_segments >= 2 else 1)
 
-    published = _publish_report_first(match_id, root)
+    published = _publish_report_first(
+        match_id, root,
+        client_finish_reason=client_finish_reason,
+        client_read_percent=client_read_percent,
+    )
     if not published:
         # Explicit failure is preferable to another invisible 89% wait.
         return JSONResponse(
