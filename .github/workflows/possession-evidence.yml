@@ -1,0 +1,25 @@
+name: Possession evidence integration
+on:
+  pull_request:
+    paths:
+      - 'source/**'
+      - 'tests/test_possession_evidence.py'
+      - '.github/workflows/possession-evidence.yml'
+jobs:
+  possession-evidence:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install jinja2
+      - run: python -m py_compile source/main.py source/services/analysis_product.py source/services/possession_evidence.py
+      - run: PYTHONPATH=source python -m unittest discover -s tests -p test_possession_evidence.py -v
+      - run: |
+          python - <<'PY'
+          from jinja2 import Environment, FileSystemLoader
+          e=Environment(loader=FileSystemLoader('source/templates'))
+          for f in ('analysis_result_clean_v2.html','analysis_all_measurements.html','possession_evidence.html','possession_evidence_controls.html'):
+              e.get_template(f)
+          PY
