@@ -22,3 +22,18 @@ class BroadcastScoreboardTests(unittest.TestCase):
         self.assertEqual(result[0]["reason"],"unknown")
         self.assertEqual(result[0]["after"],28)
         self.assertEqual(clock_changes([rows[0],dict(rows[1],is_replay=True)]),[])
+    def test_tight_crop_retries_unreadable_digit(self):
+        image=self.fixture()
+        cv2.putText(image,"0",(240,61),cv2.FONT_HERSHEY_SIMPLEX,.8,(255,255,255),2)
+        values={"home":"0","away":"6","clock":"06:49","period":"2","shot":"14"}
+        seen=[]
+        def read(img,key):
+            if key=="home":
+                seen.append(img.shape)
+                if len(seen)==1:
+                    return "",0.0
+            return values[key],.95
+        result=read_broadcast_scoreboard(image,read)
+        self.assertEqual(result["home_score"],0)
+        self.assertEqual(len(seen),2)
+        self.assertNotEqual(seen[0],seen[1])

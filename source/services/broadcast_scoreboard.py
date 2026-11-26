@@ -24,6 +24,13 @@ def read_broadcast_scoreboard(frame, read_text):
         _,img=cv2.threshold(img,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
         img=cv2.copyMakeBorder(255-img,15,15,15,15,cv2.BORDER_CONSTANT,value=255)
         text,conf=read_text(img,key)
+        # Tight digit crop rescued the unreadable zero at 3.6 s in a real FFN clip.
+        if not text and key != 'clock':
+            ys,xs=np.nonzero(img<128)
+            if len(xs) and xs.max()-xs.min()>=2 and ys.max()-ys.min()>=2:
+                tight=img[ys.min():ys.max()+1,xs.min():xs.max()+1]
+                tight=cv2.copyMakeBorder(tight,20,20,20,20,cv2.BORDER_CONSTANT,value=255)
+                text,conf=read_text(tight,key)
         vals[key]=str(text).strip(); confs.append(float(conf))
     if not all(re.fullmatch(r'\d{1,2}',vals[k]) for k in ('home','away','period','shot')): return {}
     if not re.fullmatch(r'\d{1,2}:\d{2}',vals['clock']): return {}
