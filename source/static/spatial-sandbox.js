@@ -4,7 +4,7 @@ const $=id=>document.getElementById("sbx-"+id);
 const data=JSON.parse($("data").textContent), base=data.baseline.observations, reference=data.baseline.result;
 const clone=x=>JSON.parse(JSON.stringify(x)), L=base.length_m,W=base.width_m;
 const canvas=$("canvas"),ctx=canvas.getContext("2d");
-const initial=()=>({start:clone(base.start),carrier_velocity:[0,0,0],defenders:clone(base.defenders),
+const initial=()=>({start:clone(base.start),carrier_velocity:[0,0,0],carrier_acceleration:[0,0,0],defenders:base.defenders.map(d=>({...clone(d),acceleration:[0,0,0]})),
  options:base.options.map(o=>({...clone(o),receiver_velocity:[0,0,0]})),delay_s:0,ball_speed_m_s:12,suggest:true});
 const snapshots={A:null,B:null};
 let edit=initial(), result=null, resultInput=null, history=[], selected="carrier", drag=null, timer=null, revision=0, busy=false, pending=false, refineNext=false, animation=0;
@@ -12,8 +12,8 @@ const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)), fmt=(v,n=2)=>Number.isFinite(v)?
 const num=id=>$(id).valueAsNumber;
 const add=(el,tag,txt)=>{const a=document.createElement(tag);a.textContent=txt;el.append(a);return a};
 function entities(){
- return [{key:"carrier",label:"Ballon / porteuse",p:edit.start,v:edit.carrier_velocity,color:"#ffd36a"},
- ...edit.defenders.map((d,i)=>({key:"d"+i,label:"Défense · "+d.id,p:d.position,v:d.velocity,defender:d,color:"#ff727c"})),
+ return [{key:"carrier",label:"Ballon / porteuse",p:edit.start,v:edit.carrier_velocity,a:edit.carrier_acceleration,color:"#ffd36a"},
+ ...edit.defenders.map((d,i)=>({key:"d"+i,label:"Défense · "+d.id,p:d.position,v:d.velocity,a:d.acceleration,defender:d,color:"#ff727c"})),
  ...edit.options.map((o,i)=>({key:"o"+i,label:(o.kind==="pass"?"Cible de passe · ":"Cible de tir · ")+o.id,p:o.target,
  v:o.kind==="pass"?o.receiver_velocity:null,option:o,color:o.kind==="pass"?"#61ddff":"#73e9a7"}))];
 }
@@ -22,6 +22,7 @@ function sync(){
  const e=selectedEntity(); selected=e.key;$("entity").value=selected;
  ["x","y","z"].forEach((id,i)=>{$(id).value=fmt(e.p[i]);$(id).disabled=!!e.option&&e.option.kind==="shot"&&e.option.id!==base.chosen&&i===0});
  ["vx","vy","vz"].forEach((id,i)=>{$(id).disabled=!e.v;$(id).value=e.v?fmt(e.v[i]):""});
+ ["ax","ay","az"].forEach((id,i)=>{$(id).disabled=!e.a;$(id).value=e.a?fmt(e.a[i]):""});
  $("radius").disabled=!e.defender;$("radius").value=e.defender?fmt(e.defender.radius):"";
  $("flight").disabled=!e.option;$("flight").value=e.option?e.option.duration_s:"";
  $("delay").value=edit.delay_s;$("delay-value").value=fmt(edit.delay_s,1)+" s";$("speed").value=edit.ball_speed_m_s;$("suggest").checked=edit.suggest;
@@ -56,7 +57,7 @@ function draw(){
  for(const e of entities()){
   line([[e.p[0],e.p[1],0],e.p],e.color,1,null,true);
   dot(e.p,e.color,e.key===selected?9:6,e.label);
-  if(e.v)line([e.p,e.p.map((p,i)=>p+e.v[i]*edit.delay_s)],e.color,2,null,true);
+  if(e.v)line([e.p,e.p.map((p,i)=>p+e.v[i]*edit.delay_s+.5*(e.a?.[i]||0)*edit.delay_s**2)],e.color,2,null,true);
  }
  ctx.fillStyle="#c9e2ef";ctx.font="14px sans-serif";ctx.fillText("HYPOTHÈSE COACH · t avant geste = "+fmt(edit.delay_s,1)+" s",15,23);
 }
@@ -92,11 +93,12 @@ async function calculate(){
 }
 const select=$("entity");for(const e of entities()){const o=add(select,"option",e.label);o.value=e.key}
 select.addEventListener("change",()=>{selected=select.value;sync();draw()});
-for(const id of ["x","y","z","vx","vy","vz","flight","radius"])$(id).addEventListener("change",()=>{
+for(const id of ["x","y","z","vx","vy","vz","ax","ay","az","flight","radius"])$(id).addEventListener("change",()=>{
  const value=num(id);if(!Number.isFinite(value)){sync();return}const e=selectedEntity();remember();
  if(["x","y","z"].includes(id)){const p=[...e.p];p[["x","y","z"].indexOf(id)]=value;setPoint(e,p)}
  else if(id==="radius"&&e.defender)e.defender.radius=clamp(value,.15,1.8);
  else if(id==="flight"&&e.option)e.option.duration_s=clamp(value,.15,2);
+ else if(["ax","ay","az"].includes(id)&&e.a)e.a[["ax","ay","az"].indexOf(id)]=clamp(value,-2,2);
  else if(e.v)e.v[["vx","vy","vz"].indexOf(id)]=clamp(value,-3,3);
  sync();changed();
 });
