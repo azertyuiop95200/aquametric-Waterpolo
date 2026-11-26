@@ -1030,7 +1030,7 @@ def add_event(
 @app.post("/matches/{match_id}/review-reference")
 def import_match_review_reference(match_id: int, request: Request,
     reference_file: UploadFile = File(...), home_color: str = Form(...),
-    same_match: str = Form(""), db: Session = Depends(get_db)):
+    same_match: str = Form(""), expected_digest: str = Form(""), db: Session = Depends(get_db)):
     from models import MatchReviewReference
     from services.review_reference_import import load, MAX_BYTES, COLORS
     from sqlalchemy.exc import IntegrityError
@@ -1047,15 +1047,21 @@ def import_match_review_reference(match_id: int, request: Request,
     finally:
         reference_file.file.close()
     prior = db.scalar(select(MatchReviewReference).where(MatchReviewReference.match_id==match_id,MatchReviewReference.period==period))
-    if prior:
-        if prior.digest != digest or prior.home_color != home_color:
-            raise HTTPException(409, detail="Une référence différente existe pour cette période. Exporter et supprimer explicitement avant remplacement.")
-    else:
-        db.add(MatchReviewReference(match_id=match_id,period=period,digest=digest,home_color=home_color,payload_json=canonical))
-        try: db.commit()
-        except IntegrityError:
-            db.rollback()
-            raise HTTPException(409, detail="Import concurrent, recharger le rapport.")
+    try:
+        if prior:
+            from services.review_reference_revision import replace_reference
+            replace_reference(db,prior,p,canonical,digest,home_color,expected_digest)
+        else:
+            if expected_digest:
+                raise ValueError("La version à remplacer ne correspond pas à cette période.")
+            db.add(MatchReviewReference(match_id=match_id,period=period,digest=digest,home_color=home_color,payload_json=canonical))
+        db.commit()
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(409,detail=str(exc)) from None
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, detail="Import concurrent, recharger le rapport.") from None
     return RedirectResponse(f"/matches/{match_id}/analysis/result#reviewReferences", status_code=303)
 
 @app.get("/matches/{match_id}/review-reference/{period}.json")
