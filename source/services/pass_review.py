@@ -20,7 +20,7 @@ def validate_pass_review(reference, duration):
     review = reference.get('pass_review')
     if review is None:
         return None
-    check(isinstance(review, dict) and review.get('version') == 1 and review.get('coverage_complete') is False, 'Référence passes invalide ou non partielle.')
+    check(isinstance(review, dict) and type(review.get('version')) is int and review['version'] == 1 and review.get('coverage_complete') is False, 'Référence passes invalide ou non partielle.')
     fps = review.get('fps')
     check(type(fps) is int and 1 <= fps <= 240 and isinstance(duration, (int,float)) and isfinite(duration), 'Cadence vidéo invalide.')
     limit = round(duration * fps)
@@ -29,7 +29,7 @@ def validate_pass_review(reference, duration):
     check(isinstance(rows,list) and len(rows)<=2000, 'Registre de passes invalide.')
     events={e['event_id']:e for e in reference.get('events',[])}
     intervals={e['interval_id']:e for e in reference.get('possession_review_intervals',[])}
-    ids=set(); releases=[]
+    ids=set(); releases=[]; same_action_ids=set()
     for r in rows:
         check(isinstance(r,dict), 'Action de passe invalide.')
         uid=r.get('id');state=r.get('state');outcome=r.get('outcome');team=r.get('team');receiver=r.get('control_team')
@@ -55,7 +55,7 @@ def validate_pass_review(reference, duration):
         proof=r.get('evidence')
         check(isinstance(proof,list) and 1<=len(proof)<=12 and all(isinstance(x,str) and re.fullmatch(r'preuves/[A-Za-z0-9_.-]+\.jpg',x) for x in proof),'Référence preuve invalide.')
         if state=='observed_pass':
-            check(team in TEAMS and lo is not None,'Passe observée : départ et équipe requis.')
+            check(team in TEAMS and lo is not None and r['delivery']!='not_applicable','Passe observée : départ et équipe requis.')
             releases.append((lo,hi,uid))
         else:
             check(outcome=='unknown' and k is None,'Candidat ou contre-exemple : aucun résultat attribuable.')
@@ -69,8 +69,10 @@ def validate_pass_review(reference, duration):
         elif outcome=='out_of_play':check(k is None and r.get('direct_sequence') is True,'Sortie directe non démontrée.')
         ev=r.get('related_event_id');relation=r.get('event_relation');iv=r.get('related_interval_id')
         check((ev is None and relation is None) or ev in events and relation in {'same_action','precedes_shot'},'Lien événement invalide.')
-        if relation=='precedes_shot':check(outcome=='completed' and k/fps<=events[ev]['video_start_s'] and events[ev]['source_kind']=='shot','Lien passe-tir incompatible.')
-        if relation=='same_action':check(lo is not None and events[ev]['video_start_s']-0.25<=hi/fps<=events[ev]['video_end_s']+0.25,'Lien temporel action incompatible.')
+        if relation=='precedes_shot':check(outcome=='completed' and k/fps<=events[ev]['video_start_s'] and events[ev]['source_kind']=='shot' and events[ev]['team_before']==team,'Lien passe-tir incompatible.')
+        if relation=='same_action':
+            check(ev not in same_action_ids and lo is not None and events[ev]['team_before']==team and events[ev]['video_start_s']-0.25<=hi/fps<=events[ev]['video_end_s']+0.25,'Lien temporel action incompatible ou dupliqué.')
+            same_action_ids.add(ev)
         if iv is not None:
             check(iv in intervals and a/fps<=intervals[iv]['end_s'] and b/fps>=intervals[iv]['start_s'],'Lien fenêtre de possession incompatible.')
     releases.sort()
