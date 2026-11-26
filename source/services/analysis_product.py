@@ -387,6 +387,8 @@ def analysis_snapshot(db, match):
     snapshot["statistics"] = match_statistics(match)
     from services.elite_performance import elite_report
     snapshot["elite_performance"] = elite_report(snapshot["verified_events"])
+    from services.statistical_audit import audit_rows
+    snapshot["statistical_audit"] = audit_rows(snapshot["verified_events"])
     from services.video_action_report import action_report
     snapshot["video_actions"] = action_report(db, match)
     from services.identity_aggregation import build_identity_report
@@ -541,6 +543,10 @@ def build_analysis_zip(db, match, evidence_dir: Path) -> io.BytesIO:
                 for p in auto_report["players"] for row in flatten_measurements(p["report"])]))
         archive.writestr(f"{root}/04_sequences/action_coverage.json", json.dumps(
             {key: auto_report[key] for key in ("segments", "families", "coverage_percent", "physical")}, ensure_ascii=False, indent=2))
+        audit=snapshot["statistical_audit"]
+        audit_export=[dict(row, side=side, player_id=None) for side in ("team","opponent") for row in audit[side]]
+        audit_export.extend(dict(row, side=p["side"], player_id=p["player_id"]) for p in audit["players"] for row in p["metrics"])
+        archive.writestr(f"{root}/02_kpis/statistical_audit.csv", _csv_text(["side","player_id","section","key","label","value","state","denominator","requirement","scope"], audit_export))
         archive.writestr(f"{root}/02_kpis/all_match_measurements.csv",
             _csv_text(["perspective", "metric", "value"], [
                 {"perspective": side, **row} for side in ("team", "opponent")
