@@ -920,6 +920,8 @@ def add_event(
     p_dv: str = Form(""),
     p_exact: str = Form(""),
     p_prior: str = Form(""),
+    p_ra: str = Form("unknown"),
+    p_rv: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = require_user(request, db)
@@ -975,7 +977,7 @@ def add_event(
         from services.possession_evidence import build_note
         try:
             note = build_note(float(p_start),second,p_before,p_after,p_bs,p_as,p_cause,
-                p_cv=="1",p_dv=="1",p_exact=="1",p_prior=="1",note,period,segment.id if segment else None)
+                p_cv=="1",p_dv=="1",p_exact=="1",p_prior=="1",note,period,segment.id if segment else None,p_ra,p_rv=="1")
         except (ValueError,TypeError) as exc:
             raise HTTPException(400, detail=str(exc)) from None
         pid=None
