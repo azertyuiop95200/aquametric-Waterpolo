@@ -132,8 +132,10 @@ def enrich_lineups(audit,lineups,phases):
             if row["key"]==key:
                 row.update(value=value,denominator=n,state="derived_sample" if value is not None else "not_measured",requirement=requirement)
     valid=[q for q in lineups["quarters"] if q["valid"]]
-    set_value(audit["team"],"lineup_efficiency",len(lineups["lineups"]) if valid else None,len(valid),
-              "Nombre de compositions observées sur quarts validés · voir différentiels détaillés")
+    total_seconds=sum(r["seconds"] for r in lineups["lineups"])
+    net=sum(r["plus_minus"] for r in lineups["lineups"])
+    set_value(audit["team"],"lineup_efficiency",round(480*net/total_seconds,3) if total_seconds else None,total_seconds,
+              "Différentiel global par 8 min sur compositions admissibles · détail par composition")
     index={p["player_id"]:p for p in lineups["players"]}
     for p in audit["players"]:
         if p["side"]!="for" or p["player_id"] not in index:continue
