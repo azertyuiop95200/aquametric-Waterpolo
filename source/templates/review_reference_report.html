@@ -8,8 +8,9 @@
 <details><summary>Événements de référence</summary><table><thead><tr><th>ID</th><th>Temps global</th><th>Partie / temps local</th><th>Équipe</th><th>Nature</th><th>État</th><th>Observation</th></tr></thead><tbody>
 {% for e in p.events %}<tr><td>{{e.id}}</td><td>{{e.time}}</td><td>{{e.location.file}} / {{e.location.local_s}} s</td><td>{{e.side}}</td><td>{{e.cause}}</td><td>{{e.state}}</td><td>{{e.observation}}</td></tr>{% endfor %}
 </tbody></table></details>
-<details><summary>Fenêtres de possession</summary><table><thead><tr><th>ID</th><th>Temps global</th><th>Avant → après</th><th>Constat</th><th>Observation</th></tr></thead><tbody>
-{% for e in p.intervals %}<tr><td>{{e.id}}</td><td>{{e.start}}–{{e.end}}</td><td>{{e.before}} → {{e.after}}</td><td>{{ {'opposite_endpoints':'Contrôles opposés','same_team_endpoints':'Même équipe aux bornes','probable_opposite_endpoints':'Changement probable','unresolved':'Indéterminé'}.get(e.status,e.status) }}</td><td>{{e.observation}}</td></tr>{% endfor %}
+<p>Au moins {{p.lower_bound_excluding_linked_shots}} changement(s) sur fenêtres disjointes hors tirs liés. {{p.referee_signals}} fenêtre(s) avec geste arbitral observé, {{p.confirmed_referee_decisions}} décision(s) déclarée(s) vérifiée(s) dans cette référence. Total exact non établi.</p>
+<details><summary>Fenêtres de possession</summary><table><thead><tr><th>ID</th><th>Temps global</th><th>Avant → après</th><th>Constat</th><th>Cause / arbitrage</th><th>Observation</th></tr></thead><tbody>
+{% for e in p.intervals %}<tr><td>{{e.id}}</td><td>{{e.start}}–{{e.end}}</td><td>{{e.before}} → {{e.after}}</td><td>{{ {'opposite_endpoints':'Contrôles opposés','same_team_endpoints':'Même équipe aux bornes','probable_opposite_endpoints':'Changement probable','unresolved':'Indéterminé'}.get(e.status,e.status) }}</td><td>{{e.attributed_cause or "Cause non attribuée"}}{% if e.cause_candidate %}<br>Hypothèse : {{e.cause_candidate}}{% endif %}{% if e.referee_signal_observed %}<br>Geste observé{% endif %}{% if e.decision_verified %}<br>Décision déclarée vérifiée{% endif %}</td><td>{{e.observation}}</td></tr>{% endfor %}
 </tbody></table></details>
 {% else %}<p>Aucune référence vidéo importée.</p>{% endfor %}
 </section>
