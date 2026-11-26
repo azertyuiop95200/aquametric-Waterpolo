@@ -186,6 +186,18 @@
         </div>
         <p class="evidence-note">Pour le temps de jeu, marquer entrée et sortie avec le chrono réel du même quart (y compris exclusions et retours). Pour la distance, ne pas comptabiliser deux fois le même trajet. Sélectionner l'issue avant « Fin de possession », « Fin de 6v5 » ou « Fin de 5v6 » ; le but désigne l'équipe en attaque.</p>
       </details>
+      <details style="margin:12px 0"><summary>Possessions, réseau de passes, TSAP et mesures calibrées</summary>
+      <div class="formgrid">
+      <label>Identifiant de possession<input name="possession_id" maxlength="32" pattern="[A-Za-z0-9_-]+" placeholder="Q1-p01"></label>
+      <label>Identifiant unique du geste<input name="action_id" maxlength="32" pattern="[A-Za-z0-9_-]+" placeholder="Q1-a01"></label>
+      <label>Destinataire de la passe (équipe)<select name="receiver_id"><option value="">Non renseignée</option>{% for p in players %}<option value="{{p.id}}">#{{p.cap_number or "—"}} · {{p.name}}</option>{% endfor %}</select></label>
+      <label><input type="checkbox" name="passes_complete" value="yes"> Toutes les passes de cette possession sont annotées (fin de possession)</label>
+      <label>Catégorie TSAP<select name="tsap_category"><option value="">Non renseignée</option><option value="rb">RB · ballon reçu</option><option value="cb">CB · ballon conquis</option><option value="nb">NB · ballon neutre</option><option value="lb">LB · ballon perdu</option><option value="ob">OB · ballon offensif</option><option value="ss">SS · tir réussi selon protocole</option></select></label>
+      <label><input type="checkbox" name="tsap_coverage" value="complete"> Couverture TSAP complète de l'échantillon individuel étudié</label>
+      <label>Mesure calibrée<select name="metric_type"><option value="">Non renseignée</option>{% for key,label in [('shot_speed_kmh','Vitesse de tir (km/h)'),('release_time_s','Déclenchement (s)'),('shot_distance_m','Distance de tir (m)'),('shot_release_height_m','Hauteur de libération (m)'),('shot_horizontal_angle_deg','Angle horizontal (°)'),('shot_vertical_angle_deg','Angle vertical (°)'),('pass_distance_m','Distance de passe (m)'),('pass_speed_kmh','Vitesse de passe (km/h)'),('sprint_5m_s','Sprint 5 m (s)'),('sprint_10m_s','Sprint 10 m (s)'),('max_swim_speed_mps','Vitesse maximale de nage (m/s)')] %}<option value="{{key}}">{{label}}</option>{% endfor %}</select></label>
+      <label>Valeur<input name="metric_value" type="number" min="0" step="0.001"></label>
+      <label><input type="checkbox" name="metric_calibrated" value="yes"> Valeur issue d'une mesure métrique calibrée</label>
+      </div><p>Utiliser le même identifiant de possession et un identifiant unique par geste. Renseigner l'horloge réelle pour chaque action. Ne pas déclarer une couverture exhaustive sans vérification.</p></details>
       <p class="evidence-note">Position du tir (facultative) : sélectionne un point sur la <a href="#spatialDashboard">carte du bassin</a> juste au-dessus. Sans point réellement observé, l'action reste enregistrée sans coordonnées et n'est pas affichée sur la heatmap.</p>
       <label style="display:block;margin:12px 0"><input type="checkbox" name="observed" value="1" required> J'ai réellement observé cet événement dans la vidéo ou sur une feuille de match vérifiable.</label>
       <div class="actions" style="gap:9px">
@@ -216,7 +228,7 @@
         <button class="btn secondary" type="submit" name="event_type" value="bad_pass">Mauvaise passe</button>
         <button class="btn secondary" type="submit" name="event_type" value="pass_complete">Passe réussie</button>
         <button class="btn secondary" type="submit" name="event_type" value="key_pass">Passe clé</button>
-        <button class="btn secondary" type="submit" name="event_type" value="possession_end">Fin de possession</button>
+        <button class="btn secondary" type="submit" name="event_type" value="possession_start">Début de possession</button><button class="btn secondary" type="submit" name="event_type" value="possession_end">Fin de possession</button>
         <button class="btn secondary" type="submit" name="event_type" value="power_play_end">Fin de 6v5</button>
         <button class="btn secondary" type="submit" name="event_type" value="penalty_kill_end">Fin de 5v6</button>
         <button class="btn secondary" type="submit" name="event_type" value="shot_clock_expired">Fin chrono 28/18 s</button>
