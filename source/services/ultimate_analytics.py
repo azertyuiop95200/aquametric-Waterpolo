@@ -9,6 +9,7 @@ from services.event_evidence import verified_events
 SHOT_EVENTS = {"goal", "shot_on_target", "shot_off_target", "shot_blocked", "shot_unknown"}
 PASS_SUCCESS = {"pass_complete", "assist", "key_pass"}
 PASS_FAILURE = {"bad_pass"}
+PASS_UNKNOWN = {"pass_unknown"}
 LOSS_EVENTS = {"turnover", "bad_pass"}
 DEFENSIVE_WINS = {"interception", "recovery", "block", "duel_won", "save"}
 TERMINAL_EVENTS = SHOT_EVENTS | LOSS_EVENTS | {"exclusion_earned", "penalty_earned"}
@@ -103,7 +104,7 @@ def _basic(events):
     on_target = c["goal"] + c["shot_on_target"]
     passes_ok = sum(c[k] for k in PASS_SUCCESS)
     passes_bad = sum(c[k] for k in PASS_FAILURE)
-    pass_attempts = passes_ok + passes_bad
+    pass_attempts = passes_ok + passes_bad + c["pass_unknown"]
     losses = sum(c[k] for k in LOSS_EVENTS)
     return {
         "events": len(events),
@@ -118,7 +119,8 @@ def _basic(events):
         "passes_completed": passes_ok,
         "passes_failed": passes_bad,
         "pass_attempts": pass_attempts,
-        "pass_completion_pct": _pct(passes_ok, pass_attempts),
+        "passes_unknown": c["pass_unknown"],
+        "pass_completion_pct": _pct(passes_ok, pass_attempts) if not c["pass_unknown"] else None,
         "turnovers": losses,
         "ball_wins": sum(c[k] for k in DEFENSIVE_WINS),
         "exclusions_earned": c["exclusion_earned"],
@@ -256,7 +258,7 @@ def shot_profile(events):
 
 
 def pass_profile(events):
-    passes = [e for e in events if getattr(e, "event_type", "") in PASS_SUCCESS | PASS_FAILURE]
+    passes = [e for e in events if getattr(e, "event_type", "") in PASS_SUCCESS | PASS_FAILURE | PASS_UNKNOWN]
     grouped = defaultdict(list)
     zones = defaultdict(list)
     pressures = defaultdict(list)
@@ -279,6 +281,7 @@ def pass_profile(events):
                 "attempts": basic["pass_attempts"],
                 "completed": basic["passes_completed"],
                 "failed": basic["passes_failed"],
+                "unknown": basic["passes_unknown"],
                 "completion_pct": basic["pass_completion_pct"],
             })
         return out
@@ -372,7 +375,7 @@ def period_report(events):
 
 def possession_report(events):
     groups = defaultdict(list)
-    candidates = [e for e in events if getattr(e, "event_type", "") in (SHOT_EVENTS | PASS_SUCCESS | PASS_FAILURE | LOSS_EVENTS | {"action_created", "exclusion_earned", "penalty_earned", "centre_touch"})]
+    candidates = [e for e in events if getattr(e, "event_type", "") in (SHOT_EVENTS | PASS_SUCCESS | PASS_FAILURE | PASS_UNKNOWN | LOSS_EVENTS | {"action_created", "exclusion_earned", "penalty_earned", "centre_touch"})]
     for e in candidates:
         pid = note_tags(e).get("possession") or note_tags(e).get("possession_id")
         if pid:
@@ -407,7 +410,7 @@ def possession_report(events):
         outcomes[outcome] += 1
         if len(seq) >= 2:
             durations.append(float(seq[-1].second or 0) - float(seq[0].second or 0))
-        pass_counts.append(sum(c[x] for x in PASS_SUCCESS | PASS_FAILURE))
+        pass_counts.append(sum(c[x] for x in PASS_SUCCESS | PASS_FAILURE | PASS_UNKNOWN))
     total = len(groups)
     return {
         "available": True,
@@ -430,7 +433,7 @@ def coverage_report(events):
     events = list(events)
     relevant = [e for e in events if getattr(e, "event_type", "") not in {"whistle", "power_play_start", "penalty_kill_start", "counterattack_start", "defensive_recovery_start"}]
     shots = [e for e in relevant if e.event_type in SHOT_EVENTS]
-    passes = [e for e in relevant if e.event_type in PASS_SUCCESS | PASS_FAILURE]
+    passes = [e for e in relevant if e.event_type in PASS_SUCCESS | PASS_FAILURE | PASS_UNKNOWN]
     losses = [e for e in relevant if e.event_type in LOSS_EVENTS]
 
     def tag_cov(seq, key, allowed=None):

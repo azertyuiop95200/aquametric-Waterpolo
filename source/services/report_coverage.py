@@ -4,7 +4,7 @@ from services.elite_performance import METRICS,reduce_side
 
 FAMILIES={
 "tirs":("goal","shot_on_target","shot_off_target","shot_blocked","shot_unknown"),
-"passes":("assist","key_pass","pass_complete","bad_pass"),
+"passes":("assist","key_pass","pass_complete","bad_pass","pass_unknown"),
 "duels":("duel_won","duel_lost"),
 "touches":("touch","centre_touch"),
 "pertes":("turnover","bad_pass","unforced_error"),
@@ -29,7 +29,7 @@ def metric_table(rows):
     # A zero numerator within a nonempty observed family is meaningful for
     # that sample; do not turn it into a whole-match zero.
     if stats.get("pass_attempts"):
-        for k in ("passes","bad_passes","pass_attempts"):
+        for k in ("passes","bad_passes","pass_attempts","pass_unknown"):
             values[k]=stats[k]
     return {"metrics":values,"families":families,"event_count":len(rows),"scope":"partial_sample"}
 

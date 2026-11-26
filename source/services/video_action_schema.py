@@ -8,7 +8,7 @@ VERSION = "video-actions-v1"
 
 EVENT_LABELS = {
     "goal": "But", "shot_on_target": "Tir cadré arrêté", "shot_off_target": "Tir non cadré",
-    "shot_blocked": "Tir bloqué", "shot_unknown": "Tir visible, issue indéterminée", "pass_complete": "Passe réussie", "bad_pass": "Passe manquée",
+    "shot_blocked": "Tir bloqué", "shot_unknown": "Tir visible, issue indéterminée", "pass_complete": "Passe réussie", "bad_pass": "Passe manquée", "pass_unknown": "Passe tentée, issue non résolue",
     "assist": "Passe décisive", "key_pass": "Passe clé", "action_created": "Action créée",
     "touch": "Ballon touché", "centre_touch": "Ballon touché au centre", "save": "Arrêt",
     "goalkeeper_restart": "Relance du gardien", "turnover": "Perte de balle",
@@ -60,6 +60,10 @@ class ActionObservation(ObservationModel):
     hand: Literal["left", "right", "unknown"] = "unknown"
     shot_type: Literal["direct", "lob", "skip", "backhand", "redirect", "penalty", "unknown"] = "unknown"
     pass_type: Literal["perimeter", "centre_entry", "cross", "through", "back", "long", "restart", "unknown"] = "unknown"
+    receiver_cap_number: int | None = Field(default=None, ge=1, le=30)
+    receiver_evidence: str = Field(default="", max_length=400)
+    pass_method: Literal["dry","wet","hand_off","unknown"] = "unknown"
+    pass_flight_seconds: float | None = Field(default=None, ge=0, le=12)
     cause: Literal["bad_pass", "centre_entry", "counterattack", "offensive_foul", "shot_clock",
                    "steal", "handling", "decision", "technical", "pressure", "unknown"] = "unknown"
     pressure: Literal["low", "medium", "high", "unknown"] = "unknown"
@@ -79,6 +83,11 @@ class ActionObservation(ObservationModel):
             self.cap_number = None
         if not self.cap_colour_evidence.strip():
             self.cap_colour = "unknown"
+        if not self.receiver_evidence.strip() or self.side == "unknown" or self.event_type not in {"pass_complete","assist","key_pass"} or self.receiver_cap_number == self.cap_number:
+            self.receiver_cap_number = None
+        if self.event_type not in {"pass_complete","assist","key_pass","bad_pass","pass_unknown"}:
+            self.pass_method = "unknown"
+            self.pass_flight_seconds = None
         return self
 
 
@@ -104,7 +113,7 @@ Types autorisés: {', '.join(EVENT_LABELS)}.
 
 Règles de comptage: un but est UNE action goal, pas aussi shot_on_target. Une passe est
 UN type parmi assist (passe immédiatement décisive visible), key_pass, pass_complete ou
-bad_pass; ne double pas une même passe. Une passe ratée n'est pas aussi turnover.
+bad_pass ou pass_unknown. Une passe est une transmission volontaire destinée à une autre joueuse : sèche, mouillée, de main à main, latérale, en retrait, longue, courte, en pointe, vers ou depuis la gardienne, y compris remise en jeu vers une partenaire. Recense TOUTES ces transmissions, pas seulement celles avant un tir. La nage avec ballon, la feinte, l'auto-remise en jeu et le rebond récupéré ne sont pas des passes. Une réussite exige contrôle par une autre partenaire. Interception ou échec visible : bad_pass ; tentative visible mais issue masquée : pass_unknown. Si le transfert lui-même n'est pas discernable, ne crée aucune action. Une passe décisive/clée est une passe réussie, pas une deuxième passe. La réception n'est pas une nouvelle passe collective. Indique second au lâcher, receiver_cap_number seulement si numéro et appartenance à la même équipe sont visibles, avec receiver_evidence. pass_flight_seconds uniquement si lâcher et réception sont visibles. Ne double pas une même passe. Une passe ratée n'est pas aussi turnover.
 Une touche au centre est centre_touch, pas aussi touch. Une relance est une action
 goalkeeper_restart; si son issue est visible, ajoute séparément la passe correspondante.
 Un tir et l'arrêt adverse sont deux actions distinctes. Ne déduis pas un but d'un mouvement

@@ -6,3 +6,13 @@
 <p>{{cr.confirmed_unassigned}} action(s) confirmée(s) et {{cr.candidate_unassigned}} hypothèse(s) IA sans équipe résolue.</p>
 {% if cr.candidate_players %}<h3>Fiches IA par bonnet (non validées)</h3>{% for p in cr.candidate_players %}<details><summary>{{names[p.side]}} · bonnet {{p.cap}} · {{p.event_count}} action(s) candidate(s)</summary><table class="metric-table"><tbody>{% for k,l in cr.labels %}{% set v=p.metrics.get(k) %}<tr><td>{{l}}</td><td>{{v if v is not none else '—'}}</td></tr>{% endfor %}</tbody></table></details>{% endfor %}{% endif %}
 {% endif %}
+{% set pl=(snapshot.video_actions|default({})).get('pass_ledger',{}) %}
+{% if pl and pl.teams %}
+<h2>Circulation du ballon · registre automatique</h2>
+<p>Les tentatives, réussites et échecs sont des observations candidates. Une réception ne constitue pas une deuxième passe. Aucun total intégral ne peut être déduit de cet échantillon.</p>
+{% for side,name in [('for',match.team.name),('against',match.opponent),('unknown','Équipe non résolue')] %}
+{% set p=pl.teams[side] %}<h3>{{name}}</h3>
+<table class="metric-table"><tbody>{% for k,l in [('attempts','Tentatives'),('completed','Réussies'),('failed','Ratées'),('unknown','Issue non résolue'),('completion_pct','Réussite (%)'),('unattributed_passers','Tentatives sans passeuse identifiée'),('unattributed_receivers','Réceptions sans numéro identifié')] %}<tr><th>{{l}}</th><td>{{p[k] if p[k] is not none else '—'}}</td></tr>{% endfor %}</tbody></table>
+{% if p.players %}<table class="metric-table"><thead><tr><th>Bonnet</th><th>Tentatives envoyées</th><th>Réceptions identifiées</th></tr></thead><tbody>{% for athlete in p.players %}<tr><td>{{athlete.cap}}</td><td>{{athlete.sent}}</td><td>{{athlete.received}}</td></tr>{% endfor %}</tbody></table>{% endif %}
+{% if p.network %}<table class="metric-table"><thead><tr><th>Bonnet émetteur</th><th>Bonnet receveur</th><th>Passes réussies candidates</th></tr></thead><tbody>{% for link in p.network %}<tr><td>{{link['from']}}</td><td>{{link['to']}}</td><td>{{link.count}}</td></tr>{% endfor %}</tbody></table>{% endif %}
+{% endfor %}{% endif %}

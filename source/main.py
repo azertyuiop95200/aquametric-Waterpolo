@@ -64,7 +64,7 @@ OFFICIAL_REFRESH_LOOP_MINUTES = int(os.getenv("OFFICIAL_REFRESH_LOOP_MINUTES", "
 ALLOWED_VIDEO_EXTENSIONS = {".mp4", ".webm", ".mov", ".m4v", ".ogv", ".ogg"}
 EVENT_TYPES = (
     "goal", "assist", "key_pass", "action_created", "touch", "centre_touch", "duel_won", "duel_lost", "pass_complete", "shot_on_target", "shot_off_target", "shot_blocked", "shot_unknown",
-    "block", "interception", "recovery", "save", "bad_pass", "turnover", "foul",
+    "block", "interception", "recovery", "save", "bad_pass", "pass_unknown", "turnover", "foul",
     "exclusion", "exclusion_earned", "exclusion_committed", "penalty_earned", "penalty_committed",
     "whistle", "power_play_start", "penalty_kill_start", "counterattack_start",
     "defensive_recovery_start", "fast_recovery", "late_recovery",
