@@ -90,5 +90,7 @@ $("form")?.addEventListener("submit",async e=>{
  }catch(err){$("status").textContent="Impossible de calculer : "+err.message}
  finally{button.disabled=false}
 });
+const requested=new URLSearchParams(location.search).get("event");
+if(requested&&data.events.some(e=>String(e.id)===requested))$("event").value=requested;
 load();
 })();
