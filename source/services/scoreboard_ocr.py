@@ -355,3 +355,15 @@ def sample_scoreboard_observations(
         return observations
     finally:
         cap.release()
+
+
+def read_physical_field(img,kind):
+    if not tesseract_available():
+        return _onnx_image(img)[0]
+    for psm in ([7,10,8] if kind!='clock' else [7,8]):
+        try:
+            t=pytesseract.image_to_string(img,config=f'--psm {psm} -c tessedit_char_whitelist=0123456789:',timeout=_ocr_timeout_seconds()).strip()
+        except Exception:
+            t=''
+        if t:return t
+    return ''

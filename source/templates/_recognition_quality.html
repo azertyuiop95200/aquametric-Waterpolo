@@ -21,3 +21,9 @@
 {% include "_player_tracking_map.html" %}
 
 {% include "_metric_field_map.html" %}
+
+{% set board=(snapshot.automatic|default({})).get('summary',{}).get('physical_scoreboard') %}
+{% if board %}
+<h3>Tableau de marque physique · lectures concordantes</h3>
+<p><strong>Bonnets blancs {{board.white_score}} – {{board.blue_score}} bonnets bleus</strong> · {{board.observations}} instants distincts, de {{board.start_second}} à {{board.end_second}} s vidéo. Score affiché uniquement, non attribué aux clubs ou aux joueuses. Ce total ne crée aucun événement de but. Le chronomètre général reste non résolu sur ces lectures.</p>
+{% endif %}

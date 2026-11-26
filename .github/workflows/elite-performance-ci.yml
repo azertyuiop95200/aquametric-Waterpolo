@@ -28,6 +28,7 @@ jobs:
           python -m unittest discover -s tests -p test_tactical_timeline.py -v
           python -m unittest discover -s tests -p test_metric_field.py -v
           python -m unittest discover -s tests -p test_identity_aggregation.py -v
+          python -m unittest discover -s tests -p test_physical_board.py -v
       - working-directory: source
         run: |
           python - <<'PY'

@@ -218,6 +218,15 @@ def run_rapid_analysis(
         candidates = mapped_candidates
 
     summary = build_auto_summary(observations, periods, candidates)
+    # A physical close-up is a separate scoreboard observation, not a goal
+    # event, in-game clock or a mapping to the selected club.
+    if source_kind == "upload":
+        try:
+            from services.physical_board import scan_tail
+            from services.scoreboard_ocr import read_physical_field
+            summary["physical_scoreboard"] = scan_tail(source_path,result.duration_seconds,read_physical_field)
+        except Exception:
+            summary["physical_scoreboard"] = None
     from services.broadcast_scoreboard import clock_changes
     summary["shot_clock_changes"] = clock_changes(observations)
     summary.update({
