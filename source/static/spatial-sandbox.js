@@ -112,6 +112,9 @@ for(const event of ["pointerup","pointercancel","lostpointercapture"])canvas.add
 for(const id of ["rotation","tilt","playtime"])$(id).addEventListener("input",draw);
 $("reset").addEventListener("click",()=>{remember();edit=initial();sync();changed()});
 $("undo").addEventListener("click",()=>{if(history.length){edit=history.pop();$("undo").disabled=!history.length;sync();changed()}});
+$("wait").addEventListener("click",()=>{remember();edit.delay_s=clamp(edit.delay_s+.5,0,3);sync();changed()});
+$("open").addEventListener("click",()=>{const e=selectedEntity();if(e.option?.kind!=="pass"){$("status").textContent="Sélectionner une cible de passe.";return}remember();const p=[...e.p];p[1]+=p[1]<W/2?-1:1;setPoint(e,p);sync();changed()});
+$("shift").addEventListener("click",()=>{remember();const p=edit.start;p[1]+=clamp(W/2-p[1],-1,1);sync();changed()});
 $("refine").addEventListener("click",()=>changed(true));
 $("play").addEventListener("click",()=>{cancelAnimationFrame(animation);const start=performance.now();function frame(now){$("playtime").value=Math.min(2,(now-start)/1000);draw();if(now-start<2000)animation=requestAnimationFrame(frame)}animation=requestAnimationFrame(frame)});
 $("export").addEventListener("click",()=>{if(!result||resultInput!==JSON.stringify(edit))return;const url=URL.createObjectURL(new Blob([JSON.stringify({mode:"coach_hypothesis",match:data.match,event:data.event,reference,edits:edit,result},null,2)],{type:"application/json"}));const a=document.createElement("a");a.href=url;a.download="scenario-"+data.event+".json";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)});
