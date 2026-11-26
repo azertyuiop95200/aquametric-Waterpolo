@@ -15,16 +15,25 @@ def sandbox(baseline, edits, trials=32):
         out=[a+b*t for a,b in zip(p,v)]
         # Never silently clip a trajectory at a boundary.
         return list(xyz(out,bounds))
+    def accelerate(p,v,a,t):
+        a=xyz(a,((-2,2),(-2,2),(-2,2)))
+        final_v=xyz([v[i]+a[i]*t for i in range(3)],vb)
+        for j in range(9):
+            u=t*j/8
+            xyz([p[i]+v[i]*u+.5*a[i]*u*u for i in range(3)],bounds)
+        return [p[i]+v[i]*t+.5*a[i]*t*t for i in range(3)],list(final_v)
     start=list(xyz(edits.get("start",scene["start"]),bounds))
-    scene["start"]=advance(start,xyz(edits.get("carrier_velocity",[0,0,0]),vb),delay)
+    scene["start"],_=accelerate(start,xyz(edits.get("carrier_velocity",[0,0,0]),vb),edits.get("carrier_acceleration",[0,0,0]),delay)
     defenders=edits.get("defenders",scene["defenders"])
     if not isinstance(defenders,list) or len(defenders)!=len(scene["defenders"]):
         raise ValueError("Keep the observed defender roster")
     if sorted(d["id"] for d in defenders)!=sorted(d["id"] for d in scene["defenders"]):
         raise ValueError("Keep the observed defender identities")
     original={d["id"]:d for d in scene["defenders"]}
-    scene["defenders"]=[dict(original[d["id"]],position=advance(xyz(d["position"],bounds),xyz(d["velocity"],vb),delay),
-                            velocity=list(xyz(d["velocity"],vb)),radius=number(d.get("radius",original[d["id"]]["radius"]),.15,1.8)) for d in defenders]
+    scene["defenders"]=[]
+    for d in defenders:
+        p,v=accelerate(xyz(d["position"],bounds),xyz(d["velocity"],vb),d.get("acceleration",[0,0,0]),delay)
+        scene["defenders"].append(dict(original[d["id"]],position=p,velocity=v,radius=number(d.get("radius",original[d["id"]]["radius"]),.15,1.8)))
     original_opts={o["id"]:o for o in scene["options"]}
     opts=edits.get("options",scene["options"])
     if not isinstance(opts,list) or len(opts)!=len(original_opts) or {o["id"] for o in opts}!=set(original_opts):
@@ -73,6 +82,7 @@ def sandbox(baseline, edits, trials=32):
                   baseline_decision_second=baseline["decision_second"],
                   model_assumptions={"nominal_ball_horizontal_speed_m_s":speed,
                     "receiver_targets":"pass endpoints advanced at constant velocity",
+                    "acceleration":"carrier and defenders accelerate before release, constant velocity during ball flight",
                     "legal_and_athletic_feasibility":"not verified"})
     # Separate hypothetical comparison from the saved evidence, not a new event.
     for o in result["options"]:
