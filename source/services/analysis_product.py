@@ -399,6 +399,8 @@ def analysis_snapshot(db, match):
     summary = snapshot["automatic"].get("summary", {})
     snapshot["identity_analysis"] = build_identity_report(summary.get("metric_field_map", {}), snapshot["verified_events"], snapshot["video_actions"], [{"id":p.id,"name":p.name,"cap_number":p.cap_number} for p in match.team.players], summary.get("identity_reviews", {}))
     snapshot["identity_analysis"]["analysis_id"] = auto.id if auto else None
+    from services.tracking_performance import motion_report
+    snapshot["motion_performance"] = motion_report(summary.get("metric_field_map", {}),snapshot["identity_analysis"])
     from services.report_coverage import report_coverage
     snapshot["report_coverage"] = report_coverage(snapshot["verified_events"], snapshot["video_actions"], [{"id":p.id,"name":p.name,"cap_number":p.cap_number} for p in match.team.players])
     from services.defensive_systems import metric_diagnostics
@@ -552,6 +554,7 @@ def build_analysis_zip(db, match, evidence_dir: Path) -> io.BytesIO:
         audit=snapshot["statistical_audit"]
         audit_export=[dict(row, side=side, player_id=None) for side in ("team","opponent") for row in audit[side]]
         audit_export.extend(dict(row, side=p["side"], player_id=p["player_id"]) for p in audit["players"] for row in p["metrics"])
+        archive.writestr(f"{root}/02_kpis/motion_performance.json", json.dumps(snapshot["motion_performance"],ensure_ascii=False,indent=2))
         archive.writestr(f"{root}/02_kpis/advanced_observed.json", json.dumps(snapshot["advanced_observed"],ensure_ascii=False,indent=2))
         archive.writestr(f"{root}/02_kpis/statistical_audit.csv", _csv_text(["side","player_id","section","key","label","value","state","denominator","requirement","scope"], audit_export))
         archive.writestr(f"{root}/02_kpis/all_match_measurements.csv",
