@@ -1,0 +1,48 @@
+{% set ir=snapshot.identity_analysis|default({}) %}
+{% if ir %}
+<h2>Identités et statistiques consolidées</h2>
+<p>Identifiant unique dans ce match : équipe + numéro de bonnet. La couleur est un attribut vérifié, pas une identité à elle seule. Les mesures de déplacement sont des estimations partielles ; les actions ci-dessous sont confirmées et distinctes des hypothèses IA.</p>
+{% set names={'for':match.team.name,'against':match.opponent} %}
+{% macro val(x) %}{{x if x is not none else '—'}}{% endmacro %}
+<div style="overflow:auto"><table class="metric-table"><thead><tr><th>Indicateur</th><th>{{names['for']}}</th><th>{{names['against']}}</th></tr></thead><tbody>
+<tr><td>Distance cumulée des joueuses identifiées (m)</td>{% for s in ['for','against'] %}<td>{{val(ir.teams[s].distance_m)}}</td>{% endfor %}</tr>
+<tr><td>Joueuses avec distance mesurée</td>{% for s in ['for','against'] %}<td>{{ir.teams[s].players_measured}}</td>{% endfor %}</tr>
+<tr><td>Temps vidéo cumulé des pistes (joueuse-secondes)</td>{% for s in ['for','against'] %}<td>{{ir.teams[s].player_seconds}}</td>{% endfor %}</tr>
+<tr><td>Temps de jeu effectif cumulé relevé (joueuse-secondes)</td>{% for s in ['for','against'] %}<td>{{val(ir.teams[s].playing_seconds)}}</td>{% endfor %}</tr>
+<tr><td>Actions confirmées sans numéro résolu</td>{% for s in ['for','against'] %}<td>{{ir.teams[s].unassigned_events}}</td>{% endfor %}</tr>
+<tr><td>Origines de tirs localisées et attribuées (indépendantes des compteurs)</td>{% for s in ['for','against'] %}<td>{{ir.teams[s].mapped_shots}}</td>{% endfor %}</tr>
+{% for k,l in ir.metrics %}<tr><td>{{l}}</td>{% for s in ['for','against'] %}<td>{{val(ir.teams[s].stats[k]) if ir.teams[s].stats.events else '—'}}</td>{% endfor %}</tr>{% endfor %}
+</tbody></table></div>
+<p>{{ir.unassigned_tracks}} piste(s), {{ir.unassigned_shots}} origine(s) de tir sans identité complète ; exclues des distances cumulées et des cartes attribuées. {{ir.unknown_side_events}} action(s) confirmée(s) sans équipe résolue. Les ratios collectifs sont recalculés à partir des numérateurs et dénominateurs collectifs, pas moyennés entre joueuses.</p>
+{% for side in ['for','against'] %}
+<h3>{{names[side]}} · fiches individuelles</h3>
+{% for p in ir.players if p.side==side %}
+<details {% if loop.first %}open{% endif %}><summary>{{p.name}} · n°{{p.cap_number}} · {{p.colours|join(' / ') or 'couleur non déterminée'}} · {{val(p.distance_m)}} m partiels</summary>
+<p>Suivi vidéo : {{p.observed_seconds}} s ; chevauchement {{p.overlap_seconds}} s ; conflit exclu {{p.conflict_seconds}} s. Pistes {{p.track_ids|join(', ') or 'aucune'}}. Temps effectif relevé : {{val(p.stats.playing_seconds)}} s. {{p.mapped_shots}} origine(s) de tir attribuée(s).</p>
+<div style="overflow:auto"><table class="metric-table"><tbody>{% for k,l in ir.metrics %}<tr><td>{{l}}</td><td>{{val(p.stats[k]) if p.stats.events else '—'}}</td></tr>{% endfor %}</tbody></table></div></details>
+{% else %}<p>Aucune identité résolue pour cette équipe.</p>{% endfor %}
+{% endfor %}
+{% if ir.auto_players %}<details><summary>Hypothèses IA par équipe et numéro (non confirmées)</summary>{% for p in ir.auto_players %}<p>{{names[p.side]}} n°{{p.cap_number}} · {{p.colours|join(' / ')}} : {% for k,v in p.event_counts.items() %}{{k}} {{v}}{% if not loop.last %} · {% endif %}{% endfor %}</p>{% endfor %}</details>{% endif %}
+{% if interactive_report|default(false) and ir.analysis_id %}
+<details open><summary>Attribuer ou corriger les identités sur la vidéo</summary>
+<p>Une attribution indique que la piste entière a été vérifiée. Si le numéro, la couleur ou le club est incertain, ne pas valider. Une gardienne rouge peut appartenir à chacune des deux équipes. Toute référence de piste est spécifique à cette calibration.</p>
+<div id="identityReview" data-url="/matches/{{match.id}}/analysis/identity-review" data-analysis="{{ir.analysis_id}}" data-revision="{{ir.calibration_revision}}">
+{% if match.video_source=='upload' %}<video id="identityVideo" src="/matches/{{match.id}}/video" controls preload="metadata" style="width:100%;max-height:350px"></video>{% endif %}
+{% for kind,rows,label in [('tracks',ir.track_rows,'Pistes'),('shots',ir.shot_rows,'Origines de tirs'),('events',ir.event_rows,'Actions confirmées')] %}
+<h4>{{label}}</h4>
+{% for row in rows if not row.roster_locked|default(false) and (kind!='events' or row.side in ['for','against']) %}
+{% set a=row.review %}
+<div class="identity-row" data-kind="{{kind}}" data-id="{{row.id}}" style="border-bottom:1px solid #8a9ca555;padding:8px 0">
+<strong>{{'P' if kind=='tracks' else '#' }}{{row.id}}</strong> · {{row.event_type|default(row.colour|default('tir'))}} · {{val(row.second)}} s
+{% if row.second is not none %}<button type="button" class="btn secondary identity-seek" data-second="{{row.second}}">Voir l'instant</button>{% endif %}
+<label>Équipe <select class="identity-side"><option value="">Non attribuée</option>{% for side in ['for','against'] if kind!='events' or side==row.side %}<option value="{{side}}" {% if a.side==side %}selected{% endif %}>{{names[side]}}</option>{% endfor %}</select></label>
+<label>Bonnet n° <input class="identity-cap" type="number" min="1" max="30" value="{{a.cap_number if a.cap_number else ''}}" placeholder="Inconnu"></label>
+<label>Couleur <select class="identity-colour">{% for key,label in [('unknown','Inconnue'),('white','Blanc'),('blue','Bleu'),('red','Rouge'),('black','Noir'),('other','Autre')] %}<option value="{{key}}" {% if a.colour==key %}selected{% endif %}>{{label}}</option>{% endfor %}</select></label>
+<label>Preuve visuelle <input class="identity-evidence" maxlength="300" value="{{a.evidence|default('')}}" placeholder="Numéro et équipe visibles à…"></label>
+</div>{% else %}<p>Aucun élément à attribuer manuellement.</p>{% endfor %}
+{% endfor %}
+<button type="button" class="btn" id="identitySave">Enregistrer et recalculer les statistiques</button>
+<p id="identityStatus" role="status" aria-live="polite"></p></div>
+<script defer src="/static/identity-review.js"></script></details>
+{% endif %}
+{% endif %}

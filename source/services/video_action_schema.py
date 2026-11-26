@@ -45,8 +45,10 @@ class ActionObservation(ObservationModel):
     event_type: ActionType
     side: Side
     cap_number: int | None = Field(default=None, ge=1, le=30)
+    cap_colour: Literal["white","blue","red","black","other","unknown"] = "unknown"
     confidence: float = Field(ge=0, le=1)
     evidence: str = Field(min_length=12, max_length=700)
+    cap_colour_evidence: str = Field(default="", max_length=300)
     identity_evidence: str = Field(default="", max_length=400)
     team_evidence: str = Field(default="", max_length=400)
     phase: Phase = "unknown"
@@ -75,6 +77,8 @@ class ActionObservation(ObservationModel):
             self.side = "unknown"
         if not self.identity_evidence.strip():
             self.cap_number = None
+        if not self.cap_colour_evidence.strip():
+            self.cap_colour = "unknown"
         return self
 
 
@@ -111,7 +115,7 @@ second est le temps vidéo LOCAL en secondes, jamais le chrono de la période. F
 evidence décrivant balle, geste et issue visibles. Fournis side uniquement si un indice
 visible identifie l'équipe (team_evidence), sans supposer équipe suivie=bonnet blanc.
 Un nom fourni ou un numéro sur le tableau de score ne prouve pas le bonnet de l'acteur.
-cap_number exige lecture du bonnet de l'acteur (identity_evidence), sinon null.
+cap_number exige lecture du bonnet de l'acteur (identity_evidence), sinon null. cap_colour est la couleur réellement visible du bonnet, documentée par cap_colour_evidence ; ne déduis jamais le club de la couleur seule. Deux équipes peuvent avoir une gardienne au bonnet rouge.
 Pas de reconnaissance biométrique. Ne crée aucun nom. En cas d'incertitude side=unknown.
 Les zones sont relatives au but attaqué. cage_zone seulement si le point d'impact est
 visible. Phase/période/main/cause/pression/décision: renseigne uniquement ce que les images

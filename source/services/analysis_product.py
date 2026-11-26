@@ -389,6 +389,11 @@ def analysis_snapshot(db, match):
     snapshot["elite_performance"] = elite_report(snapshot["verified_events"])
     from services.video_action_report import action_report
     snapshot["video_actions"] = action_report(db, match)
+    from services.identity_aggregation import build_identity_report
+    summary = snapshot["automatic"].get("summary", {})
+    snapshot["identity_analysis"] = build_identity_report(summary.get("metric_field_map", {}), snapshot["verified_events"], snapshot["video_actions"], [{"id":p.id,"name":p.name,"cap_number":p.cap_number} for p in match.team.players], summary.get("identity_reviews", {}))
+    snapshot["identity_analysis"]["analysis_id"] = auto.id if auto else None
+    snapshot["identity_analysis"]["calibration_revision"] = summary.get("metric_field_map", {}).get("revision", "")
     from services.recognition_quality import audit
     snapshot["recognition_quality"] = audit(snapshot["automatic"], snapshot["video_actions"])
     # Basic counters over an empty event set are implementation zeros, not

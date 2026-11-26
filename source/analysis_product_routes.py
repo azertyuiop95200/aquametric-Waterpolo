@@ -537,7 +537,11 @@ def metric_calibration(match_id: int, request: Request, payload: dict, db: Sessi
         # never become confirmed sporting events.
         db.refresh(auto)
         latest=json.loads(auto.summary_json or "{}")
+        result["revision"]=secrets.token_hex(16)
         latest["metric_field_map"]=result
+        # Track/shot indexes belong to one calibration only. Preserve event reviews.
+        old_reviews=latest.get("identity_reviews",{})
+        latest["identity_reviews"]={"tracks":{},"shots":{},"events":old_reviews.get("events",{})}
         auto.summary_json=json.dumps(latest,ensure_ascii=False)
         db.commit()
         return {"ok":True,"aligned_frames":result["aligned_frames"],"requested_frames":result["requested_frames"],"mapped_shots":len(result["shots"])}
@@ -547,3 +551,38 @@ def metric_calibration(match_id: int, request: Request, payload: dict, db: Sessi
         raise HTTPException(422,"Calibration impossible : vérifier les cinq repères et le décor fixe.") from None
     finally:
         _METRIC_SLOT.release()
+
+
+@router.post("/matches/{match_id}/analysis/identity-review")
+def save_identity_review(match_id:int,request:Request,payload:dict,db:Session=Depends(get_db)):
+    import json
+    from models import AutonomousAnalysis
+    from services.identity_aggregation import validate_reviews
+    _,match=_owned_match(match_id,request,db)
+    auto=db.scalar(select(AutonomousAnalysis).where(AutonomousAnalysis.match_id==match.id).order_by(AutonomousAnalysis.id.desc()).limit(1))
+    if not auto:raise HTTPException(409,"Lance une pré-analyse avant l'attribution.")
+    # Serialize against calibration in this worker; reject obsolete form revisions.
+    if not _METRIC_SLOT.acquire(blocking=False):raise HTTPException(429,"Un calcul est déjà en cours.")
+    try:
+        db.refresh(auto)
+        summary=json.loads(auto.summary_json or "{}");metric=summary.get("metric_field_map",{})
+        if payload.get("analysis_id")!=auto.id or payload.get("calibration_revision","")!=metric.get("revision",""):
+            raise HTTPException(409,"La calibration a changé. Actualise le rapport.")
+        tracks={str(t["id"]) for t in metric.get("tracks",[])}
+        shots={str(i) for i,_ in enumerate(metric.get("shots",[]))}
+        events={}
+        for e in match.events:
+            if str(e.confidence or "").upper() not in {"CONFIRMED","VERIFIED"}:continue
+            side=getattr(getattr(e,"context_meta",None),"perspective","for")
+            if side in ("for","against") and not (side=="for" and e.player_id):events[str(e.id)]=side
+        reviewed=validate_reviews(payload.get("reviews"),tracks,events,shots)
+        from collections import Counter
+        counts=Counter(p.cap_number for p in match.team.players if p.cap_number)
+        if any(a["side"]=="for" and counts[a["cap_number"]]>1 for group in reviewed.values() for a in group.values()):
+            raise ValueError("Ce numéro est partagé par plusieurs joueuses de la feuille : corriger la feuille avant attribution.")
+        summary["identity_reviews"]=reviewed
+        auto.summary_json=json.dumps(summary,ensure_ascii=False);db.commit()
+        return {"ok":True}
+    except ValueError as exc:
+        raise HTTPException(422,str(exc)) from None
+    finally:_METRIC_SLOT.release()

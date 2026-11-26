@@ -2,6 +2,9 @@
 <h2>Cartographie métrique · but calibré</h2>
 {% if mm and mm.status == 'estimated' %}
 <p>{{mm.note}} {{mm.aligned_frames}}/{{mm.requested_frames}} images raccordées au décor de référence. Largeur saisie : {{mm.width_m}} m ; distance entre lignes de but : {{mm.length_m}} m. Pas de liaison entre des pistes indépendantes.</p>
+{% set ids=snapshot.identity_analysis|default({}) %}
+{% set track_labels={} %}{% for row in ids.get("track_rows",[]) %}{% if row.review.cap_number and row.review.side %}{% set _=track_labels.update({row.id:((match.team.name if row.review.side=="for" else match.opponent) ~ " n°" ~ row.review.cap_number)}) %}{% endif %}{% endfor %}
+{% set shot_labels={} %}{% for row in ids.get("shot_rows",[]) %}{% if row.review.cap_number and row.review.side %}{% set _=shot_labels.update({row.id:((match.team.name if row.review.side=="for" else match.opponent) ~ " n°" ~ row.review.cap_number)}) %}{% endif %}{% endfor %}
 {% set scale=18 %}{% set centre=220 %}{% set left=45 %}{% set half=mm.length_m/2 %}
 <div style="display:flex;flex-wrap:wrap;gap:16px">
 {% for mode in ['shots','tracks'] %}<div style="flex:1;min-width:230px"><h3>{{'Origines des tirs repérées' if mode=='shots' else 'Déplacements dans le champ de jeu'}}</h3>
@@ -14,16 +17,16 @@
 {% endfor %}
 {% if mode=='shots' %}{% for s in mm.shots %}
 <line x1="{{left+s.x_m*scale}}" y1="{{centre-s.y_m*scale}}" x2="{{left}}" y2="{{centre}}" stroke="#ffdd70" stroke-dasharray="5 4"/>
-<circle cx="{{left+s.x_m*scale}}" cy="{{centre-s.y_m*scale}}" r="6" fill="#ffdd70"/><text x="{{left+s.x_m*scale+8}}" y="{{centre-s.y_m*scale-8}}" fill="white" font-size="10">{{s.second}} s · {{s.range_m}} m</text>{% endfor %}
+<circle cx="{{left+s.x_m*scale}}" cy="{{centre-s.y_m*scale}}" r="6" fill="#ffdd70"/><text x="{{left+s.x_m*scale+8}}" y="{{centre-s.y_m*scale-8}}" fill="white" font-size="10">{{shot_labels.get(loop.index0,"Tireuse non identifiée")}} · {{s.second}} s · {{s.range_m}} m</text>{% endfor %}
 {% else %}{% for t in mm.tracks %}{% for seg in t.segments %}
 <polyline points="{% for p in seg %}{{left+p.x_m*scale}},{{centre-p.y_m*scale}} {% endfor %}" stroke="{{'white' if t.colour=='light' else '#ffbd6e' if t.colour=='dark' else '#ff9292'}}" stroke-width="2" fill="none"/>
-{% set p=seg[-1] %}<circle cx="{{left+p.x_m*scale}}" cy="{{centre-p.y_m*scale}}" r="3" fill="#80e7d9"/><text x="{{left+p.x_m*scale+4}}" y="{{centre-p.y_m*scale-4}}" fill="white" font-size="9">P{{t.id}}</text>{% endfor %}{% endfor %}{% endif %}
+{% set p=seg[-1] %}<circle cx="{{left+p.x_m*scale}}" cy="{{centre-p.y_m*scale}}" r="3" fill="#80e7d9"/><text x="{{left+p.x_m*scale+4}}" y="{{centre-p.y_m*scale-4}}" fill="white" font-size="9">{{track_labels.get(t.id,"P" ~ t.id)}}</text>{% endfor %}{% endfor %}{% endif %}
 </svg>
 {% if mode=='shots' and not mm.shots %}<p>Aucun tir localisé : pas de point artificiel.</p>{% endif %}
 </div>{% endfor %}</div>
 <h3>Distances partielles par piste (identité non vérifiée)</h3>
 <div style="overflow:auto"><table class="metric-table"><thead><tr><th>Piste</th><th>Couleur candidate</th><th>Suivi (s)</th><th>Déplacement projeté (m)</th><th>Ruptures rejetées</th></tr></thead><tbody>
-{% for t in mm.tracks %}<tr><td>P{{t.id}}</td><td>{{t.colour}}</td><td>{{t.observed_seconds}}</td><td>{{t.distance_m if t.distance_m is not none else '—'}}</td><td>{{t.rejected_jumps}}</td></tr>{% endfor %}
+{% for t in mm.tracks %}<tr><td>{{track_labels.get(t.id,"P" ~ t.id)}}</td><td>{{t.colour}}</td><td>{{t.observed_seconds}}</td><td>{{t.distance_m if t.distance_m is not none else '—'}}</td><td>{{t.rejected_jumps}}</td></tr>{% endfor %}
 </tbody></table></div>
 {% else %}<p>Pas de calibration de ce champ de jeu. Les distances en mètres restent non mesurées.</p>{% endif %}
 {% if interactive_report|default(false) and match.video_source == 'upload' %}
@@ -39,3 +42,5 @@
 <button type="button" id="metricSubmit" class="btn">Calculer la carte métrique</button>
 </div><script defer src="/static/metric-calibrator.js"></script></details>
 {% endif %}
+
+{% include "_identity_aggregation.html" %}
