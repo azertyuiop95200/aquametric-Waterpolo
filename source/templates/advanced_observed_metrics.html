@@ -1,0 +1,18 @@
+{% set a=snapshot.advanced_observed %}
+<h3>Possessions complètes et circulation du ballon</h3>
+<p>Une possession doit être identifiée, appariée début/fin et horodatée à l’horloge de jeu. Aucun regroupement approximatif n’est présenté comme une possession complète.</p>
+{% for side,name in [('for',match.team.name),('against',match.opponent)] %}{% set d=a.sides[side] %}
+<details><summary>{{name}} · {{d.possessions|length}} possession(s) appariée(s)</summary>
+<table class="metric-table"><thead><tr><th>Mesure</th><th>Valeur</th><th>Échantillon</th></tr></thead><tbody>
+{% for k,label in [('goals_per_possession','Buts par possession'),('possession_duration','Durée moyenne'),('passes_per_possession','Passes par possession')] %}{% set m=d[k] %}<tr><td>{{label}}</td><td>{{m.value if m.value is not none else '—'}} {{m.unit if m.value is not none else ''}}</td><td>{{m.n}} · {{m.requirement}}</td></tr>{% endfor %}
+</tbody></table>
+<p>{{d.incomplete_possession_groups}} groupe(s) de possession incomplet(s) ou non cohérent(s).</p>
+{% if d.possessions %}<table class="metric-table"><thead><tr><th>Quart</th><th>ID</th><th>Durée (s)</th><th>Phase</th><th>Issue</th><th>Preuves</th></tr></thead><tbody>{% for p in d.possessions %}<tr><td>{{p.period}}</td><td>{{p.possession}}</td><td>{{p.seconds}}</td><td>{{p.phase}}</td><td>{{p.outcome}}</td><td>{{p.event_ids|join(', ')}}</td></tr>{% endfor %}</tbody></table>{% endif %}
+<h4>Réseau des passes réussies</h4>
+{% if d.pass_network.edges %}<table class="metric-table"><thead><tr><th>Émettrice (ID)</th><th>Destinataire (ID)</th><th>Nombre</th><th>Événements</th></tr></thead><tbody>{% for edge in d.pass_network.edges %}<tr><td>{{edge.from_id}}</td><td>{{edge.to_id}}</td><td>{{edge.count}}</td><td>{{edge.event_ids|join(', ')}}</td></tr>{% endfor %}</tbody></table>{% else %}<p>Pas de liaison de passe explicitement identifiée.</p>{% endif %}
+<p>{{d.pass_network.rejected_or_unlinked}} passe(s) sans liaison vérifiable.</p>
+</details>{% endfor %}
+<h3>Mesures physiques et techniques calibrées</h3>
+{% macro numerical(d) %}<table class="metric-table"><thead><tr><th>Mesure</th><th>Moyenne</th><th>Maximum</th><th>n</th></tr></thead><tbody>{% for k,m in d.items() %}<tr><td>{{k}}</td><td>{{m.mean.value if m.mean.value is not none else '—'}} {{m.mean.unit if m.mean.value is not none else ''}}</td><td>{{m.max.value if m.max.value is not none else '—'}}</td><td>{{m.mean.n}}</td></tr>{% endfor %}</tbody></table>{% endmacro %}
+{% for side,name in [('for',match.team.name),('against',match.opponent)] %}<details><summary>{{name}} · mesures agrégées</summary>{{numerical(a.sides[side].numeric)}}</details>{% endfor %}
+{% for p in a.players %}<details><summary>{{p.name}} · {{'Équipe' if p.side=='for' else 'Adversaire'}} · TSAP et mesures physiques</summary>{{numerical(p.numeric)}}<p>TSAP : {{p.tsap.sample}} action(s) catégorisée(s). VP : {{p.tsap.volume_play if p.tsap.volume_play is not none else '—'}} · EI : {{p.tsap.efficiency_index if p.tsap.efficiency_index is not none else '—'}} · PS : {{p.tsap.performance_score if p.tsap.performance_score is not none else '—'}}.</p><p>Les indices TSAP sont réservés aux échantillons explicitement déclarés complets. <a href="{{p.tsap.source}}">Référence scientifique</a>.</p></details>{% endfor %}
