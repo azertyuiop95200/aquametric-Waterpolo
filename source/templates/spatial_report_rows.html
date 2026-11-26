@@ -2,7 +2,7 @@
 {% for eid, row in (spatial_reviews|default({})).items() %}
 <article class="candidate"><h3>Action #{{eid}} · {{'%.2f'|format(row.result.decision_second)}} s</h3>
 <p>Source : {{row.result.source}} · σ supposé : {{row.result.sigma_m}} m · {{row.result.trials}} simulations par option.</p>
-{% if interactive_report|default(false) %}<p><a href="/matches/{{match.id}}/spatial?event={{eid}}">Voir la vidéo et la scène 3D</a></p>{% endif %}
+{% if interactive_report|default(false) %}<p><a href="/matches/{{match.id}}/spatial?event={{eid}}">Voir la vidéo et la scène 3D</a> · <a href="/matches/{{match.id}}/spatial/{{eid}}/sandbox">Modifier la situation et simuler</a></p>{% endif %}
 <div style="overflow-x:auto"><table class="metric-table"><thead><tr><th>Option</th><th>Marge (m)</th><th>Dégagement simulé</th><th>Probabilité sportive</th></tr></thead><tbody>
 {% for o in row.result.options %}<tr><td>{{o.id}}{% if o.id==row.result.chosen %} · geste réel{% endif %}</td><td>{{'%.2f'|format(o.clearance_m) if o.clearance_m is not none else 'Non mesurée'}}</td><td>{% if o.clearance_frequency is not none %}{{'%.1f'|format(o.clearance_frequency*100)}} % ({{'%.1f'|format(o.simulation_interval[0]*100)}}–{{'%.1f'|format(o.simulation_interval[1]*100)}} %){% else %}Non mesuré{% endif %}</td><td>Non calibrée</td></tr>{% endfor %}
 </tbody></table></div><p>Le classement géométrique ne prouve pas une erreur tactique. Les intervalles reflètent l'échantillonnage des simulations, pas la validité du modèle.</p></article>
