@@ -40,7 +40,7 @@ PENDING = {
  "gestion_match":[("on_water_plus_minus","Différentiel de buts en jeu","intervalles et buts horodatés"),("lineup_efficiency","Efficacité des compositions","présence complète des joueuses"),("score_momentum","Dynamique du score","chronologie complète validée"),("shot_clock_at_release","Chrono de possession au tir","lecture horloge"),("decision_quality","Qualité de décision indépendante de l'issue","alternatives pré-action évaluées"),("decision_regret","Coût d'opportunité d'une décision","valeur attendue calibrée"),("scenario_3d","Relecture et scénarios 3D","reconstruction métrique et module 3D")],
  "physique_temps":[("trajectory_map","Cartographie continue des déplacements","tracking calibré"),("swim_speed","Vitesse moyenne et maximale de nage","tracking calibré et temps"),("acceleration","Accélération et décélération","tracking calibré"),("sprint_5m_10m","Temps de sprint sur 5 et 10 m","segments mesurés"),("high_intensity_distance","Distance à haute intensité","seuil individualisé et tracking"),("work_rest","Temps d'effort et récupération","classification temporelle"),("fatigue","Évolution de la charge / fatigue","mesures répétées et contexte"),("vertical_elevation","Élévation verticale","calibration 3D"),("per_minute","Indicateurs par minute jouée","temps de jeu fiable"),("tracking_coverage","Couverture du suivi joueur / ballon","intervalles de visibilité"),("formation_heatmap","Heatmap occupation par joueuse","positions avec durée observée")],
 }
-def audit_rows(events):
+def audit_rows(events, roster=()):
     confirmed=[e for e in events if str(e.get("confidence") or "").upper() in {"CONFIRMED","VERIFIED"}]
     sides={s:[e for e in confirmed if e.get("perspective")==s] for s in ("for","against")}
     def group(rows, scope):
@@ -86,8 +86,41 @@ def audit_rows(events):
     for s,rows in sides.items():
         for e in rows:
             if e.get("player_id") is not None:players[(s,e["player_id"])].append(e)
+    for p in roster:
+        players.setdefault(("for",p["id"]),[])
+    roster_names={p["id"]:p["name"] for p in roster}
     return dict(version="ultimate-audit-v1",sources=SOURCES,scope="confirmed_sample_only",issues=issues,
                 team=group(sides["for"],"team"),opponent=group(sides["against"],"team"),
-                players=[dict(side=s,player_id=pid,name=rows[0].get("player") or "Non nommée",metrics=group(rows,"player")) for (s,pid),rows in players.items()],
+                players=[dict(side=s,player_id=pid,name=(roster_names.get(pid) if s=="for" else None) or (rows[0].get("player") if rows else None) or "Non nommée",metrics=group(rows,"player")) for (s,pid),rows in players.items()],
                 confirmed_count=len(confirmed),excluded_count=len(events)-len(confirmed),
                 note="Les valeurs comptent les annotations vérifiées, pas un match intégral. Les indicateurs non raccordés dans ce registre peuvent exister ailleurs dans le logiciel ; aucune valeur n'est inventée.")
+
+
+def enrich_audit(audit,advanced,identity,statistics):
+    """Expose computed values without conflating tagged samples with tracking estimates."""
+    def update(rows,key,value,n,requirement,state="derived_sample"):
+        for r in rows:
+            if r["key"]==key:
+                r.update(value=value,denominator=n,requirement=requirement,
+                         state=state if value is not None else "not_measured")
+                return
+    for side,key in (("for","team"),("against","opponent")):
+        rr=audit[key];a=advanced["sides"][side];s=statistics[key];track=identity.get("teams",{}).get(side,{})
+        for k in ("goals_per_possession","possession_duration","passes_per_possession"):
+            x=a[k];update(rr,k,x["value"],x["n"],x["requirement"]+" · "+x["unit"])
+        network=a["pass_network"]["edges"]
+        update(rr,"pass_network",len(network) if network else None,sum(e["count"] for e in network),"Nombre de liens orientés · réseau détaillé sous le tableau")
+        update(rr,"shot_type_split",sum(r.get("shots",0) for r in s["shots"]["types"] if r.get("key")!="unknown") or None,s["shots"]["total"],"Tirs avec technique renseignée · détail dans statistiques de tir")
+        update(rr,"shot_speed",a["numeric"]["shot_speed_kmh"]["mean"]["value"],a["numeric"]["shot_speed_kmh"]["mean"]["n"],"Moyenne km/h sur mesures calibrées renseignées")
+        update(rr,"shot_release_height",a["numeric"]["shot_release_height_m"]["mean"]["value"],a["numeric"]["shot_release_height_m"]["mean"]["n"],"Hauteur moyenne (m) · calibration déclarée")
+        update(rr,"tracking_coverage",track.get("player_seconds") if track.get("players_measured") else None,track.get("players_measured"),"Secondes-joueuses de suivi métrique observé (pas temps de jeu)","partial_measurement")
+        update(rr,"trajectory_map",track.get("distance_m"),track.get("players_measured"),"Somme des distances suivies (m) · identités revues, sans extrapolation","partial_measurement")
+    index={(p["side"],p["player_id"]):p for p in advanced["players"]}
+    for p in audit["players"]:
+        a=index.get((p["side"],p["player_id"]))
+        if not a:continue
+        ts=a["tsap"]
+        update(p["metrics"],"tsap",ts["performance_score"],ts["sample"],"Score TSAP sur catégories explicitement classées")
+        for k,raw,req in [("shot_speed","shot_speed_kmh","Moyenne km/h"),("shot_release_height","shot_release_height_m","Hauteur moyenne (m)"),("pass_length","pass_distance_m","Longueur moyenne (m)"),("swim_speed","max_swim_speed_mps","Maximum m/s")]:
+            x=a["numeric"][raw]["max" if k=="swim_speed" else "mean"]
+            update(p["metrics"],k,x["value"],x["n"],req+" · mesures calibrées renseignées")
