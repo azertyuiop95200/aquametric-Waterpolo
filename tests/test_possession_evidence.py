@@ -56,6 +56,11 @@ class PossessionReviewTests(unittest.TestCase):
     def test_no_rate(self):self.assertIsNone(report([self.event()])["turnover_rate"])
     def test_tag_override(self):
         p=report([self.event(evidence="p_after=for | p_cv=1")]);self.assertEqual(p["rows"][0]["after"],"against")
+    def test_restart_no_control_inference(self):
+        p=report([self.event(after="unknown",after_state="unknown",decision_verified=True,restart_award="against",restart_verified=True)])
+        self.assertEqual(p["rows"][0]["restart_award"],"against");self.assertIsNone(p["rows"][0]["minimum_changes"])
+    def test_restart_requires_decision(self):
+        with self.assertRaises(ValueError):validate(**self.row(restart_award="against",restart_verified=True))
     def test_template(self):
         env=Environment(loader=FileSystemLoader("source/templates"),autoescape=select_autoescape())
         html=env.get_template("possession_evidence.html").render(snapshot={"possession_evidence":report([self.event(evidence="<script>")])})
