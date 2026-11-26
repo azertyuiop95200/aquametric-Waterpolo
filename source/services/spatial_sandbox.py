@@ -24,7 +24,7 @@ def sandbox(baseline, edits, trials=32):
         raise ValueError("Keep the observed defender identities")
     original={d["id"]:d for d in scene["defenders"]}
     scene["defenders"]=[dict(original[d["id"]],position=advance(xyz(d["position"],bounds),xyz(d["velocity"],vb),delay),
-                            velocity=list(xyz(d["velocity"],vb))) for d in defenders]
+                            velocity=list(xyz(d["velocity"],vb)),radius=number(d.get("radius",original[d["id"]]["radius"]),.15,1.8)) for d in defenders]
     original_opts={o["id"]:o for o in scene["options"]}
     opts=edits.get("options",scene["options"])
     if not isinstance(opts,list) or len(opts)!=len(original_opts) or {o["id"] for o in opts}!=set(original_opts):
