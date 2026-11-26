@@ -2,7 +2,7 @@ import unittest
 from services.tactical_sequence_metrics import sequence_report
 
 def ev(i,t,c,uid="",extra="",side="for"):
-    return dict(id=i,match_id=1,event_type=t,note=f"period=1 game_clock_s={c} sequence={uid} {extra}",perspective=side,confidence="CONFIRMED",second=i)
+    return dict(id=i,match_id=1,event_type=t,note=f"period=1 game_clock_s={c} "+(f"sequence={uid} " if uid else "")+extra,perspective=side,confidence="CONFIRMED",second=i)
 
 class SequenceTests(unittest.TestCase):
     def test_numeric(self):
