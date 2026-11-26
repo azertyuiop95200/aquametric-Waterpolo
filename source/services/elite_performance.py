@@ -77,7 +77,10 @@ def exposure(rows):
         if tc is None:
             invalid += 1
             continue
-        groups[tc[0]].append((tc[1], e.get("event_type"), e.get("id") or 0))
+        if e.get("player_id") is None:
+            invalid += 1
+            continue
+        groups[(e.get("perspective"), e["player_id"], tc[0])].append((tc[1], e.get("event_type"), e.get("id") or 0))
     duration = 0.0
     pairs = 0
     for entries in groups.values():
@@ -86,7 +89,8 @@ def exposure(rows):
             if typ == "player_in":
                 if start is not None:
                     invalid += 1
-                start = c
+                if start is None:
+                    start = c
             elif start is None:
                 invalid += 1
             else:
@@ -137,7 +141,7 @@ def reduce_side(rows):
         "penalties_committed": c["penalty_committed"], "penalties_earned": c["penalty_earned"],
         "personal_fouls": c["exclusion_committed"]+c["exclusion"]+c["penalty_committed"],
         "penalty_shots": len(penalties), "penalty_goals": sum(e.get("event_type")=="goal" for e in penalties),
-        "penalty_conversion": pct(sum(e.get("event_type")=="goal" for e in penalties), len(penalties)),
+        "penalty_conversion": pct(sum(e.get("event_type")=="goal" for e in penalties), len(penalties)) if not any(e.get("event_type")=="shot_unknown" for e in penalties) else None,
         "saves": c["save"], "goals_against": c["goal_against"],
         "save_pct": pct(c["save"], c["save"]+c["goal_against"]),
         "possession_ends": sum(ends.values()), "classified_ends": classified,
