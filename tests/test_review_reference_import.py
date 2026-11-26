@@ -76,3 +76,19 @@ class ReviewImportTests(unittest.TestCase):
             db.add(MatchReviewReference(match_id=match.id,period=period,digest=digest,home_color="bleus",payload_json=canonical))
             with self.assertRaises(IntegrityError):db.commit()
             db.rollback()
+
+    def test_referee_signal_not_decision(self):
+        p=fixture(); i=p["reference"]["possession_review_intervals"][0]
+        i.update(referee_signal_observed=True,cause_candidate="offensive foul possible")
+        s=summarize(read(p)[0],"blancs")
+        self.assertEqual(s["referee_signals"],1);self.assertEqual(s["confirmed_referee_decisions"],0)
+        self.assertIsNone(s["intervals"][0]["attributed_cause"])
+    def test_recomputed_bound_no_overlap_or_shot(self):
+        p=fixture();i=p["reference"]["possession_review_intervals"][0]
+        p["reference"]["possession_review_intervals"] += [dict(i,interval_id="P2",start_s=3.8,end_s=5.5),dict(i,interval_id="P3",start_s=6,end_s=7,linked_prior_shot=True)]
+        s=summarize(read(p)[0],"bleus")
+        self.assertEqual(s["lower_bound_excluding_linked_shots"],1)
+        self.assertIsNone(s["exact_total_changes"])
+    def test_signal_type_strict(self):
+        p=fixture();p["reference"]["possession_review_intervals"][0]["referee_signal_observed"]="false"
+        with self.assertRaises(ValueError):read(p)
