@@ -137,5 +137,27 @@ for(const k of ["A","B"]){
  $("load-"+lower).addEventListener("click",()=>{if(!snapshots[k])return;remember();edit=clone(snapshots[k].edits);sync();changed(snapshots[k].result.trials===160)});
 }
 $("export").addEventListener("click",()=>{if(!result||resultInput!==JSON.stringify(edit))return;const url=URL.createObjectURL(new Blob([JSON.stringify({mode:"coach_hypothesis",match:data.match,event:data.event,reference,edits:edit,result,snapshots},null,2)],{type:"application/json"}));const a=document.createElement("a");a.href=url;a.download="scenario-"+data.event+".json";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)});
+let searchToken=0;
+$("search").addEventListener("click",async()=>{
+ const token=++searchToken, input=JSON.stringify(edit);
+ $("search").disabled=true;$("search-cancel").disabled=false;$("search-rows").replaceChildren();
+ $("search-status").textContent="Exploration des configurations…";
+ try{
+ const res=await fetch("/matches/"+data.match+"/spatial/"+data.event+"/sandbox/search",{method:"POST",headers:{"Content-Type":"application/json"},body:input});
+ const json=await res.json();if(!res.ok)throw Error(typeof json.detail==="string"?json.detail:"Recherche impossible");
+ if(token!==searchToken)return;
+ $("search-status").textContent=json.scenarios.length+" configurations calculées · "+json.rejected.length+" rejetées · aperçu à "+json.trials_per_option+" simulations par option. "+(input===JSON.stringify(edit)?"":"La scène a changé depuis le lancement.");
+ const best=x=>x?fmt(x.clearance_frequency*100,1)+" % · "+x.id:"Non mesuré";
+ for(const scenario of json.scenarios){
+ const row=document.createElement("tr");$("search-rows").append(row);
+ add(row,"td",scenario.name+" — "+scenario.description);
+ add(row,"td",best(scenario.best_shot));add(row,"td",best(scenario.best_pass));
+ const td=add(row,"td",""),btn=add(td,"button","Explorer");btn.type="button";btn.className="btn secondary";
+ btn.addEventListener("click",()=>{remember();edit=clone(scenario.edits);sync();changed(true)});
+ }
+ }catch(e){if(token===searchToken)$("search-status").textContent=e.message}
+ finally{if(token===searchToken)$("search").disabled=false}
+});
+$("search-cancel").addEventListener("click",()=>{searchToken++;$("search-rows").replaceChildren();$("search-status").textContent="Résultats masqués.";$("search-cancel").disabled=true;$("search").disabled=false});
 $("undo").disabled=true;sync();changed();
 })();
