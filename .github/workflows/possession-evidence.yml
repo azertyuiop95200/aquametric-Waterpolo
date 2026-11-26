@@ -16,7 +16,7 @@ jobs:
         with:
           python-version: '3.11'
       - run: pip install jinja2 sqlalchemy
-      - run: python -m py_compile source/main.py source/services/analysis_product.py source/services/possession_evidence.py source/services/review_reference_import.py source/services/pass_review.py source/services/review_reference_revision.py source/models.py
+      - run: python -m py_compile source/main.py source/services/analysis_product.py source/services/possession_evidence.py source/services/review_reference_import.py source/services/pass_review.py source/services/evidence_manifest.py source/services/review_reference_revision.py source/models.py
       - run: PYTHONPATH=source python -m unittest discover -s tests -p test_possession_evidence.py -v
       - run: PYTHONPATH=source python -m unittest discover -s tests -p test_review_reference_import.py -v
       - run: PYTHONPATH=source python -m unittest discover -s tests -p test_pass_review.py -v
