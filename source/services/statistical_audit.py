@@ -146,3 +146,17 @@ def enrich_lineups(audit,lineups,phases):
         row=next(p for p in phases["sides"][s]["phases"] if p["phase"]=="counterattack")
         set_value(audit[k],"counterattack_conversion",row["conversion_pct"],row["possessions"],
                   "Pourcentage de possessions complètes commencées en contre-attaque et terminées par un but")
+
+
+def enrich_sequences(audit,report):
+    for side,key in (("for","team"),("against","opponent")):
+        m={r["kind"]:r for r in report["sides"][side]["metrics"]}
+        for row in audit[key]:
+            if row["key"]=="extra_player_duration":
+                x=m["power_play"];row.update(value=x["total_seconds"],denominator=x["timed_count"],
+                    state="derived_sample" if x["total_seconds"] is not None else "not_measured",
+                    requirement="Durée totale effective (s) des surnombres appariés")
+            elif row["key"]=="transition_duration":
+                x=m["counterattack"];row.update(value=x["mean_seconds"],denominator=x["timed_count"],
+                    state="derived_sample" if x["mean_seconds"] is not None else "not_measured",
+                    requirement="Durée moyenne effective (s) des contre-attaques appariées")
