@@ -54,7 +54,8 @@ def spatial_page(match_id:int,request:Request,db:Session=Depends(get_db)):
 @router.post("/matches/{match_id}/spatial/{event_id}")
 async def spatial_save(match_id:int,event_id:int,request:Request,db:Session=Depends(get_db)):
     user,match=owned(request,db,match_id)
-    if event_id not in {e.id for e in eligible(match)}: raise HTTPException(404,"Verified eligible event required")
+    event=next((e for e in eligible(match) if e.id==event_id),None)
+    if event is None: raise HTTPException(404,"Verified eligible event required")
     # Bound incoming payload even when the caller omits Content-Length.
     body=bytearray()
     async for chunk in request.stream():
@@ -63,6 +64,8 @@ async def spatial_save(match_id:int,event_id:int,request:Request,db:Session=Depe
     try:
         data=json.loads(body)
         result=review(data)
+        if not max(0,event.second-10)<=result["decision_second"]<=event.second:
+            raise ValueError("Decision must be at or within 10 seconds before the event")
         payload=json.dumps(dict(observations=data,result=result),allow_nan=False)
     except (ValueError,TypeError,KeyError,AttributeError,OverflowError) as exc:
         raise HTTPException(422,"Invalid spatial observation: "+str(exc)[:200]) from exc
