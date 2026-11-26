@@ -4,6 +4,7 @@ on:
     paths:
       - 'source/**'
       - 'tests/test_possession_evidence.py'
+      - 'tests/test_review_reference_import.py'
       - '.github/workflows/possession-evidence.yml'
 jobs:
   possession-evidence:
@@ -14,12 +15,13 @@ jobs:
         with:
           python-version: '3.11'
       - run: pip install jinja2
-      - run: python -m py_compile source/main.py source/services/analysis_product.py source/services/possession_evidence.py
+      - run: python -m py_compile source/main.py source/services/analysis_product.py source/services/possession_evidence.py source/services/review_reference_import.py source/models.py
       - run: PYTHONPATH=source python -m unittest discover -s tests -p test_possession_evidence.py -v
+      - run: PYTHONPATH=source python -m unittest discover -s tests -p test_review_reference_import.py -v
       - run: |
           python - <<'PY'
           from jinja2 import Environment, FileSystemLoader
           e=Environment(loader=FileSystemLoader('source/templates'))
-          for f in ('analysis_result_clean_v2.html','analysis_all_measurements.html','possession_evidence.html','possession_evidence_controls.html'):
+          for f in ('analysis_result_clean_v2.html','analysis_all_measurements.html','possession_evidence.html','possession_evidence_controls.html','review_reference_form.html','review_reference_report.html'):
               e.get_template(f)
           PY
