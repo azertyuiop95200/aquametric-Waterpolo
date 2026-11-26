@@ -126,3 +126,5 @@
 {% for k,label in [('pass','Passe'),('shot','Tir')] %}{% set v=et.teams[side][k] %}<tr><th>Équipe</th><td>{{label}}</td><td>{{v.mean_visible_control_s if v.mean_visible_control_s is not none else '—'}}</td><td>{{v.control_samples}}</td><td>{{v.mean_reception_to_release_s if v.mean_reception_to_release_s is not none else '—'}}</td><td>{{v.reception_samples}}</td></tr>{% endfor %}
 </tbody></table></div>{% endfor %}
 {% endif %}
+
+{% include "_decision_space.html" %}

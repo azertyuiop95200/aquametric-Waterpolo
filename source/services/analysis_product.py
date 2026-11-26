@@ -406,6 +406,8 @@ def analysis_snapshot(db, match):
     snapshot["phase_mobility"]=phase_mobility(players,possession.get("rows",[]),source_revision=metric.get("source_revision"),possession_revision=possession.get("source_revision"),**dimensions)
     from services.execution_timing import execution_report
     snapshot["execution_timing"]=execution_report(snapshot["spatial_attribution"]["events"],control,source_revision=metric.get("source_revision"))
+    from services.decision_space import decision_report
+    snapshot["decision_space"]=decision_report(snapshot["spatial_attribution"]["events"],players,**dimensions)
     snapshot["identity_analysis"]["analysis_id"] = auto.id if auto else None
     from services.report_coverage import report_coverage
     snapshot["report_coverage"] = report_coverage(snapshot["verified_events"], snapshot["video_actions"], [{"id":p.id,"name":p.name,"cap_number":p.cap_number} for p in match.team.players])
