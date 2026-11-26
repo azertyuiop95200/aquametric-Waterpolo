@@ -35,6 +35,7 @@ def review(data, trials=160):
     bounds=((0,length),(0,width),(0,3))
     start=xyz(data.get("start"),bounds)
     sigma=number(data.get("sigma_m"),0,2)
+    decision_second=number(data.get("decision_second"),0,86400)
     raw=data.get("defenders")
     opts=data.get("options")
     if not isinstance(raw,list) or len(raw)>8 or not isinstance(opts,list) or not 1<=len(opts)<=12:
@@ -61,8 +62,10 @@ def review(data, trials=160):
         if kind not in ("shot","pass"):
             raise ValueError("Unknown action")
         end=xyz(o["target"],bounds)
-        if kind=="shot" and (abs(end[0]-goal_x)>1e-6 or abs(end[1]-width/2)>1.5 or end[2]>.9):
-            raise ValueError("Shot target outside configured 3 m x 0.9 m goal")
+        # The observed missed shot may be outside the frame or stop at a block.
+        in_goal = (abs(end[0]-goal_x)<1e-6 and abs(end[1]-width/2)<=1.5 and end[2]<=.9) if kind=="shot" else None
+        if kind=="shot" and ident!=data["chosen"] and not in_goal:
+            raise ValueError("Alternative shot target must be inside the configured goal")
         duration=number(o["duration_s"],.15,2)
         r=assess(start,end,duration,tracks or None,1,steps=32)
         # A speed limit is not assumed to be a universal athlete capability.
@@ -84,7 +87,7 @@ def review(data, trials=160):
         if not complete:
             r.update(status="unknown",clearance_m=None,closest_defender=None,closest_time_s=None)
         output.append(dict(r,id=ident,kind=kind,target=end,clearance_frequency=freq,
-                           simulation_interval=interval,goal_probability=None,
+                           simulation_interval=interval,target_in_goal=in_goal,goal_probability=None,
                            pass_completion_probability=None))
     ids=[o["id"] for o in output]
     if len(set(ids))!=len(ids) or data["chosen"] not in ids:
@@ -93,7 +96,7 @@ def review(data, trials=160):
                 defenders=[dict(id=d.id,position=d.position,velocity=d.velocity,radius=d.radius,confidence=d.confidence) for d in tracks],
                 length_m=length,width_m=width,goal_x=goal_x,chosen=data["chosen"],options=output,
                 goal_angles=goal_angles(start,goal_x,width/2) if abs(start[0]-goal_x)>1e-8 else None,
-                sigma_m=sigma,trials=trials,complete_defence=complete,
+                sigma_m=sigma,trials=trials,complete_defence=complete,decision_second=decision_second,
                 limitations=["Conditional geometric clearance, not scoring or completion probability",
                 "Constant defender velocity and spherical reach; no learned goalkeeper or arm model",
                 "Manual or supplied positions are not automatically reconstructed from pixels"])
