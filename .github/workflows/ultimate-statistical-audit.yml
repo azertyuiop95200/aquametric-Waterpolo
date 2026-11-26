@@ -21,6 +21,8 @@ jobs:
           PYTHONPATH: source
         run: python -m unittest discover -s tests -p "test_ultimate_statistical*.py" -v
       - name: Verify the report templates
+        env:
+          PYTHONPATH: source
         run: |
           pip install jinja2
           python - <<'PY'
@@ -29,4 +31,17 @@ jobs:
           for name in ('statistical_audit.html','advanced_observed_metrics.html','analysis_all_measurements.html','analysis_result_clean_v2.html','motion_performance.html','lineup_performance.html','tactical_sequence_metrics.html'):
               e.get_template(name)
               print(name, 'compiled')
+          from types import SimpleNamespace
+          from services.lineup_performance import lineup_report, phase_context_report
+          from services.tactical_sequence_metrics import sequence_report
+          from services.statistical_audit import audit_rows
+          e=Environment(loader=FileSystemLoader('source/templates'))
+          roster=[{'id':1,'name':'Joueuse test'}]
+          snapshot={'lineup_performance':lineup_report([],roster),'phase_context':phase_context_report([]),
+                    'tactical_sequences':sequence_report([]),'statistical_audit':audit_rows([],roster)}
+          match=SimpleNamespace(team=SimpleNamespace(name='Equipe'),opponent='Adversaire')
+          for name in ('lineup_performance.html','tactical_sequence_metrics.html','statistical_audit.html'):
+              html=e.get_template(name).render(snapshot=snapshot,match=match)
+              assert len(html)>200 and 'Joueuse test' in html if name!='tactical_sequence_metrics.html' else len(html)>200
+              print(name,'rendered empty evidence sample')
           PY
