@@ -68,7 +68,7 @@ EVENT_TYPES = (
     "exclusion", "exclusion_earned", "exclusion_committed", "penalty_earned", "penalty_committed",
     "whistle", "power_play_start", "penalty_kill_start", "counterattack_start",
     "defensive_recovery_start", "fast_recovery", "late_recovery",
-    "foul_earned", "offensive_foul", "unforced_error", "goal_against", "possession_end", "power_play_end", "penalty_kill_end", "shot_clock_expired", "player_in", "player_out", "distance_sample", "swim_off_won", "swim_off_lost", "timeout_start", "timeout_end", "period_start", "period_end", "sprint"
+    "foul_earned", "offensive_foul", "unforced_error", "goal_against", "possession_start", "possession_end", "power_play_end", "penalty_kill_end", "shot_clock_expired", "player_in", "player_out", "distance_sample", "swim_off_won", "swim_off_lost", "timeout_start", "timeout_end", "period_start", "period_end", "sprint"
 )
 PHASE_TAGS = ("auto", "even_attack", "even_defence", "power_play", "penalty_kill", "counterattack", "defensive_recovery", "centre_play", "restart", "penalty")
 PERSPECTIVES = ("for", "against", "neutral")
@@ -909,6 +909,15 @@ def add_event(
     game_clock_s: str = Form(""),
     outcome: str = Form(""),
     distance_m: str = Form(""),
+    possession_id: str = Form(""),
+    action_id: str = Form(""),
+    receiver_id: str = Form(""),
+    passes_complete: str = Form(""),
+    tsap_category: str = Form(""),
+    tsap_coverage: str = Form(""),
+    metric_type: str = Form(""),
+    metric_value: str = Form(""),
+    metric_calibrated: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = require_user(request, db)
@@ -977,7 +986,35 @@ def add_event(
             if distance is None:
                 raise HTTPException(400, detail="Distance mesurée invalide.")
             evidence_tags.append(f"distance_m={distance}")
-        note = f"{note[:340]} {' '.join(evidence_tags)}"
+        for key,value in (("possession",possession_id),("action_id",action_id)):
+            if value.strip():
+                if not re.fullmatch(r"[A-Za-z0-9_-]{1,32}",value.strip()):
+                    raise HTTPException(400, detail="Identifiant invalide.")
+                evidence_tags.append(f"{key}={value.strip().lower()}")
+        if receiver_id:
+            receiver = db.get(Player,int(receiver_id)) if receiver_id.isdecimal() else None
+            if perspective!="for" or pid is None or not receiver or receiver.team_id!=match.team_id or receiver.id==pid or event_type not in {"pass_complete","assist","key_pass"} or not action_id.strip():
+                raise HTTPException(400,detail="Destinataire ou identifiant de passe invalide.")
+            evidence_tags.append(f"receiver_id={receiver.id}")
+        if passes_complete=="yes" and event_type=="possession_end":
+            evidence_tags.append("passes_complete=yes")
+        if tsap_category:
+            if tsap_category not in {"rb","cb","nb","lb","ob","ss"} or pid is None or not action_id.strip():
+                raise HTTPException(400,detail="TSAP : joueuse, catégorie et identifiant d'action requis.")
+            evidence_tags.append(f"tsap={tsap_category}")
+        if tsap_coverage=="complete" and tsap_category:
+            evidence_tags.append("tsap_coverage=complete")
+        if metric_type or metric_value:
+            from services.advanced_observed_metrics import METRIC_SPEC
+            spec=METRIC_SPEC.get(metric_type)
+            if not spec or event_type not in spec[0] or metric_calibrated!="yes":
+                raise HTTPException(400,detail="Mesure incompatible ou calibration non confirmée.")
+            val=number(metric_value,spec[2])
+            if val is None or val<spec[1]:
+                raise HTTPException(400,detail="Valeur physique invalide.")
+            evidence_tags.extend([f"{metric_type}={val}","measurement=calibrated"])
+        suffix=" ".join(evidence_tags)
+        note = f"{note[:max(0,499-len(suffix))]} {suffix}"
     event = Event(
         match_id=match.id,
         player_id=pid,
