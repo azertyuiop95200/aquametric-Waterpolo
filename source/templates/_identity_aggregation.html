@@ -4,8 +4,23 @@
 <p>Identifiant unique dans ce match : équipe + numéro de bonnet. La couleur est un attribut vérifié, pas une identité à elle seule. Les mesures de déplacement sont des estimations partielles ; les actions ci-dessous sont confirmées et distinctes des hypothèses IA.</p>
 {% set names={'for':match.team.name,'against':match.opponent} %}
 {% macro val(x) %}{{x if x is not none else '—'}}{% endmacro %}
+{% macro mobility_map(h,edges=[]) %}
+{% if h and h.cells %}
+{% set peak=h.cells|map(attribute='seconds')|max %}
+<svg viewBox="-1.5 {{-h.width_m/2-1}} {{h.length_m+3}} {{h.width_m+2}}" style="display:block;width:100%;max-width:540px;background:#102e40;border-radius:6px" role="img" aria-label="Carte de présence temporelle et trajectoires métriques">
+<rect x="0" y="{{-h.width_m/2}}" width="{{h.length_m}}" height="{{h.width_m}}" fill="#17677b" stroke="#bfdce1" stroke-width=".08"/>
+{% for c in h.cells %}<rect x="{{c.x_m}}" y="{{-c.y_m-c.height_m}}" width="{{c.width_m}}" height="{{c.height_m}}" fill="#ffd36c" fill-opacity="{{0.12+0.78*c.seconds/peak}}"><title>{{c.seconds|round(2)}} s</title></rect>{% endfor %}
+{% for x in [2,6,h.length_m/2,h.length_m-6,h.length_m-2] %}<path d="M{{x}} {{-h.width_m/2}} V{{h.width_m/2}}" stroke="#afd0d9" stroke-width=".06" stroke-dasharray=".25 .22"/>{% endfor %}
+<rect x="-1" y="-1.5" width="1" height="3" fill="none" stroke="white" stroke-width=".09"/>
+<rect x="{{h.length_m}}" y="-1.5" width="1" height="3" fill="none" stroke="white" stroke-width=".09"/>
+{% for e in edges %}<line x1="{{e.x0}}" y1="{{-e.y0}}" x2="{{e.x1}}" y2="{{-e.y1}}" stroke="#c1fff4" stroke-width=".09" stroke-opacity=".85"/>{% endfor %}
+</svg>
+<p>Cellules de {{h.cell_m}} m (bord ajusté). Teinte plus claire : durée de présence observée supérieure. Maximum de la carte : {{peak|round(2)}} s. Échelle de couleur propre à cette carte ; repère de la calibration, pas une orientation offensive permanente.</p>
+{% endif %}
+{% endmacro %}
 <div style="overflow:auto"><table class="metric-table"><thead><tr><th>Indicateur</th><th>{{names['for']}}</th><th>{{names['against']}}</th></tr></thead><tbody>
 <tr><td>Distance cumulée des joueuses identifiées (m)</td>{% for s in ['for','against'] %}<td>{{val(ir.teams[s].distance_m)}}</td>{% endfor %}</tr>
+<tr><td>Vitesse moyenne locale pondérée (m/s)</td>{% for s in ['for','against'] %}<td>{{val(ir.teams[s].mean_speed_m_s|default(none))}}</td>{% endfor %}</tr>
 <tr><td>Joueuses avec distance mesurée</td>{% for s in ['for','against'] %}<td>{{ir.teams[s].players_measured}}</td>{% endfor %}</tr>
 <tr><td>Temps vidéo cumulé des pistes (joueuse-secondes)</td>{% for s in ['for','against'] %}<td>{{ir.teams[s].player_seconds}}</td>{% endfor %}</tr>
 <tr><td>Temps de jeu effectif cumulé relevé (joueuse-secondes)</td>{% for s in ['for','against'] %}<td>{{val(ir.teams[s].playing_seconds)}}</td>{% endfor %}</tr>
@@ -15,10 +30,14 @@
 </tbody></table></div>
 <p>{{ir.unassigned_tracks}} piste(s), {{ir.unassigned_shots}} origine(s) de tir sans identité complète ; exclues des distances cumulées et des cartes attribuées. {{ir.unknown_side_events}} action(s) confirmée(s) sans équipe résolue. Les ratios collectifs sont recalculés à partir des numérateurs et dénominateurs collectifs, pas moyennés entre joueuses.</p>
 {% for side in ['for','against'] %}
+<h3>{{names[side]}} · présence collective mesurée</h3>
+{{mobility_map(ir.teams[side].heatmap|default({}))}}
 <h3>{{names[side]}} · fiches individuelles</h3>
 {% for p in ir.players if p.side==side %}
-<details {% if loop.first %}open{% endif %}><summary>{{p.name}} · n°{{p.cap_number}} · {{p.colours|join(' / ') or 'couleur non déterminée'}} · {{val(p.distance_m)}} m partiels</summary>
+<details open><summary>{{p.name}} · n°{{p.cap_number}} · {{p.colours|join(' / ') or 'couleur non déterminée'}} · {{val(p.distance_m)}} m partiels</summary>
 <p>Suivi vidéo : {{p.observed_seconds}} s ; chevauchement {{p.overlap_seconds}} s ; conflit exclu {{p.conflict_seconds}} s. Pistes {{p.track_ids|join(', ') or 'aucune'}}. Temps effectif relevé : {{val(p.stats.playing_seconds)}} s. {{p.mapped_shots}} origine(s) de tir attribuée(s).</p>
+<p>Vitesse moyenne : {{val(p.mean_speed_m_s|default(none))}} m/s · médiane : {{val(p.median_speed_m_s|default(none))}} m/s · 90e percentile : {{val(p.p90_speed_m_s|default(none))}} m/s. Ces vitesses ne sont pas des maxima physiologiques.</p>
+{{mobility_map(p.heatmap|default({}),p.accepted_edges|default([]))}}
 <div style="overflow:auto"><table class="metric-table"><tbody>{% for k,l in ir.metrics %}<tr><td>{{l}}</td><td>{{val(p.stats[k]) if p.stats.events else '—'}}</td></tr>{% endfor %}</tbody></table></div></details>
 {% else %}<p>Aucune identité résolue pour cette équipe.</p>{% endfor %}
 {% endfor %}

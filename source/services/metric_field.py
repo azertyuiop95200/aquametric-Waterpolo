@@ -83,23 +83,22 @@ def build_map(path,tracking,anchors,polygon,width=20.,length=25.,reference_secon
         def project_at(t,x,y):
             if not isfinite(t) or t<0 or not 0<=x<=1 or not 0<=y<=1:return None
             if t not in cache:
-                if len(cache)>=100:return None
                 f=frame(t);a=aligner.align(f) if f is not None else None;cache[t]=a
                 if a is not None:quality.append(a[1])
             a=cache[t]
             if a is None:return None
             return project(cal,*aligner.point(a[0],x,y))
         tracks=[]
-        for tr in tracking.get("tracks",[])[:72]:
+        for tr in tracking.get("tracks",[]):
             pts=[]
-            for p in tr.get("points",[])[:100]:
+            for p in tr.get("points",[]):
                 t=float(p["second"]);xy=project_at(t,float(p["x"]),float(p["y"]))
                 pts.append({"second":t,"x_m":xy[0],"y_m":xy[1]} if xy is not None else None)
             tracks.append({"id":tr["id"],"colour":tr.get("colour","unknown"),"cap_number":None,"team":None,**measure(pts)})
         mapped=[]
-        for s in list(shots)[:30]:
+        for s in shots:
             t=float(s["second"]);xy=project_at(t,float(s["x"]),float(s["y"]))
             if xy is None:continue
             x,y=xy;mapped.append({"second":t,"x_m":round(x,2),"y_m":round(y,2),"range_m":round(hypot(x,y),2),"outcome":s.get("outcome","unknown") if s.get("outcome") in ("unknown","goal","save","off_target","blocked","post") else "unknown","provenance":"manual_review_candidate"})
-        return {"status":"estimated","width_m":cal["width"],"length_m":cal["length"],"goal_relative":True,"reference_second":reference_second,"tracks":tracks,"shots":mapped,"aligned_frames":len(quality),"requested_frames":len(cache),"median_alignment_error_px":round(float(np.median(quality)),2) if quality else None,"fit_error_normalized":cal["fit_error_normalized"],"note":"Projection estimative sur le plan de l’eau; largeur saisie, repères manuels et tête au-dessus de l’eau. Distances partielles de pistes, pas des distances exactes par joueuse."}
+        return {"status":"estimated","width_m":cal["width"],"length_m":cal["length"],"goal_relative":True,"reference_second":reference_second,"tracks":tracks,"shots":mapped,"aligned_frames":len(quality),"requested_frames":len(cache),"rejected_alignment_frames":len(cache)-len(quality),"source_track_count":len(tracking.get("tracks",[])),"median_alignment_error_px":round(float(np.median(quality)),2) if quality else None,"fit_error_normalized":cal["fit_error_normalized"],"note":"Projection estimative sur le plan de l’eau; largeur saisie, repères manuels et tête au-dessus de l’eau. Distances partielles de pistes, pas des distances exactes par joueuse."}
     finally:cap.release()

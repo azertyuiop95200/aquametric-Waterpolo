@@ -50,32 +50,10 @@ def edges(track):
             if not all(isfinite(v) for v in (t,u,x,y,X,Y)) or not 0<u-t<=.26 or hypot(X-x,Y-y)/(u-t)>3.5:continue
             yield (t,u,x,y,X,Y)
 
-def distance_union(tracks):
-    """Sweep observed intervals; overlapping estimates are counted once.
-    Conflicting overlaps (>0.75 m between interpolated midpoints) are omitted.
-    No extrapolation or bridging gaps. Video seconds, not effective playing time.
-    """
-    spans=[e for tr in tracks for e in edges(tr)]
-    if not spans:return {"distance_m":None,"observed_seconds":0.,"overlap_seconds":0.,"conflict_seconds":0.}
-    boundaries=sorted(set(t for e in spans for t in e[:2]))
-    distance=duration=overlap=conflict=0.
-    for a,b in zip(boundaries,boundaries[1:]):
-        active=[e for e in spans if e[0]<=a and e[1]>=b]
-        if not active:continue
-        dt=b-a; mid=(a+b)/2
-        def point(e):
-            f=(mid-e[0])/(e[1]-e[0])
-            return e[2]+f*(e[4]-e[2]),e[3]+f*(e[5]-e[3])
-        if len(active)>1:
-            overlap+=dt
-            points=[point(e) for e in active]
-            if any(hypot(x-X,y-Y)>.75 for i,(x,y) in enumerate(points) for X,Y in points[i+1:]):
-                conflict+=dt;continue
-        # Prefer the shortest sampled interval (highest temporal resolution).
-        e=min(active,key=lambda r:r[1]-r[0])
-        distance+=hypot(e[4]-e[2],e[5]-e[3])*dt/(e[1]-e[0]);duration+=dt
-    return {"distance_m":round(distance,2) if duration else None,"observed_seconds":round(duration,3),
-            "overlap_seconds":round(overlap,3),"conflict_seconds":round(conflict,3)}
+def distance_union(tracks, **dimensions):
+    """Sweep observed intervals; weighted speeds and occupancy, no bridging."""
+    from services.mobility import summarize_tracks
+    return summarize_tracks(tracks, **dimensions)
 
 def build_identity_report(metric,events,automatic,roster,reviews):
     reviews=reviews or {}
@@ -115,7 +93,7 @@ def build_identity_report(metric,events,automatic,roster,reviews):
         else:unassigned_shots.append(s)
     players=[]
     for (side,cap),g in sorted(groups.items()):
-        m=distance_union(g["tracks"])
+        m=distance_union(g["tracks"], length_m=float(metric.get("length_m",25.)), width_m=float(metric.get("width_m",20.)))
         colours=sorted(g["colours"]-{"unknown"})
         # Different colours may be legitimate (change of cap); retain both.
         players.append({"side":side,"cap_number":cap,"name":names.get((side,cap),f"Bonnet {cap}"),
@@ -127,7 +105,13 @@ def build_identity_report(metric,events,automatic,roster,reviews):
         measured=[p for p in ps if p["distance_m"] is not None]
         rows=[e for e in confirmed if e.get("perspective")==side]
         play=[p["stats"]["playing_seconds"] for p in ps if p["stats"]["playing_seconds"] is not None]
-        teams[side]={"playing_seconds":round(sum(play),1) if play else None,"distance_m":round(sum(p["distance_m"] for p in measured),2) if measured else None,
+        cells=defaultdict(float)
+        for p in measured:
+            for c in p["heatmap"]["cells"]:
+                cells[(c["x_m"],c["y_m"],c["width_m"],c["height_m"])]+=c["seconds"]
+        grid={"length_m":float(metric.get("length_m",25.)),"width_m":float(metric.get("width_m",20.)),"cell_m":2.,"cells":[{"x_m":x,"y_m":y,"width_m":w,"height_m":h,"seconds":round(v,6)} for (x,y,w,h),v in sorted(cells.items())]}
+        total_time=sum(p["observed_seconds"] for p in measured)
+        teams[side]={"heatmap":grid,"mean_speed_m_s":round(sum(p["distance_m"] for p in measured)/total_time,3) if total_time else None,"playing_seconds":round(sum(play),1) if play else None,"distance_m":round(sum(p["distance_m"] for p in measured),2) if measured else None,
                      "players_measured":len(measured),"player_seconds":round(sum(p["observed_seconds"] for p in measured),3),
                      "players_identified":len(ps),"unassigned_events":len(unassigned_events[side]),
                      "unassigned_stats":reduce_side(unassigned_events[side]),"stats":reduce_side(rows),
