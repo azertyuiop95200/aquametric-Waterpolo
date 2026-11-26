@@ -385,6 +385,8 @@ def analysis_snapshot(db, match):
     snapshot["diagnostics"] = analysis_diagnostics(snapshot["automatic"], snapshot["verified_events"])
     from services.measurement_report import match_statistics
     snapshot["statistics"] = match_statistics(match)
+    from services.elite_performance import elite_report
+    snapshot["elite_performance"] = elite_report(snapshot["verified_events"])
     from services.video_action_report import action_report
     snapshot["video_actions"] = action_report(db, match)
     # Basic counters over an empty event set are implementation zeros, not

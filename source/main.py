@@ -67,9 +67,10 @@ EVENT_TYPES = (
     "block", "interception", "recovery", "save", "bad_pass", "turnover", "foul",
     "exclusion", "exclusion_earned", "exclusion_committed", "penalty_earned", "penalty_committed",
     "whistle", "power_play_start", "penalty_kill_start", "counterattack_start",
-    "defensive_recovery_start", "fast_recovery", "late_recovery"
+    "defensive_recovery_start", "fast_recovery", "late_recovery",
+    "foul_earned", "offensive_foul", "unforced_error", "goal_against", "possession_end", "power_play_end", "penalty_kill_end", "shot_clock_expired", "player_in", "player_out", "distance_sample", "swim_off_won", "swim_off_lost", "timeout_start", "timeout_end", "period_start", "period_end", "sprint"
 )
-PHASE_TAGS = ("auto", "even_attack", "even_defence", "power_play", "penalty_kill", "counterattack", "defensive_recovery", "centre_play", "restart")
+PHASE_TAGS = ("auto", "even_attack", "even_defence", "power_play", "penalty_kill", "counterattack", "defensive_recovery", "centre_play", "restart", "penalty")
 PERSPECTIVES = ("for", "against", "neutral")
 EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 
@@ -323,7 +324,7 @@ def login_page(request: Request):
 def login(request: Request, email: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
     user = db.scalar(select(User).where(User.email == email.strip().lower()))
     if not user or not verify_password(password, user.password_hash):
-        return render(request, "login.html", error="Invalid credentials.", status_code=400)
+        return render(request, "login.html", error="Adresse ou mot de passe incorrect. Si le compte a disparu après une mise à jour, la récupération dépend de la base sauvegardée.", login_email=email.strip().lower(), status_code=400)
     request.session.clear()
     request.session["user_id"] = user.id
     return RedirectResponse("/dashboard", status_code=303)
@@ -955,7 +956,7 @@ def add_event(
         player_id=pid,
         second=second,
         event_type=event_type,
-        note=clean_text(note, 500),
+        note=clean_text(f"{note[:470]} period={period}" if return_to == "report" else note, 500),
         confidence="CONFIRMED",
         source="manual",
     )

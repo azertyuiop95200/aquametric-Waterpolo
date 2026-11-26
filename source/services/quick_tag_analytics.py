@@ -64,7 +64,8 @@ def reviewed_match_metrics(events: list[dict], video_url="") -> dict:
          "url":timestamped_video_url(video_url,float(e.get("second") or 0)) if video_url else ""}
         for e in sorted(confirmed,key=lambda e:float(e.get("second") or 0))
     ]
-    return {"verified_count":len(confirmed),"team":sides["for"],"opponent":sides["against"],
+    from services.elite_performance import elite_report
+    return {"elite":elite_report(confirmed), "verified_count":len(confirmed),"team":sides["for"],"opponent":sides["against"],
             "phases":by_phase,"players":players,"timeline":timeline,
             "sample_only":True,
             "note":"Résultats calculés uniquement sur les actions annotées et confirmées. Les absences de tags ne valent pas zéro sur le match entier."}

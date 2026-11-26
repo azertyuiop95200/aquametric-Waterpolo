@@ -13,10 +13,10 @@
     </a>
     <p class="mode-note">Avec la même adresse Gmail vérifiée, retrouve ton compte AquaMetric existant et ses matchs. Pour les autres adresses, une confirmation peut être nécessaire.</p>
   {% else %}
-    <div class="notice">La connexion Google sera proposée dès l’activation de l’identifiant OAuth par l’administrateur. Tu peux utiliser ton email et ton mot de passe existants.</div>
+    <div class="notice">Google n’est pas encore configuré sur ce serveur. La connexion nécessite un identifiant OAuth et un secret fournis par Google Cloud. En attendant, utilise le mode invité si disponible. Un compte enregistré sur une base locale non persistante peut être perdu après un redéploiement.</div>
   {% endif %}
   <form method="post" action="/login">
-    <label>Email<input type="email" name="email" autocomplete="email" required></label>
+    <label>Email<input type="email" name="email" value="{{ login_email|default('') }}" autocomplete="username" required></label>
     <label>Mot de passe<input type="password" name="password" autocomplete="current-password" required></label>
     <button class="btn" type="submit">Se connecter avec un mot de passe</button>
   </form>

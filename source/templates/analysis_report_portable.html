@@ -35,6 +35,7 @@ Les moments d'activité et les lectures OCR de cette capture ne sont pas des fai
 {% for player in review_metrics.players %}<tr><td>{{player.name}}</td><td>{{player.tagged_goals}}</td><td>{{player.tagged_shots}}</td><td>{{player.tagged_assists}}</td></tr>{% endfor %}
 </tbody></table>
 {% endif %}
+{% include "_elite_performance.html" %}
 <h2>Carte de tirs · positions relevées et confirmées</h2>
 <p><strong>{{spatial_stats.shots_mapped}} tir(s) localisé(s) / {{spatial_stats.shots_reviewed}} tir(s) annoté(s)</strong> · {{video_segments|length}} source(s) vidéo associée(s). Les points sont placés par observation et se rapportent au demi-bassin offensif normalisé ; leur absence ne signifie pas zéro tir.</p>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 440" style="display:block;width:100%;max-width:650px;background:#e9f4f8">

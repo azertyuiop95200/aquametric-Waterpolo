@@ -161,12 +161,14 @@
             <option value="counterattack">Contre-attaque</option>
             <option value="penalty_kill">Infériorité numérique</option>
             <option value="centre_play">Jeu au centre</option>
+            <option value="penalty">Penalty 5 m</option>
           </select>
         </label>
       </div>
       <label>Observation complémentaire
-        <input name="note" maxlength="500" placeholder="Ex. tir depuis l'aile droite, ballon dévié par la gardienne">
+        <input name="note" maxlength="500" placeholder="Ex. game_clock_s=420 outcome=goal distance_m=25">
       </label>
+      <p class="evidence-note">Pour les entrées/sorties, indiquer le chrono restant du quart en secondes (game_clock_s=420 signifie 7:00). Pour une fin de possession, saisir outcome=goal, save, off_target, post, blocked, bad_pass, steal, offensive_foul, shot_clock, handling, period_end ou other. Pour une fin de 6v5 ou 5v6 : outcome=goal ou no_goal (but de l’équipe en attaque). Pour la distance, saisir distance_m=25 uniquement sur un segment mesuré distinct.</p>
       <p class="evidence-note">Position du tir (facultative) : sélectionne un point sur la <a href="#spatialDashboard">carte du bassin</a> juste au-dessus. Sans point réellement observé, l'action reste enregistrée sans coordonnées et n'est pas affichée sur la heatmap.</p>
       <label style="display:block;margin:12px 0"><input type="checkbox" name="observed" value="1" required> J'ai réellement observé cet événement dans la vidéo ou sur une feuille de match vérifiable.</label>
       <div class="actions" style="gap:9px">
@@ -180,6 +182,32 @@
         <button class="btn secondary" type="submit" name="event_type" value="assist">Passe décisive</button>
         <button class="btn secondary" type="submit" name="event_type" value="exclusion_earned">Exclusion obtenue</button>
         <button class="btn secondary" type="submit" name="event_type" value="exclusion_committed">Exclusion commise</button>
+        <button class="btn secondary" type="submit" name="event_type" value="foul">Faute ordinaire commise</button>
+        <button class="btn secondary" type="submit" name="event_type" value="foul_earned">Faute ordinaire obtenue</button>
+        <button class="btn secondary" type="submit" name="event_type" value="offensive_foul">Faute offensive</button>
+        <button class="btn secondary" type="submit" name="event_type" value="unforced_error">Erreur non provoquée</button>
+        <button class="btn secondary" type="submit" name="event_type" value="goal_against">But encaissé (gardienne)</button>
+        <button class="btn secondary" type="submit" name="event_type" value="penalty_earned">5 m obtenu</button>
+        <button class="btn secondary" type="submit" name="event_type" value="penalty_committed">5 m concédé</button>
+        <button class="btn secondary" type="submit" name="event_type" value="interception">Interception</button>
+        <button class="btn secondary" type="submit" name="event_type" value="block">Contre</button>
+        <button class="btn secondary" type="submit" name="event_type" value="bad_pass">Mauvaise passe</button>
+        <button class="btn secondary" type="submit" name="event_type" value="pass_complete">Passe réussie</button>
+        <button class="btn secondary" type="submit" name="event_type" value="key_pass">Passe clé</button>
+        <button class="btn secondary" type="submit" name="event_type" value="possession_end">Fin de possession</button>
+        <button class="btn secondary" type="submit" name="event_type" value="power_play_end">Fin de 6v5</button>
+        <button class="btn secondary" type="submit" name="event_type" value="penalty_kill_end">Fin de 5v6</button>
+        <button class="btn secondary" type="submit" name="event_type" value="shot_clock_expired">Fin chrono 28/18 s</button>
+        <button class="btn secondary" type="submit" name="event_type" value="player_in">Entrée joueuse</button>
+        <button class="btn secondary" type="submit" name="event_type" value="player_out">Sortie joueuse</button>
+        <button class="btn secondary" type="submit" name="event_type" value="distance_sample">Distance mesurée</button>
+        <button class="btn secondary" type="submit" name="event_type" value="swim_off_won">Engagement gagné</button>
+        <button class="btn secondary" type="submit" name="event_type" value="swim_off_lost">Engagement perdu</button>
+        <button class="btn secondary" type="submit" name="event_type" value="timeout_start">Début temps mort</button>
+        <button class="btn secondary" type="submit" name="event_type" value="timeout_end">Fin temps mort</button>
+        <button class="btn secondary" type="submit" name="event_type" value="period_start">Début quart</button>
+        <button class="btn secondary" type="submit" name="event_type" value="period_end">Fin quart</button>
+        <button class="btn secondary" type="submit" name="event_type" value="sprint">Sprint</button>
       </div>
     </form>
     <script>
@@ -211,6 +239,9 @@
     </script>
   </section>
 
+  <section class="report-card section-wide" id="elitePerformance">
+    {% include "_elite_performance.html" %}
+  </section>
   <section class="report-card section-wide" id="observedKPIs">
     <h2>Tableau de bord · données réellement annotées</h2>
     <p class="evidence-note">Statistiques <b>sur l'échantillon confirmé</b>, pas sur tout le match. Les buts annoncés dans le titre YouTube ne sont pas additionnés aux buts observés.</p>

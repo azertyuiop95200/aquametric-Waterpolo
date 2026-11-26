@@ -1,0 +1,34 @@
+{% set elite=review_metrics.elite %}
+{% if elite %}
+<h2>Ultimate · Performance water-polo</h2>
+<p>Échantillon d'actions confirmées seulement. « — » signifie non mesuré ou dénominateur inconnu. Les zéros des compteurs signifient zéro action annotée, pas zéro sur tout le match. Les temps et distances sont des relevés partiels, pas une mesure automatique.</p>
+<p><strong>Référentiel senior :</strong> {{elite.rules.quarters}} × {{elite.rules.quarter_seconds//60}} min effectives · possession {{elite.rules.shot_clock_seconds}} s · remise à {{elite.rules.reset_seconds}} s dans les cas prévus · exclusion ordinaire {{elite.rules.exclusion_seconds}} s. <a href="{{elite.rules.source}}" target="_blank" rel="noopener">Règles World Aquatics</a> · <a href="{{elite.rules.ffn}}" target="_blank" rel="noopener">FFN</a>. Les formats jeunes et historiques peuvent différer.</p>
+{% macro val(r,k) -%}{% if r.events and r[k] is not none %}{{r[k]}}{% else %}—{% endif %}{%- endmacro %}
+<div style="overflow-x:auto"><table class="metric-table"><thead><tr><th>Indicateur</th><th>{{match.team.name}}</th><th>{{match.opponent}}</th></tr></thead><tbody>
+{% for k,l in elite.metrics if k not in ['playing_seconds','playing_intervals','unpaired_markers','distance_m','distance_samples'] %}<tr><td>{{l}}</td><td>{{val(elite.team,k)}}</td><td>{{val(elite.opponent,k)}}</td></tr>{% endfor %}
+</tbody></table></div>
+<h3>Comment se terminent les attaques ?</h3>
+{% for side,name in [(elite.team,match.team.name),(elite.opponent,match.opponent)] %}
+<p><strong>{{name}}</strong> · {{side.possession_ends}} fin(s) annotée(s), {{side.classified_ends}} classée(s).</p>
+{% if side.outcomes %}<table class="metric-table"><thead><tr><th>Issue</th><th>Nombre</th><th>Part (%)</th></tr></thead><tbody>{% for o in side.outcomes %}<tr><td>{{o.label}}</td><td>{{o.count}}</td><td>{{o.share}}</td></tr>{% endfor %}</tbody></table>{% else %}<p>Aucune fin de possession explicitement renseignée.</p>{% endif %}
+{% endfor %}
+<h3>Situations offensives et quarts</h3>
+<p>Une possession avec un rebond offensif n’est pas automatiquement une nouvelle attaque. La conversion des 6v5, 5v6 et 5 m possède son propre dénominateur.</p>
+<div style="overflow-x:auto"><table class="metric-table"><thead><tr><th>Situation</th><th>Buts / tirs équipe</th><th>Conversion (%)</th><th>Buts / tirs adverses</th><th>Conversion (%)</th></tr></thead><tbody>
+{% for r in elite.phases %}<tr><td>{{r.label}}</td>{% for s in ['for','against'] %}<td>{{val(r[s],'goals')}} / {{val(r[s],'shots')}}</td><td>{{val(r[s],'shot_conversion')}}</td>{% endfor %}</tr>{% endfor %}
+{% for r in elite.quarters %}<tr><td>Q{{r.quarter}}</td>{% for s in ['for','against'] %}<td>{{val(r[s],'goals')}} / {{val(r[s],'shots')}}</td><td>{{val(r[s],'shot_conversion')}}</td>{% endfor %}</tr>{% endfor %}
+</tbody></table></div>
+<p>{{elite.unassigned_period}} action(s) sans quart renseigné ; elles ne sont pas réparties artificiellement.</p>
+<h3>Fiches individuelles · {{match.team.name}}</h3>
+{% if elite.players %}
+<div style="overflow-x:auto"><table class="metric-table" style="min-width:1200px"><thead><tr><th>Joueuse</th>{% for k,l in elite.player_metrics %}<th>{{l}}</th>{% endfor %}</tr></thead><tbody>
+{% for p in elite.players %}<tr><th>{{p.name}}</th>{% for k,l in elite.player_metrics %}<td>{{val(p,k)}}</td>{% endfor %}</tr>{% endfor %}
+</tbody></table></div>
+{% for p in elite.players %}
+<details><summary>{{p.name}} · fiche détaillée ({{p.events}} actions)</summary>
+<table class="metric-table"><tbody>{% for k,l in elite.metrics %}<tr><td>{{l}}</td><td>{{val(p,k)}}</td></tr>{% endfor %}</tbody></table>
+<p>Temps : {{p.playing_intervals}} intervalle(s) apparié(s), {{p.unpaired_markers}} marqueur(s) incomplet(s). Distance : {{p.distance_samples}} segment(s) renseigné(s). Aucun extrapolé.</p></details>
+{% endfor %}
+{% else %}<p>Attribuer les actions vérifiées aux joueuses de la feuille de match pour alimenter leurs fiches.</p>{% endif %}
+<p>Limites : le suivi continu des bonnets, les mètres nagés automatiques, les compositions, le +/−, la vitesse et les buts attendus exigent des données calibrées et une validation du suivi vidéo. Ils ne sont pas calculés par ce module.</p>
+{% endif %}
