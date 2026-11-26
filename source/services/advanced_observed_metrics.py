@@ -82,15 +82,15 @@ def tsap(rows):
             "performance_score":round(vp/2+ei*10,3) if vp is not None else None,
             "event_ids":ids,"source":"https://pmc.ncbi.nlm.nih.gov/articles/PMC10532484/"}
 
-def observed_numeric(rows):
-    spec={"shot_speed_kmh":(SHOTS,0,180,"km/h"),"release_time_s":(SHOTS,0,10,"s"),
+METRIC_SPEC={"shot_speed_kmh":(SHOTS,0,180,"km/h"),"release_time_s":(SHOTS,0,10,"s"),
           "shot_distance_m":(SHOTS,0,40,"m"),"shot_release_height_m":(SHOTS,0,3,"m"),
           "shot_horizontal_angle_deg":(SHOTS,0,180,"°"),"shot_vertical_angle_deg":(SHOTS,0,180,"°"),
           "pass_distance_m":(PASS_ALL,0,40,"m"),"pass_speed_kmh":(PASS_ALL,0,180,"km/h"),
           "sprint_5m_s":({"sprint"},0,30,"s"),"sprint_10m_s":({"sprint"},0,60,"s"),
           "max_swim_speed_mps":({"sprint","distance_sample"},0,5,"m/s")}
+def observed_numeric(rows):
     out={}
-    for key,(types,lo,hi,unit) in spec.items():
+    for key,(types,lo,hi,unit) in METRIC_SPEC.items():
         vals=[];ids=[]
         for e in rows:
             if e.get("event_type") not in types:continue
