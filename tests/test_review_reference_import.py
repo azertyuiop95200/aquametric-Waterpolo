@@ -92,3 +92,38 @@ class ReviewImportTests(unittest.TestCase):
     def test_signal_type_strict(self):
         p=fixture();p["reference"]["possession_review_intervals"][0]["referee_signal_observed"]="false"
         with self.assertRaises(ValueError):read(p)
+
+    def test_revision_history(self):
+        from sqlalchemy import create_engine, select
+        from sqlalchemy.orm import Session
+        from db import Base
+        from models import Match, MatchReviewReference, MatchReviewRevision, Event, User, Team, Club
+        from services.review_reference_revision import replace_reference
+        engine=create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        with Session(engine) as db:
+            user=User(email="test@example.invalid",password_hash="test")
+            db.add(user);db.flush()
+            club=Club(name="Test",owner_id=user.id);db.add(club);db.flush()
+            team=Team(name="Test",club_id=club.id,owner_id=user.id);db.add(team);db.flush()
+            match=Match(owner_id=user.id,team_id=team.id,opponent="Other");db.add(match);db.flush()
+            p,canonical,digest,period=read(fixture())
+            prior=MatchReviewReference(match_id=match.id,period=period,digest=digest,home_color="bleus",payload_json=canonical)
+            db.add(prior);db.commit()
+            self.assertFalse(replace_reference(db,prior,p,canonical,digest,"bleus",""))
+            changed=fixture()
+            changed["reference"]["events"][0]["source_observation"]="Révision"
+            payload,new_canonical,new_digest,_=read(changed)
+            with self.assertRaises(ValueError):replace_reference(db,prior,payload,new_canonical,new_digest,"bleus","")
+            with self.assertRaises(ValueError):replace_reference(db,prior,payload,new_canonical,new_digest,"blancs",digest)
+            different=copy.deepcopy(changed);different["timeline"]["segments"][0]["sha256"]="b"*64
+            d,dc,dd,_=read(different)
+            with self.assertRaises(ValueError):replace_reference(db,prior,d,dc,dd,"bleus",digest)
+            self.assertTrue(replace_reference(db,prior,payload,new_canonical,new_digest,"bleus",digest))
+            db.commit()
+            self.assertEqual(prior.digest,new_digest)
+            self.assertEqual(len(prior.revisions),1)
+            self.assertEqual(prior.revisions[0].digest,digest)
+            self.assertEqual(prior.revisions[0].payload_json,canonical)
+            self.assertEqual(db.scalars(select(Event)).all(),[])
+            with self.assertRaises(ValueError):replace_reference(db,prior,p,canonical,digest,"bleus",digest)
