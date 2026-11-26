@@ -14,7 +14,7 @@ from models import VideoActionAnalysis
 from services.video_action_provider import provider_configuration
 from services.video_action_report import action_report, run_progress
 
-SHOT_TYPES = frozenset({"goal", "shot_on_target", "shot_off_target", "shot_blocked"})
+SHOT_TYPES = frozenset({"goal", "shot_on_target", "shot_off_target", "shot_blocked", "shot_unknown"})
 FIELDS = ("goals", "shots", "saves", "turnovers", "assists", "exclusions_earned", "exclusions_committed")
 
 
@@ -29,7 +29,8 @@ def _counts(rows: list[dict]) -> dict:
         "assists": counter["assist"],
         "exclusions_earned": counter["exclusion_earned"],
         "exclusions_committed": counter["exclusion_committed"],
-        "efficiency_pct": round(100 * counter["goal"] / shots, 1) if shots else None,
+        "shots_unknown_outcome": counter["shot_unknown"],
+        "efficiency_pct": round(100 * counter["goal"] / shots, 1) if shots and not counter["shot_unknown"] else None,
         "actions": sum(counter.values()),
     }
 

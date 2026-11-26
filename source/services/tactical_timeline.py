@@ -17,11 +17,11 @@ def tactical_timeline(events):
             # Never infer the next attack from the previous outcome. An
             # incompatible observation also invalidates the current state.
             attacking=None
-        elif kind in ("shot_on_target","shot_off_target","shot_blocked","assist","key_pass","pass_complete","bad_pass") and attacking is not None and side in ("for","against") and side != attacking:
+        elif kind in ("shot_on_target","shot_off_target","shot_blocked","shot_unknown","assist","key_pass","pass_complete","bad_pass") and attacking is not None and side in ("for","against") and side != attacking:
             attacking=None
         # A pass/shot does not independently establish who controls the ball
         # in the rest of the segment. Never derive possession from cap colour.
-        if kind in ("possession_start","possession_end","goal","shot_on_target","shot_off_target","shot_blocked","assist","key_pass","pass_complete","bad_pass","interception","save","exclusion_earned","exclusion_committed","penalty_earned","penalty_committed"):
+        if kind in ("possession_start","possession_end","goal","shot_on_target","shot_off_target","shot_blocked","shot_unknown","assist","key_pass","pass_complete","bad_pass","interception","save","exclusion_earned","exclusion_committed","penalty_earned","penalty_committed"):
             result.append({"second":e["second"],"period":q,"segment":current,"event_type":kind,
                            "actor_side":side,"cap_number":e.get("cap_number"),
                            "attack_before":before,"attack_after":attacking,

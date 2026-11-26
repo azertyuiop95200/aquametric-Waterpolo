@@ -2,7 +2,7 @@
 from collections import Counter, defaultdict
 from math import isfinite
 
-SHOT = {"goal", "shot_on_target", "shot_off_target", "shot_blocked"}
+SHOT = {"goal", "shot_on_target", "shot_off_target", "shot_blocked", "shot_unknown"}
 PASS = {"assist", "key_pass", "pass_complete", "bad_pass"}
 
 def finite(value):

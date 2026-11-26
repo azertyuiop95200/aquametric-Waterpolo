@@ -55,7 +55,7 @@ def run_progress(db, match, *, run=None):
 
 
 def _action_family(kind):
-    if kind in {"goal", "shot_on_target", "shot_off_target", "shot_blocked"}: return "shot"
+    if kind in {"goal", "shot_on_target", "shot_off_target", "shot_blocked", "shot_unknown"}: return "shot"
     if kind in {"assist", "key_pass", "pass_complete", "bad_pass"}: return "pass"
     if kind in {"touch", "centre_touch"}: return "touch"
     return kind
@@ -63,7 +63,7 @@ def _action_family(kind):
 
 def canonical_actions(actions):
     """Prevent counting goal+shot and assist+pass for the same visible action."""
-    priorities = {"goal": 4, "shot_on_target": 3, "assist": 4, "key_pass": 3,
+    priorities = {"goal": 4, "shot_on_target": 3, "shot_off_target": 2, "shot_blocked": 2, "shot_unknown": -1, "assist": 4, "key_pass": 3,
                   "pass_complete": 2, "centre_touch": 2}
     result = []
     for action in sorted(actions, key=lambda row: (row["second"], -priorities.get(row["event_type"], 0))):
@@ -77,7 +77,7 @@ def canonical_actions(actions):
             # Contradictory outcomes are not resolved by taking the higher
             # confidence score. Keep the observation in the ledger for review.
             types = {duplicate["event_type"], action["event_type"]}
-            compatible = types <= {"goal", "shot_on_target"} or types <= {"assist", "key_pass", "pass_complete"} or types <= {"touch", "centre_touch"} or len(types) == 1
+            compatible = types <= {"goal", "shot_on_target"} or types <= {"assist", "key_pass", "pass_complete"} or types <= {"touch", "centre_touch"} or len(types) == 1 or ("shot_unknown" in types and family == "shot")
             if not compatible or duplicate.get("conflict"):
                 duplicate["counted"] = False
                 duplicate["conflict"] = "Issues contradictoires dans les détections de la même action."
@@ -105,7 +105,7 @@ def summarize_actions(actions):
     if not actions:
         report["basic"] = {key: 0 if key == "events" else None for key in report["basic"]}
     report["event_counts"] = {key: (sum(a["event_type"] == key for a in actions) if actions else None) for key in EVENT_LABELS}
-    report["cage_zones"] = dict(Counter(a["cage_zone"] for a in actions if a["event_type"] in {"goal", "shot_on_target", "shot_off_target", "shot_blocked"} and a.get("cage_zone") != "unknown"))
+    report["cage_zones"] = dict(Counter(a["cage_zone"] for a in actions if a["event_type"] in {"goal", "shot_on_target", "shot_off_target", "shot_blocked", "shot_unknown"} and a.get("cage_zone") != "unknown"))
     report["by_period"] = _group_summary(actions, "period")
     report["by_phase"] = _group_summary(actions, "phase")
     report["tag_breakdowns"] = {key: dict(Counter(str(a[key]) for a in actions if a.get(key) not in {None,"unknown",""}))
@@ -132,7 +132,7 @@ def bounded_possessions(actions):
             start = opened.pop(side, None)
             if start and start["segment_index"] == action["segment_index"] and start["second"] < action["second"]:
                 observed = [a for a in actions if a["side"] == side and start["second"] <= a["second"] <= action["second"]]
-                shots = [a for a in observed if a["event_type"] in {"goal", "shot_on_target", "shot_off_target", "shot_blocked"}]
+                shots = [a for a in observed if a["event_type"] in {"goal", "shot_on_target", "shot_off_target", "shot_blocked", "shot_unknown"}]
                 intervals.append({"start_second": start["second"], "end_second": action["second"],
                                   "video_duration_seconds": round(action["second"] - start["second"], 3),
                                   "passes": sum(a["event_type"] in {"assist","key_pass","pass_complete","bad_pass"} for a in observed),

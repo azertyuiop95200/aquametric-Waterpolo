@@ -6,7 +6,7 @@ import re
 import math
 from services.event_evidence import verified_events
 
-SHOT_EVENTS = {"goal", "shot_on_target", "shot_off_target", "shot_blocked"}
+SHOT_EVENTS = {"goal", "shot_on_target", "shot_off_target", "shot_blocked", "shot_unknown"}
 PASS_SUCCESS = {"pass_complete", "assist", "key_pass"}
 PASS_FAILURE = {"bad_pass"}
 LOSS_EVENTS = {"turnover", "bad_pass"}
@@ -112,8 +112,9 @@ def _basic(events):
         "shots_on_target": on_target,
         "shots_off_target": c["shot_off_target"],
         "shots_blocked": c["shot_blocked"],
-        "shot_accuracy_pct": _pct(on_target, shots),
-        "scoring_efficiency_pct": _pct(c["goal"], shots),
+        "shots_unknown_outcome": c["shot_unknown"],
+        "shot_accuracy_pct": _pct(on_target, shots) if not c["shot_unknown"] else None,
+        "scoring_efficiency_pct": _pct(c["goal"], shots) if not c["shot_unknown"] else None,
         "passes_completed": passes_ok,
         "passes_failed": passes_bad,
         "pass_attempts": pass_attempts,
