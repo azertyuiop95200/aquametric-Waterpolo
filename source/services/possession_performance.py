@@ -1,4 +1,4 @@
-"""Conservative complete-possession sample: explicit bounds in one continuous clip.
+"""Conservative complete-possession sample: explicit bounds in continuous visible cores.
 No inference from isolated shots, timeouts, rebounds or a score increment.
 """
 from collections import Counter, defaultdict
@@ -11,23 +11,46 @@ PASSES={"pass_complete","assist","key_pass","bad_pass","pass_unknown"}
 
 def complete_possessions(events, segments, lineups):
     by=defaultdict(list)
+    # Merge only exactly adjacent, fully visible cores. Missing or limited
+    # segments break a chain; old records without bounds stay independent.
+    groups={}; last_end=None; group=None
+    for seg in sorted(segments,key=lambda v:v["index"]):
+        payload=seg.get("result",{})
+        visible=(seg.get("status")=="complete" and payload.get("scene")=="water_polo"
+                 and any(v.get("family")=="possessions" and v.get("status")=="visible" for v in payload.get("observability",[]))
+                 and not any(v.get("family")=="possessions" and v.get("status")!="visible" for v in payload.get("observability",[])))
+        a,b=seg.get("start"),seg.get("end")
+        bounded=type(a) in (float,int) and type(b) in (float,int) and isfinite(a) and isfinite(b) and 0<=a<b
+        if not visible:
+            last_end=None;group=None;continue
+        if not bounded or last_end is None or abs(a-last_end)>1e-6:
+            group=seg["index"]
+        groups[seg["index"]]=(group,a,b) if bounded else (group,None,None)
+        last_end=b if bounded else None
     for e in events:
-        if e.get("counted") is True and not e.get("conflict") and not e.get("is_replay"):
-            by[e.get("segment_index")].append(e)
-    visible=set()
-    for s in segments:
-        payload=s.get("result",{})
-        if s.get("status")=="complete" and payload.get("scene")=="water_polo" and any(v.get("family")=="possessions" and v.get("status")=="visible" for v in payload.get("observability",[])):
-            visible.add(s["index"])
+        idx=e.get("segment_index")
+        if idx not in groups:continue
+        g,a,b=groups[idx];t=e.get("second")
+        if type(t) not in (int,float) or not isfinite(t) or (a is not None and not a<=t<b):continue
+        # A conflicting or replay observation must not silently become
+        # positive evidence. Keep it as a boundary barrier when relevant.
+        if e.get("is_replay") or e.get("conflict"):
+            by[g].append({**e,"event_type":"_barrier"})
+        elif e.get("counted") is True:
+            by[g].append(e)
     rejected=Counter(); candidates=[]
     def clock(e):
         v=e.get("game_clock_seconds")
         return float(v) if type(v) in (float,int) and isfinite(v) and 0<=v<=480 and e.get("game_clock_evidence") else None
     for i,rr in by.items():
-        if i not in visible:continue
         start=None
         for e in sorted(rr,key=lambda a:a["second"]):
             kind=e.get("event_type")
+            if kind=="_barrier":
+                if start is not None:rejected["interrupted"]+=1
+                start=None;continue
+            if start is not None and e.get("period") is not None and e.get("period")!=start.get("period"):
+                rejected["period_change"]+=1;start=None
             if kind=="possession_start":
                 if start is not None:rejected["unclosed_start"]+=1
                 start=e if e.get("side") in SIDES and e.get("team_evidence") else None

@@ -61,7 +61,7 @@
 {% set pp=(snapshot.video_actions|default({})).get('possession_performance',{}) %}
 {% if pp %}
 <h2>Efficacité des possessions complètes observées</h2>
-<p>Échantillon candidat limité aux possessions dont les deux bornes sont observées dans une même séquence de visibilité déclarée suffisante. Les rebonds offensifs ne créent pas une nouvelle possession. Les taux décrivent cet échantillon, pas tout le match.</p>
+<p>Échantillon candidat limité aux possessions dont les deux bornes sont observées dans une chaîne de séquences contiguës de visibilité déclarée suffisante. Les rebonds offensifs ne créent pas une nouvelle possession. Les taux décrivent cet échantillon, pas tout le match.</p>
 {% macro posval(x) %}{{x if x is not none else '—'}}{% endmacro %}
 {% for side,name in [('for',match.team.name),('against',match.opponent)] %}{% set t=pp.teams[side] %}
 <h3>{{name}}</h3>

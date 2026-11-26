@@ -34,3 +34,18 @@ class PossessionTests(unittest.TestCase):
     def test_no_numerical_guess(self):
         r=self.report(sample(),ls=[lineup("for",7)])
         self.assertEqual(r["teams"]["for"]["numerical"]["unresolved_or_changing"]["possessions"],1)
+
+    def test_adjacent_cores(self):
+        ss=[dict(segment(),start=0,end=6),dict(segment(),index=1,start=6,end=12)]
+        rr=[dict(e,segment_index=int(e["second"]>=6)) for e in sample()]
+        self.assertEqual(complete_possessions(rr,ss,lineup_report([]))["teams"]["for"]["overall"]["possessions"],1)
+    def test_gap_breaks_chain(self):
+        ss=[dict(segment(),start=0,end=6),dict(segment(),index=1,start=7,end=12)]
+        rr=[dict(e,segment_index=int(e["second"]>=7)) for e in sample()]
+        self.assertIsNone(complete_possessions(rr,ss,lineup_report([]))["teams"]["for"]["overall"]["possessions"])
+    def test_replay_barrier(self):
+        rr=sample()+[event("pass_complete",4,56,is_replay=True)]
+        self.assertIsNone(self.report(rr)["teams"]["for"]["overall"]["possessions"])
+    def test_period_change_breaks_chain(self):
+        rr=sample()+[event("touch",4,56,period=2)]
+        self.assertIsNone(self.report(rr)["teams"]["for"]["overall"]["possessions"])
