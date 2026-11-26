@@ -1,0 +1,14 @@
+{% if p.pass_review %}
+{% set pr=p.pass_review %}
+<section class="report-card" id="reviewPassesQ{{ref.period}}">
+<h3>Passes — référence vidéo partielle</h3>
+<p>{{pr.note}}</p>
+<table><thead><tr><th>Équipe</th><th>Passes recensées</th><th>Réussies</th><th>Issues inconnues</th><th>Interceptées</th><th>Sorties</th><th>Déviées conservées</th></tr></thead><tbody>
+{% for color,stats in pr.teams.items() %}<tr><td>{{color}}{% if color==p.home_color %} (notre équipe){% endif %}</td><td>{{stats.observed_attempts}}</td><td>{{stats.completed}}</td><td>{{stats.unknown_outcomes}}</td><td>{{stats.intercepted}}</td><td>{{stats.out_of_play}}</td><td>{{stats.deflected_retained}}</td></tr>{% endfor %}
+</tbody></table>
+<p>Ces nombres concernent exclusivement les annotations disponibles, pas le total du match. Candidats : {{pr.states.get('candidate',0)}} ; contre-exemples : {{pr.states.get('not_pass',0)}}.</p>
+<details><summary>Chronologie et preuves des transmissions</summary>
+<table><thead><tr><th>ID / équipe</th><th>Libération (s)</th><th>Contact / maîtrise (s)</th><th>État / issue</th><th>Contexte et observation</th></tr></thead><tbody>
+{% for a in pr.actions %}<tr><td>{{a.id}} · {{a.team or 'Indéterminée'}}</td><td>{% if a.release_first_free_s is not none %}{{a.release_last_held_s}}–{{a.release_first_free_s}}{% else %}Non observée{% endif %}</td><td>Contact : {{a.contact_s if a.contact_s is not none else '—'}} ({{a.contact_state}})<br>Maîtrise : {{a.control_s if a.control_s is not none else '—'}}<br>Surface : {{a.water_seen_s if a.water_seen_s is not none else '—'}}</td><td>{{ {'observed_pass':'Passe observée','candidate':'Candidate','not_pass':'Aucun départ observé'}.get(a.state,a.state) }}<br>{{ {'completed':'Réussie','unknown':'Issue inconnue','intercepted':'Interceptée','out_of_play':'Sortie','deflected_retained':'Déviée puis conservée'}.get(a.outcome,a.outcome) }}</td><td>{{a.observation}}{% if a.related_event_id %}<br>Événement lié : {{a.related_event_id}}{% endif %}{% if a.related_interval_id %}<br>Fenêtre liée : {{a.related_interval_id}}{% endif %}{% if a.release_to_control_evidence_s %}<br>Libération → preuve de maîtrise : {{a.release_to_control_evidence_s[0]}}–{{a.release_to_control_evidence_s[1]}} s{% endif %}<br>Preuves du dossier privé : {{a.evidence|join(', ')}}</td></tr>{% endfor %}
+</tbody></table></details></section>
+{% endif %}
