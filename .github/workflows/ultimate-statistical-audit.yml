@@ -15,7 +15,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Compile edited Python modules
-        run: python -m py_compile source/main.py source/services/elite_performance.py source/services/spatial_match_analysis.py source/services/analysis_product.py source/services/statistical_audit.py source/services/advanced_observed_metrics.py source/services/tracking_performance.py source/services/lineup_performance.py
+        run: python -m py_compile source/main.py source/services/elite_performance.py source/services/spatial_match_analysis.py source/services/analysis_product.py source/services/statistical_audit.py source/services/advanced_observed_metrics.py source/services/tracking_performance.py source/services/lineup_performance.py source/services/tactical_sequence_metrics.py
       - name: Focused evidence audit tests
         env:
           PYTHONPATH: source
@@ -26,7 +26,7 @@ jobs:
           python - <<'PY'
           from jinja2 import Environment, FileSystemLoader
           e=Environment(loader=FileSystemLoader('source/templates'))
-          for name in ('statistical_audit.html','advanced_observed_metrics.html','analysis_all_measurements.html','analysis_result_clean_v2.html','motion_performance.html','lineup_performance.html'):
+          for name in ('statistical_audit.html','advanced_observed_metrics.html','analysis_all_measurements.html','analysis_result_clean_v2.html','motion_performance.html','lineup_performance.html','tactical_sequence_metrics.html'):
               e.get_template(name)
               print(name, 'compiled')
           PY
