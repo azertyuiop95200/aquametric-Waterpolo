@@ -4,5 +4,9 @@
 <label>Fichier de référence<input type="file" name="reference_file" accept=".json,application/json" required></label>
 <label>Couleur de {{match.team.name}}<select name="home_color" required><option value="">Choisir</option><option value="blancs">Blancs</option><option value="bleus">Bleus</option></select></label>
 <label><input type="checkbox" name="same_match" value="1" required> Je confirme que le fichier correspond au match ouvert.</label>
+{% if snapshot is defined and snapshot.review_references %}
+<label>Révision à remplacer (facultatif)<select name="expected_digest"><option value="">Nouvelle référence / import identique</option>{% for r in snapshot.review_references %}<option value="{{r.digest}}">Q{{r.period}} · {{r.digest[:12]}}</option>{% endfor %}</select></label>
+<p>Une nouvelle révision conserve l'ancienne en historique. Même chronologie vidéo et même couleur requises.</p>
+{% endif %}
 <button class="btn secondary" type="submit">Importer comme référence</button>
 </form></details>
