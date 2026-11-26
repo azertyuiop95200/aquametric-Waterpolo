@@ -36,33 +36,52 @@ def complete_possessions(rows):
         # All sport actions must have the same valid clock and fall within boundaries.
         if any(clock(e) is None or clock(e)[0]!=a[0] or not b[1]<=clock(e)[1]<=a[1] for e in seq):
             rejected+=1;continue
-        completed.append(dict(side=side,period=int(q),possession=p,seconds=round(a[1]-b[1],3),
+        passes=[e for e in seq if e.get("event_type") in PASS_ALL]
+        pass_groups=defaultdict(list)
+        for e in passes:pass_groups[tags(e).get("action_id")].append(e)
+        # Legacy passes without unique IDs remain countable as annotations but
+        # cannot establish exhaustive unique-pass totals.
+        pass_valid=not pass_groups.get(None) and all(len({x.get("player_id") for x in group})==1 and not (any(x["event_type"]=="bad_pass" for x in group) and any(x["event_type"] in PASS_OK for x in group)) for group in pass_groups.values())
+        completed.append(dict(side=side,period=int(q),possession=p,start_clock=a[1],end_clock=b[1],seconds=round(a[1]-b[1],3),
                              outcome=outcome,phase=starts[0].get("phase") or "auto",
                              event_ids=[e.get("id") for e in seq],start_id=starts[0].get("id"),
-                             end_id=ends[0].get("id"),passes=sum(e.get("event_type") in PASS_ALL for e in seq),
-                             pass_coverage=tags(ends[0]).get("passes_complete")=="yes"))
-    return completed,rejected
+                             end_id=ends[0].get("id"),passes=len(pass_groups) if pass_valid else None,
+                             pass_coverage=tags(ends[0]).get("passes_complete")=="yes" and pass_valid))
+    # Reject overlapping possessions of the same side and quarter.
+    conflict=set()
+    for i,a in enumerate(completed):
+        for j in range(i+1,len(completed)):
+            b=completed[j]
+            if a["side"]==b["side"] and a["period"]==b["period"] and min(a["start_clock"],b["start_clock"])>max(a["end_clock"],b["end_clock"]):conflict.update((i,j))
+    return [p for i,p in enumerate(completed) if i not in conflict],rejected+len(conflict)
 
 def pass_network(rows,valid_ids):
-    pairs=defaultdict(list); seen=set(); rejected=0
+    pairs=defaultdict(list); actions=defaultdict(list); rejected=0; conflicts=[]
     for e in rows:
-        if e.get("event_type") not in PASS_OK:continue
-        t=tags(e);pid=e.get("player_id")
-        try: receiver=int(t.get("receiver_id",""))
-        except (TypeError,ValueError):rejected+=1;continue
-        # No self-pass, no cross-side link and no duplicate physical action ID.
-        if pid is None or pid==receiver or receiver not in valid_ids or pid not in valid_ids:
-            rejected+=1;continue
-        uid=t.get("action_id")
-        if uid:
-            key=(e.get("match_id"),e.get("perspective"),t.get("period"),uid)
-            if key in seen:continue
-            seen.add(key)
-        else:
-            rejected+=1;continue
-        pairs[(pid,receiver)].append(e.get("id"))
+        if e.get("event_type") not in PASS_ALL:continue
+        t=tags(e);uid=t.get("action_id")
+        if not uid:rejected+=1;continue
+        actions[(e.get("match_id"),e.get("perspective"),t.get("period"),uid)].append(e)
+    for key,seq in actions.items():
+        # One physical pass may have several labels, but contradictory results
+        # or receivers must be resolved rather than silently taking the first.
+        if all(e["event_type"]=="bad_pass" for e in seq):continue
+        links=set();invalid=False
+        for e in seq:
+            t=tags(e);pid=e.get("player_id")
+            if e["event_type"]=="bad_pass":invalid=True;continue
+            if pid not in valid_ids:invalid=True;continue
+            if not t.get("receiver_id"):continue
+            try: receiver=int(t["receiver_id"])
+            except (TypeError,ValueError):invalid=True;continue
+            if pid==receiver or receiver not in valid_ids:invalid=True;continue
+            links.add((pid,receiver))
+        if invalid or len(links)!=1 or len({e.get("player_id") for e in seq})!=1:
+            rejected+=1;conflicts.append({"action_id":key[-1],"event_ids":[e.get("id") for e in seq]});continue
+        pair=next(iter(links));pairs[pair].append(next(e.get("id") for e in seq if tags(e).get("receiver_id")))
     return {"edges":[{"from_id":a,"to_id":b,"count":len(ids),"event_ids":ids} for (a,b),ids in sorted(pairs.items())],
-            "rejected_or_unlinked":rejected,"scope":"explicit_completed_pass_ids"}
+            "rejected_or_unlinked":rejected,"conflicts":conflicts,"scope":"explicit_completed_pass_ids"}
+
 
 def tsap(rows):
     # TSAP categories must be explicitly classified, never inferred from ordinary event labels.
