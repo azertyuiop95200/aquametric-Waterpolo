@@ -67,7 +67,7 @@ EVENT_TYPES = (
     "block", "interception", "recovery", "save", "bad_pass", "turnover", "foul",
     "exclusion", "exclusion_earned", "exclusion_committed", "penalty_earned", "penalty_committed",
     "whistle", "power_play_start", "penalty_kill_start", "counterattack_start",
-    "defensive_recovery_start", "fast_recovery", "late_recovery",
+    "defensive_recovery_start", "counterattack_end", "defensive_recovery_end", "fast_recovery", "late_recovery",
     "foul_earned", "offensive_foul", "unforced_error", "goal_against", "possession_start", "possession_end", "power_play_end", "penalty_kill_end", "shot_clock_expired", "player_in", "player_out", "distance_sample", "swim_off_won", "swim_off_lost", "timeout_start", "timeout_end", "period_start", "period_end", "sprint"
 )
 PHASE_TAGS = ("auto", "even_attack", "even_defence", "power_play", "penalty_kill", "counterattack", "defensive_recovery", "centre_play", "restart", "penalty")
@@ -918,6 +918,7 @@ def add_event(
     metric_type: str = Form(""),
     metric_value: str = Form(""),
     metric_calibrated: str = Form(""),
+    sequence_id: str = Form(""),
     lineups_complete: str = Form(""),
     goals_complete: str = Form(""),
     db: Session = Depends(get_db),
@@ -981,7 +982,7 @@ def add_event(
             evidence_tags.append(f"game_clock_s={clock_value}")
         if outcome:
             allowed = set(END_LABELS) if event_type == "possession_end" else {"goal", "no_goal"}
-            if event_type in {"possession_end", "power_play_end", "penalty_kill_end"}:
+            if event_type in {"possession_end", "power_play_end", "penalty_kill_end", "counterattack_end"}:
                 if outcome not in allowed:
                     raise HTTPException(400, detail="Issue incompatible avec cette action.")
                 evidence_tags.append(f"outcome={outcome}")
@@ -990,7 +991,7 @@ def add_event(
             if distance is None:
                 raise HTTPException(400, detail="Distance mesurée invalide.")
             evidence_tags.append(f"distance_m={distance}")
-        for key,value in (("possession",possession_id),("action_id",action_id)):
+        for key,value in (("possession",possession_id),("action_id",action_id),("sequence",sequence_id)):
             if value.strip():
                 if not re.fullmatch(r"[A-Za-z0-9_-]{1,32}",value.strip()):
                     raise HTTPException(400, detail="Identifiant invalide.")
