@@ -19,7 +19,7 @@ ARBITRAL = {c for c, f in CAUSES.items() if f == "officiating"} | {"penalty_viol
 TURNOVER = {"offensive_foul", "ball_under_water", "two_hands", "offside_goal_area", "illegal_restart", "shot_clock_expired", "penalty_violation", "pass_intercepted", "pass_inaccurate", "pass_dropped", "ball_stolen", "ball_lost_under_pressure", "unforced_loss", "bad_control", "ball_out", "dribble_lost"}
 SIDES = {"for", "against"}
 
-def validate(start, end, before, after, before_state, after_state, cause, cause_verified, decision_verified, exact, prior_shot, evidence):
+def validate(start, end, before, after, before_state, after_state, cause, cause_verified, decision_verified, exact, prior_shot, evidence, restart_award='unknown', restart_verified=False):
     if not all(isinstance(v,(int,float)) and not isinstance(v,bool) and isfinite(v) for v in (start,end)) or not 0 <= start < end <= 43200:
         raise ValueError("Intervalle vidéo invalide.")
     for side, state in ((before,before_state),(after,after_state)):
@@ -31,6 +31,8 @@ def validate(start, end, before, after, before_state, after_state, cause, cause_
         raise ValueError("Cause invalide.")
     if cause_verified and cause in ARBITRAL and not decision_verified:
         raise ValueError("Une cause arbitrale nécessite une décision identifiée.")
+    if restart_award not in SIDES | {"unknown", "neutral"} or (restart_verified and (restart_award=="unknown" or not decision_verified)):
+        raise ValueError("Reprise vérifiée : bénéficiaire et décision identifiés nécessaires.")
     if exact and not (before_state==after_state=="observed" and before!=after):
         raise ValueError("Transition unique : deux contrôles opposés observés sont nécessaires.")
     status = "unresolved"
@@ -46,15 +48,16 @@ def validate(start, end, before, after, before_state, after_state, cause, cause_
     return dict(status=status, minimum_changes=1 if status=="opposite_endpoints" else None,
                 exact_count=1 if exact else None, attributed_cause=cause if credited else None,
                 turnover=turnover, prior_shot=prior_shot, video_duration_s=round(end-start,3),
-                complete_possession=False, game_duration_s=None)
+                complete_possession=False, game_duration_s=None,
+                restart_award=restart_award, restart_verified=bool(restart_verified))
 
-def build_note(start, end, before, after, before_state, after_state, cause, cause_verified, decision_verified, exact, prior_shot, evidence, period, segment):
-    validate(start,end,before,after,before_state,after_state,cause,cause_verified,decision_verified,exact,prior_shot,evidence)
+def build_note(start, end, before, after, before_state, after_state, cause, cause_verified, decision_verified, exact, prior_shot, evidence, period, segment, restart_award="unknown", restart_verified=False):
+    validate(start,end,before,after,before_state,after_state,cause,cause_verified,decision_verified,exact,prior_shot,evidence,restart_award,restart_verified)
     # Free text cannot introduce overriding tags; machine tags are last.
     safe = evidence.replace("="," : ").replace("|"," ").replace(";"," ")[:180]
     return (safe+" | "+" ".join([f"period={period}",f"p_source={segment or 'match'}",f"p_start={start:g}",
         f"p_before={before}",f"p_after={after}",f"p_bs={before_state}",f"p_as={after_state}",f"p_cause={cause}",
-        f"p_cv={int(cause_verified)}",f"p_dv={int(decision_verified)}",f"p_exact={int(exact)}",f"p_prior={int(prior_shot)}"]))
+        f"p_cv={int(cause_verified)}",f"p_dv={int(decision_verified)}",f"p_exact={int(exact)}",f"p_prior={int(prior_shot)}",f"p_ra={restart_award}",f"p_rv={int(restart_verified)}"]))
 
 def report(events):
     rows=[]; rejected=[]; groups=defaultdict(list)
@@ -65,14 +68,14 @@ def report(events):
             a=float(t["p_start"]); b=float(e["second"]); q=int(t["period"]); src=t["p_source"]
             if not 1<=q<=8 or not (src=="match" or src.isdecimal()): raise ValueError("source")
             note=(e.get("note") or "").split(" | ",1)[0]
-            vals=validate(a,b,t["p_before"],t["p_after"],t["p_bs"],t["p_as"],t["p_cause"],t["p_cv"]=="1",t["p_dv"]=="1",t["p_exact"]=="1",t["p_prior"]=="1",note)
+            vals=validate(a,b,t["p_before"],t["p_after"],t["p_bs"],t["p_as"],t["p_cause"],t["p_cv"]=="1",t["p_dv"]=="1",t["p_exact"]=="1",t["p_prior"]=="1",note,t.get("p_ra","unknown"),t.get("p_rv")=="1")
             r=dict(id=e.get("id"),period=q,source=src,start_s=a,end_s=b,before=t["p_before"],after=t["p_after"],cause=t["p_cause"],evidence=note,**vals)
             groups[(src,q,a,b)].append(r)
         except (ValueError,TypeError,KeyError) as err:
             rejected.append(dict(id=e.get("id"),reason=str(err)))
     # Repeated windows never add counts; conflicting duplicates are excluded.
     for key, rr in groups.items():
-        comparable=lambda r: tuple(r[k] for k in ("before","after","cause","status","exact_count","attributed_cause","turnover","prior_shot"))
+        comparable=lambda r: tuple(r[k] for k in ("before","after","cause","status","exact_count","attributed_cause","turnover","prior_shot","restart_award","restart_verified"))
         if any(comparable(r)!=comparable(rr[0]) for r in rr[1:]):
             rejected.extend(dict(id=r["id"],reason="Annotations contradictoires") for r in rr)
             continue
