@@ -23,6 +23,7 @@ jobs:
           python -m unittest discover -s tests -p test_guest_full_policy.py -v
           python -m unittest discover -s tests -p test_recognition_quality.py -v
           python -m unittest discover -s tests -p test_ball_candidate_pixels.py -v
+          python -m unittest discover -s tests -p test_broadcast_scoreboard.py -v
       - working-directory: source
         run: |
           python - <<'PY'

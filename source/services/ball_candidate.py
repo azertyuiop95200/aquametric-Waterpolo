@@ -61,7 +61,7 @@ def scan_windows(video_path, duration, moments, max_windows=4):
     cap=cv2.VideoCapture(str(video_path))
     if not cap.isOpened():
         cap.release(); return {'status':'unreadable','tracks':[],'windows':0}
-    tracks=[]; windows=0; used=[]
+    tracks=[]; windows=0; used=[]; redwhite_proposals=[]
     try:
         for m in moments[:max_windows*3]:
             if windows>=max_windows: break
@@ -69,14 +69,21 @@ def scan_windows(video_path, duration, moments, max_windows=4):
             if end-start<.5 or any(start<b and end>a for a,b in used): continue
             used.append((start,end)); windows+=1
             def frames():
-                for stamp in np.arange(start,end,.125):
+                from services.ball_redwhite import redwhite_candidates
+                for index,stamp in enumerate(np.arange(start,end,.125)):
                     cap.set(cv2.CAP_PROP_POS_MSEC,float(stamp)*1000)
                     ok,frame=cap.read()
                     if ok and frame is not None:
                         if frame.shape[1]>960:
                             frame=cv2.resize(frame,(960,max(1,round(frame.shape[0]*960/frame.shape[1]))))
+                        # Sample proposals separately, never merge with a yellow track.
+                        if index % 4 == 0:
+                            h,w=frame.shape[:2]
+                            proposals=redwhite_candidates(frame)
+                            if proposals:
+                                redwhite_proposals.append({"second":round(float(stamp),3),"points":[{"x":round(x/w,5),"y":round(y/h,5)} for x,y in proposals[:20]],"ambiguous":len(proposals)>1})
                         yield float(stamp),frame
             tracks.extend(track_frames(frames()))
     finally: cap.release()
-    return {'status':'candidate_only','tracks':tracks,'windows':windows,
+    return {'status':'candidate_only','tracks':tracks,'windows':windows,'redwhite_proposals':redwhite_proposals,
             'note':'Hypothèses de trajectoire 2D par couleur et continuité, uniquement dans les fenêtres inspectées. Aucun ballon, tir, identité ou distance certifié.'}

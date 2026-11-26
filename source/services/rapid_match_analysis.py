@@ -211,6 +211,8 @@ def run_rapid_analysis(
         candidates = mapped_candidates
 
     summary = build_auto_summary(observations, periods, candidates)
+    from services.broadcast_scoreboard import clock_changes
+    summary["shot_clock_changes"] = clock_changes(observations)
     summary.update({
         "pipeline": "rapid-long-video-v1",
         "ball_candidate_tracking": ball_tracking,

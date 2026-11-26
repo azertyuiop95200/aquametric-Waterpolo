@@ -104,6 +104,7 @@ class ScoreboardObservation:
     is_replay: bool = False
     is_break: bool = False
     is_final: bool = False
+    shot_clock_seconds: int | None = None
 
     def to_dict(self):
         return asdict(self)
@@ -217,7 +218,7 @@ def parse_scoreboard_text(text: str) -> dict:
     numbers = _extract_numbers(canonical)
     replay, break_flag, final = _broadcast_status(normalized)
     home = away = None
-    if (period is not None or clock is not None) and len(numbers) >= 2:
+    if (period is not None or clock is not None) and len(numbers) == 2:
         home, away = numbers[0], numbers[1]
     return {
         "normalized_text": normalized,
@@ -282,6 +283,16 @@ def ocr_image(img: np.ndarray) -> tuple[str, float]:
     return best_text, min(1.0, max(0.0, best_conf))
 
 
+def _read_broadcast_field(img, key):
+    if not tesseract_available():
+        return _onnx_image(img)
+    for mode in ((7,) if key == "clock" else (7, 8, 10)):
+        text, confidence = _ocr_once(img, f"--psm {mode} -c tessedit_char_whitelist=0123456789:")
+        if text and confidence >= .30:
+            return text, confidence
+    return "", 0.0
+
+
 def sample_scoreboard_observations(
     video_path: Path,
     rois: Iterable[dict],
@@ -295,9 +306,9 @@ def sample_scoreboard_observations(
         return []
     try:
         candidates = list(rois)[:2]
-        if not candidates:
-            return []
-        n = max(8, min(max_samples, max(8, int(duration_seconds / 12))))
+        # Short extracts need approximately one read per second; keep long-video budget.
+        n = max(8, min(max_samples, max(8, int(duration_seconds / (1.0 if duration_seconds <= 30 else 12)))))
+        from services.broadcast_scoreboard import read_broadcast_scoreboard
         end = max(0.0, duration_seconds - 0.25)
         times = np.linspace(0.0, end, n)
         observations: list[ScoreboardObservation] = []
@@ -305,6 +316,19 @@ def sample_scoreboard_observations(
             cap.set(cv2.CAP_PROP_POS_MSEC, float(second) * 1000.0)
             ok, frame = cap.read()
             if not ok or frame is None:
+                continue
+            layout = read_broadcast_scoreboard(frame, _read_broadcast_field)
+            if layout is not None:
+                # Recognized but obscured field: no generic score fallback.
+                if layout:
+                    observations.append(ScoreboardObservation(
+                        second=round(float(second),2), roi_name="ffn_separated_fields",
+                        raw_text=layout["raw_text"], normalized_text=layout["raw_text"],
+                        ocr_confidence=round(layout["ocr_confidence"],3),
+                        period=layout["period"], clock_seconds=layout["clock_seconds"],
+                        numbers=[layout["home_score"],layout["away_score"]],
+                        home_score=layout["home_score"], away_score=layout["away_score"],
+                        shot_clock_seconds=layout["shot_clock_seconds"]))
                 continue
             best = None
             for roi_idx, roi_info in enumerate(candidates):
