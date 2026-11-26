@@ -124,3 +124,23 @@ def enrich_audit(audit,advanced,identity,statistics):
         for k,raw,req in [("shot_speed","shot_speed_kmh","Moyenne km/h"),("shot_release_height","shot_release_height_m","Hauteur moyenne (m)"),("pass_length","pass_distance_m","Longueur moyenne (m)"),("swim_speed","max_swim_speed_mps","Maximum m/s")]:
             x=a["numeric"][raw]["max" if k=="swim_speed" else "mean"]
             update(p["metrics"],k,x["value"],x["n"],req+" · mesures calibrées renseignées")
+
+
+def enrich_lineups(audit,lineups,phases):
+    def set_value(rows,key,value,n,requirement):
+        for row in rows:
+            if row["key"]==key:
+                row.update(value=value,denominator=n,state="derived_sample" if value is not None else "not_measured",requirement=requirement)
+    valid=[q for q in lineups["quarters"] if q["valid"]]
+    set_value(audit["team"],"lineup_efficiency",len(lineups["lineups"]) if valid else None,len(valid),
+              "Nombre de compositions observées sur quarts validés · voir différentiels détaillés")
+    index={p["player_id"]:p for p in lineups["players"]}
+    for p in audit["players"]:
+        if p["side"]!="for" or p["player_id"] not in index:continue
+        x=index[p["player_id"]]
+        set_value(p["metrics"],"on_water_plus_minus",x["plus_minus"],x["goal_evaluated_seconds"],
+                  "Différentiel de buts sur secondes de jeu des quarts admissibles")
+    for s,k in (("for","team"),("against","opponent")):
+        row=next(p for p in phases["sides"][s]["phases"] if p["phase"]=="counterattack")
+        set_value(audit[k],"counterattack_conversion",row["conversion_pct"],row["possessions"],
+                  "Pourcentage de possessions complètes commencées en contre-attaque et terminées par un but")
