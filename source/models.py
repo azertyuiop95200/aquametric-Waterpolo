@@ -81,6 +81,18 @@ class MatchReviewReference(Base):
     home_color: Mapped[str] = mapped_column(String(12))
     payload_json: Mapped[str] = mapped_column(Text)
     match = relationship("Match", back_populates="review_references")
+    revisions = relationship("MatchReviewRevision", back_populates="reference", cascade="all, delete-orphan")
+
+class MatchReviewRevision(Base):
+    """Preserve prior reference payload before replacing the current revision."""
+    __tablename__ = "match_review_revisions"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    reference_id: Mapped[int] = mapped_column(ForeignKey("match_review_references.id"), index=True)
+    digest: Mapped[str] = mapped_column(String(64))
+    home_color: Mapped[str] = mapped_column(String(12))
+    payload_json: Mapped[str] = mapped_column(Text)
+    archived_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    reference = relationship("MatchReviewReference", back_populates="revisions")
 
 class MatchVideoSegment(Base):
     """One real video belonging to a match (quarter, period, or other recording)."""
