@@ -225,6 +225,9 @@ def action_report(db, match, *, run=None):
     result["lineup_performance"] = analyze_performance(rows, result["lineup_exposure"])
     from services.possession_performance import complete_possessions
     result["possession_performance"] = complete_possessions(rows, segments, result["lineup_exposure"])
+    # All contributing visible cores must refer to the same original upload.
+    pos_revisions={s.get("result",{}).get("source_revision") for s in segments if s.get("status")=="complete"}
+    result["possession_performance"]["source_revision"]=next(iter(pos_revisions)) if run.source_kind=="upload" and len(pos_revisions)==1 else None
     result["families"] = [{"key": key, "label": label, "observations": visibility[key]} for key, label in FAMILIES.items()]
     return result
 

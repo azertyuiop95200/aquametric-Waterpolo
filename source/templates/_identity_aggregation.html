@@ -84,3 +84,34 @@
 {% if side in cm.teams %}{% set t=cm.teams[side] %}<p>Avec ballon : {{t.with_ball_m if t.with_ball_m is not none else '—'}} m · autre porteuse identifiée : {{t.other_controller_m if t.other_controller_m is not none else '—'}} m · contrôle inconnu : {{t.unknown_control_m if t.unknown_control_m is not none else '—'}} m (sommes de distances individuelles partielles).</p>{% endif %}
 <div style="overflow:auto"><table class="metric-table"><thead><tr><th>Bonnet</th><th>Avec ballon (s)</th><th>Avec ballon (m)</th><th>Vitesse avec ballon (m/s)</th><th>Autre porteuse (m)</th><th>Contrôle inconnu (m)</th><th>Distance mesurée (m)</th></tr></thead><tbody>{% for p in cm.players if p.side==side %}<tr><td>{{p.cap}}</td>{% for k in ['with_ball_seconds','with_ball_m','with_ball_speed_m_s','other_controller_m','unknown_control_m','measured_m'] %}<td>{{p[k] if p[k] is not none and (k!='with_ball_seconds' or p.with_ball_m is not none) else '—'}}</td>{% endfor %}</tr>{% endfor %}</tbody></table></div>{% endfor %}
 {% else %}<p>Non mesuré : aucune intersection exploitable ou sources incompatibles.</p>{% endif %}{% endif %}
+
+{% set eg=snapshot.event_geometry|default({}) %}
+{% if eg and eg.rows %}
+<h2>Géométrie des actions et opposition observée</h2>
+<p>Positions de tête projetées dans le bassin, associées à des pistes revues. La séparation passeuse–receveuse ne mesure ni la trajectoire aérienne ni la vitesse du ballon. La distance à l'adversaire visible le plus proche n'est pas une mesure exhaustive de pression. Le but effectivement visé n'est pas supposé.</p>
+{% for side,name in [('for',match.team.name),('against',match.opponent)] %}
+{% set t=eg.teams[side] %}<h3>{{name}}</h3>
+<p>{{t.located_actions}} actions localisées, {{t.located_shots}} tirs et {{t.located_pass_endpoints}} transmissions avec deux extrémités. Distance moyenne entre extrémités : {{t.mean_pass_endpoint_separation_m if t.mean_pass_endpoint_separation_m is not none else '—'}} m. Adversaire mesuré le plus proche : {{t.mean_nearest_measured_opponent_m if t.mean_nearest_measured_opponent_m is not none else '—'}} m en moyenne ({{t.opponent_gap_samples}} actions).</p>
+<svg viewBox="-1.5 {{-eg.width_m/2-1}} {{eg.length_m+3}} {{eg.width_m+2}}" style="display:block;width:100%;max-width:560px;background:#102e40;border-radius:6px" role="img" aria-label="Carte des origines d'actions et extrémités des transmissions">
+<rect x="0" y="{{-eg.width_m/2}}" width="{{eg.length_m}}" height="{{eg.width_m}}" fill="#17677b" stroke="#bfdce1" stroke-width=".08"/>
+{% for x in [2,6,eg.length_m/2,eg.length_m-6,eg.length_m-2] %}<path d="M{{x}} {{-eg.width_m/2}} V{{eg.width_m/2}}" stroke="#afd0d9" stroke-width=".06" stroke-dasharray=".25 .22"/>{% endfor %}
+<rect x="-1" y="-1.5" width="1" height="3" fill="none" stroke="white" stroke-width=".09"/>
+<rect x="{{eg.length_m}}" y="-1.5" width="1" height="3" fill="none" stroke="white" stroke-width=".09"/>
+{% for r in eg.rows if r.side==side %}
+{% if r.receiver_x_m is defined %}<line x1="{{r.x_m}}" y1="{{-r.y_m}}" x2="{{r.receiver_x_m}}" y2="{{-r.receiver_y_m}}" stroke="#ffe174" stroke-width=".11"><title>N°{{r.cap}} vers n°{{r.receiver_cap}} : {{r.endpoint_separation_m}} m</title></line><circle cx="{{r.receiver_x_m}}" cy="{{-r.receiver_y_m}}" r=".12" fill="#ffe174"/>{% endif %}
+<circle cx="{{r.x_m}}" cy="{{-r.y_m}}" r=".17" fill="{{'#ff9878' if r.goal_geometry is defined else '#d3fff3'}}"><title>{{r.kind}} · n°{{r.cap}} · {{r.second}} s</title></circle>{% endfor %}
+</svg>
+<p>Origines des tirs : orange ; passes : vert clair ; extrémités des transmissions : jaune. Repère de calibration commun.</p>
+{% endfor %}
+<div style="overflow:auto"><table class="metric-table"><thead><tr><th>Équipe / bonnet</th><th>Actions localisées</th><th>Tirs</th><th>Passes avec extrémités</th><th>Séparation moyenne (m)</th><th>Adversaire mesuré le plus proche (m)</th><th>Échantillon opposition</th></tr></thead><tbody>{% for p in eg.players %}<tr><td>{{match.team.name if p.side=='for' else match.opponent}} · {{p.cap}}</td>{% for k in ['located_actions','located_shots','located_pass_endpoints','mean_pass_endpoint_separation_m','mean_nearest_measured_opponent_m','opponent_gap_samples'] %}<td>{{p[k] if p[k] is not none else '—'}}</td>{% endfor %}</tr>{% endfor %}</tbody></table></div>
+{% endif %}
+{% set pm=snapshot.phase_mobility|default({}) %}
+{% if pm and pm.players %}
+<h2>Mobilité en attaque et en défense</h2>
+<p>Intersection des trajectoires métriques revues avec les possessions candidates complètes. Temps vidéo, non temps réglementaire. Les distances sans possession établie restent non classées.</p>
+{% for side,name in [('for',match.team.name),('against',match.opponent)] %}<h3>{{name}}</h3>
+<div style="overflow:auto"><table class="metric-table"><thead><tr><th>Bonnet</th><th>Attaque (m)</th><th>Attaque (s)</th><th>Défense (m)</th><th>Défense (s)</th><th>Phase inconnue (m)</th><th>Total partiel (m)</th></tr></thead><tbody>
+{% for p in pm.players if p.side==side %}<tr><td>{{p.cap}}</td>{% for k in ['attack','defence'] %}<td>{{p[k].distance_m if p[k].distance_m is not none else '—'}}</td><td>{{p[k].seconds if p[k].distance_m is not none else '—'}}</td>{% endfor %}<td>{{p.unknown.distance_m if p.unknown.distance_m is not none else '—'}}</td><td>{{p.total.distance_m}}</td></tr>{% endfor %}
+{% if side in pm.teams %}{% set p=pm.teams[side] %}<tr><th>Équipe</th>{% for k in ['attack','defence'] %}<td>{{p[k].distance_m if p[k].distance_m is not none else '—'}}</td><td>{{p[k].seconds if p[k].distance_m is not none else '—'}}</td>{% endfor %}<td>{{p.unknown.distance_m if p.unknown.distance_m is not none else '—'}}</td><td>{{p.total.distance_m}}</td></tr>{% endif %}
+</tbody></table></div>{% endfor %}
+{% endif %}

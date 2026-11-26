@@ -34,3 +34,8 @@ class SpatialTests(unittest.TestCase):
         self.assertIsNone(r["events"][0]["receiver_cap_number"])
     def test_replay(self):
         self.assertEqual(self.report([event(is_replay=True)])["events"],[])
+
+    def test_actor_conflict_blocks_receiver(self):
+        r=self.report([event(cap_number=9,receiver_position=pos(.5,.8))],tracks=[track(1,.3),track(2,.5)],reviews={"1":review(8),"2":review(2)})
+        self.assertIsNone(r["events"][0]["receiver_cap_number"])
+        self.assertEqual(r["counts"]["receiver_actor_conflict"],1)

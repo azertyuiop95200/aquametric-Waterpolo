@@ -397,6 +397,13 @@ def analysis_snapshot(db, match):
     from services.control_mobility import control_mobility
     control=snapshot["video_actions"].get("ball_control",{})
     snapshot["control_mobility"]=control_mobility(snapshot["identity_analysis"]["players"],control,source_revision=summary.get("metric_field_map",{}).get("source_revision"),control_revision=control.get("source_revision"))
+    from services.metric_context import event_geometry, phase_mobility
+    metric=summary.get("metric_field_map",{})
+    dimensions={"length_m":float(metric.get("length_m",25.)),"width_m":float(metric.get("width_m",20.))}
+    players=snapshot["identity_analysis"]["players"]
+    snapshot["event_geometry"]=event_geometry(snapshot["spatial_attribution"]["events"],players,**dimensions)
+    possession=snapshot["video_actions"].get("possession_performance",{})
+    snapshot["phase_mobility"]=phase_mobility(players,possession.get("rows",[]),source_revision=metric.get("source_revision"),possession_revision=possession.get("source_revision"),**dimensions)
     snapshot["identity_analysis"]["analysis_id"] = auto.id if auto else None
     from services.report_coverage import report_coverage
     snapshot["report_coverage"] = report_coverage(snapshot["verified_events"], snapshot["video_actions"], [{"id":p.id,"name":p.name,"cap_number":p.cap_number} for p in match.team.players])

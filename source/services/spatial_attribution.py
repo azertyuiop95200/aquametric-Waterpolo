@@ -74,6 +74,10 @@ def attribute_events(events,tracking,metric,reviews):
         row=dict(e); detail={}
         for role,field,capfield in (("actor","actor_position","cap_number"),("receiver","receiver_position","receiver_cap_number")):
             if role=="receiver" and e.get("event_type") not in {"pass_complete","assist","key_pass"}:continue
+            if role=="receiver" and detail.get("actor",{}).get("status")=="identity_conflict":
+                counts["receiver_actor_conflict"]+=1
+                detail["receiver"]={"status":"actor_conflict","match":None}
+                continue
             m,status=index.match(e.get(field)) if rev and e.get("source_revision")==rev and valid_ids else (None,"source_or_review_unavailable")
             if m:
                 old=e.get(capfield)
