@@ -236,7 +236,8 @@ def _score_change_candidate(
 
 def infer_candidates(observations: list[dict], interesting_moments: list[dict]) -> list[AutoCandidate]:
     candidates: list[AutoCandidate] = []
-    stable = _stable_score(observations)
+    from services.recognition_quality import temporal_score_rows
+    stable = _stable_score(temporal_score_rows(observations))
     prev = None
     for row in stable:
         if prev is not None:

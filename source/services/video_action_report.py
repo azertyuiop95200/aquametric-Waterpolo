@@ -78,13 +78,13 @@ def canonical_actions(actions):
             # confidence score. Keep the observation in the ledger for review.
             types = {duplicate["event_type"], action["event_type"]}
             compatible = types <= {"goal", "shot_on_target"} or types <= {"assist", "key_pass", "pass_complete"} or types <= {"touch", "centre_touch"} or len(types) == 1
-            if not compatible:
+            if not compatible or duplicate.get("conflict"):
                 duplicate["counted"] = False
                 duplicate["conflict"] = "Issues contradictoires dans les détections de la même action."
                 action["counted"] = False
                 action["conflict"] = duplicate["conflict"]
                 result.append(action)
-            elif priorities.get(action["event_type"], 0) > priorities.get(duplicate["event_type"], 0):
+            elif (bool(action.get("counted")), priorities.get(action["event_type"], 0), action.get("confidence",0)) > (bool(duplicate.get("counted")), priorities.get(duplicate["event_type"], 0), duplicate.get("confidence",0)):
                 result[result.index(duplicate)] = action
             continue
         result.append(action)
@@ -137,8 +137,13 @@ def bounded_possessions(actions):
                                   "video_duration_seconds": round(action["second"] - start["second"], 3),
                                   "passes": sum(a["event_type"] in {"assist","key_pass","pass_complete","bad_pass"} for a in observed),
                                   "shots": len(shots), "goals": sum(a["event_type"] == "goal" for a in shots),
+                                  "outcome": action.get("possession_outcome", "unknown"),
                                   "first_shot_after_seconds": round(shots[0]["second"] - start["second"], 3) if shots else None})
+    outcomes = Counter(i["outcome"] for i in intervals)
+    classified = sum(v for k,v in outcomes.items() if k != "unknown")
     return {"count": len(intervals) if intervals else None, "intervals": intervals,
+            "outcomes": dict(outcomes), "classified": classified,
+            "conversion_pct": round(100*outcomes["goal"]/classified,1) if classified else None,
             "note": "Bornes de possession proposées par le modèle dans une même séquence continue. Durées en temps vidéo, pas en chrono de jeu ; aucune extrapolation aux possessions manquantes."}
 
 
@@ -167,9 +172,10 @@ def action_report(db, match, *, run=None):
     for segment in segments:
         payload = segment.get("result", {})
         if segment["status"] == "complete":
-            processed += segment["end"] - segment["start"]
+            if payload.get("scene") in {"water_polo", "mixed"}:
+                processed += segment["end"] - segment["start"]
             for action in payload.get("actions", []):
-                rows.append({**action, "counted": action["confidence"] >= .65})
+                rows.append({**action, "counted": action["confidence"] >= .65 and payload.get("scene") in {"water_polo","mixed"} and not action.get("is_replay")})
             for item in payload.get("observability", []):
                 visibility[item["family"]].append({**item, "start": segment["start"], "end": segment["end"]})
         result["segments"].append({"index": segment["index"], "start": segment["start"], "end": segment["end"],

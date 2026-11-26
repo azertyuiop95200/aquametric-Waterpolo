@@ -389,6 +389,8 @@ def analysis_snapshot(db, match):
     snapshot["elite_performance"] = elite_report(snapshot["verified_events"])
     from services.video_action_report import action_report
     snapshot["video_actions"] = action_report(db, match)
+    from services.recognition_quality import audit
+    snapshot["recognition_quality"] = audit(snapshot["automatic"], snapshot["video_actions"])
     # Basic counters over an empty event set are implementation zeros, not
     # measured match statistics. Apply the same contract to JSON/CSV and HTML.
     for side in ("team", "opponent"):

@@ -62,6 +62,9 @@ class ActionObservation(ObservationModel):
                    "steal", "handling", "decision", "technical", "pressure", "unknown"] = "unknown"
     pressure: Literal["low", "medium", "high", "unknown"] = "unknown"
     decision: Literal["good", "poor", "neutral", "unknown"] = "unknown"
+    possession_outcome: Literal["goal","save","off_target","post","blocked","bad_pass","steal","offensive_foul","shot_clock","handling","period_end","unknown"] = "unknown"
+    game_clock_seconds: float | None = Field(default=None, ge=0, le=480)
+    shot_clock_seconds: float | None = Field(default=None, ge=0, le=30)
     is_replay: bool = False
 
     @model_validator(mode="after")
@@ -115,6 +118,7 @@ visible. Phase/période/main/cause/pression/décision: renseigne uniquement ce q
 étayent. shot_type décrit le geste du tir, pass_type la famille de passe. Une entrée/sortie
 n'est pas une sortie du cadre de la caméra. Le début/fin d'une
 possession exige observation du changement de possession, pas le début/fin de la séquence.
+Pour possession_end, renseigne possession_outcome seulement si la cause est visible : but, arrêt, tir hors cadre, poteau, contre, mauvaise passe, interception, faute offensive, expiration, erreur technique ou fin de période. Un rebond récupéré par l’attaque ne termine pas automatiquement la possession. Un simple coup de sifflet ne prouve pas une exclusion : cherche le geste arbitral et la sortie/zone de rentrée. Une exclusion et un penalty ne sont pas la même sanction. Ne déduis pas la supériorité du nombre de personnes visibles dans un cadrage incomplet. Le référentiel senior récent est 4 × 8 min, possession 28 s, reset/exclusion 18 s dans les cas prévus, mais ne force pas ces valeurs sur un match ancien ou une compétition différente. game_clock_seconds et shot_clock_seconds uniquement si les affichages respectifs sont lisibles au timestamp ; ne les intervertis pas. Une passe décisive exige la séquence complète jusqu’au but. Si une action est masquée, ne la complète pas par supposition.
 
 Rends la visibilité et ses limites pour chacune des familles: {', '.join(FAMILIES)}.
 Une absence de détection n'est pas la preuve d'un zéro. Ni distance métrique, vitesse,

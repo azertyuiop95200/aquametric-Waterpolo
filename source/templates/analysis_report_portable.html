@@ -82,6 +82,7 @@ Les moments d'activité et les lectures OCR de cette capture ne sont pas des fai
 {% include "analysis_scoreboard_evidence.html" %}
 {% include "analysis_all_measurements.html" %}
 {% include "analysis_export_media.html" %}
+{% include "_recognition_quality.html" %}
 <h2>Couverture des preuves</h2><p>{{snapshot.verified_events|length}} événements confirmés enregistrés · {{snapshot.automatic.candidates|length}} candidats automatiques à vérifier. Ces nombres décrivent le dossier, pas la totalité des actions du match.</p>
 <h2>Statistiques confirmées dans le dossier</h2><table><thead><tr><th>Mesure</th><th>{{match.team.name}}</th><th>{{match.opponent}}</th></tr></thead><tbody>{% for label,key in [('Buts','goals'),('Tirs (buts inclus)','shots'),('Arrêts','saves'),('Pertes de balle','turnovers'),('Récupérations','recoveries'),('Exclusions provoquées','exclusions_earned'),('Exclusions commises','exclusions_committed'),('Passes décisives','assists'),('Passes clés','key_passes')] %}<tr><td>{{label}}</td><td>{{for_verified[key] if for_verified[key] is not none else 'Non mesuré'}}</td><td>{{against_verified[key] if against_verified[key] is not none else 'Non mesuré'}}</td></tr>{% endfor %}</tbody></table>
 <p>Les tirs incluent les buts. Chaque événement représente une tentative distincte. Aucun score final ou taux d’efficacité global ne peut être déduit sans couverture complète.</p>

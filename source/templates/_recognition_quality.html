@@ -1,0 +1,11 @@
+{% set q=snapshot.recognition_quality %}
+{% if q %}<h2>Contrôle qualité de la reconnaissance vidéo</h2>
+<p>Indicateurs provisoires : aucun taux de précision sur un match réel n'est annoncé sans vérité terrain annotée.</p>
+<table class="metric-table"><thead><tr><th>Contrôle</th><th>Résultat</th></tr></thead><tbody>
+<tr><td>Instants OCR distincts</td><td>{{q.ocr_frames}}</td></tr>
+<tr><td>Variations de score candidates</td><td>{{q.score_windows}}</td></tr>
+<tr><td>Buts candidats du modèle vidéo</td><td>{{q.ai_goal_candidates}}</td></tr>
+<tr><td>Concordances temporelles non ambiguës</td><td>{{q.time_matches if q.comparison_enabled else 'Sources non alignées'}}</td></tr>
+<tr><td>Actions sans équipe ou bonnet résolu</td><td>{{q.unreadable_or_unassigned}}</td></tr>
+<tr><td>Observations contradictoires</td><td>{{q.conflicting_actions}}</td></tr>
+</tbody></table><p>{{q.note}}</p>{% endif %}
