@@ -39,3 +39,9 @@
 <h3>Continuité du suivi · propositions non validées</h3>
 <p>{{tc.raw_tracklets}} fragments, {{tc.proposed_links}} raccords proposés, {{tc.candidate_chains}} chaînes candidates. {{tc.observations_before}} observations avant et {{tc.observations_after}} après ; {{tc.missing_frames_not_filled}} images manquantes non interpolées. Aucun numéro, équipe, distance ou action sportive n'est confirmé par ces raccords.</p>
 {% endif %}
+
+{% set bc=(snapshot.automatic|default({})).get('summary',{}).get('ball_continuity',{}) %}
+{% if bc.scope == 'ball_candidates_not_verified' %}
+<h3>Suivi temporel des candidats ballon</h3>
+<p>{{bc.counts.frames}} images, {{bc.counts.observations}} observations candidates, {{bc.counts.links}} raccords, {{bc.persistent_tracklets}} fragments persistants. {{bc.counts.unique_persistent_candidate_frames}} images avec un seul candidat persistant. Il ne s'agit pas de ballons ni de passes confirmés ; les reflets, flotteurs et bonnets restent des faux positifs possibles. Aucune position manquante n'est interpolée.</p>
+{% endif %}

@@ -248,6 +248,14 @@ def run_rapid_analysis(
                         summary["track_continuity"] = continuity
                     except Exception:
                         summary["track_continuity"] = {"scope":"unavailable"}
+                    try:
+                        from services.ball_continuity import analyze as analyze_ball_continuity
+                        ball_continuity = analyze_ball_continuity(Path(tmp)/"frames.jsonl.gz")
+                        ball_continuity.pop("tracks", None)
+                        summary["ball_continuity"] = ball_continuity
+                    except Exception:
+                        summary["ball_continuity"] = {"scope":"unavailable"}
+
 
                 # Keep bounded summary; per-frame trace remains available in local CLI.
                 result_full.pop("tracklet_records", None)
