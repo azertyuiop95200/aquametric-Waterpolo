@@ -63,6 +63,7 @@ GUEST_ULTIMATE_ENABLED = WEB_DEMO_MODE or os.getenv("AQUAMETRIC_GUEST_ULTIMATE",
 OFFICIAL_REFRESH_LOOP_MINUTES = int(os.getenv("OFFICIAL_REFRESH_LOOP_MINUTES", "30"))
 ALLOWED_VIDEO_EXTENSIONS = {".mp4", ".webm", ".mov", ".m4v", ".ogv", ".ogg"}
 EVENT_TYPES = (
+    "possession_transition",
     "goal", "assist", "key_pass", "action_created", "touch", "centre_touch", "duel_won", "duel_lost", "pass_complete", "shot_on_target", "shot_off_target", "shot_blocked", "shot_unknown",
     "block", "interception", "recovery", "save", "bad_pass", "turnover", "foul",
     "exclusion", "exclusion_earned", "exclusion_committed", "penalty_earned", "penalty_committed",
@@ -909,6 +910,16 @@ def add_event(
     game_clock_s: str = Form(""),
     outcome: str = Form(""),
     distance_m: str = Form(""),
+    p_start: str = Form(""),
+    p_before: str = Form("unknown"),
+    p_after: str = Form("unknown"),
+    p_bs: str = Form("unknown"),
+    p_as: str = Form("unknown"),
+    p_cause: str = Form("unknown"),
+    p_cv: str = Form(""),
+    p_dv: str = Form(""),
+    p_exact: str = Form(""),
+    p_prior: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = require_user(request, db)
@@ -919,7 +930,7 @@ def add_event(
         raise HTTPException(400, detail="Unsupported event type.")
     if return_to == "report" and observed != "1":
         raise HTTPException(400, detail="Confirmer que cet événement a réellement été observé avant de l’ajouter.")
-    if second < 0 or second > 12 * 60 * 60:
+    if not __import__("math").isfinite(second) or second < 0 or second > 12 * 60 * 60:
         raise HTTPException(400, detail="Event time is outside the supported range.")
     if not 1 <= period <= 8:
         raise HTTPException(400, detail="Période invalide (1 à 8).")
@@ -958,7 +969,19 @@ def add_event(
     if phase_tag not in PHASE_TAGS:
         phase_tag = "auto"
     # Structured optional evidence fields. Video time is not playing time.
-    if return_to == "report":
+    if event_type == "possession_transition":
+        if return_to != "report" or observed != "1":
+            raise HTTPException(400, detail="Revue manuelle confirmée requise.")
+        from services.possession_evidence import build_note
+        try:
+            note = build_note(float(p_start),second,p_before,p_after,p_bs,p_as,p_cause,
+                p_cv=="1",p_dv=="1",p_exact=="1",p_prior=="1",note,period,segment.id if segment else None)
+        except (ValueError,TypeError) as exc:
+            raise HTTPException(400, detail=str(exc)) from None
+        pid=None
+        perspective="neutral"
+        phase_tag="auto"
+    elif return_to == "report":
         from services.elite_performance import END_LABELS, number
         evidence_tags = [f"period={period}"]
         if game_clock_s.strip():
