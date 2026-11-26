@@ -1,0 +1,32 @@
+name: Elite performance calculations
+on:
+  push:
+    branches: [fix/youtube-report-intake-2026-11]
+    paths: ['source/services/elite_performance.py','source/tests/test_elite_performance.py','source/templates/_elite_performance.html','source/main.py','.github/workflows/elite-performance-ci.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m compileall -q source/main.py source/services/elite_performance.py source/services/quick_tag_analytics.py
+      - working-directory: source
+        run: python -m unittest discover -s tests -p test_elite_performance.py -v
+      - run: pip install jinja2
+      - working-directory: source
+        run: |
+          python - <<'PY'
+          from jinja2 import Environment, FileSystemLoader
+          from services.elite_performance import elite_report
+          from types import SimpleNamespace
+          env = Environment(loader=FileSystemLoader('templates'))
+          for name in ('_elite_performance.html','analysis_result_clean_v2.html','analysis_report_portable.html','login.html'):
+              env.get_template(name)
+          html = env.get_template('_elite_performance.html').render(review_metrics={'elite':elite_report([])},match=SimpleNamespace(team=SimpleNamespace(name='A'),opponent='B'))
+          assert 'Ultimate' in html and '—' in html
+          PY

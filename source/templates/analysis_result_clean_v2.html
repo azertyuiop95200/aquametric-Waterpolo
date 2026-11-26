@@ -166,9 +166,25 @@
         </label>
       </div>
       <label>Observation complémentaire
-        <input name="note" maxlength="500" placeholder="Ex. game_clock_s=420 outcome=goal distance_m=25">
+        <input name="note" maxlength="500" placeholder="Ex. tir depuis l’aile droite, défense en zone">
       </label>
-      <p class="evidence-note">Pour les entrées/sorties, indiquer le chrono restant du quart en secondes (game_clock_s=420 signifie 7:00). Pour une fin de possession, saisir outcome=goal, save, off_target, post, blocked, bad_pass, steal, offensive_foul, shot_clock, handling, period_end ou other. Pour une fin de 6v5 ou 5v6 : outcome=goal ou no_goal (but de l’équipe en attaque). Pour la distance, saisir distance_m=25 uniquement sur un segment mesuré distinct.</p>
+      <details style="margin:12px 0" open>
+        <summary>Chronomètre, issue de l'attaque et mesure physique</summary>
+        <div class="formgrid">
+          <label>Chrono restant dans le quart (secondes, facultatif)<input type="number" name="game_clock_s" min="0" max="480" step="0.1" placeholder="420 = 7 min"></label>
+          <label>Issue de la possession / situation<select name="outcome">
+            <option value="">Non renseignée</option><option value="goal">But</option>
+            <option value="no_goal">Sans but (6v5 / 5v6)</option>
+            <option value="save">Arrêt de la gardienne</option><option value="off_target">Tir non cadré</option>
+            <option value="post">Poteau / barre</option><option value="blocked">Tir contré</option>
+            <option value="bad_pass">Mauvaise passe</option><option value="steal">Interception</option>
+            <option value="offensive_foul">Faute offensive</option><option value="shot_clock">Fin du chrono</option>
+            <option value="handling">Erreur technique</option><option value="period_end">Fin du quart</option>
+            <option value="other">Autre</option></select></label>
+          <label>Distance mesurée sur un segment distinct (m)<input type="number" name="distance_m" min="0" max="10000" step="0.1" placeholder="Facultatif"></label>
+        </div>
+        <p class="evidence-note">Pour le temps de jeu, marquer entrée et sortie avec le chrono réel du même quart (y compris exclusions et retours). Pour la distance, ne pas comptabiliser deux fois le même trajet. Sélectionner l'issue avant « Fin de possession », « Fin de 6v5 » ou « Fin de 5v6 » ; le but désigne l'équipe en attaque.</p>
+      </details>
       <p class="evidence-note">Position du tir (facultative) : sélectionne un point sur la <a href="#spatialDashboard">carte du bassin</a> juste au-dessus. Sans point réellement observé, l'action reste enregistrée sans coordonnées et n'est pas affichée sur la heatmap.</p>
       <label style="display:block;margin:12px 0"><input type="checkbox" name="observed" value="1" required> J'ai réellement observé cet événement dans la vidéo ou sur une feuille de match vérifiable.</label>
       <div class="actions" style="gap:9px">

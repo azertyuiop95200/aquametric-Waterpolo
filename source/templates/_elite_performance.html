@@ -16,6 +16,7 @@
 <p>Une possession avec un rebond offensif n’est pas automatiquement une nouvelle attaque. La conversion des 6v5, 5v6 et 5 m possède son propre dénominateur.</p>
 <div style="overflow-x:auto"><table class="metric-table"><thead><tr><th>Situation</th><th>Buts / tirs équipe</th><th>Conversion (%)</th><th>Buts / tirs adverses</th><th>Conversion (%)</th></tr></thead><tbody>
 {% for r in elite.phases %}<tr><td>{{r.label}}</td>{% for s in ['for','against'] %}<td>{{val(r[s],'goals')}} / {{val(r[s],'shots')}}</td><td>{{val(r[s],'shot_conversion')}}</td>{% endfor %}</tr>{% endfor %}
+{% for r in elite.halves %}<tr><td>Mi-temps {{r.half}}</td>{% for s in ['for','against'] %}<td>{{val(r[s],'goals')}} / {{val(r[s],'shots')}}</td><td>{{val(r[s],'shot_conversion')}}</td>{% endfor %}</tr>{% endfor %}
 {% for r in elite.quarters %}<tr><td>Q{{r.quarter}}</td>{% for s in ['for','against'] %}<td>{{val(r[s],'goals')}} / {{val(r[s],'shots')}}</td><td>{{val(r[s],'shot_conversion')}}</td>{% endfor %}</tr>{% endfor %}
 </tbody></table></div>
 <p>{{elite.unassigned_period}} action(s) sans quart renseigné ; elles ne sont pas réparties artificiellement.</p>

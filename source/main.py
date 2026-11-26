@@ -903,6 +903,9 @@ def add_event(
     segment_id: str = Form(""),
     coord_x: str = Form(""),
     coord_y: str = Form(""),
+    game_clock_s: str = Form(""),
+    outcome: str = Form(""),
+    distance_m: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = require_user(request, db)
@@ -951,12 +954,33 @@ def add_event(
         perspective = "neutral"
     if phase_tag not in PHASE_TAGS:
         phase_tag = "auto"
+    # Structured optional evidence fields. Video time is not playing time.
+    if return_to == "report":
+        from services.elite_performance import END_LABELS, number
+        evidence_tags = [f"period={period}"]
+        if game_clock_s.strip():
+            clock_value = number(game_clock_s, 480)
+            if clock_value is None:
+                raise HTTPException(400, detail="Chrono de jeu invalide (0 à 480 secondes).")
+            evidence_tags.append(f"game_clock_s={clock_value}")
+        if outcome:
+            allowed = set(END_LABELS) if event_type == "possession_end" else {"goal", "no_goal"}
+            if event_type in {"possession_end", "power_play_end", "penalty_kill_end"}:
+                if outcome not in allowed:
+                    raise HTTPException(400, detail="Issue incompatible avec cette action.")
+                evidence_tags.append(f"outcome={outcome}")
+        if distance_m.strip() and event_type == "distance_sample":
+            distance = number(distance_m, 10000)
+            if distance is None:
+                raise HTTPException(400, detail="Distance mesurée invalide.")
+            evidence_tags.append(f"distance_m={distance}")
+        note = f"{note[:340]} {' '.join(evidence_tags)}"
     event = Event(
         match_id=match.id,
         player_id=pid,
         second=second,
         event_type=event_type,
-        note=clean_text(f"{note[:470]} period={period}" if return_to == "report" else note, 500),
+        note=clean_text(note, 500),
         confidence="CONFIRMED",
         source="manual",
     )

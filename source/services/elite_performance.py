@@ -192,9 +192,13 @@ def elite_report(events):
     for q in range(1,5):
         values = {s:reduce_side([e for e in rows if number(tags(e).get("period"),4)==q]) for s,rows in sides.items()}
         periods.append({"quarter":q, **values})
+    halves = []
+    for h, quarters in [(1,{1,2}),(2,{3,4})]:
+        values = {s:reduce_side([e for e in rows if number(tags(e).get("period"),4) in quarters]) for s,rows in sides.items()}
+        halves.append({"half":h, **values})
     return {"rules": RULES, "metrics": METRICS, "player_metrics":[(k,l) for k,l in METRICS if k in PLAYER_KEYS],
             "team": reduce_side(sides["for"]), "opponent":reduce_side(sides["against"]),
             "players":[{"id":pid,"name":name,**reduce_side(rows)} for (pid,name),rows in sorted(players.items(),key=lambda x:x[0][1])],
-            "phases":phase_rows, "quarters":periods,
+            "phases":phase_rows, "quarters":periods, "halves":halves,
             "unassigned_period":sum(number(tags(e).get("period"),4) not in {1,2,3,4} for e in confirmed),
             "scope":"confirmed_sample"}
