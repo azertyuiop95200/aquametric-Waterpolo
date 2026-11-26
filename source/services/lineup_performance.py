@@ -32,7 +32,13 @@ def analyze_performance(events, lineups):
             for n in caps:players[side,n]["seconds"]+=dt
     def at(side,p,t):
         rr=[r for r in by[side,p] if r["clock_end"]<t<r["clock_start"]]
-        return tuple(rr[0]["in_play"]) if len(rr)==1 else None
+        if len(rr)==1:return tuple(rr[0]["in_play"])
+        if rr:return None
+        # The sweep may split a constant lineup at an overlap boundary.
+        # An event on that boundary is valid only when both sides agree.
+        before=[tuple(r["in_play"]) for r in by[side,p] if r["clock_start"]==t]
+        after=[tuple(r["in_play"]) for r in by[side,p] if r["clock_end"]==t]
+        return before[0] if len(before)==len(after)==1 and before[0]==after[0] else None
     # Matched exposure for comparing goal differential and numerical states.
     for p in range(1,5):
         a,b=by["for",p],by["against",p]
@@ -63,6 +69,7 @@ def analyze_performance(events, lineups):
         if identified and n not in caps:ignored["actor_lineup_conflict"]+=1;continue
         names=[]
         if kind in SHOTS:names.append("shots")
+        if kind=="shot_unknown":names.append("shots_unknown")
         if kind in PASSES:names.append("passes_attempted")
         if kind in {"pass_complete","assist","key_pass"}:names.append("passes_completed")
         if kind in METRICS:names.append(METRICS[kind])
@@ -79,7 +86,7 @@ def analyze_performance(events, lineups):
                 paired[s,ks][label]+=1
                 for n in ks:players[s,n][label]+=1
     def view(c):
-        return {k:c[k] for k in ("goals","shots","passes_attempted","passes_completed","passes_received","assists","interceptions","recoveries","direct_turnovers","exclusions_earned","exclusions_committed","saves","blocks","duels_won","duels_lost")}
+        return {k:c[k] for k in ("goals","shots","shots_unknown","passes_attempted","passes_completed","passes_received","assists","interceptions","recoveries","direct_turnovers","exclusions_earned","exclusions_committed","saves","blocks","duels_won","duels_lost")}
     def differential(c):
         return {"goals_for":c["goals_for"],"goals_against":c["goals_against"],"observed_goal_diff":c["goals_for"]-c["goals_against"] if c["goals_for"]+c["goals_against"] else None}
     out={}
@@ -94,6 +101,6 @@ def analyze_performance(events, lineups):
             cs.append({"caps":list(k),"seconds":round(c["seconds"],3),"paired_seconds":round(d["seconds"],3),**view(c),**differential(d),"shots_per_min":_rate(c["shots"],c["seconds"])})
         for (s,a,b),c in sorted(states.items()):
             if s!=side:continue
-            ns.append({"players":a,"opponents":b,"seconds":round(c["seconds"],3),**view(c),"goal_per_min":_rate(c["goals"],c["seconds"]),"goals_per_detected_shot_pct":round(100*c["goals"]/c["shots"],1) if c["shots"] else None})
+            ns.append({"players":a,"opponents":b,"seconds":round(c["seconds"],3),**view(c),"goal_per_min":_rate(c["goals"],c["seconds"]),"goals_per_detected_shot_pct":round(100*c["goals"]/c["shots"],1) if c["shots"] and not c["shots_unknown"] else None})
         out[side]={"players":ps,"compositions":sorted(cs,key=lambda r:-r["seconds"]),"numerical":ns}
     return {"scope":"candidate_events_matched_to_partial_game_clock_exposure","teams":out,"excluded":dict(ignored),"note":"Detected-event rates, not validated match rates. Goal differential only on goals matched to both lineups. Numerical states include goalkeepers and are not possessions."}

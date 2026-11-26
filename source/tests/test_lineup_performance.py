@@ -31,3 +31,15 @@ class PerformanceTests(unittest.TestCase):
         x=self.run_report([e(t=30),e(key="b",period=2)],[r(a=60,b=40),r(a=20,b=0)]);self.assertEqual(x["excluded"]["lineup_gap_or_boundary"],2)
     def test_no_events(self):
         x=self.run_report([]);p=x["teams"]["for"]["players"][0];self.assertIsNone(p["goals_per_min"]);self.assertIsNone(p["observed_goal_diff"])
+
+    def test_artificial_boundary_same_lineup(self):
+        x=self.run_report([e(t=30)],[r(a=60,b=30),r(a=30,b=0),r("against")])
+        self.assertEqual(x["teams"]["for"]["players"][0]["goals"],1)
+    def test_actual_substitution_boundary(self):
+        x=self.run_report([e(t=30)],[r(a=60,b=30),r(a=30,b=0,caps=[1,2,3,4,5,6,8]),r("against")])
+        self.assertEqual(x["excluded"]["lineup_gap_or_boundary"],1)
+    def test_unknown_shot_suppresses_conversion(self):
+        x=self.run_report([e(),e("shot_unknown",key="b",t=20)])
+        n=x["teams"]["for"]["numerical"][0]
+        self.assertEqual(n["shots_unknown"],1)
+        self.assertIsNone(n["goals_per_detected_shot_pct"])
