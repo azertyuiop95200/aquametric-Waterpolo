@@ -1,0 +1,18 @@
+(() => {
+const root=document.getElementById('metricCalibrator');if(!root)return;
+const get=id=>document.getElementById(id),video=get('metricVideo'),canvas=get('metricCanvas'),ctx=canvas.getContext('2d'),info=get('metricInstruction');
+const labels=['poteau proche, à la surface','poteau opposé, à la surface','angle ligne de but / bord latéral opposé','transition rouge–jaune (2 m)','transition jaune–vert (6 m)'];
+let mode='idle',anchors=[],polygon=[],shots=[],reference=0,stamp=0,base=null;
+function freeze(){if(video.readyState<2){info.textContent='Attendre le chargement de l’image.';return false;}video.pause();canvas.width=video.videoWidth;canvas.height=video.videoHeight;ctx.drawImage(video,0,0);base=ctx.getImageData(0,0,canvas.width,canvas.height);stamp=video.currentTime;return true;}
+function repaint(points){ctx.putImageData(base,0,0);points.forEach((p,i)=>{ctx.beginPath();ctx.arc(p[0]*canvas.width,p[1]*canvas.height,Math.max(5,canvas.width*.005),0,2*Math.PI);ctx.fillStyle='#ffe078';ctx.fill();ctx.font=Math.max(14,canvas.width*.016)+'px sans-serif';ctx.fillText(String(i+1),p[0]*canvas.width+10,p[1]*canvas.height-8)})}
+get('metricFreeze').onclick=()=>{if(!freeze())return;anchors=[];polygon=[];shots=[];reference=stamp;mode='anchors';info.textContent='1/5 : '+labels[0]};
+canvas.onclick=e=>{if(!base)return;const r=canvas.getBoundingClientRect(),p=[(e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height];
+if(mode==='anchors'){anchors.push(p);repaint(anchors);if(anchors.length===5){mode='decor';info.textContent='Cliquer 3 à 16 sommets délimitant uniquement le décor fixe (hors eau, score, personnes).'}else info.textContent=(anchors.length+1)+'/5 : '+labels[anchors.length]}
+else if(mode==='decor'&&polygon.length<16){polygon.push(p);repaint(polygon);info.textContent=polygon.length+' sommets du décor.'}
+else if(mode==='shot'&&shots.length<30){shots.push({second:stamp,x:p[0],y:p[1],outcome:'unknown'});repaint([p]);mode='ready';info.textContent=shots.length+' tir(s) repéré(s). Origine à la surface de l’eau, issue indéterminée.'}};
+get('metricDecor').onclick=()=>{if(mode!=='decor'||polygon.length<3){info.textContent='Au moins trois sommets du décor fixe requis.';return;}mode='ready';info.textContent='Repères terminés. Ajouter les tirs en avançant la vidéo ou calculer.'};
+get('metricShot').onclick=()=>{if(mode!=='ready'||anchors.length!==5||polygon.length<3){info.textContent='Terminer la calibration de référence avant les tirs.';return;}if(freeze()){mode='shot';info.textContent='Cliquer la position de la tireuse au niveau de l’eau, pas le ballon en hauteur.'}};
+get('metricReset').onclick=()=>{mode='idle';anchors=[];polygon=[];shots=[];base=null;ctx.clearRect(0,0,canvas.width,canvas.height);info.textContent='Choisir une nouvelle image de référence.'};
+get('metricSubmit').onclick=async()=>{if(mode!=='ready'||anchors.length!==5||polygon.length<3){info.textContent='Terminer les repères.';return;}const b=get('metricSubmit');b.disabled=true;info.textContent='Calcul et contrôle des raccords caméra…';
+try{const res=await fetch(root.dataset.endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({anchors,polygon,shots,reference_second:reference,width:+get('metricWidth').value,length:+get('metricLength').value})});const data=await res.json();if(!res.ok)throw new Error(typeof data.detail==='string'?data.detail:'Calibration refusée');location.reload()}catch(e){info.textContent=e.message;b.disabled=false}};
+})();

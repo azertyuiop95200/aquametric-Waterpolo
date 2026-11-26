@@ -26,6 +26,7 @@ jobs:
           python -m unittest discover -s tests -p test_broadcast_scoreboard.py -v
           python -m unittest discover -s tests -p test_player_tracking.py -v
           python -m unittest discover -s tests -p test_tactical_timeline.py -v
+          python -m unittest discover -s tests -p test_metric_field.py -v
       - working-directory: source
         run: |
           python - <<'PY'
@@ -33,7 +34,7 @@ jobs:
           from services.elite_performance import elite_report
           from types import SimpleNamespace
           env = Environment(loader=FileSystemLoader('templates'))
-          for name in ('_elite_performance.html','analysis_result_clean_v2.html','analysis_report_portable.html','login.html','guest.html','analysis_live_automatic_stats.html','_recognition_quality.html'):
+          for name in ('_elite_performance.html','analysis_result_clean_v2.html','analysis_report_portable.html','login.html','guest.html','analysis_live_automatic_stats.html','_recognition_quality.html','_metric_field_map.html'):
               env.get_template(name)
           html = env.get_template('_elite_performance.html').render(review_metrics={'elite':elite_report([])},match=SimpleNamespace(team=SimpleNamespace(name='A'),opponent='B'))
           assert 'Ultimate' in html and '—' in html

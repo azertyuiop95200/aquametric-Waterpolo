@@ -1,16 +1,16 @@
 {% set pt=(snapshot.automatic|default({})).get('summary',{}).get('player_candidate_tracking',{}) %}
 {% if pt and pt.status == 'candidate_only' %}
-<h2>Cartographie des déplacements · pistes de tête candidates</h2>
+<h2>Diagnostic du tracking image · pistes de tête candidates</h2>
 <p>{{pt.windows|length}} fenêtres analysées, {{pt.tracks|length}} pistes courtes (pas un nombre de joueuses). {{pt.note}}</p>
 {% for window in pt.windows %}
 <details {% if loop.first %}open{% endif %}><summary>Fenêtre {{window.start}}–{{window.end}} s · {{window.tracklets}} pistes</summary>
 {% set wi=loop.index %}
 <div style="display:flex;flex-wrap:wrap;gap:16px">
-<div style="flex:1;min-width:250px"><h3>Carte image 2D</h3>
+<div style="flex:1;min-width:250px"><h3>Diagnostic image 2D</h3>
 <svg viewBox="0 0 320 180" style="width:100%;max-width:640px;background:#164c61" role="img" aria-label="Trajectoires candidates 2D">{% for t in pt.tracks if t.window == wi %}
 <polyline fill="none" stroke="{{'#f7f9fc' if t.colour == 'light' else '#ffb344' if t.colour == 'dark' else '#ff7575'}}" stroke-width="1.5" points="{% for p in t.points %}{{p.x*320}},{{p.y*180}} {% endfor %}"/>
 {% set p=t.points[-1] %}<circle cx="{{p.x*320}}" cy="{{p.y*180}}" r="2.5" fill="#74e5df"/><text x="{{p.x*320+4}}" y="{{p.y*180}}" font-size="8" fill="white">P{{t.id}}</text>{% endfor %}</svg></div>
-<div style="flex:1;min-width:250px"><h3>Vue 3D espace-temps</h3>
+<div style="flex:1;min-width:250px"><h3>Diagnostic 3D espace-temps</h3>
 <svg viewBox="0 0 360 240" style="width:100%;max-width:640px;background:#164c61" role="img" aria-label="Projection des positions image et du temps">
 <path d="M30 205 L250 205 L330 155 L110 155 Z M30 205 L30 30" fill="none" stroke="#82a9b9"/><text x="34" y="25" fill="white" font-size="10">temps ↑</text>
 {% for t in pt.tracks if t.window == wi %}<polyline fill="none" stroke="{{'#f7f9fc' if t.colour == 'light' else '#ffb344' if t.colour == 'dark' else '#ff7575'}}" stroke-width="1.7" points="{% for p in t.points %}{{30+p.x*220+p.y*80}},{{205-p.y*50-(p.second-window.start)*50}} {% endfor %}"/>{% endfor %}

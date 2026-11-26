@@ -487,3 +487,63 @@ def export_complete_analysis(match_id: int, request: Request, db: Session = Depe
         media_type="application/zip",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+# Explicit, owner-only calibration of a local recording; no hard-coded geometry
+# from a different venue. One bounded calibration job per worker.
+from threading import BoundedSemaphore
+_METRIC_SLOT = BoundedSemaphore(1)
+
+@router.post("/matches/{match_id}/analysis/metric-calibration")
+def metric_calibration(match_id: int, request: Request, payload: dict, db: Session = Depends(get_db)):
+    import json
+    import math
+    from models import AutonomousAnalysis
+    from services.metric_field import build_map
+    _, match = _owned_match(match_id, request, db)
+    if not _is_owned_upload(match):
+        raise HTTPException(400, "Calibration disponible pour un fichier vidéo local.")
+    source = UPLOAD_DIR / Path(match.video_path).name
+    if not source.is_file():
+        raise HTTPException(404, "Vidéo locale absente.")
+    auto = db.scalar(select(AutonomousAnalysis).where(AutonomousAnalysis.match_id == match.id)
+                     .order_by(AutonomousAnalysis.id.desc()).limit(1))
+    if not auto:
+        raise HTTPException(409, "Lance d'abord la pré-analyse vidéo.")
+    try:
+        summary = json.loads(auto.summary_json or "{}")
+        tracking = summary.get("player_candidate_tracking", {})
+        anchors, polygon = payload["anchors"], payload["polygon"]
+        width, length = float(payload["width"]), float(payload.get("length",25))
+        reference = float(payload["reference_second"])
+        if not math.isfinite(reference) or not 0<=reference<=28800:
+            raise ValueError("Instant de référence invalide.")
+        shots = payload.get("shots",[])
+        if not isinstance(shots,list) or len(shots)>30 or not isinstance(polygon,list) or len(polygon)>16 or not isinstance(anchors,list) or len(anchors)!=5:
+            raise ValueError("Nombre de repères invalide.")
+        for shot in shots:
+            if not isinstance(shot,dict) or not all(math.isfinite(float(shot[k])) for k in ("second","x","y")) or not 0<=float(shot["second"])<=28800:
+                raise ValueError("Position de tir invalide.")
+    except (ValueError,TypeError,KeyError):
+        raise HTTPException(400,"Paramètres de calibration invalides.") from None
+    if not _METRIC_SLOT.acquire(blocking=False):
+        raise HTTPException(429,"Une calibration est déjà en cours sur le serveur.")
+    try:
+        result=build_map(source,tracking,anchors,polygon,width,length,reference,shots)
+        result["calibration_provenance"]="manual_reviewed_anchors"
+        if not result["aligned_frames"]:
+            raise HTTPException(422,"Aucun raccord caméra accepté. Revoir les repères du décor.")
+        # Preserve existing candidates and confirmed events; metric positions
+        # never become confirmed sporting events.
+        db.refresh(auto)
+        latest=json.loads(auto.summary_json or "{}")
+        latest["metric_field_map"]=result
+        auto.summary_json=json.dumps(latest,ensure_ascii=False)
+        db.commit()
+        return {"ok":True,"aligned_frames":result["aligned_frames"],"requested_frames":result["requested_frames"],"mapped_shots":len(result["shots"])}
+    except HTTPException:
+        raise
+    except (ValueError,TypeError,KeyError):
+        raise HTTPException(422,"Calibration impossible : vérifier les cinq repères et le décor fixe.") from None
+    finally:
+        _METRIC_SLOT.release()

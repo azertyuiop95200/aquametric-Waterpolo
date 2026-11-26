@@ -1,0 +1,41 @@
+{% set mm=(snapshot.automatic|default({})).get('summary',{}).get('metric_field_map',{}) %}
+<h2>Cartographie métrique · but calibré</h2>
+{% if mm and mm.status == 'estimated' %}
+<p>{{mm.note}} {{mm.aligned_frames}}/{{mm.requested_frames}} images raccordées au décor de référence. Largeur saisie : {{mm.width_m}} m ; distance entre lignes de but : {{mm.length_m}} m. Pas de liaison entre des pistes indépendantes.</p>
+{% set scale=18 %}{% set centre=220 %}{% set left=45 %}{% set half=mm.length_m/2 %}
+<div style="display:flex;flex-wrap:wrap;gap:16px">
+{% for mode in ['shots','tracks'] %}<div style="flex:1;min-width:230px"><h3>{{'Origines des tirs repérées' if mode=='shots' else 'Déplacements dans le champ de jeu'}}</h3>
+<svg viewBox="0 0 620 440" style="width:100%;background:#123b4a" role="img" aria-label="Champ de jeu métrique">
+<rect x="{{left}}" y="{{centre-mm.width_m*scale/2}}" width="{{mm.length_m*scale}}" height="{{mm.width_m*scale}}" fill="#16677b" stroke="#fff"/>
+<rect x="{{left-12}}" y="{{centre-1.5*scale}}" width="12" height="{{3*scale}}" fill="none" stroke="#fff" stroke-width="2"/>
+<rect x="{{left}}" y="{{centre-3.5*scale}}" width="{{2*scale}}" height="{{7*scale}}" fill="#da736c" fill-opacity=".18" stroke="#f39a91"/>
+{% for distance,colour in [(2,'#ff9f92'),(5,'white'),(6,'#ffdb79'),(half,'#9ecfd9')] %}
+<path d="M{{left+distance*scale}} {{centre-mm.width_m*scale/2}} V{{centre+mm.width_m*scale/2}}" stroke="{{colour}}" stroke-dasharray="4 4"/><text x="{{left+distance*scale}}" y="{{centre-mm.width_m*scale/2-5}}" text-anchor="middle" font-size="10" fill="{{colour}}">{{distance}} m</text>
+{% endfor %}
+{% if mode=='shots' %}{% for s in mm.shots %}
+<line x1="{{left+s.x_m*scale}}" y1="{{centre-s.y_m*scale}}" x2="{{left}}" y2="{{centre}}" stroke="#ffdd70" stroke-dasharray="5 4"/>
+<circle cx="{{left+s.x_m*scale}}" cy="{{centre-s.y_m*scale}}" r="6" fill="#ffdd70"/><text x="{{left+s.x_m*scale+8}}" y="{{centre-s.y_m*scale-8}}" fill="white" font-size="10">{{s.second}} s · {{s.range_m}} m</text>{% endfor %}
+{% else %}{% for t in mm.tracks %}{% for seg in t.segments %}
+<polyline points="{% for p in seg %}{{left+p.x_m*scale}},{{centre-p.y_m*scale}} {% endfor %}" stroke="{{'white' if t.colour=='light' else '#ffbd6e' if t.colour=='dark' else '#ff9292'}}" stroke-width="2" fill="none"/>
+{% set p=seg[-1] %}<circle cx="{{left+p.x_m*scale}}" cy="{{centre-p.y_m*scale}}" r="3" fill="#80e7d9"/><text x="{{left+p.x_m*scale+4}}" y="{{centre-p.y_m*scale-4}}" fill="white" font-size="9">P{{t.id}}</text>{% endfor %}{% endfor %}{% endif %}
+</svg>
+{% if mode=='shots' and not mm.shots %}<p>Aucun tir localisé : pas de point artificiel.</p>{% endif %}
+</div>{% endfor %}</div>
+<h3>Distances partielles par piste (identité non vérifiée)</h3>
+<div style="overflow:auto"><table class="metric-table"><thead><tr><th>Piste</th><th>Couleur candidate</th><th>Suivi (s)</th><th>Déplacement projeté (m)</th><th>Ruptures rejetées</th></tr></thead><tbody>
+{% for t in mm.tracks %}<tr><td>P{{t.id}}</td><td>{{t.colour}}</td><td>{{t.observed_seconds}}</td><td>{{t.distance_m if t.distance_m is not none else '—'}}</td><td>{{t.rejected_jumps}}</td></tr>{% endfor %}
+</tbody></table></div>
+{% else %}<p>Pas de calibration de ce champ de jeu. Les distances en mètres restent non mesurées.</p>{% endif %}
+{% if interactive_report|default(false) and match.video_source == 'upload' %}
+<details><summary>Calibrer sur la vidéo réelle et localiser les tirs</summary>
+<p>Choisir une image où les deux poteaux, l'angle du champ et les transitions 2 m / 6 m du même bord latéral sont visibles. Indiquer la largeur réelle du champ, pas la largeur du bassin. Cliquer au niveau de l'eau.</p>
+<div id="metricCalibrator" data-endpoint="/matches/{{match.id}}/analysis/metric-calibration">
+<label>Largeur du champ (m) <input id="metricWidth" type="number" min="12.5" max="20" step=".1" value="20"></label>
+<label>Distance entre lignes de but (m) <input id="metricLength" type="number" min="15" max="30" step=".1" value="25"></label>
+<video id="metricVideo" src="/matches/{{match.id}}/video" controls preload="metadata" style="width:100%;max-height:360px"></video>
+<div><button type="button" id="metricFreeze" class="btn secondary">Figer l'image de référence</button> <button type="button" id="metricDecor" class="btn secondary">Terminer les repères du décor</button> <button type="button" id="metricShot" class="btn secondary">Figer un tir à l'instant vidéo</button> <button type="button" id="metricReset" class="btn secondary">Recommencer</button></div>
+<canvas id="metricCanvas" style="width:100%;max-width:960px;display:block;cursor:crosshair"></canvas>
+<p id="metricInstruction" role="status" aria-live="polite">Choisir l'image puis la figer.</p>
+<button type="button" id="metricSubmit" class="btn">Calculer la carte métrique</button>
+</div><script defer src="/static/metric-calibrator.js"></script></details>
+{% endif %}
