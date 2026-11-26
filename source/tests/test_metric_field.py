@@ -46,3 +46,21 @@ class MetricTests(unittest.TestCase):
             for seg in measure(pts)["segments"]:
                 for a,b in zip(seg,seg[1:]):
                     self.assertLessEqual(math.hypot(b["x_m"]-a["x_m"],b["y_m"]-a["y_m"]),3.5*(b["second"]-a["second"])+1e-9)
+
+    def test_repeated_track(self):
+        p=[dict(second=i*.125,x_m=i*.1,y_m=0.) for i in range(8)]
+        r=measure(p*2)
+        self.assertEqual(r["distance_m"],.7)
+        self.assertEqual(r["observed_seconds"],.875)
+        self.assertEqual(r["nonmonotonic_points"],8)
+    def test_gap_does_not_reset(self):
+        p=[dict(second=i*.125,x_m=i*.1,y_m=0.) for i in range(8)]
+        self.assertEqual(measure(p+[None]+p)["nonmonotonic_points"],8)
+    def test_ordered(self):
+        p=[dict(second=i*.125,x_m=i*.1,y_m=0.) for i in range(8)]
+        self.assertEqual(measure(p+[dict(q,second=q["second"]+2) for q in p])["distance_m"],1.4)
+    def test_duplicate_breaks(self):
+        p=[dict(second=i*.125,x_m=i*.1,y_m=0.) for i in range(8)]
+        r=measure(p[:4]+[p[3]]+p[4:])
+        self.assertEqual(r["nonmonotonic_points"],1)
+        self.assertIsNone(r["distance_m"])

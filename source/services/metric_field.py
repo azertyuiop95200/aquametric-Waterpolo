@@ -56,6 +56,7 @@ def measure(points, *, max_gap=.26, max_speed=3.5):
     if not all(isfinite(v) and v>0 for v in (max_gap,max_speed)):
         raise ValueError("Invalid experimental thresholds")
     segments=[]; current=[]; rejected=0; invalid=0
+    last_seen=-float("inf"); nonmonotonic=0
     for p in points:
         if p is not None:
             try:
@@ -64,6 +65,10 @@ def measure(points, *, max_gap=.26, max_speed=3.5):
                 p.update(second=t,x_m=x,y_m=y,raw_x_m=x,raw_y_m=y)
             except (ValueError,TypeError,KeyError):
                 invalid+=1;p=None
+        if p is not None:
+            if p["second"]<=last_seen:
+                nonmonotonic+=1;p=None
+            else:last_seen=p["second"]
         if p is None:
             if current:segments.append(current);current=[]
             continue
@@ -86,7 +91,7 @@ def measure(points, *, max_gap=.26, max_speed=3.5):
         for p,v in zip(s,sm):p["x_m"],p["y_m"]=map(float,v)
         distance+=float(np.linalg.norm(np.diff(sm,axis=0),axis=1).sum())
         seconds+=s[-1]["second"]-s[0]["second"]
-    return dict(segments=segments,observed_seconds=round(seconds,3),distance_m=round(distance,2) if seconds>=.5 else None,raw_distance_m=round(raw_distance,2) if seconds>=.5 else None,rejected_jumps=rejected,invalid_points=invalid,short_segment_points=short,smoothing_fallback_segments=fallback)
+    return dict(segments=segments,observed_seconds=round(seconds,3),distance_m=round(distance,2) if seconds>=.5 else None,raw_distance_m=round(raw_distance,2) if seconds>=.5 else None,rejected_jumps=rejected,invalid_points=invalid,nonmonotonic_points=nonmonotonic,short_segment_points=short,smoothing_fallback_segments=fallback)
 
 def build_map(path,tracking,anchors,polygon,width=20.,length=25.,reference_second=0.,shots=()):
     cal=calibrate(anchors,width,length);cap=cv2.VideoCapture(str(path));cache={};quality=[]
