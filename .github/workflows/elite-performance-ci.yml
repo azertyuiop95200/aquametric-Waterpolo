@@ -43,6 +43,7 @@ jobs:
           python -m unittest discover -s tests -p test_dynamic_calibration.py -v
           python -m unittest discover -s tests -p test_mobility.py -v
           python -m unittest discover -s tests -p test_lineup_exposure.py -v
+          python -m unittest discover -s tests -p test_lineup_performance.py -v
       - working-directory: source
         run: |
           python - <<'PY'

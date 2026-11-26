@@ -219,6 +219,8 @@ def action_report(db, match, *, run=None):
     result["ball_control"] = control_report(control_rows)
     from services.lineup_exposure import lineup_report
     result["lineup_exposure"] = lineup_report(lineup_rows)
+    from services.lineup_performance import analyze_performance
+    result["lineup_performance"] = analyze_performance(rows, result["lineup_exposure"])
     result["families"] = [{"key": key, "label": label, "observations": visibility[key]} for key, label in FAMILIES.items()]
     return result
 
