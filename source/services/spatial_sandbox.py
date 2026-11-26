@@ -40,6 +40,25 @@ def sandbox(baseline, edits, trials=32):
         scene["options"].append(dict(old,target=list(target),duration_s=t))
     proposed=[]
     if edits.get("suggest",True):
+        # Generate passes only to supplied receiver proxies; never invent a teammate.
+        for o in opts:
+            if len(scene["options"])>=10: break
+            if original_opts[o["id"]]["kind"]!="pass": continue
+            ident="Simulation · passe "+o["id"][:55]
+            if ident in original_opts or ident in proposed: continue
+            p=xyz(o["target"],bounds)
+            v=xyz(o.get("receiver_velocity",[0,0,0]),vb)
+            try:
+                receiver=advance(p,v,delay)
+                t=max(.15,min(2,hypot(receiver[0]-scene["start"][0],receiver[1]-scene["start"][1])/speed))
+                for _ in range(3):
+                    target=advance(p,v,delay+t)
+                    t=max(.15,min(2,hypot(target[0]-scene["start"][0],target[1]-scene["start"][1])/speed))
+                target=advance(p,v,delay+t)
+            except ValueError:
+                continue
+            scene["options"].append(dict(id=ident,kind="pass",target=target,duration_s=t))
+            proposed.append(ident)
         for name,dy,z in [("gauche basse",-1.15,.22),("droite basse",1.15,.22),
                            ("gauche haute",-1.15,.68),("droite haute",1.15,.68),("centre",0,.45)]:
             if len(scene["options"])>=12: break
