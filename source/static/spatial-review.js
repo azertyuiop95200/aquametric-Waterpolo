@@ -47,6 +47,7 @@ function display(){
  text("h3",(o.id===result.chosen?"Geste réel · ":"Alternative · ")+o.id,el);
  text("p",status[o.status]||o.status,el);
  text("p","Marge de sécurité conservatrice : "+fmt(o.clearance_m)+" m · vol "+fmt(o.flight_s)+" s · vitesse initiale "+fmt(o.launch_speed_m_s)+" m/s · hauteur max. "+fmt(o.peak_height_m)+" m",el);
+ if(o.kind==="shot")text("p",o.target_in_goal?"Cible située dans le cadre.":"Cible hors cadre ou trajectoire interrompue.",el);
  if(o.closest_defender)text("p","Défenseure la plus proche : "+o.closest_defender+" à "+fmt(o.closest_time_s)+" s (instant échantillonné).",el);
  text("p",o.clearance_frequency===null?"Fréquence de dégagement non calculable.":"Fréquence de dégagement conditionnelle : "+fmt(100*o.clearance_frequency,1)+" % (intervalle Monte-Carlo : "+o.simulation_interval.map(v=>fmt(v*100,1)).join("–")+" %).",el);
  text("p","Probabilité de but / de passe réussie : non calibrée.",el);
@@ -58,9 +59,9 @@ function load(){
  const saved=active&&reviews[active.id];
  result=saved?.result||null;
  if($("form")){
- $("form").reset();$("status").textContent="";
+ $("form").reset();$("status").textContent="";$("decision").value=active?.second??"";
  if(saved){const v=saved.observations;
- $("length").value=v.length_m;$("width").value=v.width_m;$("goal").value=v.goal_x===0?"zero":"end";
+ $("decision").value=v.decision_second??active.second;$("length").value=v.length_m;$("width").value=v.width_m;$("goal").value=v.goal_x===0?"zero":"end";
  ["x","y","z"].forEach((id,i)=>{$(id).value=v.start[i]});
  $("sigma").value=v.sigma_m;$("def").value=JSON.stringify(v.defenders,null,2);$("opt").value=JSON.stringify(v.options,null,2);
  $("chosen").value=v.chosen;$("complete").checked=v.complete_defence;
@@ -78,7 +79,7 @@ $("form")?.addEventListener("submit",async e=>{
  e.preventDefault();if(!active)return;const id=active.id;
  const button=e.target.querySelector("button[type=submit]");button.disabled=true;
  try{
- const observation={source:"manual_video",length_m:num("length"),width_m:num("width"),goal_x:$("goal").value==="zero"?0:num("length"),
+ const observation={source:"manual_video",decision_second:num("decision"),length_m:num("length"),width_m:num("width"),goal_x:$("goal").value==="zero"?0:num("length"),
  start:[num("x"),num("y"),num("z")],sigma_m:num("sigma"),defenders:JSON.parse($("def").value),options:JSON.parse($("opt").value),
  chosen:$("chosen").value,complete_defence:$("complete").checked};
  $("status").textContent="Calcul en cours…";
