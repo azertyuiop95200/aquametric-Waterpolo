@@ -168,6 +168,7 @@ def action_report(db, match, *, run=None):
     segments = json.loads(run.segments_json or "[]")
     rows = []
     control_rows = []
+    lineup_rows = []
     visibility = defaultdict(list)
     processed_intervals = []
     for segment in segments:
@@ -176,6 +177,7 @@ def action_report(db, match, *, run=None):
             if payload.get("scene") in {"water_polo", "mixed"}:
                 processed_intervals.append((segment["start"], segment["end"]))
                 control_rows.extend(payload.get("ball_control", []))
+                lineup_rows.extend(payload.get("lineups", []))
             for action in payload.get("actions", []):
                 rows.append({**action, "counted": action["confidence"] >= .65 and payload.get("scene") in {"water_polo","mixed"} and not action.get("is_replay")})
             for item in payload.get("observability", []):
@@ -215,6 +217,8 @@ def action_report(db, match, *, run=None):
     result["pass_ledger"] = pass_ledger(counted)
     from services.ball_control import control_report
     result["ball_control"] = control_report(control_rows)
+    from services.lineup_exposure import lineup_report
+    result["lineup_exposure"] = lineup_report(lineup_rows)
     result["families"] = [{"key": key, "label": label, "observations": visibility[key]} for key, label in FAMILIES.items()]
     return result
 

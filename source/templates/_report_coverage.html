@@ -27,3 +27,17 @@
 {% if t.players %}<table class="metric-table"><thead><tr><th>Bonnet</th><th>Temps vidéo avec ballon (s)</th></tr></thead><tbody>{% for p in t.players %}<tr><td>{{p.cap}}</td><td>{{p.control_video_seconds}}</td></tr>{% endfor %}</tbody></table>{% endif %}
 {% endfor %}
 {% else %}<h2>Maîtrise individuelle du ballon</h2><p>Non mesurée : aucun intervalle de contrôle exploitable.</p>{% endif %}
+
+{% set le=(snapshot.video_actions|default({})).get('lineup_exposure',{}) %}
+<h2>Temps de jeu, rotations et situations numériques</h2>
+<p>Temps du chronomètre général (hors arrêts de jeu), estimations IA sur compositions complètes observées. Les absences de données ne signifient ni zéro ni temps passé sur le banc.</p>
+{% if le and (le.teams['for'].observed_game_seconds or le.teams['against'].observed_game_seconds) %}
+{% for side,name in [('for',match.team.name),('against',match.opponent)] %}
+{% set t=le.teams[side] %}<h3>{{name}}</h3>
+<p>Temps réglementaire documenté : {{t.observed_game_seconds if t.observed_game_seconds is not none else '—'}} s · temps cumulé des joueuses : {{t.player_seconds if t.player_seconds is not none else '—'}} joueuse-secondes · contradictions exclues : {{t.conflict_game_seconds}} s.</p>
+{% if t.players %}<div style="overflow:auto"><table class="metric-table"><thead><tr><th>Bonnet</th><th>Temps en jeu (s)</th><th>Temps en exclusion observé (s)</th><th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th></tr></thead><tbody>
+{% for p in t.players %}{% set pp={} %}{% for q in p.periods %}{% set _=pp.update({q.period:q.playing_seconds}) %}{% endfor %}<tr><td>{{p.cap}}</td><td>{{p.playing_seconds if p.playing_seconds is not none else '—'}}</td><td>{{p.excluded_seconds if p.excluded_seconds is not none else '—'}}</td>{% for q in [1,2,3,4] %}<td>{{pp.get(q,'—')}}</td>{% endfor %}</tr>{% endfor %}</tbody></table></div>{% endif %}
+{% if t.compositions %}<h4>Compositions observées</h4><table class="metric-table"><thead><tr><th>Bonnets en jeu</th><th>Durée (s)</th></tr></thead><tbody>{% for c in t.compositions %}<tr><td>{{c.caps|join(' · ')}}</td><td>{{c.seconds}}</td></tr>{% endfor %}</tbody></table>{% endif %}
+{% endfor %}
+{% if le.numerical_states %}<h3>Effectifs simultanés (gardiennes incluses)</h3><p>{{le.simultaneous_game_seconds}} s de compositions concordantes des deux équipes. Ce tableau ne présume pas de l'équipe attaquante.</p><table class="metric-table"><thead><tr><th>{{match.team.name}}</th><th>{{match.opponent}}</th><th>Durée (s)</th></tr></thead><tbody>{% for n in le.numerical_states %}<tr><td>{{n.for_players}}</td><td>{{n.against_players}}</td><td>{{n.seconds}}</td></tr>{% endfor %}</tbody></table>{% endif %}
+{% else %}<p>Non mesuré : aucune composition complète associée à un intervalle fiable du chronomètre général.</p>{% endif %}

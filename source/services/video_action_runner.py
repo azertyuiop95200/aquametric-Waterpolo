@@ -103,6 +103,11 @@ def normalize_observations(payload: dict, segment: dict) -> dict:
         payload["ball_control"] = normalize_control_intervals(payload.get("ball_control", []), segment, payload["scene"])
     except ValueError as exc:
         raise VideoActionError("invalid_control_interval", "Intervalle de contrôle hors séquence ou incohérent.") from exc
+    from services.lineup_exposure import normalize_lineups
+    try:
+        payload["lineups"] = normalize_lineups(payload.get("lineups", []), segment, payload["scene"])
+    except ValueError as exc:
+        raise VideoActionError("invalid_lineup_interval", "Composition ou bornes vidéo incohérentes.") from exc
     payload["actions"] = sorted(events, key=lambda e: e["second"])
     payload["ignored"] = ignored
     return payload

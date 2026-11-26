@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-VERSION = "video-actions-v2-control"
+VERSION = "video-actions-v3-lineups"
 
 EVENT_LABELS = {
     "goal": "But", "shot_on_target": "Tir cadré arrêté", "shot_off_target": "Tir non cadré",
@@ -113,6 +113,35 @@ class BallControlObservation(ObservationModel):
         return self
 
 
+class LineupObservation(ObservationModel):
+    start_second: float = Field(ge=0)
+    end_second: float = Field(gt=0)
+    side: Literal["for","against"]
+    period: int = Field(ge=1,le=4)
+    clock_start: float = Field(gt=0,le=480)
+    clock_end: float = Field(ge=0,le=480)
+    in_play: list[int] = Field(min_length=1,max_length=7)
+    excluded: list[int] = Field(default_factory=list,max_length=30)
+    complete_lineup: bool = False
+    confidence: float = Field(ge=0,le=1)
+    clock_evidence: str = Field(default="",max_length=400)
+    lineup_evidence: str = Field(default="",max_length=700)
+    team_evidence: str = Field(default="",max_length=400)
+    is_replay: bool = False
+
+    @model_validator(mode="after")
+    def check_lineup(self):
+        if self.end_second <= self.start_second or self.clock_end >= self.clock_start:
+            raise ValueError("Invalid lineup interval")
+        if any(not 1<=n<=30 for n in self.in_play+self.excluded) or len(set(self.in_play+self.excluded))!=len(self.in_play+self.excluded):
+            raise ValueError("Invalid or conflicting cap numbers")
+        if self.clock_start-self.clock_end > self.end_second-self.start_second+1:
+            raise ValueError("Game clock exceeds elapsed video time")
+        if not (self.clock_evidence.strip() and self.lineup_evidence.strip() and self.team_evidence.strip()):
+            self.complete_lineup = False
+        return self
+
+
 class Observability(ObservationModel):
     family: Family
     status: Literal["visible", "limited", "not_visible"]
@@ -123,6 +152,7 @@ class SegmentObservation(ObservationModel):
     scene: Literal["water_polo", "mixed", "not_water_polo", "unreadable"]
     actions: list[ActionObservation] = Field(max_length=240)
     ball_control: list[BallControlObservation] = Field(default_factory=list, max_length=240)
+    lineups: list[LineupObservation] = Field(default_factory=list,max_length=120)
     observability: list[Observability] = Field(max_length=10)
     summary: str = Field(max_length=1400)
 
@@ -158,6 +188,7 @@ Pour possession_end, renseigne possession_outcome seulement si la cause est visi
 
 Pour la synthèse tactique, distingue press individuel, aide latérale 1–2 / 4–5, zone M (aide sur pointe et splits périphériques), zone 2–3–4, trappe et changement press-zone. Les postes 1–6 ne sont pas les numéros de bonnet. Évalue plusieurs secondes avant le tir, les appariements, l’aide sur pointe et les déplacements. Si le champ ne montre pas toutes les joueuses, ne nomme que le mécanisme local visible. Vérifie l'issue du tir après le lâcher, y compris ballon dans le filet, déviation par la gardienne, retour du ballon en jeu et reprise. Ne déduis pas l'issue uniquement du score.
 Dans ball_control, retourne les intervalles pendant lesquels une joueuse contrôle visiblement le ballon, en secondes locales start_second/end_second. Commence à la réception maîtrisée, à une récupération ou à une prise de contrôle visible ; termine au lâcher, à la perte de contrôle, à l'interruption ou lorsque la visibilité devient insuffisante. Inclure la conduite à la nage si le contrôle est visible. Ne pas inclure le vol du ballon, un rebond libre, une simple proximité, une lutte sans maîtrise claire, une coupure ni une rediffusion. N'utilise pas simplement le temps entre deux actions. Ne prolonge pas un intervalle derrière une occultation. Si le début ou la fin est hors du cadre temporel, limite l'intervalle à la partie observée. Identifie séparément équipe et numéro avec preuves, ou unknown/null. Les durées sont du temps vidéo observé, pas du temps de jeu officiel.
+Dans lineups, propose uniquement des intervalles de composition complète et constante d'une équipe, gardienne comprise, lorsque les numéros ET les bornes du chronomètre GENERAL descendant ET la période sont lisibles, et les rotations surveillées sans interruption. Indique les temps vidéo locaux start_second/end_second et les deux lectures clock_start/clock_end en secondes de jeu restantes. Ne confonds pas le chronomètre de possession (28/18 s) avec le chrono général. Ne suppose pas qu'une période dure huit minutes : selon la compétition sa durée peut différer. Sépare les intervalles au changement de composition, à la coupure, au changement de période ou à la perte de visibilité. Une joueuse hors cadre n'est pas forcément sur le banc. in_play contient les numéros de toutes les joueuses en jeu de cette équipe, y compris gardienne. excluded contient seulement les numéros dont l'exclusion est explicitement visible pendant tout l'intervalle ; ne déduis pas les exclusions d'un effectif réduit. N'invente pas de numéro ou de retour à 18 secondes. complete_lineup=true uniquement avec preuves de continuité, équipe et chrono. Si une composition complète n'est pas discernable, ne produis pas d'intervalle. Exclure les ralentis et rediffusions.
 Rends la visibilité et ses limites pour chacune des familles: {', '.join(FAMILIES)}.
 Une absence de détection n'est pas la preuve d'un zéro. Ni distance métrique, vitesse,
 temps de jeu complet, fatigue, note globale, ni total extrapolé: le modèle ne les mesure
