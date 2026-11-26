@@ -394,6 +394,9 @@ def analysis_snapshot(db, match):
     snapshot["identity_analysis"] = build_identity_report(summary.get("metric_field_map", {}), snapshot["verified_events"], snapshot["video_actions"], [{"id":p.id,"name":p.name,"cap_number":p.cap_number} for p in match.team.players], summary.get("identity_reviews", {}))
     from services.spatial_attribution import attribute_events
     snapshot["spatial_attribution"] = attribute_events(snapshot["video_actions"].get("events",[]), summary.get("player_candidate_tracking",{}), summary.get("metric_field_map",{}), summary.get("identity_reviews",{}))
+    from services.control_mobility import control_mobility
+    control=snapshot["video_actions"].get("ball_control",{})
+    snapshot["control_mobility"]=control_mobility(snapshot["identity_analysis"]["players"],control,source_revision=summary.get("metric_field_map",{}).get("source_revision"),control_revision=control.get("source_revision"))
     snapshot["identity_analysis"]["analysis_id"] = auto.id if auto else None
     from services.report_coverage import report_coverage
     snapshot["report_coverage"] = report_coverage(snapshot["verified_events"], snapshot["video_actions"], [{"id":p.id,"name":p.name,"cap_number":p.cap_number} for p in match.team.players])

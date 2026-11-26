@@ -75,3 +75,12 @@
 {% if sa.pass_ledger %}{% for side,name in [('for',match.team.name),('against',match.opponent)] %}{% set p=sa.pass_ledger.teams[side] %}{% if p.network %}<h3>{{name}} · réseau de passes candidat réattribué</h3><table class="metric-table"><thead><tr><th>Passeuse</th><th>Receveuse</th><th>Transmissions</th></tr></thead><tbody>{% for r in p.network %}<tr><td>{{r['from']}}</td><td>{{r['to']}}</td><td>{{r.count}}</td></tr>{% endfor %}</tbody></table>{% endif %}{% endfor %}{% endif %}
 <details><summary>Diagnostic des attributions</summary>{% for k,v in sa.counts.items() %}<p>{{k}} : {{v}}</p>{% endfor %}</details>
 {% endif %}
+
+{% set cm=snapshot.control_mobility|default({}) %}
+{% if cm %}
+<h2>Déplacement avec ballon et sans maîtrise personnelle observée</h2>
+<p>Intersection des trajectoires métriques revues et des intervalles candidats de contrôle visible. Les distances dont le contrôle est inconnu ne sont pas assimilées à un déplacement sans ballon. Les secondes sont du temps vidéo, pas du chrono de jeu.</p>
+{% if cm.players %}{% for side,name in [('for',match.team.name),('against',match.opponent)] %}<h3>{{name}}</h3>
+{% if side in cm.teams %}{% set t=cm.teams[side] %}<p>Avec ballon : {{t.with_ball_m if t.with_ball_m is not none else '—'}} m · autre porteuse identifiée : {{t.other_controller_m if t.other_controller_m is not none else '—'}} m · contrôle inconnu : {{t.unknown_control_m if t.unknown_control_m is not none else '—'}} m (sommes de distances individuelles partielles).</p>{% endif %}
+<div style="overflow:auto"><table class="metric-table"><thead><tr><th>Bonnet</th><th>Avec ballon (s)</th><th>Avec ballon (m)</th><th>Vitesse avec ballon (m/s)</th><th>Autre porteuse (m)</th><th>Contrôle inconnu (m)</th><th>Distance mesurée (m)</th></tr></thead><tbody>{% for p in cm.players if p.side==side %}<tr><td>{{p.cap}}</td>{% for k in ['with_ball_seconds','with_ball_m','with_ball_speed_m_s','other_controller_m','unknown_control_m','measured_m'] %}<td>{{p[k] if p[k] is not none and (k!='with_ball_seconds' or p.with_ball_m is not none) else '—'}}</td>{% endfor %}</tr>{% endfor %}</tbody></table></div>{% endfor %}
+{% else %}<p>Non mesuré : aucune intersection exploitable ou sources incompatibles.</p>{% endif %}{% endif %}

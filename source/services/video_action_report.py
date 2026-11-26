@@ -176,7 +176,7 @@ def action_report(db, match, *, run=None):
         if segment["status"] == "complete":
             if payload.get("scene") in {"water_polo", "mixed"}:
                 processed_intervals.append((segment["start"], segment["end"]))
-                control_rows.extend(payload.get("ball_control", []))
+                control_rows.extend({**r,"source_revision":payload.get("source_revision") if run.source_kind=="upload" else None} for r in payload.get("ball_control", []))
                 lineup_rows.extend(payload.get("lineups", []))
             for action in payload.get("actions", []):
                 rows.append({**action, "source_revision":payload.get("source_revision") if run.source_kind=="upload" else None, "counted": action["confidence"] >= .65 and payload.get("scene") in {"water_polo","mixed"} and not action.get("is_replay")})
@@ -217,6 +217,8 @@ def action_report(db, match, *, run=None):
     result["pass_ledger"] = pass_ledger(counted)
     from services.ball_control import control_report
     result["ball_control"] = control_report(control_rows)
+    revisions={r.get("source_revision") for r in control_rows}
+    result["ball_control"]["source_revision"]=next(iter(revisions)) if len(revisions)==1 else None
     from services.lineup_exposure import lineup_report
     result["lineup_exposure"] = lineup_report(lineup_rows)
     from services.lineup_performance import analyze_performance
