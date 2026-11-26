@@ -20,3 +20,29 @@ class MetricTests(unittest.TestCase):
         self.assertLess(m["distance_m"],1.5)
     def test_degenerate(self):
         with self.assertRaises(ValueError):calibrate([[.5,.5]]*5)
+
+    def test_linear_preserves_endpoints_and_input(self):
+        import copy
+        pts=[dict(second=i*.125,x_m=i*.1,y_m=0.) for i in range(8)]
+        original=copy.deepcopy(pts);r=measure(pts)
+        self.assertEqual(pts,original)
+        self.assertEqual(r["distance_m"],.7)
+        self.assertEqual(r["raw_distance_m"],.7)
+        self.assertEqual(r["segments"][0][-1]["raw_x_m"],pts[-1]["x_m"])
+    def test_invalid_and_short(self):
+        pts=[dict(second=i*.125,x_m=i*.1,y_m=0.) for i in range(4)]
+        r=measure(pts+[dict(second=1,x_m=float("nan"),y_m=0)])
+        self.assertEqual(r["invalid_points"],1)
+        self.assertEqual(r["short_segment_points"],4)
+        self.assertIsNone(r["distance_m"])
+    def test_final_speed(self):
+        import random,math
+        rng=random.Random(12)
+        for _ in range(100):
+            pts=[dict(second=0,x_m=0.,y_m=0.)]
+            for i in range(1,12):
+                a=rng.random()*6.28;d=rng.uniform(.02,.4)
+                pts.append(dict(second=i*.125,x_m=pts[-1]["x_m"]+d*math.cos(a),y_m=pts[-1]["y_m"]+d*math.sin(a)))
+            for seg in measure(pts)["segments"]:
+                for a,b in zip(seg,seg[1:]):
+                    self.assertLessEqual(math.hypot(b["x_m"]-a["x_m"],b["y_m"]-a["y_m"]),3.5*(b["second"]-a["second"])+1e-9)

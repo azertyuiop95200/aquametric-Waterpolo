@@ -51,25 +51,42 @@ class CameraAligner:
         z=cv2.perspectiveTransform(np.array([[[x*self.w,y*self.h]]],float),H)[0,0]
         return float(z[0]/self.w),float(z[1]/self.h)
 
-def measure(points):
-    segments=[]; current=[]; rejected=0
+def measure(points, *, max_gap=.26, max_speed=3.5):
+    """Partial planar track; thresholds are experimental, not rules."""
+    if not all(isfinite(v) and v>0 for v in (max_gap,max_speed)):
+        raise ValueError("Invalid experimental thresholds")
+    segments=[]; current=[]; rejected=0; invalid=0
     for p in points:
+        if p is not None:
+            try:
+                p=dict(p); t,x,y=(float(p[k]) for k in ("second","x_m","y_m"))
+                if not all(isfinite(v) for v in (t,x,y)) or t<0:raise ValueError()
+                p.update(second=t,x_m=x,y_m=y,raw_x_m=x,raw_y_m=y)
+            except (ValueError,TypeError,KeyError):
+                invalid+=1;p=None
         if p is None:
             if current:segments.append(current);current=[]
             continue
         if current:
             dt=p["second"]-current[-1]["second"];delta=hypot(p["x_m"]-current[-1]["x_m"],p["y_m"]-current[-1]["y_m"])
-            if not 0<dt<=.26 or delta/dt>3.5:
+            if not 0<dt<=max_gap or delta/dt>max_speed:
                 segments.append(current);current=[];rejected+=1
         current.append(p)
     if current:segments.append(current)
+    short=sum(len(s) for s in segments if len(s)<5)
     segments=[s for s in segments if len(s)>=5]
+    fallback=0;raw_distance=0.;distance=0.;seconds=0.
     for s in segments:
-        xy=np.array([[p["x_m"],p["y_m"]] for p in s]);sm=np.array([np.median(xy[max(0,i-2):i+3],axis=0) for i in range(len(xy))])
+        xy=np.array([[p["x_m"],p["y_m"]] for p in s]);sm=xy.copy()
+        for i in range(2,len(s)-2):sm[i]=np.median(xy[i-2:i+3],axis=0)
+        dt=np.diff([p["second"] for p in s])
+        raw_distance+=float(np.linalg.norm(np.diff(xy,axis=0),axis=1).sum())
+        if np.any(np.linalg.norm(np.diff(sm,axis=0),axis=1)>max_speed*dt+1e-9):
+            sm=xy;fallback+=1
         for p,v in zip(s,sm):p["x_m"],p["y_m"]=map(float,v)
-    seconds=sum(s[-1]["second"]-s[0]["second"] for s in segments)
-    distance=sum(sum(hypot(b["x_m"]-a["x_m"],b["y_m"]-a["y_m"]) for a,b in zip(s,s[1:])) for s in segments)
-    return {"segments":segments,"observed_seconds":round(seconds,3),"distance_m":round(distance,2) if seconds>=.5 else None,"rejected_jumps":rejected}
+        distance+=float(np.linalg.norm(np.diff(sm,axis=0),axis=1).sum())
+        seconds+=s[-1]["second"]-s[0]["second"]
+    return dict(segments=segments,observed_seconds=round(seconds,3),distance_m=round(distance,2) if seconds>=.5 else None,raw_distance_m=round(raw_distance,2) if seconds>=.5 else None,rejected_jumps=rejected,invalid_points=invalid,short_segment_points=short,smoothing_fallback_segments=fallback)
 
 def build_map(path,tracking,anchors,polygon,width=20.,length=25.,reference_second=0.,shots=()):
     cal=calibrate(anchors,width,length);cap=cv2.VideoCapture(str(path));cache={};quality=[]
