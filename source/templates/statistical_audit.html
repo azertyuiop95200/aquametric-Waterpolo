@@ -18,6 +18,7 @@
 {% for player in audit.players %}<details><summary>{{player.name}} · {{'Équipe' if player.side=='for' else 'Adversaire'}}</summary><div style="overflow-x:auto"><table class="metric-table"><thead><tr><th>Indicateur</th><th>Valeur</th><th>État / n</th></tr></thead><tbody>
 {% for row in player.metrics if row.state!='requires_evidence_or_model' %}<tr><td>{{row.label}}</td><td>{{row.value if row.value is not none else '—'}}</td><td>{{states[row.state]}}{% if row.denominator is not none %} · n={{row.denominator}}{% endif %}</td></tr>{% endfor %}
 </tbody></table></div></details>{% else %}<p>Pas d'action attribuée à une joueuse.</p>{% endfor %}
+{% if snapshot.tactical_sequences is defined %}{% include "tactical_sequence_metrics.html" %}{% endif %}
 {% if snapshot.lineup_performance is defined %}{% include "lineup_performance.html" %}{% endif %}
 {% if snapshot.motion_performance is defined %}{% include "motion_performance.html" %}{% endif %}
 {% if snapshot.advanced_observed is defined %}{% include "advanced_observed_metrics.html" %}{% endif %}<details><summary>Référentiels et méthodologie</summary><ul>{% for key,url in audit.sources.items() %}<li><a href="{{url}}" rel="noopener">{{key}}</a></li>{% endfor %}</ul><p>Le registre est exporté dans le JSON du match et dans statistical_audit.csv du ZIP. Il ne substitue pas les mesures externes aux événements vidéo.</p></details>
