@@ -218,6 +218,35 @@ def run_rapid_analysis(
         candidates = mapped_candidates
 
     summary = build_auto_summary(observations, periods, candidates)
+    # Full sequential audit of a local upload. Sparse OCR and previous maps
+    # remain separate diagnostics, not the claimed full-match measurements.
+    if source_kind == "upload":
+        import os
+        import tempfile
+        from services.continuous_match import scan
+        mode = os.getenv("AQUAMETRIC_ANALYSIS_MODE", "continuous")
+        if mode == "continuous":
+            job.message = "Analyse séquentielle de chaque image; pistes et ballon candidats."
+            job.progress = 60
+            db.commit()
+            def update_progress(n, expected):
+                if expected and n % 500 == 0:
+                    job.progress = min(97, 60 + int(37*n/expected))
+                    job.message = f"Images examinées : {n}/{expected}; aucune précision sportive garantie."
+                    db.commit()
+            try:
+                # Private temporary ledger, no public artifact or raw source image.
+                with tempfile.TemporaryDirectory(prefix="aquametric-full-") as tmp:
+                    result_full = scan(source_path, Path(tmp)/"frames.jsonl.gz", Path(tmp)/"summary.json", progress=update_progress)
+                # Keep bounded summary; per-frame trace remains available in local CLI.
+                result_full.pop("tracklet_records", None)
+                summary["continuous_coverage"] = result_full
+            except Exception:
+                db.rollback()
+                summary["continuous_coverage"] = {"status":"failed","frame_coverage_pct":None,"limitations":["Analyse continue interrompue. Ne pas assimiler la pré-analyse à un match complet."]}
+        else:
+            summary["continuous_coverage"] = {"status":"disabled","frame_coverage_pct":None}
+
     # A physical close-up is a separate scoreboard observation, not a goal
     # event, in-game clock or a mapping to the selected club.
     if source_kind == "upload":
@@ -243,7 +272,7 @@ def run_rapid_analysis(
         "scoreboard_observations": len(observations),
         "whistle_candidates": len(whistle_rows),
         "audio_scan": audio_state,
-        "speed_strategy": "2x browser ingest + source-timeline remap" if time_scale != 1.0 else "sparse visual sampling + bounded scoreboard OCR; no frame-by-frame full decode",
+        "speed_strategy": "Sequential upload audit, separate sparse OCR and local maps" if summary.get("continuous_coverage",{}).get("status")=="complete_decode" else ("2x browser ingest + source-timeline remap" if time_scale != 1.0 else "sparse visual sampling + bounded scoreboard OCR; continuous coverage not established"),
     })
     limitations = [
         "Automatic output is candidate evidence until cross-validated; it never replaces official truth.",

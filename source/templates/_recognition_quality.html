@@ -27,3 +27,9 @@
 <h3>Tableau de marque physique · lectures concordantes</h3>
 <p><strong>Bonnets blancs {{board.white_score}} – {{board.blue_score}} bonnets bleus</strong> · {{board.observations}} instants distincts, de {{board.start_second}} à {{board.end_second}} s vidéo. Score affiché uniquement, non attribué aux clubs ou aux joueuses. Ce total ne crée aucun événement de but. Le chronomètre général reste non résolu sur ces lectures.</p>
 {% endif %}
+{% set cc=(snapshot.automatic|default({})).get('summary',{}).get('continuous_coverage',{}) %}
+{% if cc %}<h2>Couverture de la vidéo · analyse continue</h2>
+{% if cc.status == 'complete_decode' %}<p><strong>{{cc.processed_frames}} / {{cc.expected_frames}} images ({{cc.frame_coverage_pct}} %)</strong> décodées et examinées séquentiellement. Ceci ne constitue pas une précision de reconnaissance de 100 %.</p>{% else %}<p>Couverture continue non établie ({{cc.status}}). Aucun total exhaustif ne peut être déduit.</p>{% endif %}
+{% if cc.counts %}<p>Images avec piste candidate : {{cc.counts.track_frames}} ; images avec objet ballon candidat : {{cc.counts.ball_candidate_frames}} ; pistes distinctes : {{cc.tracklets}} (pas des identités). Détection bonnet tous les {{cc.cap_detection_every_frames}} frames, propagation optique entre les détections.</p>
+<details><summary>Couverture par tranche de 10 secondes</summary><table class="metric-table"><thead><tr><th>Vidéo (s)</th><th>Images</th><th>Avec piste</th><th>Avec candidat ballon</th></tr></thead><tbody>{% for b in cc.bins %}<tr><td>{{b.start_s}}</td><td>{{b.frames}}</td><td>{{b.track_frames}}</td><td>{{b.ball_candidate_frames}}</td></tr>{% endfor %}</tbody></table></details>{% endif %}
+{% for warning in cc.limitations|default([]) %}<p>{{warning}}</p>{% endfor %}{% endif %}

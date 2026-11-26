@@ -1,7 +1,7 @@
 name: Elite performance and extended guest checks
 on:
   push:
-    branches: [fix/youtube-report-intake-2026-11, feature/elite-performance-2026]
+    branches: [fix/youtube-report-intake-2026-11, feature/elite-performance-2026, feature/continuous-match-2026]
     paths: ['source/**','.github/workflows/elite-performance-ci.yml']
   workflow_dispatch:
 permissions:
@@ -34,6 +34,7 @@ jobs:
           python -m unittest discover -s tests -p test_physical_board.py -v
           python -m unittest discover -s tests -p test_report_coverage.py -v
           python -m unittest discover -s tests -p test_sample_coverage.py -v
+          python -m unittest discover -s tests -p test_continuous_match.py -v
       - working-directory: source
         run: |
           python - <<'PY'
