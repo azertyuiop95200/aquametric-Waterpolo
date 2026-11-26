@@ -1,7 +1,7 @@
 name: Elite performance calculations
 on:
   push:
-    branches: [fix/youtube-report-intake-2026-11]
+    branches: [fix/youtube-report-intake-2026-11, feature/elite-performance-2026]
     paths: ['source/services/elite_performance.py','source/tests/test_elite_performance.py','source/templates/_elite_performance.html','source/main.py','.github/workflows/elite-performance-ci.yml']
   workflow_dispatch:
 permissions:
