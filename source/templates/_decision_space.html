@@ -31,7 +31,7 @@ if(box.dataset.bound)return;box.dataset.bound="1";
 const d=JSON.parse(box.querySelector("[data-scene-json]").textContent),svg=box.querySelector("[data-scene]"),goal=box.querySelector("[data-goal]"),orbit=box.querySelector("[data-orbit]"),tilt=box.querySelector("[data-tilt]");
 function draw(){
 const sc=d.row.scenarios[Number(goal.value)],a=d.row.points.find(p=>p.actor),L=d.length,W=d.width;
-const A=Number(orbit.value)*Math.PI/180,T=Number(tilt.value)*Math.PI/180,S=530/Math.hypot(L,W);
+const A=Number(orbit.value)*Math.PI/180,T=Number(tilt.value)*Math.PI/180,S=380/Math.hypot(L,W);
 function project(x,y,z=0){x-=L/2;const u=x*Math.cos(A)-y*Math.sin(A),v=x*Math.sin(A)+y*Math.cos(A);return [320+S*u,220+S*(v*Math.sin(T)-z*Math.cos(T))]}
 function add(tag,attrs,txt){const el=document.createElementNS(ns,tag);Object.entries(attrs).forEach(([k,v])=>el.setAttribute(k,String(v)));if(txt!==undefined)el.textContent=txt;svg.appendChild(el);return el}
 function line(a,b,color,w=1.5,dash=""){const p=project(...a),q=project(...b);add("line",{x1:p[0],y1:p[1],x2:q[0],y2:q[1],stroke:color,"stroke-width":w,"stroke-dasharray":dash})}
