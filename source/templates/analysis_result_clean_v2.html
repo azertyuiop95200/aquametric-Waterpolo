@@ -198,6 +198,10 @@
       <label>Valeur<input name="metric_value" type="number" min="0" step="0.001"></label>
       <label><input type="checkbox" name="metric_calibrated" value="yes"> Valeur issue d'une mesure métrique calibrée</label>
       </div><p>Utiliser le même identifiant de possession et un identifiant unique par geste. Renseigner l'horloge réelle pour chaque action. Ne pas déclarer une couverture exhaustive sans vérification.</p></details>
+      <details style="margin:12px 0"><summary>Validation du quart : compositions et score</summary>
+      <p>Uniquement avec « Fin quart », chrono réel 0 s. Annoter chaque entrée et sortie, y compris les présences initiales à 480 s et finales à 0 s, ainsi que les exclusions et retours. Confirmer les buts séparément pour chaque équipe.</p>
+      <label><input type="checkbox" name="lineups_complete" value="yes"> Toutes les présences de mon équipe sur ce quart sont renseignées</label>
+      <label><input type="checkbox" name="goals_complete" value="yes"> Tous les buts de l'équipe sélectionnée sur ce quart sont renseignés</label></details>
       <p class="evidence-note">Position du tir (facultative) : sélectionne un point sur la <a href="#spatialDashboard">carte du bassin</a> juste au-dessus. Sans point réellement observé, l'action reste enregistrée sans coordonnées et n'est pas affichée sur la heatmap.</p>
       <label style="display:block;margin:12px 0"><input type="checkbox" name="observed" value="1" required> J'ai réellement observé cet événement dans la vidéo ou sur une feuille de match vérifiable.</label>
       <div class="actions" style="gap:9px">
