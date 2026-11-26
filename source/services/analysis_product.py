@@ -396,6 +396,8 @@ def analysis_snapshot(db, match):
     from services.lineup_performance import lineup_report, phase_context_report
     snapshot["lineup_performance"] = lineup_report(snapshot["verified_events"],roster)
     snapshot["phase_context"] = phase_context_report(snapshot["verified_events"])
+    from services.tactical_sequence_metrics import sequence_report
+    snapshot["tactical_sequences"] = sequence_report(snapshot["verified_events"])
     from services.video_action_report import action_report
     snapshot["video_actions"] = action_report(db, match)
     from services.identity_aggregation import build_identity_report
@@ -415,6 +417,8 @@ def analysis_snapshot(db, match):
     enrich_audit(snapshot["statistical_audit"],snapshot["advanced_observed"],snapshot["identity_analysis"],snapshot["statistics"])
     from services.statistical_audit import enrich_lineups
     enrich_lineups(snapshot["statistical_audit"],snapshot["lineup_performance"],snapshot["phase_context"])
+    from services.statistical_audit import enrich_sequences
+    enrich_sequences(snapshot["statistical_audit"],snapshot["tactical_sequences"])
     # Basic counters over an empty event set are implementation zeros, not
     # measured match statistics. Apply the same contract to JSON/CSV and HTML.
     for side in ("team", "opponent"):
@@ -560,6 +564,7 @@ def build_analysis_zip(db, match, evidence_dir: Path) -> io.BytesIO:
         audit_export=[dict(row, side=side, player_id=None) for side in ("team","opponent") for row in audit[side]]
         audit_export.extend(dict(row, side=p["side"], player_id=p["player_id"]) for p in audit["players"] for row in p["metrics"])
         archive.writestr(f"{root}/02_kpis/lineup_performance.json",json.dumps(snapshot["lineup_performance"],ensure_ascii=False,indent=2))
+        archive.writestr(f"{root}/02_kpis/tactical_sequences.json",json.dumps(snapshot["tactical_sequences"],ensure_ascii=False,indent=2))
         archive.writestr(f"{root}/02_kpis/phase_context.json",json.dumps(snapshot["phase_context"],ensure_ascii=False,indent=2))
         archive.writestr(f"{root}/02_kpis/motion_performance.json", json.dumps(snapshot["motion_performance"],ensure_ascii=False,indent=2))
         archive.writestr(f"{root}/02_kpis/advanced_observed.json", json.dumps(snapshot["advanced_observed"],ensure_ascii=False,indent=2))
