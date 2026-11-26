@@ -4,6 +4,7 @@ A manual seed or a colour proposal is not a verified roster identity.
 import cv2
 import numpy as np
 from math import hypot
+from services.cap_reading import crop_observation, select_reading_frames
 
 
 def cap_proposals(frame):
@@ -38,6 +39,7 @@ def track_frames(frames,seeds=None,max_gap=.25):
             for i,p in enumerate(seeds if seeds is not None else cap_proposals(frame)):
                 if not (0<=p['x']<=1 and 0<=p['y']<=1):continue
                 track={'id':i+1,'colour':p.get('colour','unknown'),'cap_number':None,'team':None,'origin':'manual_seed' if seeds is not None else 'colour_candidate','points':[{'second':round(t,3),'x':p['x'],'y':p['y']}]}
+                track['reading_frames']=[crop_observation(frame,track['points'][-1])]
                 active[i+1]=(np.array([p['x']*w,p['y']*h],dtype=np.float32),track); all_tracks.append(track)
         elif t-last>max_gap or prev.shape!=gray.shape or float(np.mean(cv2.absdiff(prev,gray)))>45:
             break
@@ -54,8 +56,11 @@ def track_frames(frames,seeds=None,max_gap=.25):
                 if not st[k,0] or not st2[k,0] or error>1.25 or move>max(w,h)*.045 or near or not(0<=x<w and 0<=y<h):
                     active.pop(i,None);continue
                 track=active[i][1]; track['points'].append({'second':round(t,3),'x':round(x/w,5),'y':round(y/h,5)});active[i]=(new[k,0],track)
+                track['reading_frames'].append(crop_observation(frame,track['points'][-1]))
         prev=gray;last=t;n+=1
         if not active:break
+    for tr in all_tracks:
+        tr['reading_frames']=select_reading_frames(tr['reading_frames'])
     return [tr for tr in all_tracks if len(tr['points'])>=5],n
 
 
@@ -66,13 +71,13 @@ def scan_player_windows(path,duration,moments,seeds=None,max_windows=3):
         starts=[0.] if seeds is not None else [0.]+[max(0,float(m.get('second',0))-1) for m in moments[:8]]
         for start in starts:
             if len(windows)>=max_windows:break
-            end=min(float(duration),start+3.)
+            end=min(float(duration),start+6.)
             if end-start<.5 or any(start<x['end'] and end>x['start'] for x in windows):continue
             def frames():
                 for t in np.arange(start,end,.125):
                     cap.set(cv2.CAP_PROP_POS_MSEC,float(t)*1000);ok,f=cap.read()
                     if ok and f is not None:
-                        if f.shape[1]>960:f=cv2.resize(f,(960,round(f.shape[0]*960/f.shape[1])))
+                        if f.shape[1]>1280:f=cv2.resize(f,(1280,round(f.shape[0]*1280/f.shape[1])))
                         yield float(t),f
             rows,n=track_frames(frames(),seeds)
             for tr in rows:tr['id']=len(tracks)+1;tr['window']=len(windows)+1;tracks.append(tr)
