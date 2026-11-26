@@ -26,6 +26,11 @@ def metric_table(rows):
     # Ratio zero is meaningful only where denominator actually exists.
     for k in ("shot_conversion","shot_accuracy","pass_accuracy","duel_pct","save_pct","attack_conversion","penalty_conversion","power_play_conversion","penalty_kill_success"):
         values[k]=stats.get(k)
+    # A zero numerator within a nonempty observed family is meaningful for
+    # that sample; do not turn it into a whole-match zero.
+    if stats.get("pass_attempts"):
+        for k in ("passes","bad_passes","pass_attempts"):
+            values[k]=stats[k]
     return {"metrics":values,"families":families,"event_count":len(rows),"scope":"partial_sample"}
 
 def report_coverage(confirmed,automatic,roster):

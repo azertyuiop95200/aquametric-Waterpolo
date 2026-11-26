@@ -168,12 +168,12 @@ def action_report(db, match, *, run=None):
     segments = json.loads(run.segments_json or "[]")
     rows = []
     visibility = defaultdict(list)
-    processed = 0
+    processed_intervals = []
     for segment in segments:
         payload = segment.get("result", {})
         if segment["status"] == "complete":
             if payload.get("scene") in {"water_polo", "mixed"}:
-                processed += segment["end"] - segment["start"]
+                processed_intervals.append((segment["start"], segment["end"]))
             for action in payload.get("actions", []):
                 rows.append({**action, "counted": action["confidence"] >= .65 and payload.get("scene") in {"water_polo","mixed"} and not action.get("is_replay")})
             for item in payload.get("observability", []):
@@ -182,6 +182,8 @@ def action_report(db, match, *, run=None):
                                    "status": segment["status"], "summary": payload.get("summary", ""),
                                    "scene": payload.get("scene", ""), "error": segment.get("error", ""),
                                    "error_code": segment.get("error_code", ""), "ignored": payload.get("ignored", {})})
+    from services.sample_coverage import interval_union_seconds
+    processed = interval_union_seconds(processed_intervals, run.duration_seconds)
     rows = canonical_actions(rows)
     for action in rows:
         identity = [run.id, action["segment_index"], action["second"], action["event_type"], action["side"], action["cap_number"]]

@@ -64,6 +64,33 @@ def track_frames(frames,seeds=None,max_gap=.25):
     return [tr for tr in all_tracks if len(tr['points'])>=5],n
 
 
+def track_seed_bidirectional(before, after, seeds):
+    """Both sequences start at the same reviewed seed frame. Before is
+    reverse chronological, after chronological. Do not reconnect lost IDs."""
+    from itertools import chain
+    def run(frames, reverse=False):
+        # Map the reverse time axis to increasing values for LK validation.
+        mapped=(((-t if reverse else t),frame) for t,frame in frames)
+        tracks,n=track_frames(mapped,seeds)
+        if reverse:
+            for tr in tracks:
+                for p in tr["points"]:p["second"]=-p["second"]
+                tr["points"].reverse()
+                for p in tr["reading_frames"]:p["second"]=-p["second"]
+                tr["reading_frames"].sort(key=lambda p:p["second"])
+        return tracks,n
+    left,n1=run(before,True);right,n2=run(after)
+    merged={}
+    for tr in chain(left,right):
+        if tr["id"] not in merged:
+            merged[tr["id"]]=tr
+        else:
+            dest=merged[tr["id"]]
+            dest["points"]=sorted({p["second"]:p for p in dest["points"]+tr["points"]}.values(),key=lambda p:p["second"])
+            dest["reading_frames"]=select_reading_frames(dest["reading_frames"]+tr["reading_frames"])
+    return list(merged.values()),n1+n2
+
+
 def scan_player_windows(path,duration,moments,seeds=None,max_windows=3):
     cap=cv2.VideoCapture(str(path)); tracks=[]; windows=[]
     if not cap.isOpened():cap.release();return {'status':'unreadable','tracks':[],'windows':[]}
