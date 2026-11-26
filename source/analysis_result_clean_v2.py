@@ -93,6 +93,8 @@ def download_analysis_report(match_id: int, request: Request, db: Session = Depe
     attach_export_clips(snapshot['video_actions'], export_media)
     return TEMPLATES.TemplateResponse(request, 'analysis_report_portable.html', {
         'match': match, 'snapshot': snapshot,
+        'spatial_reviews': saved_reviews(db, match),
+        'spatial_eligible_count': len(eligible(match)),
         'generated_at': datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC'),
         'for_verified': _verified_side(snapshot['verified_events'], 'for'),
         'against_verified': _verified_side(snapshot['verified_events'], 'against'),
