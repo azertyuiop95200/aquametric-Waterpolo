@@ -37,7 +37,7 @@ def spatial_match_dashboard(db, match, segments):
         position=positions.get(event.id)
         from services.ultimate_analytics import note_tags
         raw_period=position.period if position and position.period else note_tags(event).get("period")
-        period=int(raw_period) if str(raw_period) in {"1","2","3","4"} else None
+        period=int(raw_period) if str(raw_period) in {"1","2","3","4","5","6","7","8"} else None
         if period is None: unknown_period_events+=1
         segment=indexes.get(position.segment_id) if position and position.segment_id else legacy
         second=round(float(position.segment_second if position and position.segment_second is not None
