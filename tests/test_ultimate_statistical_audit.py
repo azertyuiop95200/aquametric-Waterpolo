@@ -34,7 +34,7 @@ class AuditTests(unittest.TestCase):
     def test_possession_rebound_not_terminal(self):
         r=[e(1,"possession_start","period=1 game_clock_s=440 possession=p"),
            e(2,"shot_on_target","period=1 game_clock_s=435 possession=p"),
-           e(3,"pass_complete","period=1 game_clock_s=430 possession=p"),
+           e(3,"pass_complete","period=1 game_clock_s=430 possession=p action_id=a"),
            e(4,"goal","period=1 game_clock_s=420 possession=p"),
            e(5,"possession_end","period=1 game_clock_s=420 possession=p outcome=goal passes_complete=yes")]
         out=advanced_report(r,[])["sides"]["for"]
@@ -51,6 +51,23 @@ class AuditTests(unittest.TestCase):
         n=pass_network(r,{1,2})
         self.assertEqual(n["edges"][0]["count"],1)
         self.assertEqual(n["rejected_or_unlinked"],2)
+    def test_conflicting_pass(self):
+        r=[e(1,"pass_complete","receiver_id=2 action_id=a"),e(2,"assist","receiver_id=3 action_id=a")]
+        n=pass_network(r,{1,2,3})
+        self.assertEqual(n["edges"],[])
+        self.assertEqual(len(n["conflicts"]),1)
+    def test_overlap_possessions(self):
+        r=[e(1,"possession_start","period=1 game_clock_s=440 possession=p"),
+           e(2,"possession_end","period=1 game_clock_s=420 possession=p outcome=save"),
+           e(3,"possession_start","period=1 game_clock_s=430 possession=q"),
+           e(4,"possession_end","period=1 game_clock_s=410 possession=q outcome=goal")]
+        self.assertEqual(complete_possessions(r),([],2))
+    def test_duplicate_pass_in_possession(self):
+        r=[e(1,"possession_start","period=1 game_clock_s=440 possession=p"),
+           e(2,"pass_complete","period=1 game_clock_s=430 possession=p action_id=a"),
+           e(3,"assist","period=1 game_clock_s=430 possession=p action_id=a"),
+           e(4,"possession_end","period=1 game_clock_s=420 possession=p outcome=goal passes_complete=yes")]
+        self.assertEqual(complete_possessions(r)[0][0]["passes"],1)
     def test_tsap(self):
         r=[e(1,"touch","tsap=rb action_id=a tsap_coverage=complete"),e(2,"touch","tsap=ob action_id=b")]
         t=tsap(r);self.assertEqual(t["volume_play"],1);self.assertEqual(t["efficiency_index"],.1);self.assertEqual(t["performance_score"],1.5)
