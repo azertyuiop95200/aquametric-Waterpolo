@@ -12,6 +12,7 @@
 <p>Les tirs incluent les buts. Chaque événement représente une tentative distincte. Aucun score final ou taux d’efficacité global ne peut être déduit sans couverture complète.</p>
 <h2>Chronologie des événements confirmés</h2>{% if snapshot.verified_events %}<table><thead><tr><th>Temps source (s)</th><th>Action / joueuse</th><th>Preuve / note</th></tr></thead><tbody>{% for e in snapshot.verified_events %}<tr><td>{{e.second}}</td><td>{{e.event_type}} · {{e.player or 'Non attribuée'}}</td><td>{{e.source}} · {{e.note}}</td></tr>{% endfor %}</tbody></table>{% else %}<p>Aucune action confirmée enregistrée.</p>{% endif %}
 <h2>Candidats automatiques</h2>{% for e in snapshot.automatic.candidates %}<p>{{e.second}} s · {{e.event_type}} · confiance {{e.confidence}} : {{e.summary}}</p>{% else %}<p>Aucun candidat disponible.</p>{% endfor %}
+<h2>Relectures décisionnelles 3D</h2>{% include 'spatial_report_rows.html' %}
 <h2>Limites et suite de l’analyse</h2><p>Identités, postes, tactiques, transitions, temps de jeu, distances et vitesses doivent être étayés par des observations ou mesures explicites. Les données absentes restent non mesurées. Ce rapport ne remplace pas la sauvegarde des fichiers vidéo.</p>{% for limitation in snapshot.vision.limitations %}<p>{{limitation}}</p>{% endfor %}
 <p>Pour compléter un dossier sans pixels : importer une vidéo accessible, ou reprendre une capture d’onglet sur ordinateur compatible ; vérifier ensuite les candidats et attribuer les actions. Les constats tactiques doivent renvoyer à des séquences précises.</p>
 </html>
