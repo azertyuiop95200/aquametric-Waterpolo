@@ -57,3 +57,16 @@
 {% endfor %}
 <details><summary>Contrôles des attributions</summary>{% for k,v in lp.excluded.items() %}<p>{{k}} : {{v}}</p>{% endfor %}</details>
 {% endif %}
+
+{% set pp=(snapshot.video_actions|default({})).get('possession_performance',{}) %}
+{% if pp %}
+<h2>Efficacité des possessions complètes observées</h2>
+<p>Échantillon candidat limité aux possessions dont les deux bornes sont observées dans une même séquence de visibilité déclarée suffisante. Les rebonds offensifs ne créent pas une nouvelle possession. Les taux décrivent cet échantillon, pas tout le match.</p>
+{% macro posval(x) %}{{x if x is not none else '—'}}{% endmacro %}
+{% for side,name in [('for',match.team.name),('against',match.opponent)] %}{% set t=pp.teams[side] %}
+<h3>{{name}}</h3>
+<div style="overflow:auto"><table class="metric-table"><thead><tr><th>Situation</th><th>Possessions</th><th>Buts</th><th>Issues non résolues</th><th>Buts / possession (%)</th><th>Durée moyenne (s de jeu)</th><th>Passes détectées / possession</th><th>Tirs détectés / possession</th></tr></thead><tbody>
+{% for label,r in [('Toutes les possessions retenues',t.overall),('Égalité',t.numerical.equal),('Supériorité',t.numerical.advantage),('Infériorité',t.numerical.disadvantage),('Effectif changeant ou non résolu',t.numerical.unresolved_or_changing)] %}<tr><td>{{label}}</td>{% for k in ['possessions','goals','unresolved_outcomes','goal_pct','mean_game_seconds','detected_passes_per_possession','detected_shots_per_possession'] %}<td>{{posval(r[k])}}</td>{% endfor %}</tr>{% endfor %}</tbody></table></div>
+{% if t.overall.outcomes %}<h4>Fins de possession recensées</h4>{% set labels={'goal':'But','save':'Arrêt','off_target':'Non cadré','post':'Poteau / barre','blocked':'Contré','bad_pass':'Mauvaise passe','steal':'Interception','offensive_foul':'Faute offensive','shot_clock':'Fin du chrono','handling':'Erreur technique','period_end':'Fin de période','unknown':'Non résolue'} %}<table class="metric-table"><tbody>{% for k,v in t.overall.outcomes.items() %}<tr><td>{{labels.get(k,k)}}</td><td>{{v}}</td></tr>{% endfor %}</tbody></table>{% endif %}
+{% endfor %}
+{% endif %}

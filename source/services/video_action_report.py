@@ -221,6 +221,8 @@ def action_report(db, match, *, run=None):
     result["lineup_exposure"] = lineup_report(lineup_rows)
     from services.lineup_performance import analyze_performance
     result["lineup_performance"] = analyze_performance(rows, result["lineup_exposure"])
+    from services.possession_performance import complete_possessions
+    result["possession_performance"] = complete_possessions(rows, segments, result["lineup_exposure"])
     result["families"] = [{"key": key, "label": label, "observations": visibility[key]} for key, label in FAMILIES.items()]
     return result
 
