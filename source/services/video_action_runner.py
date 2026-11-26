@@ -89,6 +89,13 @@ def normalize_observations(payload: dict, segment: dict) -> dict:
         if not segment["start"] <= second < segment["end"]:
             ignored["overlap"] += 1
             continue
+        for key in ("actor_position","receiver_position"):
+            p=event.get(key)
+            if p is not None:
+                if not 0<=p["second"]<segment["clip_end"]-segment["clip_start"]:
+                    event[key]=None
+                else:
+                    p["second"]=round(p["second"]+segment["clip_start"],3)
         event["second"] = round(second, 3)
         event["segment_index"] = segment["index"]
         # Literal duplicates are safely removed; close-in-time shots or passes
@@ -116,6 +123,8 @@ def normalize_observations(payload: dict, segment: dict) -> dict:
 def _segment_work(source, segment, team, opponent, deadline):
     try:
         with tempfile.TemporaryDirectory(prefix="aquametric-actions-") as folder:
+            from services.spatial_attribution import source_revision
+            revision=source_revision(source)
             target = Path(folder) / "segment.mp4"
             with _ENCODE_LOCK:
                 remaining = deadline - time.monotonic()
@@ -126,7 +135,11 @@ def _segment_work(source, segment, team, opponent, deadline):
             if remaining < 5:
                 raise VideoActionError("budget", "Limite de temps atteinte ; les séquences restantes pourront être reprises.")
             payload = analyze_video_segment(target, team=team, opponent=opponent, timeout=min(75, remaining))
-            return {"status": "complete", "result": normalize_observations(payload, segment)}
+            normalized=normalize_observations(payload, segment)
+            # Only original, uncropped, unwarped time and image coordinates.
+            if (revision and revision==source_revision(source) and segment["panes"]==1 and abs(segment["rate"]-1)<1e-8 and abs(segment["capture_start"]-segment["clip_start"])<1e-6):
+                normalized["source_revision"]=revision
+            return {"status": "complete", "result": normalized}
     except VideoActionError as exc:
         return {"status": "failed", "error_code": exc.code, "error": str(exc)}
     except Exception:

@@ -179,7 +179,7 @@ def action_report(db, match, *, run=None):
                 control_rows.extend(payload.get("ball_control", []))
                 lineup_rows.extend(payload.get("lineups", []))
             for action in payload.get("actions", []):
-                rows.append({**action, "counted": action["confidence"] >= .65 and payload.get("scene") in {"water_polo","mixed"} and not action.get("is_replay")})
+                rows.append({**action, "source_revision":payload.get("source_revision") if run.source_kind=="upload" else None, "counted": action["confidence"] >= .65 and payload.get("scene") in {"water_polo","mixed"} and not action.get("is_replay")})
             for item in payload.get("observability", []):
                 visibility[item["family"]].append({**item, "start": segment["start"], "end": segment["end"]})
         result["segments"].append({"index": segment["index"], "start": segment["start"], "end": segment["end"],

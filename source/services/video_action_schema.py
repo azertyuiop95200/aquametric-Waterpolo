@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-VERSION = "video-actions-v4-lineup-performance"
+VERSION = "video-actions-v5-spatial-attribution"
 
 EVENT_LABELS = {
     "goal": "But", "shot_on_target": "Tir cadré arrêté", "shot_off_target": "Tir non cadré",
@@ -40,6 +40,13 @@ class ObservationModel(BaseModel):
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
 
+class ActorPosition(ObservationModel):
+    second: float = Field(ge=0)
+    x: float = Field(ge=0,le=1)
+    y: float = Field(ge=0,le=1)
+    evidence: str = Field(min_length=12,max_length=400)
+
+
 class ActionObservation(ObservationModel):
     second: float = Field(ge=0, description="Seconds from the beginning of THIS clip, not the match clock.")
     event_type: ActionType
@@ -60,6 +67,8 @@ class ActionObservation(ObservationModel):
     hand: Literal["left", "right", "unknown"] = "unknown"
     shot_type: Literal["direct", "lob", "skip", "backhand", "redirect", "penalty", "unknown"] = "unknown"
     pass_type: Literal["perimeter", "centre_entry", "cross", "through", "back", "long", "restart", "unknown"] = "unknown"
+    actor_position: ActorPosition | None = None
+    receiver_position: ActorPosition | None = None
     receiver_cap_number: int | None = Field(default=None, ge=1, le=30)
     receiver_evidence: str = Field(default="", max_length=400)
     pass_method: Literal["dry","wet","hand_off","unknown"] = "unknown"
@@ -86,6 +95,10 @@ class ActionObservation(ObservationModel):
             self.cap_colour = "unknown"
         if not self.receiver_evidence.strip() or self.side == "unknown" or self.event_type not in {"pass_complete","assist","key_pass"} or self.receiver_cap_number == self.cap_number:
             self.receiver_cap_number = None
+        if self.actor_position and abs(self.actor_position.second-self.second)>.15:
+            self.actor_position=None
+        if self.event_type not in {"pass_complete","assist","key_pass"} or (self.receiver_position and not self.second<=self.receiver_position.second<=self.second+12):
+            self.receiver_position=None
         if self.event_type not in {"pass_complete","assist","key_pass","bad_pass","pass_unknown"}:
             self.pass_method = "unknown"
             self.pass_flight_seconds = None
@@ -191,6 +204,7 @@ Pour la synthèse tactique, distingue press individuel, aide latérale 1–2 / 4
 Dans ball_control, retourne les intervalles pendant lesquels une joueuse contrôle visiblement le ballon, en secondes locales start_second/end_second. Commence à la réception maîtrisée, à une récupération ou à une prise de contrôle visible ; termine au lâcher, à la perte de contrôle, à l'interruption ou lorsque la visibilité devient insuffisante. Inclure la conduite à la nage si le contrôle est visible. Ne pas inclure le vol du ballon, un rebond libre, une simple proximité, une lutte sans maîtrise claire, une coupure ni une rediffusion. N'utilise pas simplement le temps entre deux actions. Ne prolonge pas un intervalle derrière une occultation. Si le début ou la fin est hors du cadre temporel, limite l'intervalle à la partie observée. Identifie séparément équipe et numéro avec preuves, ou unknown/null. Les durées sont du temps vidéo observé, pas du temps de jeu officiel.
 Dans lineups, propose uniquement des intervalles de composition complète et constante d'une équipe, gardienne comprise, lorsque les numéros ET les bornes du chronomètre GENERAL descendant ET la période sont lisibles, et les rotations surveillées sans interruption. Indique les temps vidéo locaux start_second/end_second et les deux lectures clock_start/clock_end en secondes de jeu restantes. Ne confonds pas le chronomètre de possession (28/18 s) avec le chrono général. Ne suppose pas qu'une période dure huit minutes : selon la compétition sa durée peut différer. Sépare les intervalles au changement de composition, à la coupure, au changement de période ou à la perte de visibilité. Une joueuse hors cadre n'est pas forcément sur le banc. in_play contient les numéros de toutes les joueuses en jeu de cette équipe, y compris gardienne. excluded contient seulement les numéros dont l'exclusion est explicitement visible pendant tout l'intervalle ; ne déduis pas les exclusions d'un effectif réduit. N'invente pas de numéro ou de retour à 18 secondes. complete_lineup=true uniquement avec preuves de continuité, équipe et chrono. Si une composition complète n'est pas discernable, ne produis pas d'intervalle. Exclure les ralentis et rediffusions.
 Pour la famille possessions, status=visible uniquement si les prises de contrôle, transitions, pertes de contrôle et fins d'attaque sont suivies sans coupure ou occultation significative dans le segment. Lorsque possible, relève possession_start et possession_end pour la même équipe, avec période et lectures du chrono général aux deux bornes. Un rebond offensif n'est pas une nouvelle possession. Si le début ou la fin manque, ne l'invente pas. Une issue goal doit être corroborée par l'événement goal dans cette même possession. Un intervalle sans preuve de continuité ne peut pas servir au calcul d'efficacité par possession.
+Pour chaque action individuelle, même lorsque le bonnet est illisible, fournis actor_position si la tête de l'actrice est visible au moment exact de l'action : coordonnées normalisées x,y de 0 à 1 (origine en haut à gauche de l'image complète), second local et preuve visuelle. Pour une passe réussie, receiver_position est la tête de la destinataire à son propre instant de réception maîtrisée, pas la position du ballon ni celle de la passeuse. Si tête, rôle ou instant sont masqués, laisse null. Ne transforme pas une proximité en attribution.
 Rends la visibilité et ses limites pour chacune des familles: {', '.join(FAMILIES)}.
 Une absence de détection n'est pas la preuve d'un zéro. Ni distance métrique, vitesse,
 temps de jeu complet, fatigue, note globale, ni total extrapolé: le modèle ne les mesure

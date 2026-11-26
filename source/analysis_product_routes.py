@@ -529,7 +529,13 @@ def metric_calibration(match_id: int, request: Request, payload: dict, db: Sessi
     if not _METRIC_SLOT.acquire(blocking=False):
         raise HTTPException(429,"Une calibration est déjà en cours sur le serveur.")
     try:
+        from services.spatial_attribution import source_revision
+        revision=source_revision(source)
+        if tracking.get("source_revision") and tracking["source_revision"]!=revision:
+            raise HTTPException(409,"La vidéo a changé : relancer le suivi avant la calibration.")
         result=build_map(source,tracking,anchors,polygon,width,length,reference,shots)
+        if revision and revision==source_revision(source) and tracking.get("source_revision")==revision:
+            result["source_revision"]=revision
         result["calibration_provenance"]="manual_reviewed_anchors"
         if not result["aligned_frames"]:
             raise HTTPException(422,"Aucun raccord caméra accepté. Revoir les repères du décor.")

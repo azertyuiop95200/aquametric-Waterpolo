@@ -66,3 +66,12 @@
 {% endif %}
 {% endif %}
 {% include "_report_coverage.html" %}
+
+{% set sa=snapshot.spatial_attribution|default({}) %}
+{% if sa %}
+<h2>Attribution des actions par trajectoire</h2>
+<p>Rapprochements candidats avec une piste revue : {{sa.counts.get('actor_new_candidate',0)}} actrices nouvellement proposées, {{sa.counts.get('actor_corroborated',0)}} concordances, {{sa.counts.get('receiver_new_candidate',0)}} receveuses nouvellement proposées. Aucune action n'est confirmée automatiquement. Les pistes concurrentes, les changements de vidéo et les conflits de numéros bloquent l'attribution.</p>
+{% if sa.players %}<table class="metric-table"><thead><tr><th>Équipe / bonnet</th><th>Actions concordantes avec une piste revue</th></tr></thead><tbody>{% for p in sa.players %}<tr><td>{{match.team.name if p.side=='for' else match.opponent}} · {{p.cap}}</td><td>{% for k,v in p.events.items() %}{{k}} : {{v}}{% if not loop.last %} · {% endif %}{% endfor %}</td></tr>{% endfor %}</tbody></table>{% endif %}
+{% if sa.pass_ledger %}{% for side,name in [('for',match.team.name),('against',match.opponent)] %}{% set p=sa.pass_ledger.teams[side] %}{% if p.network %}<h3>{{name}} · réseau de passes candidat réattribué</h3><table class="metric-table"><thead><tr><th>Passeuse</th><th>Receveuse</th><th>Transmissions</th></tr></thead><tbody>{% for r in p.network %}<tr><td>{{r['from']}}</td><td>{{r['to']}}</td><td>{{r.count}}</td></tr>{% endfor %}</tbody></table>{% endif %}{% endfor %}{% endif %}
+<details><summary>Diagnostic des attributions</summary>{% for k,v in sa.counts.items() %}<p>{{k}} : {{v}}</p>{% endfor %}</details>
+{% endif %}

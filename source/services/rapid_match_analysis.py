@@ -171,7 +171,11 @@ def run_rapid_analysis(
     if source_kind == "upload":
         try:
             from services.player_tracking import scan_player_windows
+            from services.spatial_attribution import source_revision
+            revision=source_revision(source_path)
             player_tracking = scan_player_windows(source_path, result.duration_seconds, result.interesting_moments)
+            if revision and revision==source_revision(source_path):
+                player_tracking["source_revision"]=revision
         except Exception:
             player_tracking = {"status":"unavailable","tracks":[],"windows":[]}
     periods = infer_periods(observations, result.duration_seconds)
