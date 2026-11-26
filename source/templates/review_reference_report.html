@@ -9,7 +9,7 @@
 {% for e in p.events %}<tr><td>{{e.id}}</td><td>{{e.time}}</td><td>{{e.location.file}} / {{e.location.local_s}} s</td><td>{{e.side}}</td><td>{{e.cause}}</td><td>{{e.state}}</td><td>{{e.observation}}</td></tr>{% endfor %}
 </tbody></table></details>
 <details><summary>Fenêtres de possession</summary><table><thead><tr><th>ID</th><th>Temps global</th><th>Avant → après</th><th>Constat</th><th>Observation</th></tr></thead><tbody>
-{% for e in p.intervals %}<tr><td>{{e.id}}</td><td>{{e.start}}–{{e.end}}</td><td>{{e.before}} → {{e.after}}</td><td>{{e.status}}</td><td>{{e.observation}}</td></tr>{% endfor %}
+{% for e in p.intervals %}<tr><td>{{e.id}}</td><td>{{e.start}}–{{e.end}}</td><td>{{e.before}} → {{e.after}}</td><td>{{ {'opposite_endpoints':'Contrôles opposés','same_team_endpoints':'Même équipe aux bornes','probable_opposite_endpoints':'Changement probable','unresolved':'Indéterminé'}.get(e.status,e.status) }}</td><td>{{e.observation}}</td></tr>{% endfor %}
 </tbody></table></details>
 {% else %}<p>Aucune référence vidéo importée.</p>{% endfor %}
 </section>
