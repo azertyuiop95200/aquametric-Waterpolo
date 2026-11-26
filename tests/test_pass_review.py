@@ -82,3 +82,29 @@ class PassReviewTests(unittest.TestCase):
         h=env.get_template("review_reference_report.html").render(snapshot={"review_references":[dict(period=1,digest="a"*64,report=s)]})
         self.assertIn("Passes — référence vidéo partielle",h);self.assertIn("&lt;script&gt;",h);self.assertNotIn("<script>",h)
         self.assertIn("PA1",h)
+
+    def manifest(self):
+        p=sample();p["reference"]["evidence_manifest"]=[
+            dict(id="G1",kind="source",path="preuves/goal.jpg",sha256="a"*64,bytes=100),
+            dict(id="P1",kind="interval",path="preuves/interval.jpg",sha256="b"*64,bytes=100),
+            dict(id="PA1",kind="pass",path="preuves/fixture.jpg",sha256="c"*64,bytes=100)]
+        return p
+    def test_manifest(self):
+        p=self.manifest()
+        s=summarize(read(p)[0],"bleus")["evidence_manifest"]
+        self.assertEqual(s["entries"],3);self.assertFalse(s["files_verified_on_server"])
+    def test_manifest_missing(self):
+        p=self.manifest();p["reference"]["evidence_manifest"].pop()
+        with self.assertRaises(ValueError):read(p)
+    def test_manifest_path_escape(self):
+        p=self.manifest();p["reference"]["evidence_manifest"][0]["path"]="preuves/../goal.jpg"
+        with self.assertRaises(ValueError):read(p)
+    def test_manifest_conflict(self):
+        p=self.manifest();p["reference"]["evidence_manifest"][1]["path"]="preuves/goal.jpg"
+        with self.assertRaises(ValueError):read(p)
+    def test_manifest_shared(self):
+        p=self.manifest();p["reference"]["evidence_manifest"][1].update(path="preuves/goal.jpg",sha256="a"*64)
+        self.assertEqual(summarize(read(p)[0],"bleus")["evidence_manifest"]["distinct_paths"],2)
+    def test_manifest_duplicate(self):
+        p=self.manifest();p["reference"]["evidence_manifest"].append(copy.deepcopy(p["reference"]["evidence_manifest"][0]))
+        with self.assertRaises(ValueError):read(p)
