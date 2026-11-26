@@ -26,6 +26,8 @@ jobs:
           python -m unittest discover -s tests -p test_broadcast_scoreboard.py -v
           python -m unittest discover -s tests -p test_player_tracking.py -v
           python -m unittest discover -s tests -p test_cap_reading.py -v
+          python -m unittest discover -s tests -p test_defensive_systems.py -v
+          python -m unittest discover -s tests -p test_elite_extended_metrics.py -v
           python -m unittest discover -s tests -p test_tactical_timeline.py -v
           python -m unittest discover -s tests -p test_metric_field.py -v
           python -m unittest discover -s tests -p test_identity_aggregation.py -v

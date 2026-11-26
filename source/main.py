@@ -63,7 +63,7 @@ GUEST_ULTIMATE_ENABLED = WEB_DEMO_MODE or os.getenv("AQUAMETRIC_GUEST_ULTIMATE",
 OFFICIAL_REFRESH_LOOP_MINUTES = int(os.getenv("OFFICIAL_REFRESH_LOOP_MINUTES", "30"))
 ALLOWED_VIDEO_EXTENSIONS = {".mp4", ".webm", ".mov", ".m4v", ".ogv", ".ogg"}
 EVENT_TYPES = (
-    "goal", "assist", "key_pass", "action_created", "touch", "centre_touch", "duel_won", "duel_lost", "pass_complete", "shot_on_target", "shot_off_target", "shot_blocked",
+    "goal", "assist", "key_pass", "action_created", "touch", "centre_touch", "duel_won", "duel_lost", "pass_complete", "shot_on_target", "shot_off_target", "shot_blocked", "shot_unknown",
     "block", "interception", "recovery", "save", "bad_pass", "turnover", "foul",
     "exclusion", "exclusion_earned", "exclusion_committed", "penalty_earned", "penalty_committed",
     "whistle", "power_play_start", "penalty_kill_start", "counterattack_start",

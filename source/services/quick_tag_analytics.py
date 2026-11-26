@@ -6,7 +6,7 @@ A goal is a shot outcome: only one tag should be recorded for that attempt.
 from __future__ import annotations
 from collections import defaultdict
 
-SHOT_OUTCOMES={"goal","shot_on_target","shot_off_target","shot_blocked"}
+SHOT_OUTCOMES={"goal","shot_on_target","shot_off_target","shot_blocked","shot_unknown"}
 LABELS={
  "goal":"But","shot_on_target":"Tir cadré sans but","shot_off_target":"Tir non cadré",
  "shot_blocked":"Tir bloqué","save":"Arrêt","turnover":"Perte de balle",
@@ -31,7 +31,7 @@ def _side(rows):
         "tagged_turnovers":turnovers,
         "tagged_exclusions_earned":sum(e.get("event_type")=="exclusion_earned" for e in rows),
         "tagged_exclusions_committed":sum(e.get("event_type")=="exclusion_committed" for e in rows),
-        "shot_conversion_pct":round(100*goals/shots,1) if shots else None,
+        "shot_conversion_pct":round(100*goals/shots,1) if shots and not any(e.get("event_type")=="shot_unknown" for e in rows) else None,
     }
 
 

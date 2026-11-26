@@ -28,7 +28,7 @@ def shot_clock_reset(reason, remaining=None, rules=None):
         return max(remaining, r["reset_seconds"])
     return None
 
-SHOTS = {"goal", "shot_on_target", "shot_off_target", "shot_blocked"}
+SHOTS = {"goal", "shot_on_target", "shot_off_target", "shot_blocked", "shot_unknown"}
 END_LABELS = {
     "goal": "But", "save": "Arrêt gardienne", "off_target": "Tir non cadré",
     "post": "Poteau / barre", "blocked": "Tir contré",
@@ -119,10 +119,14 @@ def reduce_side(rows):
     return {
         "events": len(rows), "goals": c["goal"], "shots": shots, "on_target": on,
         "off_target": c["shot_off_target"], "blocked_shots": c["shot_blocked"],
-        "shot_conversion": pct(c["goal"], shots), "shot_accuracy": pct(on, shots),
+        "shot_unknown": c["shot_unknown"],
+        "shot_conversion": pct(c["goal"], shots) if not c["shot_unknown"] else None, "shot_accuracy": pct(on, shots) if not c["shot_unknown"] else None,
         "assists": c["assist"], "points": c["goal"]+c["assist"],
-        "key_passes": c["key_pass"], "passes": c["pass_complete"],
-        "bad_passes": c["bad_pass"], "pass_accuracy": pct(c["pass_complete"], c["pass_complete"]+c["bad_pass"]),
+        "key_passes": c["key_pass"], "passes": c["pass_complete"]+c["assist"]+c["key_pass"],
+        "touches": c["touch"]+c["centre_touch"], "centre_touches": c["centre_touch"],
+        "duels_won": c["duel_won"], "duels_lost": c["duel_lost"], "duel_pct": pct(c["duel_won"],c["duel_won"]+c["duel_lost"]),
+        "actions_created":c["action_created"], "fast_recoveries":c["fast_recovery"], "late_recoveries":c["late_recovery"],
+        "bad_passes": c["bad_pass"], "pass_accuracy": pct(c["pass_complete"]+c["assist"]+c["key_pass"], c["pass_complete"]+c["assist"]+c["key_pass"]+c["bad_pass"]),
         "turnovers": c["turnover"], "unforced_errors": c["unforced_error"],
         "steals": c["interception"], "recoveries": c["recovery"], "blocks": c["block"],
         "fouls_committed": c["foul"], "fouls_earned": c["foul_earned"],
@@ -151,7 +155,8 @@ def reduce_side(rows):
 
 METRICS = [
     ("goals","Buts"),("shots","Tirs"),("on_target","Cadrés (buts inclus)"),
-    ("off_target","Non cadrés"),("blocked_shots","Tirs contrés"),
+    ("off_target","Non cadrés"),("blocked_shots","Tirs contrés"),("shot_unknown","Tirs à issue inconnue"),
+    ("touches","Ballons touchés"),("centre_touches","Touches en pointe"),("duels_won","Duels gagnés"),("duels_lost","Duels perdus"),("duel_pct","Duels gagnés (%)"),("actions_created","Actions créées"),("fast_recoveries","Replis rapides"),("late_recoveries","Replis tardifs"),
     ("shot_conversion","Conversion tir (%)"),("shot_accuracy","Précision (%)"),
     ("assists","Passes décisives"),("points","Buts + passes décisives"),
     ("key_passes","Passes clés"),("passes","Passes réussies"),("bad_passes","Mauvaises passes"),
@@ -174,7 +179,7 @@ METRICS = [
     ("distance_m","Distance relevée (m)"),("distance_samples","Segments de distance relevés"),
     ("playing_intervals","Intervalles de jeu appariés"),("unpaired_markers","Entrées/sorties à compléter"),
 ]
-PLAYER_KEYS = ("playing_seconds","distance_m","goals","shots","shot_conversion","shot_accuracy","assists",
+PLAYER_KEYS = ("playing_seconds","distance_m","goals","shots","shot_unknown","shot_conversion","shot_accuracy","assists","passes","bad_passes","pass_accuracy","touches","centre_touches","duels_won","duels_lost","duel_pct","actions_created","fast_recoveries","late_recoveries",
                "steals","blocks","recoveries","fouls_committed","fouls_earned","exclusions_committed",
                "exclusions_earned","penalties_committed","penalties_earned","personal_fouls",
                "turnovers","unforced_errors","saves","goals_against","save_pct","possession_ends",
