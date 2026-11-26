@@ -82,3 +82,34 @@ def spatial_export(match_id:int,request:Request,db:Session=Depends(get_db)):
     _,match=owned(request,db,match_id)
     return JSONResponse({"match_id":match.id,"eligible_count":len(eligible(match)),"reviews":saved_reviews(db,match)},
         headers={"Cache-Control":"private, no-store","Content-Disposition":f'attachment; filename="spatial-{match_id}.json"'})
+
+
+def sandbox_baseline(request,db,match_id,event_id):
+    user,match=owned(request,db,match_id)
+    row=saved_reviews(db,match).get(event_id)
+    if row is None: raise HTTPException(404,"Saved verified spatial review required")
+    return user,match,row
+
+@router.get("/matches/{match_id}/spatial/{event_id}/sandbox",response_class=HTMLResponse)
+def sandbox_page(match_id:int,event_id:int,request:Request,db:Session=Depends(get_db)):
+    user,match,row=sandbox_baseline(request,db,match_id,event_id)
+    return templates.TemplateResponse(request,"spatial_sandbox.html",dict(request=request,user=user,app_name="AquaMetric",
+        match=match,event_id=event_id,baseline=row))
+
+@router.post("/matches/{match_id}/spatial/{event_id}/sandbox")
+async def sandbox_calculate(match_id:int,event_id:int,request:Request,db:Session=Depends(get_db)):
+    from starlette.concurrency import run_in_threadpool
+    from services.spatial_sandbox import sandbox
+    _,_,row=sandbox_baseline(request,db,match_id,event_id)
+    body=bytearray()
+    async for chunk in request.stream():
+        if len(body)+len(chunk)>32768: raise HTTPException(413,"Scenario too large")
+        body.extend(chunk)
+    try:
+        edits=json.loads(body)
+        if not isinstance(edits,dict): raise ValueError("Invalid scenario")
+        trials=160 if edits.get("refine") is True else 32
+        result=await run_in_threadpool(sandbox,row["observations"],edits,trials)
+    except (ValueError,TypeError,KeyError,AttributeError,OverflowError) as exc:
+        raise HTTPException(422,"Invalid scenario: "+str(exc)[:200]) from exc
+    return JSONResponse(result,headers={"Cache-Control":"private, no-store"})
