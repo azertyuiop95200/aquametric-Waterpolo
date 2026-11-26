@@ -35,6 +35,7 @@ jobs:
           python -m unittest discover -s tests -p test_report_coverage.py -v
           python -m unittest discover -s tests -p test_sample_coverage.py -v
           python -m unittest discover -s tests -p test_continuous_match.py -v
+          python -m unittest discover -s tests -p test_track_continuity.py -v
       - working-directory: source
         run: |
           python - <<'PY'

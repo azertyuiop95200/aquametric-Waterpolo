@@ -33,3 +33,9 @@
 {% if cc.counts %}<p>Images avec piste candidate : {{cc.counts.track_frames}} ; images avec objet ballon candidat : {{cc.counts.ball_candidate_frames}} ; pistes distinctes : {{cc.tracklets}} (pas des identités). Détection bonnet tous les {{cc.cap_detection_every_frames}} frames, propagation optique entre les détections.</p>
 <details><summary>Couverture par tranche de 10 secondes</summary><table class="metric-table"><thead><tr><th>Vidéo (s)</th><th>Images</th><th>Avec piste</th><th>Avec candidat ballon</th></tr></thead><tbody>{% for b in cc.bins %}<tr><td>{{b.start_s}}</td><td>{{b.frames}}</td><td>{{b.track_frames}}</td><td>{{b.ball_candidate_frames}}</td></tr>{% endfor %}</tbody></table></details>{% endif %}
 {% for warning in cc.limitations|default([]) %}<p>{{warning}}</p>{% endfor %}{% endif %}
+
+{% set tc=(snapshot.automatic|default({})).get('summary',{}).get('track_continuity',{}) %}
+{% if tc.scope == 'unverified_candidate_chains_not_player_identities' %}
+<h3>Continuité du suivi · propositions non validées</h3>
+<p>{{tc.raw_tracklets}} fragments, {{tc.proposed_links}} raccords proposés, {{tc.candidate_chains}} chaînes candidates. {{tc.observations_before}} observations avant et {{tc.observations_after}} après ; {{tc.missing_frames_not_filled}} images manquantes non interpolées. Aucun numéro, équipe, distance ou action sportive n'est confirmé par ces raccords.</p>
+{% endif %}

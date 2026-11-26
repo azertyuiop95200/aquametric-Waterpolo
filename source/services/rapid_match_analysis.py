@@ -238,6 +238,17 @@ def run_rapid_analysis(
                 # Private temporary ledger, no public artifact or raw source image.
                 with tempfile.TemporaryDirectory(prefix="aquametric-full-") as tmp:
                     result_full = scan(source_path, Path(tmp)/"frames.jsonl.gz", Path(tmp)/"summary.json", progress=update_progress)
+                    # Separate second pass: no identities or metric distances are confirmed.
+                    try:
+                        from services.track_continuity import analyze
+                        continuity = analyze(Path(tmp)/"frames.jsonl.gz")
+                        links = continuity.pop("links")
+                        # Bounded audit example, not full identity mapping.
+                        continuity["review_examples"] = links[::max(1,(len(links)+15)//16)][:16]
+                        summary["track_continuity"] = continuity
+                    except Exception:
+                        summary["track_continuity"] = {"scope":"unavailable"}
+
                 # Keep bounded summary; per-frame trace remains available in local CLI.
                 result_full.pop("tracklet_records", None)
                 summary["continuous_coverage"] = result_full
