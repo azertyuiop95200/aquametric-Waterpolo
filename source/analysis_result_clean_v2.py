@@ -19,6 +19,7 @@ from services.analysis_product import analysis_snapshot, youtube_segment_embed
 from services.deep_analysis_sequences import sequence_gallery, sequence_summary
 from services.video import youtube_embed
 from services.capture_report_progress import report_progress
+from spatial_review_routes import saved_reviews, eligible
 
 
 def _verified_side(events: list[dict], perspective: str) -> dict:
@@ -61,6 +62,8 @@ def clean_analysis_result(match_id: int, request: Request, db: Session = Depends
             "match": match,
             "snapshot": snapshot,
             "interactive_report": True,
+            "spatial_reviews": saved_reviews(db, match),
+            "spatial_eligible_count": len(eligible(match)),
             "vision": snapshot.get("vision") or {},
             "automatic": snapshot.get("automatic") or {},
             "for_verified": _verified_side(events, "for"),
