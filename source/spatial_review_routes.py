@@ -113,3 +113,20 @@ async def sandbox_calculate(match_id:int,event_id:int,request:Request,db:Session
     except (ValueError,TypeError,KeyError,AttributeError,OverflowError) as exc:
         raise HTTPException(422,"Invalid scenario: "+str(exc)[:200]) from exc
     return JSONResponse(result,headers={"Cache-Control":"private, no-store"})
+
+
+@router.post("/matches/{match_id}/spatial/{event_id}/sandbox/search")
+async def sandbox_search(match_id:int,event_id:int,request:Request,db:Session=Depends(get_db)):
+    from starlette.concurrency import run_in_threadpool
+    from services.spatial_scenario_search import search_scenarios
+    _,_,row=sandbox_baseline(request,db,match_id,event_id)
+    body=bytearray()
+    async for chunk in request.stream():
+        if len(body)+len(chunk)>32768: raise HTTPException(413,"Scenario too large")
+        body.extend(chunk)
+    try:
+        edits=json.loads(body)
+        result=await run_in_threadpool(search_scenarios,row["observations"],edits)
+    except (ValueError,TypeError,KeyError,AttributeError,OverflowError) as exc:
+        raise HTTPException(422,"Invalid search: "+str(exc)[:200]) from exc
+    return JSONResponse(result,headers={"Cache-Control":"private, no-store"})
