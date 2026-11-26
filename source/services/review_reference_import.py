@@ -13,6 +13,8 @@ def num(x):
     return isinstance(x,(int,float)) and not isinstance(x,bool) and isfinite(x)
 def clean_id(x):
     return isinstance(x,str) and re.fullmatch(r"[A-Za-z0-9_-]{1,60}",x)
+def internal(color):
+    return {'bleus':'for','blancs':'against',None:'unknown'}[color]
 def strict_bool(x):
     return type(x) is bool
 def load(raw):
@@ -65,7 +67,7 @@ def load(raw):
             require(strict_bool(e.get(k)),"Drapeau de preuve invalide.")
         require(e.get("linked_prior_event") is None or e["linked_prior_event"] in ids,"Lien événement absent.")
         require(isinstance(e.get("observation"),str) and len(e["observation"])<=4000,"Observation invalide.")
-        validate(a,b,e.get("before_team") or "unknown",e.get("after_team") or "unknown",
+        validate(a,b,internal(e.get("before_team")),internal(e.get("after_team")),
                  e.get("before_state"),e.get("after_state"),e.get("cause"),e["cause_verified"],e["decision_verified"],
                  e["single_transition_verified"],e["linked_prior_shot"],e["observation"])
         iv_ids.add(e["interval_id"]);periods.add(e["period"])
@@ -91,7 +93,7 @@ def summarize(p,home_color):
             observation=e.get("source_observation","")))
     iv=[]
     for e in r["possession_review_intervals"]:
-        result=validate(e["start_s"],e["end_s"],e.get("before_team") or "unknown",e.get("after_team") or "unknown",
+        result=validate(e["start_s"],e["end_s"],internal(e.get("before_team")),internal(e.get("after_team")),
             e["before_state"],e["after_state"],e["cause"],e["cause_verified"],e["decision_verified"],
             e["single_transition_verified"],e["linked_prior_shot"],e["observation"])
         iv.append(dict(id=e["interval_id"],start=e["start_s"],end=e["end_s"],before=side(e.get("before_team")),after=side(e.get("after_team")),
