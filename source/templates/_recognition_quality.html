@@ -9,3 +9,9 @@
 <tr><td>Actions sans équipe ou bonnet résolu</td><td>{{q.unreadable_or_unassigned}}</td></tr>
 <tr><td>Observations contradictoires</td><td>{{q.conflicting_actions}}</td></tr>
 </tbody></table><p>{{q.note}}</p>{% endif %}
+{% set tracking=(snapshot.automatic|default({})).get('summary',{}).get('ball_candidate_tracking',{}) %}
+{% if tracking and tracking.status == 'candidate_only' %}
+<h3>Suivi local du ballon · hypothèses 2D</h3>
+<p>{{tracking.windows}} fenêtre(s) inspectée(s) · {{tracking.tracks|length}} trajectoire(s) candidate(s). {{tracking.note}}</p>
+{% for t in tracking.tracks %}<details><summary>{{t.start_second}}–{{t.end_second}} s · {{t.points|length}} observations</summary><svg viewBox="0 0 320 180" style="width:100%;max-width:320px;background:#153848" role="img" aria-label="Trajectoire candidate en coordonnées image"><polyline fill="none" stroke="#ffdc42" stroke-width="2" points="{% for p in t.points %}{{p.x*320}},{{p.y*180}} {% endfor %}"/></svg><p>Coordonnées relatives à l’image, pas au bassin. Le mouvement de caméra peut déplacer la trajectoire.</p></details>{% endfor %}
+{% endif %}

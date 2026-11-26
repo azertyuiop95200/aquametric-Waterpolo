@@ -17,11 +17,12 @@ jobs:
       - run: python -m compileall -q source
       - working-directory: source
         run: python -m unittest discover -s tests -p test_elite_performance.py -v
-      - run: pip install jinja2 fastapi sqlalchemy pytest pydantic
+      - run: pip install jinja2 fastapi sqlalchemy pytest pydantic opencv-python-headless numpy
       - working-directory: source
         run: |
           python -m unittest discover -s tests -p test_guest_full_policy.py -v
           python -m unittest discover -s tests -p test_recognition_quality.py -v
+          python -m unittest discover -s tests -p test_ball_candidate_pixels.py -v
       - working-directory: source
         run: |
           python - <<'PY'
