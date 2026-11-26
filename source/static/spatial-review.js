@@ -38,6 +38,7 @@ function draw(){
 function display(){
  $("results").replaceChildren();
  if(!result){$("summary").textContent="Aucune relecture calculée pour cette action.";draw();return}
+ const sandboxLink=text("a","Ouvrir le laboratoire tactique interactif",$("results"));sandboxLink.className="btn";sandboxLink.href="/matches/"+data.match+"/spatial/"+active.id+"/sandbox";
  const angles=result.goal_angles;
  $("summary").textContent=angles?"Distance horizontale au but : "+fmt(angles.distance_m)+" m · angle horizontal : "+fmt(angles.horizontal_deg,1)+"° · angle vertical au centre : "+fmt(angles.vertical_center_deg,1)+"°":"Angle non mesurable.";
  const status={unknown:"Couverture défensive insuffisante",clear_in_model:"Trajectoire dégagée dans le modèle",potential_obstruction:"Obstruction possible",uncertain:"Observation incertaine"};
