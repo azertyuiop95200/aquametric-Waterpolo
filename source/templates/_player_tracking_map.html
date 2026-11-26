@@ -1,0 +1,22 @@
+{% set pt=(snapshot.automatic|default({})).get('summary',{}).get('player_candidate_tracking',{}) %}
+{% if pt and pt.status == 'candidate_only' %}
+<h2>Cartographie des déplacements · pistes de tête candidates</h2>
+<p>{{pt.windows|length}} fenêtres analysées, {{pt.tracks|length}} pistes courtes (pas un nombre de joueuses). {{pt.note}}</p>
+{% for window in pt.windows %}
+<details {% if loop.first %}open{% endif %}><summary>Fenêtre {{window.start}}–{{window.end}} s · {{window.tracklets}} pistes</summary>
+{% set wi=loop.index %}
+<div style="display:flex;flex-wrap:wrap;gap:16px">
+<div style="flex:1;min-width:250px"><h3>Carte image 2D</h3>
+<svg viewBox="0 0 320 180" style="width:100%;max-width:640px;background:#164c61" role="img" aria-label="Trajectoires candidates 2D">{% for t in pt.tracks if t.window == wi %}
+<polyline fill="none" stroke="{{'#f7f9fc' if t.colour == 'light' else '#ffb344' if t.colour == 'dark' else '#ff7575'}}" stroke-width="1.5" points="{% for p in t.points %}{{p.x*320}},{{p.y*180}} {% endfor %}"/>
+{% set p=t.points[-1] %}<circle cx="{{p.x*320}}" cy="{{p.y*180}}" r="2.5" fill="#74e5df"/><text x="{{p.x*320+4}}" y="{{p.y*180}}" font-size="8" fill="white">P{{t.id}}</text>{% endfor %}</svg></div>
+<div style="flex:1;min-width:250px"><h3>Vue 3D espace-temps</h3>
+<svg viewBox="0 0 360 240" style="width:100%;max-width:640px;background:#164c61" role="img" aria-label="Projection des positions image et du temps">
+<path d="M30 205 L250 205 L330 155 L110 155 Z M30 205 L30 30" fill="none" stroke="#82a9b9"/><text x="34" y="25" fill="white" font-size="10">temps ↑</text>
+{% for t in pt.tracks if t.window == wi %}<polyline fill="none" stroke="{{'#f7f9fc' if t.colour == 'light' else '#ffb344' if t.colour == 'dark' else '#ff7575'}}" stroke-width="1.7" points="{% for p in t.points %}{{30+p.x*220+p.y*80}},{{205-p.y*50-(p.second-window.start)*50}} {% endfor %}"/>{% endfor %}
+</svg></div></div>
+<p>Clair/foncé : proposition de couleur, pas attribution à un club. La hauteur de la vue 3D représente le temps, pas la profondeur de nage. Les pistes P ne sont pas des numéros de bonnet.</p>
+</details>{% endfor %}
+{% endif %}
+{% set timeline=(snapshot.video_actions|default({})).get('tactical_timeline',[]) %}
+{% if timeline %}<h3>Chronologie tactique reconnue · provisoire</h3><p>L'équipe en possession n'est établie qu'après une observation explicite du début de possession, jamais déduite de la couleur seule.</p><div style="overflow-x:auto"><table class="metric-table"><thead><tr><th>Vidéo (s)</th><th>Quart</th><th>Chrono général (s)</th><th>Possession (s)</th><th>Action</th><th>Bonnet</th><th>Équipe de l'action</th><th>Attaque après action</th><th>Défense après action</th></tr></thead><tbody>{% for e in timeline %}<tr><td>{{e.second}}</td><td>{{e.period if e.period is not none else '—'}}</td><td>{{e.game_clock_seconds if e.game_clock_seconds is not none else '—'}}</td><td>{{e.shot_clock_seconds if e.shot_clock_seconds is not none else '—'}}</td><td>{{e.event_type}}</td><td>{{e.cap_number or '—'}}</td>{% for side in [e.actor_side,e.attack_after,e.defence_after] %}<td>{{match.team.name if side == 'for' else match.opponent if side == 'against' else 'Indéterminé'}}</td>{% endfor %}</tr>{% endfor %}</tbody></table></div>{% endif %}

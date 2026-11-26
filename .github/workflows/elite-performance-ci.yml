@@ -24,6 +24,8 @@ jobs:
           python -m unittest discover -s tests -p test_recognition_quality.py -v
           python -m unittest discover -s tests -p test_ball_candidate_pixels.py -v
           python -m unittest discover -s tests -p test_broadcast_scoreboard.py -v
+          python -m unittest discover -s tests -p test_player_tracking.py -v
+          python -m unittest discover -s tests -p test_tactical_timeline.py -v
       - working-directory: source
         run: |
           python - <<'PY'

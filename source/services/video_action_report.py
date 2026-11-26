@@ -205,6 +205,8 @@ def action_report(db, match, *, run=None):
                                   "name": f"Bonnet {number}" if number else "Actions sans bonnet lisible",
                                   "identity_status": "visual_candidate" if number else "unresolved",
                                   "report": summarize_actions(actions), "event_keys": [a["key"] for a in actions]})
+    from services.tactical_timeline import tactical_timeline
+    result["tactical_timeline"] = tactical_timeline(counted)
     result["families"] = [{"key": key, "label": label, "observations": visibility[key]} for key, label in FAMILIES.items()]
     return result
 

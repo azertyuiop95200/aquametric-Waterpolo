@@ -167,6 +167,13 @@ def run_rapid_analysis(
         except Exception:
             # This optional heuristic must never prevent the primary OCR report.
             ball_tracking = {"status":"unavailable","tracks":[],"windows":0}
+    player_tracking = {"status":"not_run","tracks":[],"windows":[]}
+    if source_kind == "upload":
+        try:
+            from services.player_tracking import scan_player_windows
+            player_tracking = scan_player_windows(source_path, result.duration_seconds, result.interesting_moments)
+        except Exception:
+            player_tracking = {"status":"unavailable","tracks":[],"windows":[]}
     periods = infer_periods(observations, result.duration_seconds)
     candidates = infer_candidates(observations, result.interesting_moments)
 
@@ -216,6 +223,7 @@ def run_rapid_analysis(
     summary.update({
         "pipeline": "rapid-long-video-v1",
         "ball_candidate_tracking": ball_tracking,
+        "player_candidate_tracking": player_tracking,
         "source_kind": source_kind,
         "duration_minutes": round(source_duration_seconds / 60.0, 1),
         "capture_duration_minutes": round(float(result.duration_seconds) / 60.0, 1),

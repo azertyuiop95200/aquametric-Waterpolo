@@ -11,6 +11,9 @@ import re
 RULES = {"version": "World Aquatics 2026-02 / FFN senior 2026-27",
          "quarters": 4, "quarter_seconds": 480, "shot_clock_seconds": 28,
          "reset_seconds": 18, "exclusion_seconds": 18,
+         "starting_players_per_team": 7, "starting_goalkeepers": 1,
+         "goal_width_m": 3.0, "penalty_distance_m": 5.0,
+         "regulatory_zone_m": 6.0,
          "source": "https://www.worldaquatics.com/rules/competition-regulations",
          "ffn": "https://www.ffnatation.fr/reglements-du-water-polo"}
 
