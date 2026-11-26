@@ -745,7 +745,7 @@ def create_evidence(
         raise HTTPException(400, detail="Unsupported evidence type.")
     if analysis_type not in {"action", "tactic", "technique", "referee", "transition"}:
         raise HTTPException(400, detail="Unsupported analysis category.")
-    if second < 0 or second > 12 * 60 * 60:
+    if not __import__("math").isfinite(second) or second < 0 or second > 12 * 60 * 60:
         raise HTTPException(400, detail="Evidence time is outside the supported range.")
     linked_event = None
     if event_id:
@@ -918,6 +918,8 @@ def add_event(
     metric_type: str = Form(""),
     metric_value: str = Form(""),
     metric_calibrated: str = Form(""),
+    lineups_complete: str = Form(""),
+    goals_complete: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = require_user(request, db)
@@ -964,6 +966,8 @@ def add_event(
 
     if perspective not in PERSPECTIVES:
         perspective = "neutral"
+    if return_to=="report" and pid is not None and perspective!="for":
+        raise HTTPException(400,detail="Cette joueuse appartient à votre équipe.")
     if phase_tag not in PHASE_TAGS:
         phase_tag = "auto"
     # Structured optional evidence fields. Video time is not playing time.
@@ -1013,6 +1017,11 @@ def add_event(
             if val is None or val<spec[1]:
                 raise HTTPException(400,detail="Valeur physique invalide.")
             evidence_tags.extend([f"{metric_type}={val}","measurement=calibrated"])
+        if lineups_complete=="yes" or goals_complete=="yes":
+            if event_type!="period_end" or number(game_clock_s,480)!=0 or perspective not in {"for","against"} or (lineups_complete=="yes" and perspective!="for"):
+                raise HTTPException(400,detail="Couverture : fin de quart à 0 s, équipe correcte requise.")
+            if lineups_complete=="yes": evidence_tags.append("lineups_complete=yes")
+            if goals_complete=="yes": evidence_tags.append("goals_complete=yes")
         suffix=" ".join(evidence_tags)
         note = f"{note[:max(0,499-len(suffix))]} {suffix}"
     event = Event(
