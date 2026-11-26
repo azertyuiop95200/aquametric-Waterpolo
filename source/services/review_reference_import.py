@@ -67,6 +67,8 @@ def load(raw):
             require(strict_bool(e.get(k)),"Drapeau de preuve invalide.")
         require(e.get("linked_prior_event") is None or e["linked_prior_event"] in ids,"Lien événement absent.")
         require(isinstance(e.get("observation"),str) and len(e["observation"])<=4000,"Observation invalide.")
+        require(strict_bool(e.get("referee_signal_observed",False)),"Drapeau de geste arbitral invalide.")
+        require(e.get("cause_candidate") is None or isinstance(e["cause_candidate"],str) and len(e["cause_candidate"])<=500,"Hypothèse de cause invalide.")
         validate(a,b,internal(e.get("before_team")),internal(e.get("after_team")),
                  e.get("before_state"),e.get("after_state"),e.get("cause"),e["cause_verified"],e["decision_verified"],
                  e["single_transition_verified"],e["linked_prior_shot"],e["observation"])
@@ -98,7 +100,16 @@ def summarize(p,home_color):
             e["single_transition_verified"],e["linked_prior_shot"],e["observation"])
         iv.append(dict(id=e["interval_id"],start=e["start_s"],end=e["end_s"],before=side(e.get("before_team")),after=side(e.get("after_team")),
             status=result["status"],location_start=locate(t,e["start_s"]),location_end=locate(t,e["end_s"]),
-            observation=e["observation"],prior_shot=e["linked_prior_shot"]))
+            observation=e["observation"],prior_shot=e["linked_prior_shot"],
+            referee_signal_observed=e.get("referee_signal_observed",False),decision_verified=e["decision_verified"],
+            cause_candidate=e.get("cause_candidate"),attributed_cause=result["attributed_cause"]))
+    chosen=[]; last=-1
+    for e in sorted(iv,key=lambda e:e["end"]):
+        if e["status"]=="opposite_endpoints" and not e["prior_shot"] and e["start"]>=last:
+            chosen.append(e["id"]);last=e["end"]
     return dict(events=ev,intervals=iv,counts=dict(Counter(e["state"] for e in ev)),
+                interval_statuses=dict(Counter(e["status"] for e in iv)), lower_bound_excluding_linked_shots=len(chosen),
+                bound_interval_ids=chosen, referee_signals=sum(e["referee_signal_observed"] for e in iv),
+                confirmed_referee_decisions=sum(e["decision_verified"] for e in iv), exact_total_changes=None,
                 duration_s=t["duration_s"],home_color=home_color,coverage_complete=False,
                 verified_match_event_count=0,note="Référence importée, non fusionnée aux événements du match. Temps locaux relatifs au premier échantillon de chaque partie; alignement au lecteur à vérifier.")
