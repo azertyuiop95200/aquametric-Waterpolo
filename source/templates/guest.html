@@ -3,7 +3,7 @@
 <section class="panel" style="max-width:980px;margin:auto">
   <span class="eyebrow">AQUAMETRIC · ANALYSE ULTIMATE</span>
   <h1>Essayer l’analyse Ultimate sans compte</h1>
-  <p>Un espace de démonstration privé à cette session : crée un match avec un lien YouTube public ou importe un petit fichier vidéo, puis ouvre le rapport, retrouve le replay et relève les actions sur la carte du bassin. Les événements non observés restent « non mesurés ».</p>
+  <p>Un espace de démonstration privé à cette session : crée un match avec un lien YouTube public ou importe un fichier vidéo, puis ouvre le rapport, retrouve le replay et relève les actions sur la carte du bassin. Les événements non observés restent « non mesurés ».</p>
   {% if guest_ultimate_enabled %}
   <div class="actions" style="margin:20px 0">
     <a class="btn intelligence-cta" id="guestUltimateLaunch" href="/guest/ultimate">Entrer dans Analyse Ultimate en invité</a>
@@ -11,8 +11,8 @@
   </div>
   <div class="notice">
     <strong>Ce que permet le mode invité</strong>
-    <p>Un lien YouTube, un petit MP4/MOV/WebM, la lecture vidéo, l'annotation manuelle, les points sur le bassin et les rapports des observations enregistrées. Limite de 3 matchs et de 30 Mo par fichier pour protéger ce serveur de validation.</p>
-    <p><strong>Non inclus :</strong> stockage R2/S3 de plusieurs Go, reconnaissance IA payante, traitement automatique complet, conservation garantie des données. Les travaux invités peuvent disparaître après la fermeture de la session ou un redémarrage du service.</p>
+    {% if guest_full_enabled %}<p>Studio de capture, analyse locale Vision/OCR, annotation, cartes et rapports Ultimate. {% if guest_match_limit %}{{guest_match_limit}} matchs maximum{% else %}Pas de plafond fixe de matchs{% endif %} par session ; fichier direct jusqu’à {{guest_upload_mb}} Mo selon la limite du serveur.</p>{% else %}<p>Un lien YouTube, un petit MP4/MOV/WebM, lecture vidéo et annotation. Limite de 3 matchs et de 30 Mo par fichier.</p>{% endif %}
+    <p>Le stockage cloud exige un bucket privé et une base persistante. La reconnaissance IA payante reste réservée aux comptes personnels. Les travaux invités peuvent disparaître après un redémarrage du service : exporte tes rapports.</p>
   </div>
   {% else %}
   <div class="notice">L’accès invité à Analyse Ultimate n’est pas activé sur ce serveur. Il reste disponible sur le service de validation, ou tu peux utiliser un compte personnel.</div>

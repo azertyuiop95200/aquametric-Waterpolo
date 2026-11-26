@@ -64,6 +64,9 @@ def _owned_match(match_id: int, request: Request, db: Session):
             "/url-analysis/start", "/analysis/actions/start",
             "/analysis/youtube/direct", "/analysis/evidence-pack",
         )
+        from services.guest_ultimate import full_guest
+        if full_guest(request):
+            blocked_paths = ("/analysis/actions/start", "/analysis/youtube/direct")
         if any(part in request.url.path for part in blocked_paths):
             raise HTTPException(403,"Ce traitement automatique n'est pas disponible en invité. Utilise le marquage manuel.")
     match = db.get(Match, match_id)
@@ -239,6 +242,11 @@ def start_real_analysis(
 ):
     _, match = _owned_match(match_id, request, db)
     if _is_owned_upload(match):
+        from services.guest_ultimate import full_guest
+        if full_guest(request):
+            from services.guest_local_analysis import queue_guest_local
+            queue_guest_local(db, match, background_tasks)
+            return RedirectResponse(f"/matches/{match_id}/analysis/result", status_code=303)
         from models import AnalysisJob
         from video_action_routes import upload_analysis_background, workflow_active
         if not workflow_active(db, match.id):

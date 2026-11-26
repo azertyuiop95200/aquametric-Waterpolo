@@ -47,8 +47,9 @@ def _owner(request: Request, db: Session) -> User:
     user = db.get(User, user_id) if user_id else None
     if not user:
         raise HTTPException(401, "Connecte-toi pour envoyer une vidéo.")
-    if request.session.get("web_demo"):
-        raise HTTPException(403, "Les comptes de démonstration ne peuvent pas stocker plusieurs Go. Utilise un compte personnel.")
+    from services.guest_ultimate import full_guest
+    if request.session.get("web_demo") and not full_guest(request):
+        raise HTTPException(403, "Le stockage cloud n’est pas activé pour cet espace invité.")
     return user
 
 
@@ -92,6 +93,11 @@ def large_upload_capabilities():
 @router.post("/api/large-upload/start")
 def start_large_upload(value: StartUpload, request: Request, db: Session = Depends(get_db)):
     user = _owner(request, db)
+    from services.guest_ultimate import full_guest, enforce_new_match_limit
+    if value.match_id is None:
+        enforce_new_match_limit(request, db, user)
+    if full_guest(request) and value.size_bytes > min(storage.MAX_BYTES, 1024**3):
+        raise HTTPException(413, "En invité, chaque fichier cloud est limité à 1 Go.")
     name, mime_type = storage.allowed_video(value.filename)
     if value.match_id is not None:
         target=db.get(Match,value.match_id)
@@ -108,7 +114,8 @@ def start_large_upload(value: StartUpload, request: Request, db: Session = Depen
         LargeVideoUpload.owner_id == user.id,
         LargeVideoUpload.status.in_(("uploading", "complete")),
     )) or 0
-    if total_reserved + value.size_bytes > storage.OWNER_QUOTA_BYTES:
+    quota = min(storage.OWNER_QUOTA_BYTES, 2*1024**3) if full_guest(request) else storage.OWNER_QUOTA_BYTES
+    if total_reserved + value.size_bytes > quota:
         raise HTTPException(413, "Quota personnel de stockage atteint. Annule un transfert incomplet ou contacte l'administrateur.")
     active = db.scalar(select(func.count()).select_from(LargeVideoUpload).where(
         LargeVideoUpload.owner_id == user.id,
@@ -271,11 +278,11 @@ def complete_large_upload(upload_id: str, request: Request, background_tasks: Ba
     # AI inference. The worker streams small seekable ranges of this private
     # object; it never downloads the 5 GiB body into the Render web process.
     from services.video_action_provider import provider_configuration
-    if provider_configuration()["configured"]:
+    if not request.session.get("web_demo") and provider_configuration()["configured"]:
         from services.cloud_video_actions import run_cloud_video_actions
         background_tasks.add_task(run_cloud_video_actions,row.match_id,row.object_key)
     return {"status":"complete", "match_url":match_url, "total_bytes":row.total_bytes,
-            "analysis_queued":provider_configuration()["configured"]}
+            "analysis_queued":not request.session.get("web_demo") and provider_configuration()["configured"]}
 
 
 @router.delete("/api/large-upload/{upload_id}")

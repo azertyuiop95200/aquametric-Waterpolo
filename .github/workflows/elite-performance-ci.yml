@@ -1,8 +1,8 @@
-name: Elite performance calculations
+name: Elite performance and extended guest checks
 on:
   push:
     branches: [fix/youtube-report-intake-2026-11, feature/elite-performance-2026]
-    paths: ['source/services/elite_performance.py','source/tests/test_elite_performance.py','source/templates/_elite_performance.html','source/main.py','.github/workflows/elite-performance-ci.yml']
+    paths: ['source/**','.github/workflows/elite-performance-ci.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -14,10 +14,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python -m compileall -q source/main.py source/services/elite_performance.py source/services/quick_tag_analytics.py
+      - run: python -m compileall -q source
       - working-directory: source
         run: python -m unittest discover -s tests -p test_elite_performance.py -v
-      - run: pip install jinja2
+      - run: pip install jinja2 fastapi sqlalchemy
+      - working-directory: source
+        run: python -m unittest discover -s tests -p test_guest_full_policy.py -v
       - working-directory: source
         run: |
           python - <<'PY'
@@ -25,7 +27,7 @@ jobs:
           from services.elite_performance import elite_report
           from types import SimpleNamespace
           env = Environment(loader=FileSystemLoader('templates'))
-          for name in ('_elite_performance.html','analysis_result_clean_v2.html','analysis_report_portable.html','login.html'):
+          for name in ('_elite_performance.html','analysis_result_clean_v2.html','analysis_report_portable.html','login.html','guest.html','analysis_live_automatic_stats.html'):
               env.get_template(name)
           html = env.get_template('_elite_performance.html').render(review_metrics={'elite':elite_report([])},match=SimpleNamespace(team=SimpleNamespace(name='A'),opponent='B'))
           assert 'Ultimate' in html and '—' in html

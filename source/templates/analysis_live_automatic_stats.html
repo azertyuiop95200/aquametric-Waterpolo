@@ -55,7 +55,7 @@
         Analyser automatiquement ce replay YouTube
       </button>
       {% if request.session.get('web_demo') %}
-        <p class="evidence-note">En invité, l'analyse IA payante est désactivée. Tu peux lire le match, annoter les actions réelles et produire un rapport sans compte.</p>
+        <p class="evidence-note">En invité, l'analyse IA payante est désactivée. Tu peux lire le match, annoter les actions réelles et produire un rapport sans compte. En mode invité étendu, le studio de capture et Vision/OCR locale sont également accessibles.</p>
       {% elif not snapshot.video_actions.configured %}
         <p class="evidence-note">Bouton désactivé : le moteur Gemini doit être connecté sur le serveur avant de pouvoir générer des statistiques automatiques.</p>
       {% else %}

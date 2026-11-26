@@ -100,7 +100,8 @@ def create_flexible_url_analysis(
                     raise HTTPException(400,"La durée YouTube indiquée n'est pas valide.") from None
             return RedirectResponse(f"/matches/{match.id}/analysis/result#directYoutubeAnalysis",status_code=303)
 
-    if guest_session(request):
+    from services.guest_ultimate import full_guest
+    if guest_session(request) and not full_guest(request):
         # Guests can view the embedded YouTube replay and tag verified events
         # in the Ultimate report; paid direct inference/capture is not started.
         match.status = "guest_link_saved"

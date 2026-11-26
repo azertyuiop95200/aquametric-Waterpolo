@@ -84,7 +84,7 @@ def _save_upload(file: UploadFile, user_id: int, team_id: int, max_bytes: int = 
                     break
                 total += len(chunk)
                 if total > max_bytes:
-                    raise HTTPException(status_code=413, detail="La vidéo dépasse la limite de cet espace : 30 Mo en invité ou la limite normale du serveur.")
+                    raise HTTPException(status_code=413, detail="La vidéo dépasse la limite configurée de cet espace.")
                 out.write(chunk)
     except Exception:
         target.unlink(missing_ok=True)
@@ -189,7 +189,11 @@ def premium_create_match(
     )
     db.add(match); db.commit(); db.refresh(match)
 
-    if guest_session(request):
+    from services.guest_ultimate import full_guest
+    if full_guest(request) and video_source == "upload":
+        from services.guest_local_analysis import queue_guest_local
+        queue_guest_local(db, match, background_tasks)
+    elif guest_session(request):
         # Guests receive a real report and private manual-tag workspace, but
         # never start costly deep video extraction or provider inference.
         match.status = "guest_video_received" if video_source == "upload" else "guest_link_saved"

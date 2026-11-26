@@ -152,8 +152,11 @@ def require_user(request: Request, db: Session):
 
 
 def ctx(**kwargs):
+    from services.guest_ultimate import full_guest_enabled, guest_local_mb, guest_match_limit
     return {"app_name": APP_NAME, "web_demo_mode": WEB_DEMO_MODE,
             "google_login_enabled": google_ready(), "guest_ultimate_enabled": GUEST_ULTIMATE_ENABLED,
+            "guest_full_enabled": full_guest_enabled(), "guest_upload_mb": min(MAX_UPLOAD_MB, guest_local_mb()),
+            "guest_match_limit": guest_match_limit(),
             **kwargs}
 
 

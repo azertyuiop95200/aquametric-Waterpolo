@@ -251,6 +251,7 @@ def universal_new_match_page(request: Request, db: Session = Depends(get_db)):
     catalog = analysis_team_catalog(db, user.id)
     # Imported lazily to avoid a circular import while main.py installs extensions.
     import main as core
+    from services.guest_ultimate import upload_byte_limit
     return TEMPLATES.TemplateResponse(
         request,
         "match_new.html",
@@ -258,11 +259,11 @@ def universal_new_match_page(request: Request, db: Session = Depends(get_db)):
             "request": request,
             "user": user,
             "app_name": core.APP_NAME,
-            "web_demo_mode": core.WEB_DEMO_MODE,
+            "web_demo_mode": core.WEB_DEMO_MODE or bool(request.session.get("web_demo")),
             "teams": local_teams,
             "team_catalog": catalog,
             "default_team_name": _default_team_name(catalog, local_teams),
-            "max_upload_mb": core.MAX_UPLOAD_MB,
+            "max_upload_mb": upload_byte_limit(request, core.MAX_UPLOAD_MB*1024*1024)//(1024*1024),
         },
     )
 
