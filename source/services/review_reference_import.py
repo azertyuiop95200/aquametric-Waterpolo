@@ -3,6 +3,7 @@ import json, hashlib, re
 from math import isfinite
 from collections import Counter
 from services.possession_evidence import validate, CAUSES
+from services.pass_review import validate_pass_review, summarize_pass_review
 
 MAX_BYTES=512*1024
 MAX_ROWS=2000
@@ -74,6 +75,7 @@ def load(raw):
                  e["single_transition_verified"],e["linked_prior_shot"],e["observation"])
         iv_ids.add(e["interval_id"]);periods.add(e["period"])
     require(len(periods)==1,"Une référence doit correspondre à une seule période.")
+    validate_pass_review(r,dur)
     try: canonical=json.dumps(p,sort_keys=True,ensure_ascii=True,separators=(",",":"),allow_nan=False)
     except (ValueError,RecursionError) as e: raise ValueError("JSON invalide.") from e
     return p,canonical,hashlib.sha256(canonical.encode()).hexdigest(),next(iter(periods))
@@ -112,4 +114,5 @@ def summarize(p,home_color):
                 bound_interval_ids=chosen, referee_signals=sum(e["referee_signal_observed"] for e in iv),
                 confirmed_referee_decisions=sum(e["decision_verified"] for e in iv), exact_total_changes=None,
                 duration_s=t["duration_s"],home_color=home_color,coverage_complete=False,
+                pass_review=summarize_pass_review(r,t["duration_s"]),
                 verified_match_event_count=0,note="Référence importée, non fusionnée aux événements du match. Temps locaux relatifs au premier échantillon de chaque partie; alignement au lecteur à vérifier.")
