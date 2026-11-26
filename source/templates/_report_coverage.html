@@ -1,0 +1,8 @@
+{% set cr=snapshot.report_coverage|default({}) %}
+{% if cr %}<h2>Couverture des statistiques · toutes les familles</h2>
+<p>Actions confirmées et hypothèses IA sont présentées séparément. « — » : aucun événement de ce type établi ; cela ne prouve pas zéro pendant le match. Couverture du traitement vidéo : {{cr.video_coverage_percent if cr.video_coverage_percent is not none else 'non mesurée'}}{% if cr.video_coverage_percent is not none %} %{% endif %}. Ce pourcentage ne mesure pas la précision.</p>
+{% set names={'for':match.team.name,'against':match.opponent} %}
+<div style="overflow:auto"><table class="metric-table"><thead><tr><th>Indicateur</th>{% for s in ['for','against'] %}<th>{{names[s]}} confirmé</th><th>{{names[s]}} IA</th>{% endfor %}</tr></thead><tbody>{% for k,l in cr.labels %}<tr><td>{{l}}</td>{% for s in ['for','against'] %}{% for mode in ['confirmed','candidate'] %}{% set v=cr.teams[s][mode].metrics.get(k) %}<td>{{v if v is not none else '—'}}</td>{% endfor %}{% endfor %}</tr>{% endfor %}</tbody></table></div>
+<p>{{cr.confirmed_unassigned}} action(s) confirmée(s) et {{cr.candidate_unassigned}} hypothèse(s) IA sans équipe résolue.</p>
+{% if cr.candidate_players %}<h3>Fiches IA par bonnet (non validées)</h3>{% for p in cr.candidate_players %}<details><summary>{{names[p.side]}} · bonnet {{p.cap}} · {{p.event_count}} action(s) candidate(s)</summary><table class="metric-table"><tbody>{% for k,l in cr.labels %}{% set v=p.metrics.get(k) %}<tr><td>{{l}}</td><td>{{v if v is not none else '—'}}</td></tr>{% endfor %}</tbody></table></details>{% endfor %}{% endif %}
+{% endif %}
