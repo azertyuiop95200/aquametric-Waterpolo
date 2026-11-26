@@ -53,3 +53,26 @@ class ReviewImportTests(unittest.TestCase):
         self.assertIn("Contrôles opposés",h);self.assertIn("&lt;script&gt;",h);self.assertNotIn("<script>",h)
         self.assertIn("Aucune référence",env.get_template("review_reference_report.html").render(snapshot={"review_references":[]}))
         self.assertIn("review-reference",env.get_template("review_reference_form.html").render(match={"id":1,"team":{"name":"Équipe"}}))
+
+    def test_database_separate_reference(self):
+        from sqlalchemy import create_engine, select
+        from sqlalchemy.orm import Session
+        from sqlalchemy.exc import IntegrityError
+        from db import Base
+        from models import Match, MatchReviewReference, Event, User, Team, Club
+        engine=create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        with Session(engine) as db:
+            user=User(email="test@example.invalid",password_hash="test")
+            db.add(user);db.flush()
+            club=Club(name="Test",owner_id=user.id);db.add(club);db.flush()
+            team=Team(name="Test",club_id=club.id,owner_id=user.id);db.add(team);db.flush()
+            match=Match(owner_id=user.id,team_id=team.id,opponent="Other");db.add(match);db.flush()
+            _,canonical,digest,period=read(fixture())
+            db.add(MatchReviewReference(match_id=match.id,period=period,digest=digest,home_color="bleus",payload_json=canonical))
+            db.commit()
+            self.assertEqual(len(match.review_references),1)
+            self.assertEqual(db.scalars(select(Event)).all(),[])
+            db.add(MatchReviewReference(match_id=match.id,period=period,digest=digest,home_color="bleus",payload_json=canonical))
+            with self.assertRaises(IntegrityError):db.commit()
+            db.rollback()
