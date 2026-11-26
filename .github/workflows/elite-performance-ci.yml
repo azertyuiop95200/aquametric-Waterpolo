@@ -48,6 +48,7 @@ jobs:
           python -m unittest discover -s tests -p test_spatial_attribution.py -v
           python -m unittest discover -s tests -p test_control_mobility.py -v
           python -m unittest discover -s tests -p test_metric_context.py -v
+          python -m unittest discover -s tests -p test_execution_timing.py -v
       - working-directory: source
         run: |
           python - <<'PY'

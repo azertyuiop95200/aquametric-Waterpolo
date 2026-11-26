@@ -115,3 +115,14 @@
 {% if side in pm.teams %}{% set p=pm.teams[side] %}<tr><th>Équipe</th>{% for k in ['attack','defence'] %}<td>{{p[k].distance_m if p[k].distance_m is not none else '—'}}</td><td>{{p[k].seconds if p[k].distance_m is not none else '—'}}</td>{% endfor %}<td>{{p.unknown.distance_m if p.unknown.distance_m is not none else '—'}}</td><td>{{p.total.distance_m}}</td></tr>{% endif %}
 </tbody></table></div>{% endfor %}
 {% endif %}
+
+{% set et=snapshot.execution_timing|default({}) %}
+{% if et and et.players %}
+<h2>Vitesse de décision et d'exécution</h2>
+<p>Temps vidéo. Le contrôle visible avant lâcher est une durée partielle ; le délai réception–lâcher exige en plus une réception attribuée et une maîtrise continue corroborée. Tolérance de raccordement : {{et.tolerance_s}} s, seuil expérimental.</p>
+{% for side,name in [('for',match.team.name),('against',match.opponent)] %}<h3>{{name}}</h3>
+<div style="overflow:auto"><table class="metric-table"><thead><tr><th>Bonnet</th><th>Action</th><th>Contrôle avant lâcher (s, moy.)</th><th>Échantillon</th><th>Réception–lâcher (s, moy.)</th><th>Échantillon</th></tr></thead><tbody>
+{% for p in et.players if p.side==side %}{% for k,label in [('pass','Passe'),('shot','Tir')] %}{% set v=p[k] %}<tr><td>{{p.cap}}</td><td>{{label}}</td><td>{{v.mean_visible_control_s if v.mean_visible_control_s is not none else '—'}}</td><td>{{v.control_samples}}</td><td>{{v.mean_reception_to_release_s if v.mean_reception_to_release_s is not none else '—'}}</td><td>{{v.reception_samples}}</td></tr>{% endfor %}{% endfor %}
+{% for k,label in [('pass','Passe'),('shot','Tir')] %}{% set v=et.teams[side][k] %}<tr><th>Équipe</th><td>{{label}}</td><td>{{v.mean_visible_control_s if v.mean_visible_control_s is not none else '—'}}</td><td>{{v.control_samples}}</td><td>{{v.mean_reception_to_release_s if v.mean_reception_to_release_s is not none else '—'}}</td><td>{{v.reception_samples}}</td></tr>{% endfor %}
+</tbody></table></div>{% endfor %}
+{% endif %}

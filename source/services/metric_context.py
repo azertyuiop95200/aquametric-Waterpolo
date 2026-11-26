@@ -108,7 +108,8 @@ def phase_mobility(players,possessions,*,source_revision=None,possession_revisio
         for a,b,x,y,X,Y in rr:
             dt=b-a;d=hypot(X-x,Y-y);used=0.
             j=max(0,bisect_right(starts,a)-1)
-            for lo,hi,s in spans[j:]:
+            while j<len(spans):
+                lo,hi,s=spans[j];j+=1
                 if lo>=b:break
                 t=max(0.,min(hi,b)-max(lo,a))
                 k="attack" if s==side else "defence";c[k+"_s"]+=t;c[k+"_m"]+=d*t/dt;used+=t
