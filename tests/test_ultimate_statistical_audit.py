@@ -60,4 +60,23 @@ class AuditTests(unittest.TestCase):
            e(3,"goal","shot_speed_kmh=nan measurement=calibrated")]
         x=observed_numeric(r)["shot_speed_kmh"]["mean"];self.assertEqual((x["value"],x["n"]),(80,1))
 
+class MotionTests(unittest.TestCase):
+    def track(self,offset=0):
+        return {"segments":[[{"second":0,"x_m":1+offset,"y_m":1},{"second":.2,"x_m":1.4+offset,"y_m":1}]]}
+    def test_motion_overlap(self):
+        from services.tracking_performance import motion_summary
+        m=motion_summary([self.track(),self.track()])
+        self.assertAlmostEqual(m["distance_m"],.4)
+        self.assertAlmostEqual(m["observed_seconds"],.2)
+        self.assertAlmostEqual(m["average_speed_mps"],2)
+        self.assertAlmostEqual(sum(x["seconds"] for x in m["occupancy"]),.2)
+    def test_conflict(self):
+        from services.tracking_performance import motion_summary
+        m=motion_summary([self.track(),self.track(2)])
+        self.assertIsNone(m["distance_m"]);self.assertAlmostEqual(m["conflict_seconds"],.2)
+    def test_gap(self):
+        from services.tracking_performance import motion_summary
+        t=self.track();t["segments"][0][1]["second"]=1
+        self.assertIsNone(motion_summary([t])["average_speed_mps"])
+
 if __name__=="__main__":unittest.main()
