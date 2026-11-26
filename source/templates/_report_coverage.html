@@ -16,3 +16,14 @@
 {% if p.players %}<table class="metric-table"><thead><tr><th>Bonnet</th><th>Tentatives envoyées</th><th>Réceptions identifiées</th></tr></thead><tbody>{% for athlete in p.players %}<tr><td>{{athlete.cap}}</td><td>{{athlete.sent}}</td><td>{{athlete.received}}</td></tr>{% endfor %}</tbody></table>{% endif %}
 {% if p.network %}<table class="metric-table"><thead><tr><th>Bonnet émetteur</th><th>Bonnet receveur</th><th>Passes réussies candidates</th></tr></thead><tbody>{% for link in p.network %}<tr><td>{{link['from']}}</td><td>{{link['to']}}</td><td>{{link.count}}</td></tr>{% endfor %}</tbody></table>{% endif %}
 {% endfor %}{% endif %}
+
+{% set bc=(snapshot.video_actions|default({})).get('ball_control',{}) %}
+{% if bc and bc.observed_video_seconds %}
+<h2>Maîtrise individuelle du ballon</h2>
+<p>Temps vidéo de contrôle visible, candidat et partiel : {{bc.observed_video_seconds}} s ; contradictions {{bc.conflicting_video_seconds}} s. Ce n'est ni le temps de jeu réglementaire ni le temps de possession total, qui inclut notamment les trajectoires des passes.</p>
+{% for side,name in [('for',match.team.name),('against',match.opponent),('unknown','Équipe non résolue')] %}
+{% set t=bc.teams[side] %}<h3>{{name}}</h3>
+<p>Contrôle visible : {{t.control_video_seconds if t.control_video_seconds is not none else '—'}} s · sans numéro attribué : {{t.unattributed_video_seconds if t.unattributed_video_seconds is not none else '—'}} s</p>
+{% if t.players %}<table class="metric-table"><thead><tr><th>Bonnet</th><th>Temps vidéo avec ballon (s)</th></tr></thead><tbody>{% for p in t.players %}<tr><td>{{p.cap}}</td><td>{{p.control_video_seconds}}</td></tr>{% endfor %}</tbody></table>{% endif %}
+{% endfor %}
+{% else %}<h2>Maîtrise individuelle du ballon</h2><p>Non mesurée : aucun intervalle de contrôle exploitable.</p>{% endif %}

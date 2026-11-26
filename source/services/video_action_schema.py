@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-VERSION = "video-actions-v1"
+VERSION = "video-actions-v2-control"
 
 EVENT_LABELS = {
     "goal": "But", "shot_on_target": "Tir cadré arrêté", "shot_off_target": "Tir non cadré",
@@ -91,6 +91,28 @@ class ActionObservation(ObservationModel):
         return self
 
 
+class BallControlObservation(ObservationModel):
+    start_second: float = Field(ge=0)
+    end_second: float = Field(gt=0)
+    side: Side
+    cap_number: int | None = Field(default=None, ge=1, le=30)
+    confidence: float = Field(ge=0, le=1)
+    evidence: str = Field(min_length=12, max_length=700)
+    identity_evidence: str = Field(default="", max_length=400)
+    team_evidence: str = Field(default="", max_length=400)
+    is_replay: bool = False
+
+    @model_validator(mode="after")
+    def check_interval(self):
+        if self.end_second <= self.start_second:
+            raise ValueError("Invalid control interval")
+        if not self.team_evidence.strip():
+            self.side = "unknown"
+        if self.side == "unknown" or not self.identity_evidence.strip():
+            self.cap_number = None
+        return self
+
+
 class Observability(ObservationModel):
     family: Family
     status: Literal["visible", "limited", "not_visible"]
@@ -100,6 +122,7 @@ class Observability(ObservationModel):
 class SegmentObservation(ObservationModel):
     scene: Literal["water_polo", "mixed", "not_water_polo", "unreadable"]
     actions: list[ActionObservation] = Field(max_length=240)
+    ball_control: list[BallControlObservation] = Field(default_factory=list, max_length=240)
     observability: list[Observability] = Field(max_length=10)
     summary: str = Field(max_length=1400)
 
@@ -134,6 +157,7 @@ possession exige observation du changement de possession, pas le début/fin de l
 Pour possession_end, renseigne possession_outcome seulement si la cause est visible : but, arrêt, tir hors cadre, poteau, contre, mauvaise passe, interception, faute offensive, expiration, erreur technique ou fin de période. Un rebond récupéré par l’attaque ne termine pas automatiquement la possession. Un simple coup de sifflet ne prouve pas une exclusion : cherche le geste arbitral et la sortie/zone de rentrée. Une exclusion et un penalty ne sont pas la même sanction. Ne déduis pas la supériorité du nombre de personnes visibles dans un cadrage incomplet. Le référentiel senior récent est 4 × 8 min, possession 28 s, reset/exclusion 18 s dans les cas prévus, mais ne force pas ces valeurs sur un match ancien ou une compétition différente. game_clock_seconds et shot_clock_seconds uniquement si les affichages respectifs sont lisibles au timestamp ; ne les intervertis pas. Une passe décisive exige la séquence complète jusqu’au but. Pour chaque passe recherche le lâcher, le trajet de balle et la réception ou interception. Attribue le tir à la joueuse qui lâche le ballon vers la cage, distingue tir cadré arrêté, non cadré, contré et but; si le lâcher vers la cage est certain mais l’issue est masquée, utilise shot_unknown. Ne le classe ni cadré ni non cadré. Si le geste lui-même est incertain, ne crée pas de tir. Pour l’équipe attaquante, exige la maîtrise du ballon et la direction du but attaqué, sans supposer que le bonnet clair appartient au club à domicile. Les bonnets rouges peuvent correspondre à une gardienne; le numéro doit être lisible, jamais déduit d’une piste de tracking. Le nombre de joueuses visibles n’est pas le nombre de joueuses autorisées dans le bassin. Distingue temps vidéo, chrono général et chrono de possession. Si une action est masquée, ne la complète pas par supposition.
 
 Pour la synthèse tactique, distingue press individuel, aide latérale 1–2 / 4–5, zone M (aide sur pointe et splits périphériques), zone 2–3–4, trappe et changement press-zone. Les postes 1–6 ne sont pas les numéros de bonnet. Évalue plusieurs secondes avant le tir, les appariements, l’aide sur pointe et les déplacements. Si le champ ne montre pas toutes les joueuses, ne nomme que le mécanisme local visible. Vérifie l'issue du tir après le lâcher, y compris ballon dans le filet, déviation par la gardienne, retour du ballon en jeu et reprise. Ne déduis pas l'issue uniquement du score.
+Dans ball_control, retourne les intervalles pendant lesquels une joueuse contrôle visiblement le ballon, en secondes locales start_second/end_second. Commence à la réception maîtrisée, à une récupération ou à une prise de contrôle visible ; termine au lâcher, à la perte de contrôle, à l'interruption ou lorsque la visibilité devient insuffisante. Inclure la conduite à la nage si le contrôle est visible. Ne pas inclure le vol du ballon, un rebond libre, une simple proximité, une lutte sans maîtrise claire, une coupure ni une rediffusion. N'utilise pas simplement le temps entre deux actions. Ne prolonge pas un intervalle derrière une occultation. Si le début ou la fin est hors du cadre temporel, limite l'intervalle à la partie observée. Identifie séparément équipe et numéro avec preuves, ou unknown/null. Les durées sont du temps vidéo observé, pas du temps de jeu officiel.
 Rends la visibilité et ses limites pour chacune des familles: {', '.join(FAMILIES)}.
 Une absence de détection n'est pas la preuve d'un zéro. Ni distance métrique, vitesse,
 temps de jeu complet, fatigue, note globale, ni total extrapolé: le modèle ne les mesure
