@@ -10,6 +10,8 @@ on:
       - 'tests/test_retrospective_review.py'
       - 'tests/test_possession_context.py'
       - 'tests/test_local_object_tracking.py'
+      - 'tests/test_calibration_validation.py'
+      - 'source/tests/test_metric_field.py'
       - '.github/workflows/possession-evidence.yml'
 jobs:
   possession-evidence:
@@ -28,6 +30,8 @@ jobs:
       - run: PYTHONPATH=source python -m unittest discover -s tests -p test_retrospective_review.py -v
       - run: PYTHONPATH=source python -m unittest discover -s tests -p test_possession_context.py -v
       - run: PYTHONPATH=source python -m unittest discover -s tests -p test_local_object_tracking.py -v
+      - run: PYTHONPATH=source python -m unittest discover -s source/tests -p test_metric_field.py -v
+      - run: PYTHONPATH=source python -m unittest discover -s tests -p test_calibration_validation.py -v
       - run: |
           python - <<'PY'
           from jinja2 import Environment, FileSystemLoader
