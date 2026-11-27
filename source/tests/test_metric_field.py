@@ -20,3 +20,10 @@ class MetricTests(unittest.TestCase):
         self.assertLess(m["distance_m"],1.5)
     def test_degenerate(self):
         with self.assertRaises(ValueError):calibrate([[.5,.5]]*5)
+    def test_raw_preserved(self):
+        p=[{"second":i*.125,"x_m":i*.1,"y_m":0.} for i in range(8)]
+        m=measure(p)
+        self.assertEqual(m["raw_segments"][0][0]["x_m"],0.)
+        self.assertNotEqual(m["segments"][0][0]["x_m"],0.)
+        m["segments"][0][0]["x_m"]=99.
+        self.assertEqual(m["raw_segments"][0][0]["x_m"],0.)
