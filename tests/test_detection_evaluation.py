@@ -149,3 +149,16 @@ class PersistedScanBenchmarkTests(unittest.TestCase):
             dict(source_frame_index=10,second=.4,detections=[dict(kind="head",x=.1,y=.2)]),
             dict(source_frame_index=12,second=.48,detections=[])])
         with self.assertRaisesRegex(ValueError,"provenance"):self.run_pair(a,b,[])
+
+    def test_candidate_audit_without_dimensions_or_reference(self):
+        from services.detection_evaluation import compare_scan_windows
+        d=dict(kind="head",x=.1,y=.2,colour="cap_dark")
+        def frame(i,points):return dict(source_frame_index=i,second=i/25,detections=points)
+        a=self.evidence("baseline",[frame(10,[d]),frame(12,[])])
+        b=self.evidence("head_flow",[frame(10,[dict(d,point_source="detector"),
+            dict(d,x=.2,point_source="optical_flow")]),frame(12,[])])
+        r=compare_scan_windows(a,b,[],5)
+        self.assertEqual(r["same_detector_candidate_frames"],2)
+        self.assertEqual(r["candidate_counts"]["head_flow_propagated_heads"],1)
+        self.assertIsNone(r["all_candidates"]["methods"]["head_flow"]["precision"])
+        with self.assertRaises(ValueError):compare_scan_windows(a,b,[self.ref()],5)
