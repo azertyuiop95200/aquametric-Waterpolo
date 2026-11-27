@@ -5,7 +5,9 @@ from math import hypot
 
 VERSION='local-hog-head-review-v1'
 
-def hog():return cv2.HOGDescriptor((32,32),(16,16),(8,8),(8,8),9)
+def hog():
+    if not hasattr(cv2,'HOGDescriptor'):raise ValueError('HOG indisponible : utiliser OpenCV 4.x compatible.')
+    return cv2.HOGDescriptor((32,32),(16,16),(8,8),(8,8),9)
 
 def detect_heads(frame, weights, bias, *, limit=24):
     if not isinstance(frame,np.ndarray) or frame.dtype!=np.uint8 or frame.ndim!=3 or frame.shape[2]!=3 or not 128<=frame.shape[0]<=2160 or not 128<=frame.shape[1]<=3840 or not .8<=frame.shape[1]/frame.shape[0]<=3.2:raise ValueError('Image invalide')

@@ -1,9 +1,13 @@
 import unittest
+from unittest.mock import patch
 import cv2,numpy as np
 from services.learned_head import hog,detect_heads,review_disagreements
 
 def p(x,y=.5):return dict(kind='head',x=x,y=y,status='candidate',ranking_score=.3)
 class LearnedHeadTests(unittest.TestCase):
+ def test_unavailable_hog(self):
+  with patch('services.learned_head.cv2',new=object()):
+   with self.assertRaisesRegex(ValueError,'HOG indisponible'):hog()
  def test_valid_hog(self):
   f=np.full((240,320,3),100,np.uint8);v=[0.]*hog().getDescriptorSize();self.assertEqual(detect_heads(f,v,-1),[])
  def test_bad_model(self):
