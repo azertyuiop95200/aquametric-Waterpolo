@@ -234,3 +234,17 @@ class PassReviewTests(unittest.TestCase):
         self.assertIsNone(p["teams"]["blancs"]["resolved_outcome_coverage_pct"])
         p=self.validate(outcome="unknown",related_event_id=None,event_relation=None)
         self.assertEqual(p["teams"]["bleus"]["resolved_outcome_coverage_pct"],0)
+
+    def test_blocked_not_direct_completion(self):
+        self.reject(defensive_intervention="blocked")
+        p=self.validate(defensive_intervention="blocked",outcome="deflected_retained",
+            deflection_observed=True,related_event_id=None,event_relation=None)
+        self.assertEqual(p["teams"]["bleus"]["completed"],0)
+        self.assertEqual(p["teams"]["bleus"]["deflected_retained"],1)
+
+    def test_no_intervention_contradictions(self):
+        self.reject(defensive_intervention="none_observed",outcome="intercepted",
+            control_team="blancs",related_event_id=None,event_relation=None)
+        self.reject(defensive_intervention="none_observed",outcome="deflected_retained",
+            deflection_observed=True,related_event_id=None,event_relation=None)
+        self.assertEqual(self.validate(defensive_intervention="none_observed")["teams"]["bleus"]["completed"],1)
