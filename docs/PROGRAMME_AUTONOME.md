@@ -59,3 +59,6 @@ Ce document suit le développement, pas les données privées de match. Ne pas y
 
 ## R13 — délai de réception et couverture des issues
 - f69065d : délai contact observé–maîtrise pour passes réussies uniquement, nul au premier contact; inconnu si contact apparent ou arrivée seule. Couverture des issues résolues parmi tentatives observées, distincte de couverture vidéo. f81e0d8 : deux tests ciblés synthétiques. CI à confirmer. Aucun nouveau relevé vidéo ni fusion ni déploiement. Reprendre les fenêtres R12, afficher les nouveaux champs dans le rapport et vérifier CI.
+
+## R13.1 — restitution HTML
+- CI du head R13 bb971b5 confirmée completed/success via GitHub. Commit 0d5b726 : affichage couverture des issues et délai contact–maîtrise, zéro conservé, champ absent/inconnu non affiché comme zéro. Délai explicitement écart entre images. CI du nouveau commit à vérifier. Aucun nouveau relevé vidéo ni déploiement. Reprendre les fenêtres R12 et tester le rendu sur référence privée.
