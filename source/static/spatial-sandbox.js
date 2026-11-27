@@ -5,7 +5,7 @@ const data=JSON.parse($("data").textContent), base=data.baseline.observations, r
 const clone=x=>JSON.parse(JSON.stringify(x)), L=base.length_m,W=base.width_m;
 const canvas=$("canvas"),ctx=canvas.getContext("2d");
 const initial=()=>({start:clone(base.start),carrier_velocity:[0,0,0],carrier_acceleration:[0,0,0],defenders:base.defenders.map(d=>({...clone(d),acceleration:[0,0,0]})),
- options:base.options.map(o=>({...clone(o),receiver_velocity:[0,0,0]})),delay_s:0,ball_speed_m_s:12,suggest:true});
+ options:base.options.map(o=>({...clone(o),receiver_velocity:[0,0,0]})),delay_s:0,ball_speed_m_s:12,keeper_id:"",suggest:true});
 const snapshots={A:null,B:null};
 let edit=initial(), result=null, resultInput=null, history=[], selected="carrier", drag=null, timer=null, revision=0, busy=false, pending=false, refineNext=false, animation=0;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)), fmt=(v,n=2)=>Number.isFinite(v)?v.toFixed(n):"—";
@@ -25,7 +25,7 @@ function sync(){
  ["ax","ay","az"].forEach((id,i)=>{$(id).disabled=!e.a;$(id).value=e.a?fmt(e.a[i]):""});
  $("radius").disabled=!e.defender;$("radius").value=e.defender?fmt(e.defender.radius):"";
  $("flight").disabled=!e.option;$("flight").value=e.option?e.option.duration_s:"";
- $("delay").value=edit.delay_s;$("delay-value").value=fmt(edit.delay_s,1)+" s";$("speed").value=edit.ball_speed_m_s;$("suggest").checked=edit.suggest;
+ $("delay").value=edit.delay_s;$("delay-value").value=fmt(edit.delay_s,1)+" s";$("speed").value=edit.ball_speed_m_s;$("suggest").checked=edit.suggest;$("keeper").value=edit.keeper_id||"";
 }
 function remember(){history.push(clone(edit));if(history.length>40)history.shift();$("undo").disabled=false}
 function limit(e,p){
@@ -66,8 +66,24 @@ function draw(){
  }
  ctx.fillStyle="#c9e2ef";ctx.font="14px sans-serif";ctx.fillText("HYPOTHÈSE COACH · t avant geste = "+fmt(edit.delay_s,1)+" s",15,23);
 }
+function showGoalMap(map){
+ const root=$("goal-map");root.replaceChildren();
+ if(!map){$("goal-summary").textContent=edit.keeper_id?"Carte en attente de recalcul.":"Sélectionnez une gardienne.";return}
+ const counts=x=>x.clear===null?"Non évalué":x.clear+"/"+x.evaluated+" cibles";
+ $("goal-summary").textContent="Gardienne : "+counts(map.keeper)+" · Bloc : "+counts(map.defence)+(map.keeper_position?" · Profondeur "+fmt(map.keeper_position.depth_m)+" m · Décalage latéral "+fmt(map.keeper_position.lateral_offset_m)+" m":"");
+ const colors={clear_in_model:"#21754d",potential_obstruction:"#a33e47",unknown:"#60717a",outside_flight_window:"#60717a"};
+ for(const [key,label] of [["keeper_status","Gardienne seule"],["defence_status","Défense complète"]]){
+  add(root,"h3",label);
+  const table=add(root,"table","");table.setAttribute("aria-label",label+" : cibles de tir échantillonnées");
+  for(let i=0;i<map.rows;i++){const tr=add(table,"tr","");for(const c of map.cells.filter(c=>c.row===i)){
+   const status=c[key],td=add(tr,"td",status==="clear_in_model"?"Libre":status==="potential_obstruction"?"Obs.":"—");
+   td.style.backgroundColor=colors[status]||colors.unknown;td.style.color="#fff";td.style.textAlign="center";
+   td.title="Y "+fmt(c.target[1])+" m · Z "+fmt(c.target[2])+" m · vol "+fmt(c.flight_s)+" s";
+  }}
+ }
+}
 function display(){
- $("rows").replaceChildren();
+ $("rows").replaceChildren();showGoalMap(result&&resultInput===JSON.stringify(edit)?result.goal_coverage:null);
  if(!result||resultInput!==JSON.stringify(edit)){$("summary").textContent="Scène modifiée : résultats en attente de recalcul.";return}
  const options=[...result.options].sort((a,b)=>(b.clearance_m??-Infinity)-(a.clearance_m??-Infinity));
  $("summary").textContent=result.trials+" simulations / option · "+result.proposed_ids.length+" solutions générées · "+(result.complete_defence?"couverture défensive déclarée complète":"couverture défensive insuffisante");
@@ -96,6 +112,8 @@ async function calculate(){
  }catch(e){if(token===revision){result=null;resultInput=null;$("status").textContent=e.message;display();draw()}}
  finally{busy=false;if(pending){clearTimeout(timer);timer=setTimeout(calculate,100)}}
 }
+for(const d of base.defenders){const o=add($("keeper"),"option",d.id);o.value=d.id}
+$("keeper").addEventListener("change",()=>{remember();edit.keeper_id=$("keeper").value;changed()});
 const select=$("entity");for(const e of entities()){const o=add(select,"option",e.label);o.value=e.key}
 select.addEventListener("change",()=>{selected=select.value;sync();draw()});
 for(const id of ["x","y","z","vx","vy","vz","ax","ay","az","flight","radius"])$(id).addEventListener("change",()=>{
@@ -147,7 +165,7 @@ $("export").addEventListener("click",()=>{if(!result||resultInput!==JSON.stringi
 let searchToken=0;
 $("search").addEventListener("click",async()=>{
  const token=++searchToken, input=JSON.stringify(edit);
- $("search").disabled=true;$("search-cancel").disabled=false;$("search-rows").replaceChildren();
+ $("search").disabled=true;$("search-cancel").disabled=false;$("search-rows").replaceChildren();$("timing-rows").replaceChildren();
  $("search-status").textContent="Exploration des configurations…";
  try{
  const res=await fetch("/matches/"+data.match+"/spatial/"+data.event+"/sandbox/search",{method:"POST",headers:{"Content-Type":"application/json"},body:input});
@@ -155,6 +173,7 @@ $("search").addEventListener("click",async()=>{
  if(token!==searchToken)return;
  $("search-status").textContent=json.scenarios.length+" configurations calculées · "+json.rejected.length+" rejetées · aperçu à "+json.trials_per_option+" simulations par option. "+(input===JSON.stringify(edit)?"":"La scène a changé depuis le lancement.");
  const best=x=>x?fmt(x.clearance_frequency*100,1)+" % · "+x.id:"Non mesuré";
+ for(const w of json.timing_samples||[]){const tr=add($("timing-rows"),"tr","");const count=x=>x.clear===null?"Non évalué":x.clear+"/"+x.evaluated;add(tr,"td",fmt(w.delay_s)+" s");add(tr,"td",count(w.keeper));add(tr,"td",count(w.defence));add(tr,"td",best(w.best_shot));add(tr,"td",best(w.best_pass));}
  for(const scenario of json.scenarios){
  const row=document.createElement("tr");$("search-rows").append(row);
  add(row,"td",scenario.name+" — "+scenario.description);
@@ -165,6 +184,6 @@ $("search").addEventListener("click",async()=>{
  }catch(e){if(token===searchToken)$("search-status").textContent=e.message}
  finally{if(token===searchToken)$("search").disabled=false}
 });
-$("search-cancel").addEventListener("click",()=>{searchToken++;$("search-rows").replaceChildren();$("search-status").textContent="Résultats masqués.";$("search-cancel").disabled=true;$("search").disabled=false});
+$("search-cancel").addEventListener("click",()=>{searchToken++;$("search-rows").replaceChildren();$("timing-rows").replaceChildren();$("search-status").textContent="Résultats masqués.";$("search-cancel").disabled=true;$("search").disabled=false});
 $("undo").disabled=true;sync();changed();
 })();
