@@ -33,4 +33,33 @@ class ScenarioSearchTests(unittest.TestCase):
         r=search_scenarios(b,{})
         self.assertTrue(all(s["best_shot"] is None or s["best_shot"]["id"]!="real" for s in r["scenarios"]))
 
+    def test_interception_exact_horizontal_speed(self):
+        from math import hypot
+        from services.spatial_sandbox import intercept_time
+        t=intercept_time([0,0,1],[6,0,1],[2,1,0],12)
+        self.assertIsNotNone(t)
+        self.assertAlmostEqual(hypot(6+2*t,t),12*t,places=8)
+        self.assertAlmostEqual(intercept_time([0,0,1],[6,0,1],[0,0,0],12),.5)
+        self.assertIsNone(intercept_time([0,0,1],[20,0,1],[0,0,0],2))
+        self.assertIsNone(intercept_time([0,0,1],[.1,0,1],[0,0,0],12))
+        self.assertIsNone(intercept_time([0,0,1],[5,0,1],[3,0,0],2))
+
+    def test_generated_options_respect_requested_speed(self):
+        from math import hypot
+        b=baseline()
+        edits=dict(ball_speed_m_s=12,options=deepcopy(b["options"]))
+        edits["options"][1]["receiver_velocity"]=[1,.5,0]
+        r=sandbox(b,edits,16)
+        generated=[o for o in r["options"] if o["generated"]]
+        self.assertTrue(any(o["kind"]=="pass" for o in generated))
+        self.assertTrue(any(o["kind"]=="shot" for o in generated))
+        for o in generated:
+            self.assertAlmostEqual(hypot(o["target"][0]-r["start"][0],o["target"][1]-r["start"][1])/o["flight_s"],12,places=8)
+
+    def test_generated_options_outside_time_window_omitted(self):
+        b=baseline()
+        r=sandbox(b,dict(ball_speed_m_s=2),16)
+        self.assertEqual(r["proposed_ids"],[])
+        self.assertEqual(len(r["options"]),2)
+
 if __name__=="__main__":unittest.main()
