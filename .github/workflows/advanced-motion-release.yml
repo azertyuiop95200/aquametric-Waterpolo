@@ -17,12 +17,15 @@ jobs:
       - run: pip install jinja2 fastapi sqlalchemy pytest pydantic opencv-python-headless numpy
       - run: python -m compileall -q source
       - working-directory: source
+        env:
+          PYTHONPATH: ..:.
         run: |
           python -m unittest discover -s tests -p test_advanced_motion_release.py -v
           python -m unittest discover -s tests -p test_advanced_occupation_release.py -v
           python -m unittest discover -s tests -p test_collective_review_release.py -v
           python -m unittest discover -s tests -p test_recovery_review_release.py -v
           python -m unittest discover -s tests -p test_shot_context_release.py -v
+          python -m unittest discover -s tests -p 'test_spatial_*.py' -v
           python -m unittest discover -s tests -p test_identity_aggregation.py -v
           python -m unittest discover -s tests -p test_metric_field.py -v
           python -m unittest discover -s tests -p test_guest_full_policy.py -v
@@ -61,16 +64,22 @@ jobs:
               snapshot['shot_context'] = build_shots(snapshot, local_source=True)
               for name in ('shot_context_rows.html','shot_context_editor.html'):
                   env.get_template(name).render(snapshot=snapshot,match=SimpleNamespace(id=1,team=SimpleNamespace(name='A'),opponent='B'))
+          from services.spatial_context_3d import build as build_3d
+          from test_spatial_context_release import saved as saved_3d
+          for snapshot in (saved_3d(), {}):
+              snapshot['spatial_3d'] = build_3d(snapshot, local_source=True)
+              for name in ('spatial_context_3d_rows.html','spatial_context_3d_editor.html'):
+                  env.get_template(name).render(snapshot=snapshot,match=SimpleNamespace(id=1,team=SimpleNamespace(name='A'),opponent='B'))
           PY
 
-  live-release-four:
+  live-release-five:
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
-      - name: Verify live release four and isolated guest report
+      - name: Verify live release five and isolated guest report
         env:
           BASE: https://aquametric-ultimate-guest.onrender.com
-          EXPECTED: 6376bebc48a51c6b6a562c52bf9534593c9e95bd
+          EXPECTED: 1f2a5bd8ef28b4c2d16eb19d7898da43ed2253ba
         run: |
           set -euo pipefail
           tmp=$(mktemp -d)
@@ -97,6 +106,8 @@ jobs:
           grep -Fq 'id="collectiveReview"' "$tmp/export"
           grep -Fq 'id="recoveryReview"' "$tmp/report"
           grep -Fq 'id="recoveryReview"' "$tmp/export"
+          grep -Fq 'id="shotContext"' "$tmp/report"
+          grep -Fq 'id="shotContext"' "$tmp/export"
           # The live uncalibrated URL dossier must reject a collective review.
           code=$(curl -sS --max-time 30 -b "$tmp/cookies" -H "Origin: $BASE" --data-urlencode 'binding={}' --data-urlencode 'action=add' -o "$tmp/rejected" -w '%{http_code}' "$BASE/matches/$id/analysis/collective-review")
           [[ "$code" == 400 || "$code" == 422 ]]

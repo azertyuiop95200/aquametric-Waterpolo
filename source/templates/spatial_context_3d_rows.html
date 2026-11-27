@@ -1,0 +1,39 @@
+{% if snapshot.spatial_3d is defined %}{% set r=snapshot.spatial_3d %}
+<section class="report-card section-wide" id="spatial3d"><h2>Simulation spatiale 3D — alternatives</h2>
+<p>Trajectoires balistiques hypothétiques issues du moteur partagé replay-3. Positions horizontales revues ; hauteurs, portée, immobilité et vitesse supposées. Aucun résultat de tir ou probabilité de réussite n'est déduit. La cible effectivement visée n'est pas renseignée.</p>
+{% if r.reason %}<p>{{ r.reason }}</p>{% endif %}
+{% for a in r.rows %}
+<details open><summary>Tir #{{ a.event_id }} · Q{{ a.period }} · {{ '%.2f'|format(a.decision_second) }} s</summary>
+<p>Vitesse horizontale hypothétique {{ a.nominal_horizontal_speed_mps }} m/s · hauteur de départ {{ a.start[2] }} m · justification : {{ a.evidence }}. Écart-type hypothétique {{ a.sigma_m }} m ; {{ a.trials }} tirages par option si supérieur à zéro. Erreur réelle de calibration inconnue.</p>
+{% set L=a.length_m %}{% set W=a.width_m %}
+<h3>Vue axonométrique des trajectoires</h3>
+{% macro px(x,y) %}{{ x+0.5*y }}{% endmacro %}
+{% macro py(x,y,z) %}{{ 0.30*x+0.65*y-z }}{% endmacro %}
+{% set peak=namespace(v=3) %}{% for o in a.options %}{% if o.peak_height_m>peak.v %}{% set peak.v=o.peak_height_m %}{% endif %}{% endfor %}
+<svg role="img" aria-label="Projection axonométrique du bassin et des trajectoires hypothétiques" viewBox="-1 {{ -peak.v-2 }} {{ L+0.5*W+3 }} {{ 0.3*L+0.65*W+peak.v+4 }}" preserveAspectRatio="xMidYMid meet" style="width:100%;max-width:680px;background:#eef5f8;border:1px solid #4893b0">
+<polygon points="0,0 {{ L }},{{ 0.3*L }} {{ L+0.5*W }},{{ 0.3*L+0.65*W }} {{ 0.5*W }},{{ 0.65*W }}" fill="none" stroke="#4893b0" stroke-width="0.08"/>
+<polygon points="{{ px(a.goal_x,W/2-1.5) }},{{ py(a.goal_x,W/2-1.5,0) }} {{ px(a.goal_x,W/2+1.5) }},{{ py(a.goal_x,W/2+1.5,0) }} {{ px(a.goal_x,W/2+1.5) }},{{ py(a.goal_x,W/2+1.5,0.9) }} {{ px(a.goal_x,W/2-1.5) }},{{ py(a.goal_x,W/2-1.5,0.9) }}" fill="#b9dbe5" fill-opacity="0.3" stroke="#164e63" stroke-width="0.09"/>
+{% for d in a.defenders %}<line x1="{{ px(d.position[0],d.position[1]) }}" y1="{{ py(d.position[0],d.position[1],0) }}" x2="{{ px(d.position[0],d.position[1]) }}" y2="{{ py(d.position[0],d.position[1],d.position[2]) }}" stroke="#64748b" stroke-dasharray="0.2 0.2" stroke-width="0.07"/><circle cx="{{ px(d.position[0],d.position[1]) }}" cy="{{ py(d.position[0],d.position[1],d.position[2]) }}" r="0.2" fill="#b91c1c"><title>{{ d.id }} — centre hypothétique</title></circle>{% for s in d.reach_segments %}<line x1="{{ px(d.position[0]+s.start_offset[0],d.position[1]+s.start_offset[1]) }}" y1="{{ py(d.position[0]+s.start_offset[0],d.position[1]+s.start_offset[1],d.position[2]+s.start_offset[2]) }}" x2="{{ px(d.position[0]+s.end_offset[0],d.position[1]+s.end_offset[1]) }}" y2="{{ py(d.position[0]+s.end_offset[0],d.position[1]+s.end_offset[1],d.position[2]+s.end_offset[2]) }}" stroke="#b91c1c" stroke-width="0.1"><title>{{ d.id }} · {{ s.part }} (pose initiale supposée)</title></line>{% endfor %}{% endfor %}
+{% for o in a.options %}<polyline points="{% for p in o.path %}{{ px(p.xyz_m[0],p.xyz_m[1]) }},{{ py(p.xyz_m[0],p.xyz_m[1],p.xyz_m[2]) }} {% endfor %}" fill="none" stroke="{{ '#1764aa' if o.kind=='shot' else '#0f766e' }}" stroke-width="0.1" stroke-dasharray="0.3 0.15"><title>{{ o.id }} · {{ o.status }}</title></polyline>{% endfor %}
+<circle cx="{{ px(a.start[0],a.start[1]) }}" cy="{{ py(a.start[0],a.start[1],a.start[2]) }}" r="0.22" fill="#eab308"/>
+<line x1="0" y1="0" x2="5" y2="1.5" stroke="#164e63" stroke-width="0.12"/><text x="2.5" y="-0.35" font-size="0.6" fill="#164e63">5 m axe x</text>
+</svg>
+<p>Projection oblique à coefficients fixes ; lignes bleues = tirs, vertes = passes, rouge = centres et postures initiales des obstacles. Les distances du tableau sont calculées en 3D, pas sur la projection.</p>
+<h3>Ouverture du but échantillonnée</h3>
+{% set m=a.goal_coverage %}
+<svg role="img" aria-label="Grille des cibles hypothétiques du but" viewBox="-0.15 -0.15 3.3 1.2" preserveAspectRatio="xMidYMid meet" style="width:100%;max-width:520px">
+<rect x="0" y="0" width="3" height="0.9" fill="#eef5f8" stroke="#164e63" stroke-width="0.025"/>
+{% for c in m.cells %}{% set w=2.78/m.columns %}{% set h=0.68/m.rows %}<rect x="{{ 0.11+c.col*w }}" y="{{ 0.11+c.row*h }}" width="{{ w }}" height="{{ h }}" fill="{{ '#15803d' if c.defence_status=='clear_in_model' else '#b91c1c' if c.defence_status=='potential_obstruction' else '#94a3b8' }}" fill-opacity="0.7" stroke="#ffffff" stroke-width="0.008"><title>Cellule {{ c.row+1 }},{{ c.col+1 }} : {{ c.defence_status }}</title></rect>{% endfor %}
+</svg>
+<p>Vert : centre de cellule dégagé selon le modèle ; rouge : obstruction potentielle ; gris : indéterminé ou durée hors domaine. Défense complète : {{ m.defence.clear if m.defence.clear is not none else 'Non mesuré' }}/{{ m.defence.evaluated }} cibles évaluables dégagées ; gardienne seule : {{ m.keeper.clear if m.keeper.clear is not none else 'Non mesuré' }}/{{ m.keeper.evaluated }}. Ceci n'est pas la surface réellement accessible ni un taux de réussite.</p>
+<h3>Comparaison des scénarios</h3>
+<table class="metric-table"><thead><tr><th>Option hypothétique</th><th>Vol (s)</th><th>Vitesse initiale (m/s)</th><th>Hauteur max. échantillonnée (m)</th><th>Marge (m)</th><th>Obstacle le plus proche</th><th>Fréquence conditionnelle de dégagement</th></tr></thead><tbody>
+{% for o in a.options %}<tr><td>{{ o.id }}</td><td>{{ '%.2f'|format(o.flight_s) }}</td><td>{{ '%.2f'|format(o.launch_speed_m_s) }}</td><td>{{ '%.2f'|format(o.peak_height_m) }}</td><td>{{ '%.3f'|format(o.clearance_m) if o.clearance_m is not none else 'Non mesuré' }}</td><td>{{ o.closest_defender or 'Non mesuré' }} · {{ o.closest_part or '—' }}</td><td>{% if o.clearance_frequency is not none %}{{ '%.1f'|format(o.clearance_frequency*100) }} % ({{ '%.1f'|format(o.simulation_interval[0]*100) }}–{{ '%.1f'|format(o.simulation_interval[1]*100) }} %){% else %}Non mesurée{% endif %}</td></tr>{% endfor %}
+</tbody></table>
+<p>Marge positive : dégagement dans le modèle ; marge négative : obstruction potentielle. Les intervalles reflètent seulement l'échantillonnage Monte-Carlo, pas la validité sportive du modèle.</p>
+{% if a.two_step is defined %}<h3>Passe puis tir — hypothèses en deux temps</h3>
+<table class="metric-table"><thead><tr><th>Passe</th><th>Durée totale (s)</th><th>Marge minimale des deux trajets (m)</th><th>Écart au meilleur tir direct échantillonné (m)</th></tr></thead><tbody>{% for v in a.two_step.alternatives %}<tr><td>{{ v.pass_id }}</td>{% for k in ['total_duration_s','joint_clearance_m','direct_clearance_delta_m'] %}<td>{{ '%.3f'|format(v[k]) if v[k] is not none else 'Non mesuré' }}</td>{% endfor %}</tr>{% else %}<tr><td colspan="4">Aucune passe évaluable.</td></tr>{% endfor %}</tbody></table>
+<p>Réception supposée, pas de réaction adaptative ni de faisabilité sportive démontrée.</p>{% endif %}
+</details>
+{% endfor %}
+</section>{% endif %}
