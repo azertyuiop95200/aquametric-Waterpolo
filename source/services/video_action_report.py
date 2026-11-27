@@ -32,6 +32,22 @@ AUTO_LABELS = {**LABELS, **EVENT_LABELS, "events": "Actions détectées retenues
                "hand": "Main utilisée", "observed_possessions": "Possessions bornées observées"}
 
 
+AUTO_LABELS.update({
+    "possession_efficiency": "Efficacité offensive des possessions observées",
+    "possession_sample_count": "Possessions exploitables (échantillon)",
+    "possessions_with_shot": "Possessions avec tir détecté",
+    "possessions_without_observed_shot": "Possessions sans tir détecté",
+    "possessions_with_goal": "Possessions avec but détecté",
+    "possession_shot_rate_pct": "Possessions avec tir (%)",
+    "possession_goal_rate_pct": "Possessions avec but (%)",
+    "mean_shots_per_possession": "Tirs détectés par possession",
+    "mean_passes_per_possession": "Passes détectées par possession",
+    "mean_possession_video_seconds": "Durée moyenne de possession (s vidéo)",
+    "first_shot_sample_count": "Possessions avec délai de tir mesurable",
+    "mean_first_shot_video_seconds": "Délai moyen avant premier tir (s vidéo)",
+})
+
+
 def latest_run(db, match_id):
     return db.scalar(select(VideoActionAnalysis).where(VideoActionAnalysis.match_id == match_id)
                      .order_by(VideoActionAnalysis.created_at.desc(), VideoActionAnalysis.id.desc()))
@@ -104,7 +120,7 @@ def _event_proxy(action):
                            context_meta=SimpleNamespace(perspective=action["side"], phase_tag=action.get("phase", "unknown"), quality_tag=""))
 
 
-def summarize_actions(actions):
+def summarize_actions(actions, *, collective=True):
     report = descriptive_event_report([_event_proxy(action) for action in actions])
     if not actions:
         report["basic"] = {key: 0 if key == "events" else None for key in report["basic"]}
@@ -114,7 +130,11 @@ def summarize_actions(actions):
     report["by_phase"] = _group_summary(actions, "phase")
     report["tag_breakdowns"] = {key: dict(Counter(str(a[key]) for a in actions if a.get(key) not in {None,"unknown",""}))
                                 for key in ("zone","cage_zone","hand","shot_type","pass_type","cause","pressure","decision")}
-    report["observed_possessions"] = bounded_possessions(actions)
+    report["observed_possessions"] = bounded_possessions(actions if collective else [])
+    if not collective:
+        report["observed_possessions"]["note"] = "Indicateur collectif : les actions du seul bonnet ne permettent pas de reconstituer une possession d’équipe."
+    else:
+        report["possession_efficiency"] = possession_efficiency(report["observed_possessions"]["intervals"])
     # Remove prose that calls automatically inferred tags 'confirmed' and the
     # annotation-based readiness score, which is not sporting accuracy.
     report.pop("qualitative", None)
@@ -152,6 +172,32 @@ def bounded_possessions(actions):
     intervals.sort(key=lambda i: (i["start_second"], i["end_second"], i["side"], i["segment_index"]))
     return {"count": len(intervals) if intervals else None, "intervals": intervals,
             "note": "Bornes de possession proposées par le modèle dans une même séquence continue. Débuts successifs sans fin intermédiaire exclus. Durées en temps vidéo, pas en chrono de jeu ; aucune extrapolation aux possessions manquantes."}
+
+
+def possession_efficiency(intervals):
+    """Descriptive sample rates, not estimates of all match possessions."""
+    n = len(intervals)
+    with_shot = sum(i["shots"] > 0 for i in intervals)
+    with_goal = sum(i["goals"] > 0 for i in intervals)
+    first_shots = [i["first_shot_after_seconds"] for i in intervals
+                   if i["first_shot_after_seconds"] is not None]
+    def mean(values):
+        return round(sum(values) / len(values), 2) if values else None
+    def pct(count):
+        return round(100 * count / n, 2) if n else None
+    return {
+        "possession_sample_count": n,
+        "possessions_with_shot": with_shot if n else None,
+        "possessions_without_observed_shot": n - with_shot if n else None,
+        "possessions_with_goal": with_goal if n else None,
+        "possession_shot_rate_pct": pct(with_shot),
+        "possession_goal_rate_pct": pct(with_goal),
+        "mean_shots_per_possession": mean([i["shots"] for i in intervals]),
+        "mean_passes_per_possession": mean([i["passes"] for i in intervals]),
+        "mean_possession_video_seconds": mean([i["video_duration_seconds"] for i in intervals]),
+        "first_shot_sample_count": len(first_shots),
+        "mean_first_shot_video_seconds": mean(first_shots),
+    }
 
 
 def _group_summary(actions, key):
@@ -210,7 +256,7 @@ def action_report(db, match, *, run=None):
         result["players"].append({"side": side, "cap_number": number,
                                   "name": f"Bonnet {number}" if number else "Actions sans bonnet lisible",
                                   "identity_status": "visual_candidate" if number else "unresolved",
-                                  "report": summarize_actions(actions), "event_keys": [a["key"] for a in actions]})
+                                  "report": summarize_actions(actions, collective=False), "event_keys": [a["key"] for a in actions]})
     result["families"] = [{"key": key, "label": label, "observations": visibility[key]} for key, label in FAMILIES.items()]
     return result
 
