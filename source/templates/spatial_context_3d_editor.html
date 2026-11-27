@@ -1,0 +1,33 @@
+{% if snapshot.spatial_3d is defined and snapshot.spatial_3d.context %}
+{% set r=snapshot.spatial_3d %}{% set ctx=r.context %}
+<section class="report-card section-wide" id="spatial3dEditor">
+<h2>Simuler des alternatives de tir et de passe en 3D</h2>
+<p>À partir d'un tir contextualisé, avec défense complète et gardienne identifiée. But modélisé de 3 × 0,90 m. Les positions horizontales viennent du suivi revu ; hauteurs, rayons, vitesse et postures sont des hypothèses, pas des mesures. Défense et receveuses supposées immobiles hors mouvements de bras fournis.</p>
+{% if r.events %}
+<details><summary>Calculer une simulation hypothétique</summary>
+<form method="post" action="/matches/{{ match.id }}/analysis/collective-review">
+<input type="hidden" name="binding" value='{{ ctx|tojson }}'>
+<label>Tir revu <select name="event_id" required><option value="">Choisir</option>{% for e in r.events %}<option value="{{ e.id }}">#{{ e.id }} · {{ e.identity }} · Q{{ e.period }} · {{ e.second }} s</option>{% endfor %}</select></label>
+{% for label,name,lo,hi in [('Hauteur de départ du ballon (m)','release_height_m',0,3),('Hauteur du centre des obstacles (m)','defender_height_m',0,3),('Rayon des obstacles sphériques (m)','radius_m',0.15,1.8),('Vitesse horizontale nominale (m/s)','horizontal_speed_mps',2,30),('Écart-type hypothétique de position (m ; 0 = aucune simulation de perturbation)','sigma_m',0,2)] %}
+<label>{{ label }} <input name="{{ name }}" type="number" step="0.01" min="{{ lo }}" max="{{ hi }}" required></label>
+{% endfor %}
+<details><summary>Alternatives de passe (trois maximum)</summary>
+<fieldset><legend>Receveuses de la même équipe, présentes et suivies à cet instant</legend>{% for i in ctx.ids %}<label><input type="checkbox" name="receivers" value="{{ i }}"> {{ i }}</label> {% endfor %}</fieldset>
+<label>Hauteur de réception supposée (m) <input name="receiver_height_m" type="number" step="0.01" min="0" max="3"></label>
+<label>Délai réception–tir supposé (s, facultatif pour passe puis tir) <input name="reception_s" type="number" step="0.01" min="0" max="1.5"></label>
+<label>Budget temporel hypothétique (s, facultatif, pas chrono réel) <input name="budget_s" type="number" step="0.01" min="0.15" max="8"></label>
+</details>
+<details><summary>Postures de bras / corps — réglage expert facultatif</summary>
+<p>JSON par identifiant de défenseure, offsets métriques xyz par rapport au centre modélisé. Jusqu'à trois capsules par joueuse ; radius en m, réaction et mouvement en s. Un segment « body » remplace la sphère du corps. Exemple de syntaxe (hypothétique) :</p>
+<pre>{"against:1":[{"part":"left_arm","start_offset":[0,0,0],"end_offset":[0,0.6,0.4],"radius":0.1}]}</pre>
+<label>Segments de portée hypothétiques <textarea name="reach_json" maxlength="10000" placeholder="{}"></textarea></label>
+</details>
+<label>Justification des paramètres <textarea name="evidence" required minlength="3" maxlength="300"></textarea></label>
+<label><input name="hypotheses_reviewed" type="checkbox" value="true" required> Je confirme que ces paramètres et les cibles générées sont des hypothèses, non des observations réelles.</label>
+<button name="action" value="add_3d">Calculer et enregistrer les scénarios</button>
+</form>
+</details>
+{% else %}<p>Revoir d'abord le contexte spatial d'un tir, avec toutes les défenseures suivies et une gardienne identifiée, sur un but de 3 m.</p>{% endif %}
+{% if r.rows %}<details><summary>Réinitialiser les simulations</summary><form method="post" action="/matches/{{ match.id }}/analysis/collective-review"><input type="hidden" name="binding" value='{{ ctx|tojson }}'><button name="action" value="clear_3d">Effacer uniquement les simulations 3D</button></form></details>{% endif %}
+</section>
+{% endif %}
