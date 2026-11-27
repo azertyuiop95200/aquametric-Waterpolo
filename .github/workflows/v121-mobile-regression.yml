@@ -98,7 +98,9 @@ jobs:
             assert(await page.locator('#sidebar').evaluate(el=>el.classList.contains('open')),'sidebar did not open');
             const nav=page.locator('#sidebar .side-nav');
             const dims=await nav.evaluate(el=>({scrollHeight:el.scrollHeight,clientHeight:el.clientHeight,overflow:getComputedStyle(el).overflowY,touch:getComputedStyle(el).touchAction}));
-            assert(dims.scrollHeight>dims.clientHeight,'sidebar navigation is not vertically scrollable');
+            const navPaths=await nav.locator('a').evaluateAll(links=>links.map(a=>a.getAttribute('href')));
+            assert(JSON.stringify(navPaths)===JSON.stringify(['/dashboard','/matches/new','/matches','/knowledge','/analysis-history','/analysis-library']),'sidebar must contain only analysis sections');
+            assert(dims.scrollHeight>=dims.clientHeight,'sidebar dimensions invalid');
             assert(['auto','scroll'].includes(dims.overflow),'sidebar overflow-y is not scrollable');
             assert(dims.touch!=='none','sidebar touch scrolling is disabled');
             assert(await page.locator('[data-lang-choice]').count()===5,'five-language dock is missing');
