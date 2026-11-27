@@ -40,4 +40,28 @@ class ShotContextTests(unittest.TestCase):
         s=sample();w=raw(s);w['shot_link_reviewed']=False;self.assertRaises(ValueError,append,s,w)
     def test_no_extrapolation(self):
         self.assertIsNone(point_at(sample()['advanced_motion']['players'][0],1,25,20))
+    def test_primary_source_binding_and_period(self):
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import Session
+        from db import Base
+        from models import Event, EventPosition, MatchVideoSegment
+        from types import SimpleNamespace
+        from services.shot_context_review import primary_events,source_key
+        engine=create_engine('sqlite:///:memory:')
+        Base.metadata.create_all(engine)
+        with Session(engine) as db:
+            db.add_all([MatchVideoSegment(id=1,match_id=10,period=1,source_type='upload',video_path='primary.mp4'),MatchVideoSegment(id=2,match_id=10,period=2,source_type='upload',video_path='secondary.mp4')])
+            for i,seg,period,mid in [(11,1,1,10),(12,2,2,10),(13,1,2,10),(14,1,1,99),(15,None,1,10)]:
+                db.add(Event(id=i,match_id=mid,event_type='goal'))
+                db.add(EventPosition(event_id=i,segment_id=seg,period=period,segment_second=.1,provenance='manual_verified'))
+            db.commit()
+            s=sample();s['verified_events']=[dict(id=i,event_type='goal',perspective='for') for i in range(11,16)]
+            s['identity_analysis']={'event_rows':[dict(id=i,review=dict(side='for',cap_number=2,provenance='coach_review')) for i in range(11,16)]}
+            m=SimpleNamespace(id=10,video_source='upload',video_path='primary.mp4')
+            self.assertEqual(primary_events(db,m,s),[])
+            s['automatic']['summary']['metric_field_map']['source_key']=source_key(m.video_path)
+            self.assertEqual([x['id'] for x in primary_events(db,m,s)],[11])
+            m.video_path='secondary.mp4'
+            self.assertEqual(primary_events(db,m,s),[])
+        engine.dispose()
 if __name__=='__main__':unittest.main()
