@@ -7,6 +7,16 @@
   {% if match.video_source == 'upload' %}<form method="post" action="/matches/{{match.id}}/vision/scan"><button class="btn">Run visual baseline scan</button></form>{% else %}<div class="notice"><b>Third-party source</b> — AquaMetric will not download this video. Upload an owned/local copy or later connect an authorized provider analysis path.</div>{% endif %}
 </section>
 
+<section class="panel">
+<h2>Détection locale et suivi — prototype</h2>
+<p>Analyse CPU de 75 images maximum, sans modèle externe. Les positions sont des candidats anonymes, pas des identités ni des événements validés. Le temps affiché est nominal ; aucune distance réelle n’est déduite.</p>
+<form method="post" action="/matches/{{match.id}}/vision/tracklets" target="_blank">
+<label>Indice de la première image <input type="number" name="start_frame" min="0" value="0" required></label>
+<label>Identifiant de segment (0 = vidéo principale) <input type="number" name="segment_id" min="0" value="0" required></label>
+<button class="btn secondary" type="submit">Analyser un extrait (JSON)</button>
+</form>
+<p class="muted">Disponible uniquement pour les fichiers locaux du match. Cette exploration ne modifie pas les statistiques.</p>
+</section>
 {% if analysis %}
 <div class="kpi-grid tactical-kpis">
   <article class="panel kpi-card"><span>Video type</span><b class="kpi-text">{{analysis.video_type|replace('_',' ')}}</b><small>{{analysis.confidence}} heuristic confidence</small></article>
