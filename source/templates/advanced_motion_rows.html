@@ -1,0 +1,21 @@
+{% if snapshot.advanced_motion is defined %}{% set r=snapshot.advanced_motion %}
+<section class="report-card section-wide" id="advancedMotion"><h2>Déplacements et efforts observés</h2>
+<p>Estimations partielles à partir des pistes métriques et des identités revues. Le temps vidéo observé n'est pas le temps de jeu. Seuil de sprint expérimental : 1,5 m/s pendant 0,35 s au minimum.</p>
+{% if r.status=='experimental_partial' %}
+{% for p in r.players %}{% if p.metrics and p.metrics.observed_s > 0 %}{% set m=p.metrics %}{% set d=m.directional_effort %}
+<details><summary>{{ match.team.name if p.side=='for' else match.opponent }} · bonnet {{ p.cap_number }} · {{ '%.2f'|format(m.observed_s) }} s observées</summary>
+<svg role="img" aria-label="Trajectoire métrique du bonnet {{ p.cap_number }}" viewBox="-1 -1 {{ r.length_m+2 }} {{ r.width_m+3 }}" preserveAspectRatio="xMidYMid meet" style="width:100%;max-width:600px;background:#e8f3f8;border:1px solid #4893b0">
+<rect x="0" y="0" width="{{ r.length_m }}" height="{{ r.width_m }}" fill="none" stroke="#4893b0" stroke-width="0.07"/><line x1="{{ r.length_m/2 }}" y1="0" x2="{{ r.length_m/2 }}" y2="{{ r.width_m }}" stroke="#4893b0" stroke-width="0.06"/>
+{% for c in p.occupation.cells %}<rect x="{{ c.x }}" y="{{ c.y }}" width="{{ c.w }}" height="{{ c.h }}" fill="#1764aa" fill-opacity="{{ c.opacity }}"><title>{{ '%.3f'|format(c.seconds) }} s · {{ '%.2f'|format(c.density_per_m2*100) }} %/m²</title></rect>{% endfor %}
+{% for seg in p.segments %}<polyline points="{% for v in seg %}{{ v.x_m }},{{ v.y_m }} {% endfor %}" fill="none" stroke="#164e63" stroke-width="0.10"/>{% endfor %}
+{% for t in d.turns %}<circle cx="{{ t.x_m }}" cy="{{ t.y_m }}" r="0.19" fill="#b45309"><title>{{ '%.2f'|format(t.second) }} s · {{ '%.1f'|format(t.angle_deg) }}°</title></circle>{% endfor %}
+<line x1="0" y1="{{ r.width_m+0.7 }}" x2="5" y2="{{ r.width_m+0.7 }}" stroke="#164e63" stroke-width="0.12"/><text x="2.5" y="{{ r.width_m+1.5 }}" font-size="0.65" text-anchor="middle" fill="#164e63">5 m</text></svg>
+<p>Repère du but de calibration à gauche (x = 0) ; aucune orientation offensive déduite. Bleu foncé : trajet estimé ; orange : changement de direction. Fond bleu : occupation par cellule de 2 m, normalisée par surface (saturation à 25 % du temps observé par m²). Une zone sans couleur n’indique pas une absence de joueuse.</p>
+<table class="metric-table"><tbody>{% for label,v,unit in [('Distance observée',m.distance_m,'m'),('Vitesse moyenne',m.mean_speed_mps,'m/s'),('Accélération scalaire maximale',m.peak_speed_increase_mps2,'m/s²'),('Décélération scalaire maximale',m.peak_speed_decrease_mps2,'m/s²'),('Accélération vectorielle maximale',d.peak_vector_acceleration_mps2,'m/s²'),('Sprints observés',m.sprint_count,''),('Durée des sprints',m.sprint_s,'s'),('Changements de direction',d.turn_count,''),('Paires de sprints rapprochés',d.repeated_sprint_pairs,'')] %}<tr><th>{{ label }}</th><td>{{ ('%.2f'|format(v) ~ ' ' ~ unit) if v is not none else 'Non mesuré' }}</td></tr>{% endfor %}</tbody></table>
+<p>Chevauchement : {{ '%.2f'|format(p.track_quality.overlap_s) }} s ; conflit exclu : {{ '%.2f'|format(p.track_quality.conflict_s) }} s. Aucun raccord à travers une lacune.</p>
+<h3>Évolution par minute vidéo observée</h3>
+<p>Les fenêtres sans suivi ne figurent pas dans le tableau ; aucune extrapolation au match ni au temps de jeu.</p>
+<table class="metric-table"><thead><tr><th>Fenêtre vidéo (s)</th><th>Temps suivi (s)</th><th>Distance (m)</th><th>Vitesse moyenne (m/s)</th></tr></thead><tbody>{% for w in p.movement_timeline %}<tr><td>{{ w.start_s }}–{{ w.end_s }}</td><td>{{ '%.2f'|format(w.observed_s) }}</td><td>{{ '%.2f'|format(w.distance_m) }}</td><td>{{ '%.2f'|format(w.mean_speed_mps) }}</td></tr>{% endfor %}</tbody></table>
+</details>{% else %}<p>Bonnet {{ p.cap_number }} · {{ p.side }} : suivi métrique insuffisant.</p>{% endif %}{% endfor %}
+{% else %}<p>Non mesuré : calibration exploitable et identité revue nécessaires.</p>{% endif %}
+</section>{% endif %}

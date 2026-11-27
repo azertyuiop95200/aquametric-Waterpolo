@@ -1,0 +1,78 @@
+name: Advanced motion release gate
+on:
+  pull_request:
+    branches: [feature/elite-performance-2026]
+    paths: ['source/**', '.github/workflows/advanced-motion-release.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install jinja2 fastapi sqlalchemy pytest pydantic opencv-python-headless numpy
+      - run: python -m compileall -q source
+      - working-directory: source
+        run: |
+          python -m unittest discover -s tests -p test_advanced_motion_release.py -v
+          python -m unittest discover -s tests -p test_advanced_occupation_release.py -v
+          python -m unittest discover -s tests -p test_identity_aggregation.py -v
+          python -m unittest discover -s tests -p test_metric_field.py -v
+          python -m unittest discover -s tests -p test_guest_full_policy.py -v
+          python -m unittest discover -s tests -p test_elite_performance.py -v
+      - working-directory: source
+        env:
+          PYTHONPATH: .:tests
+        run: |
+          python - <<'PY'
+          from jinja2 import Environment, FileSystemLoader, StrictUndefined
+          from types import SimpleNamespace
+          from services.advanced_motion_report import build
+          from test_advanced_motion_release import fixture
+          env = Environment(loader=FileSystemLoader('templates'), undefined=StrictUndefined, autoescape=True)
+          for name in ('analysis_result_clean_v2.html','analysis_report_portable.html','analysis_all_measurements.html','advanced_motion_rows.html'):
+              env.get_template(name)
+          for snapshot in (fixture(), {}):
+              snapshot['advanced_motion'] = build(snapshot)
+              html = env.get_template('advanced_motion_rows.html').render(snapshot=snapshot,match=SimpleNamespace(team=SimpleNamespace(name='A'),opponent='B'))
+              assert 'Déplacements et efforts observés' in html
+          PY
+
+  live-release-one:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Verify live release one and isolated guest report
+        env:
+          BASE: https://aquametric-ultimate-guest.onrender.com
+          EXPECTED: e5c9860bb617487ca06ed2e1c392be38a008fcb8
+        run: |
+          set -euo pipefail
+          tmp=$(mktemp -d)
+          trap 'rm -rf "$tmp"' EXIT
+          curl --retry 2 --max-time 60 -fsS "$BASE/health" -o "$tmp/health"
+          python -c 'import json,sys; p=json.load(open(sys.argv[1])); assert p.get("ok") is True and p.get("git_commit")==sys.argv[2],p' "$tmp/health" "$EXPECTED"
+          curl -LfsS --max-time 60 -c "$tmp/cookies" -b "$tmp/cookies" "$BASE/guest/ultimate" -o "$tmp/guest"
+          grep -Fq '/analysis/url/create' "$tmp/guest"
+          # Dedicated temporary guest workspace; no real match, no video download or paid inference.
+          curl -fsS --max-time 60 -D "$tmp/create.hdr" -o /dev/null -c "$tmp/cookies" -b "$tmp/cookies" -H "Origin: $BASE" \
+            --data-urlencode 'team_name=QA temporaire' --data-urlencode 'opponent=QA sans données sportives' \
+            --data-urlencode 'competition=QA technique uniquement' --data-urlencode 'category=Women' \
+            --data-urlencode 'video_url=https://example.invalid/qa-no-video' --data-urlencode 'input_device=phone' "$BASE/analysis/url/create"
+          loc=$(awk 'tolower($1)=="location:" {gsub("\r","",$2);print $2}' "$tmp/create.hdr" | tail -1)
+          [[ "$loc" =~ ^/matches/([0-9]+)/analysis/result$ ]]
+          id="${BASH_REMATCH[1]}"
+          curl -LfsS --max-time 60 -b "$tmp/cookies" "$BASE$loc" -o "$tmp/report"
+          grep -Fq 'id="advancedMotion"' "$tmp/report"
+          grep -Fq 'Non mesuré : calibration exploitable et identité revue nécessaires.' "$tmp/report"
+          curl -LfsS --max-time 60 -b "$tmp/cookies" "$BASE/matches/$id/analysis/report.html" -o "$tmp/export"
+          grep -Fq 'id="advancedMotion"' "$tmp/export"
+          grep -Fq 'Non mesuré : calibration exploitable et identité revue nécessaires.' "$tmp/export"
+          # No session cookie is supplied: owner-scoped report must not leak.
+          code=$(curl -sS --max-time 30 -o "$tmp/anonymous" -w '%{http_code}' "$BASE$loc")
+          case "$code" in 301|302|303|307|308|401|403|404) ;; *) echo "Unexpected anonymous status $code"; exit 1;; esac
+          echo 'LIVE_GUEST_MOTION_REPORT_OK'
