@@ -127,3 +127,25 @@ class ReviewImportTests(unittest.TestCase):
             self.assertEqual(prior.revisions[0].payload_json,canonical)
             self.assertEqual(db.scalars(select(Event)).all(),[])
             with self.assertRaises(ValueError):replace_reference(db,prior,p,canonical,digest,"bleus",digest)
+
+    def test_conflicting_shared_endpoint(self):
+        p=fixture(); i=p["reference"]["possession_review_intervals"][0]
+        p["reference"]["possession_review_intervals"].append(dict(i,interval_id="P2",start_s=5.1,end_s=6))
+        s=summarize(read(p)[0],"bleus")
+        self.assertEqual(s["endpoint_conflict_ids"],["P1","P2"])
+        self.assertEqual(s["lower_bound_excluding_linked_shots"],0)
+        self.assertEqual(len(s["intervals"]),2)
+
+    def test_consistent_shared_endpoint(self):
+        p=fixture(); i=p["reference"]["possession_review_intervals"][0]
+        p["reference"]["possession_review_intervals"].append(dict(i,interval_id="P2",start_s=5.1,end_s=6,before_team="bleus",after_team="blancs"))
+        s=summarize(read(p)[0],"bleus")
+        self.assertEqual(s["endpoint_conflict_ids"],[])
+        self.assertEqual(s["lower_bound_excluding_linked_shots"],2)
+
+    def test_apparent_shared_endpoint_not_conflict(self):
+        p=fixture(); i=p["reference"]["possession_review_intervals"][0]
+        p["reference"]["possession_review_intervals"].append(dict(i,interval_id="P2",start_s=5.1,end_s=6,before_state="apparent"))
+        s=summarize(read(p)[0],"bleus")
+        self.assertEqual(s["endpoint_conflict_ids"],[])
+        self.assertEqual(s["lower_bound_excluding_linked_shots"],1)
