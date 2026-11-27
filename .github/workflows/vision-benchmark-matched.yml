@@ -1,0 +1,23 @@
+name: Paired vision benchmark tests
+on:
+  push:
+    branches: [feature/vision-benchmark-matched-scope]
+    paths:
+      - 'source/services/detection_evaluation.py'
+      - 'tests/test_detection_evaluation.py'
+      - '.github/workflows/vision-benchmark-matched.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run evaluation tests
+        env:
+          PYTHONPATH: source
+        run: python -m unittest discover -s tests -p test_detection_evaluation.py -v
