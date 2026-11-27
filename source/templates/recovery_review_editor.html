@@ -1,0 +1,28 @@
+{% if snapshot.recovery_review is defined and snapshot.recovery_review.context %}
+{% set review=snapshot.recovery_review %}{% set ctx=review.context %}
+<section class="report-card section-wide" id="recoveryReviewEditor">
+<h2>Revoir un repli défensif</h2>
+<details><summary>Ajouter une transition revue</summary>
+<p>Indiquer deux contrôles opposés observés et un changement unique, puis une fenêtre de jeu continu après le second contrôle. Quatre revues maximum, sans chevauchement ; 15 s maximum pour chaque intervalle.</p>
+<form method="post" action="/matches/{{ match.id }}/analysis/collective-review">
+<input type="hidden" name="binding" value='{{ ctx|tojson }}'>
+{% for label,name in [('Contrôle initial (s vidéo)','before_s'),('Contrôle adverse observé (s vidéo)','after_s'),('Début du repli mesuré (s vidéo)','start_s'),('Fin du repli mesuré (s vidéo)','end_s')] %}
+<label>{{ label }} <input name="{{ name }}" type="number" min="0" max="28800" step="0.001" required></label>
+{% endfor %}
+<label>Période revue <input name="period" type="number" min="1" max="8" value="1" required></label>
+<label>Équipe perdant le contrôle <select name="losing_side" required><option value="">Choisir</option><option value="for">{{ match.team.name }}</option><option value="against">{{ match.opponent }}</option></select></label>
+<label>But défendu <select name="goal_x" required><option value="">Choisir</option><option value="0">But de référence (x = 0)</option><option value="{{ ctx.length_m }}">But opposé (x = {{ ctx.length_m }} m)</option></select></label>
+<fieldset><legend>Joueuses de champ de l'équipe en repli</legend>{% for i in ctx.ids %}<label><input type="checkbox" name="defenders" value="{{ i }}"> {{ i }}</label> {% endfor %}</fieldset>
+<label>Preuves visuelles <textarea name="evidence" required minlength="3" maxlength="300"></textarea></label>
+{% for label,name in [('Deux contrôles opposés et changement unique revus','unique_change_reviewed'),('Jeu continu revu pendant le repli','continuous_play_reviewed'),('Effectif actif et but défendu revus','roster_reviewed'),('Gardienne exclue de cet effectif de champ','field_players_only')] %}
+<label><input name="{{ name }}" type="checkbox" value="true" required> {{ label }}</label>
+{% endfor %}
+<button type="submit" name="action" value="add_recovery">Enregistrer et calculer le repli</button>
+</form>
+</details>
+{% if review.reports or review.status=='invalid' %}
+<details><summary>Réinitialiser les revues de repli</summary>
+<form method="post" action="/matches/{{ match.id }}/analysis/collective-review"><input type="hidden" name="binding" value='{{ ctx|tojson }}'><button name="action" value="clear_recovery">Effacer uniquement les revues de repli</button></form></details>
+{% endif %}
+</section>
+{% endif %}
