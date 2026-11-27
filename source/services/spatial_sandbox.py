@@ -58,7 +58,8 @@ def sandbox(baseline, edits, trials=32):
     scene["defenders"]=[]
     for d in defenders:
         p,v=accelerate(xyz(d["position"],bounds),xyz(d["velocity"],vb),d.get("acceleration",[0,0,0]),delay)
-        scene["defenders"].append(dict(original[d["id"]],position=p,velocity=v,radius=number(d.get("radius",original[d["id"]]["radius"]),.15,1.8)))
+        scene["defenders"].append(dict(original[d["id"]],position=p,velocity=v,radius=number(d.get("radius",original[d["id"]]["radius"]),.15,1.8),
+            reach_elapsed_s=min(5,number(original[d["id"]].get("reach_elapsed_s",0),0,5)+delay)))
     original_opts={o["id"]:o for o in scene["options"]}
     opts=edits.get("options",scene["options"])
     if not isinstance(opts,list) or len(opts)!=len(original_opts) or {o["id"] for o in opts}!=set(original_opts):
