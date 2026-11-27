@@ -38,7 +38,10 @@ class CalibratedHTTPTests(unittest.TestCase):
             for i,(side,cap,x,y,colour) in enumerate([('for',2,14,0,'white'),('for',3,20,-2,'white'),('against',4,22,0,'blue'),('against',1,24,0,'red')],1):
                 identities[str(i)]=reviewed(side,cap,colour)
                 tracks.append(dict(id=i,colour=colour,segments=[[dict(second=t,x_m=x,y_m=y+(.2*t if side=='against' else 0)) for t in (0,.2,.4,.6,.8,1.,1.2)]],distance_m=.24 if side=='against' else 0))
-            summary=dict(metric_field_map=dict(status='estimated',goal_relative=True,revision='qa-cal-1',length_m=25,width_m=20,calibration_provenance='manual_reviewed_anchors',source_key=source_key('qa-primary.mp4'),tracks=tracks,shots=[dict(second=.6,x_m=15,y_m=0,provenance='manual_review_candidate',range_m=10)]),identity_reviews=dict(tracks=identities,events={'12':reviewed('against',1,'red')},shots={'0':reviewed('for',2,'white')}))
+            for tr in tracks:
+                tr['forward_from_s']=0
+                tr['raw_segments']=[[dict(p) for p in seg] for seg in tr['segments']]
+            summary=dict(metric_field_map=dict(reference_second=0,status='estimated',goal_relative=True,revision='qa-cal-1',length_m=25,width_m=20,calibration_provenance='manual_reviewed_anchors',source_key=source_key('qa-primary.mp4'),tracks=tracks,shots=[dict(second=.6,x_m=15,y_m=0,provenance='manual_review_candidate',range_m=10)]),identity_reviews=dict(tracks=identities,events={'12':reviewed('against',1,'red')},shots={'0':reviewed('for',2,'white')}))
             db.add(AutonomousAnalysis(id=3,match_id=10,summary_json=json.dumps(summary)))
             db.commit()
         self.app=FastAPI()
