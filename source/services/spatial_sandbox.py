@@ -104,7 +104,9 @@ def sandbox(baseline, edits, trials=32):
             if ident in original_opts: continue
             scene["options"].append(dict(id=ident,kind="shot",target=target,duration_s=duration))
             proposed.append(ident)
-    result=review(scene,trials=trials)
+    keeper_id=edits.get("keeper_id")
+    goal_map={"keeper_id":keeper_id,"speed":speed} if keeper_id else None
+    result=review(scene,trials=trials,goal_map=goal_map)
     result.update(mode="coach_hypothesis",delay_s=delay,proposed_ids=proposed,
                   baseline_decision_second=baseline["decision_second"],
                   model_assumptions={"nominal_ball_horizontal_speed_m_s":speed,
