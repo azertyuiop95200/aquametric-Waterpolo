@@ -1,7 +1,32 @@
 """Coach what-if simulations; never modify a verified event or its observation."""
 from copy import deepcopy
-from math import hypot
+from math import copysign, hypot, isclose, sqrt
 from services.spatial_replay import review, number, xyz
+
+def intercept_time(start, receiver, velocity, speed):
+    """Earliest horizontal interception in the allowed flight window.
+
+    Solve |receiver + velocity*t - start| = speed*t without clipping time.
+    Vertical motion is handled separately by the ballistic model.
+    """
+    dx, dy = receiver[0]-start[0], receiver[1]-start[1]
+    vx, vy = velocity[:2]
+    a = vx*vx + vy*vy - speed*speed
+    b = 2*(dx*vx + dy*vy)
+    c = dx*dx + dy*dy
+    eps = 1e-10
+    if abs(a) < eps:
+        roots = [-c/b] if abs(b) >= eps else ([.15] if c < eps else [])
+    else:
+        disc = b*b - 4*a*c
+        if disc < 0:
+            return None
+        q = -.5*(b + copysign(sqrt(disc), b))
+        roots = [q/a, c/q] if q else [-b/(2*a)]
+    valid = [t for t in roots if .15 <= t <= 2 and
+             isclose(hypot(dx+vx*t, dy+vy*t), speed*t, rel_tol=1e-8, abs_tol=1e-8)]
+    return min(valid) if valid else None
+
 
 def sandbox(baseline, edits, trials=32):
     if not isinstance(edits,dict): raise ValueError("Invalid scenario")
@@ -59,10 +84,9 @@ def sandbox(baseline, edits, trials=32):
             v=xyz(o.get("receiver_velocity",[0,0,0]),vb)
             try:
                 receiver=advance(p,v,delay)
-                t=max(.15,min(2,hypot(receiver[0]-scene["start"][0],receiver[1]-scene["start"][1])/speed))
-                for _ in range(3):
-                    target=advance(p,v,delay+t)
-                    t=max(.15,min(2,hypot(target[0]-scene["start"][0],target[1]-scene["start"][1])/speed))
+                t=intercept_time(scene["start"],receiver,v,speed)
+                if t is None:
+                    continue
                 target=advance(p,v,delay+t)
             except ValueError:
                 continue
@@ -72,7 +96,9 @@ def sandbox(baseline, edits, trials=32):
                            ("gauche haute",-1.15,.68),("droite haute",1.15,.68),("centre",0,.45)]:
             if len(scene["options"])>=12: break
             target=[scene["goal_x"],width/2+dy,z]
-            duration=max(.15,min(2,hypot(target[0]-scene["start"][0],target[1]-scene["start"][1])/speed))
+            duration=hypot(target[0]-scene["start"][0],target[1]-scene["start"][1])/speed
+            if not .15 <= duration <= 2:
+                continue
             ident="Simulation · tir "+name
             if ident in original_opts: continue
             scene["options"].append(dict(id=ident,kind="shot",target=target,duration_s=duration))
@@ -81,7 +107,9 @@ def sandbox(baseline, edits, trials=32):
     result.update(mode="coach_hypothesis",delay_s=delay,proposed_ids=proposed,
                   baseline_decision_second=baseline["decision_second"],
                   model_assumptions={"nominal_ball_horizontal_speed_m_s":speed,
-                    "receiver_targets":"pass endpoints advanced at constant velocity",
+                    "receiver_targets":"pass endpoints advanced at constant velocity; generated passes solve horizontal interception",
+                    "generated_flight_window_s":[.15,2],
+                    "generated_speed_constraint":"nominal horizontal speed; infeasible candidates omitted, not clipped",
                     "acceleration":"carrier and defenders accelerate before release, constant velocity during ball flight",
                     "legal_and_athletic_feasibility":"not verified"})
     # Separate hypothetical comparison from the saved evidence, not a new event.
