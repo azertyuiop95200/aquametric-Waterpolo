@@ -387,6 +387,8 @@ def analysis_snapshot(db, match):
     snapshot["statistics"] = match_statistics(match)
     from services.elite_performance import elite_report
     snapshot["elite_performance"] = elite_report(snapshot["verified_events"])
+    from services.possession_evidence import report as possession_evidence_report
+    snapshot["possession_evidence"] = possession_evidence_report(snapshot["verified_events"])
     from services.statistical_audit import audit_rows
     roster=[{"id":p.id,"name":p.name,"cap_number":p.cap_number} for p in match.team.players]
     snapshot["statistical_audit"] = audit_rows(snapshot["verified_events"], roster=roster)
@@ -550,6 +552,7 @@ def build_analysis_zip(db, match, evidence_dir: Path) -> io.BytesIO:
                         and row.get("file_path") and (Path(evidence_dir) / Path(row["file_path"]).name).is_file()]
         archive.writestr(f"{root}/01_report/report.html", _html_report(match, snapshot, export_media))
         archive.writestr(f"{root}/01_report/analysis.json", json.dumps(snapshot, ensure_ascii=False, indent=2, default=str))
+        archive.writestr(f"{root}/03_events/possession_evidence.json", json.dumps(snapshot["possession_evidence"],ensure_ascii=False,indent=2))
         from services.measurement_report import flatten_measurements
         auto_report = snapshot["video_actions"]
         archive.writestr(f"{root}/03_events/automatic_video_actions.csv", _csv_text(
