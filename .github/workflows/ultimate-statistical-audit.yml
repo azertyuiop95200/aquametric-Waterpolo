@@ -43,6 +43,13 @@ jobs:
           for suite in test_local_object_tracking.py test_head_flow_tracking.py test_clip_tracking_mode.py test_ball_motion_review.py test_calibration_validation.py test_detection_evaluation.py test_learned_head.py; do
             python -m unittest discover -s tests -p "$suite" -v || exit 1
           done
+      - name: Advanced motion and occupancy release regression
+        env:
+          PYTHONPATH: source
+        run: |
+          for suite in test_advanced_motion_release.py test_advanced_occupation_release.py; do
+            python -m unittest discover -s source/tests -p "$suite" -v || exit 1
+          done
       - name: Verify the report templates
         env:
           PYTHONPATH: source
@@ -51,7 +58,7 @@ jobs:
           python - <<'PY'
           from jinja2 import Environment, FileSystemLoader
           e=Environment(loader=FileSystemLoader('source/templates'))
-          for name in ('statistical_audit.html','advanced_observed_metrics.html','analysis_all_measurements.html','analysis_result_clean_v2.html','motion_performance.html','lineup_performance.html','tactical_sequence_metrics.html','vision.html'):
+          for name in ('statistical_audit.html','advanced_observed_metrics.html','analysis_all_measurements.html','analysis_result_clean_v2.html','motion_performance.html','lineup_performance.html','tactical_sequence_metrics.html','vision.html','advanced_motion_rows.html'):
               e.get_template(name)
               print(name, 'compiled')
           from types import SimpleNamespace
