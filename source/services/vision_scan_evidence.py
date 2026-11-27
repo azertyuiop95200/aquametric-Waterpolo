@@ -46,8 +46,10 @@ def save_scan(db,match,segment,kind,result,path):
     return row
 
 def read_scan(row):
-    return {"id":row.id,"digest":row.digest,"segment_id":row.segment_id,
-        **json.loads(row.payload_json)}
+    payload=json.loads(row.payload_json)
+    if digest(payload)!=row.digest or payload.get("source_binding")!=row.source_binding or payload.get("kind")!=row.kind:
+        raise ValueError("Empreinte de proposition incohérente.")
+    return {"id":row.id,"digest":row.digest,"segment_id":row.segment_id,**payload}
 
 def report(db,match):
     segments={s.id:s for s in db.scalars(select(MatchVideoSegment).where(MatchVideoSegment.match_id==match.id))}
@@ -71,3 +73,16 @@ def report(db,match):
     return {"status":"experimental_partial" if rows else "unavailable","rows":rows,"stale_count":stale,
         "scope":"per_window_not_unique_athletes","source_binding":"metadata_only_not_video_hash",
         "identity_verified":False,"metrics_validated":False,"statistical_use_allowed":False}
+
+
+def export_scans(db,match,summary):
+    """Export the exact evidence rows cited by a canonical snapshot, never stale rows."""
+    ids={r["id"]:r["digest"] for r in summary.get("rows",[])}
+    if not ids:return []
+    records=db.scalars(select(VisionScanEvidence).where(VisionScanEvidence.match_id==match.id,VisionScanEvidence.id.in_(ids))).all()
+    result=[]
+    for row in records:
+        if ids[row.id]!=row.digest:continue
+        try:result.append(read_scan(row))
+        except (ValueError,TypeError,KeyError,AttributeError):continue
+    return sorted(result,key=lambda r:r["id"])

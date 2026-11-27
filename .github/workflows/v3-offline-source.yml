@@ -1,0 +1,26 @@
+name: V3 portable public source for private offline QA
+on:
+  push:
+    branches: [feature/convergence-report-v3]
+    paths:
+      - 'source/**'
+      - '.github/workflows/v3-offline-source.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Export tracked public source only
+        run: |
+          git archive --format=zip --output=/tmp/aquametric-v3-source.zip HEAD source tests
+          git rev-parse HEAD > /tmp/aquametric-v3-source.sha
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v3-offline-source
+          path: |
+            /tmp/aquametric-v3-source.zip
+            /tmp/aquametric-v3-source.sha
+          retention-days: 7

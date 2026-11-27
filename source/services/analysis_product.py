@@ -582,6 +582,9 @@ def build_analysis_zip(db, match, evidence_dir: Path) -> io.BytesIO:
         archive.writestr(f"{root}/01_report/report.html", _html_report(match, snapshot, export_media))
         archive.writestr(f"{root}/01_report/analysis.json", json.dumps(snapshot, ensure_ascii=False, indent=2, default=str))
         archive.writestr(f"{root}/03_events/possession_evidence.json", json.dumps(snapshot["possession_evidence"],ensure_ascii=False,indent=2))
+        from services.vision_scan_evidence import export_scans
+        for record in export_scans(db,match,snapshot["vision_scan_evidence"]):
+            archive.writestr(f"{root}/05_evidence/vision_scans/scan_{record['id']}.json",json.dumps(record,ensure_ascii=False,indent=2,allow_nan=False))
         for r in match.review_references:
             archive.writestr(f"{root}/03_events/review_reference_Q{r.period}.json",r.payload_json)
             for old in r.revisions:
