@@ -9,7 +9,7 @@ on:
       - 'render.yaml'
       - '.github/workflows/v121-mobile-regression.yml'
   pull_request:
-    branches: [main]
+    branches: [main, fix/youtube-report-intake-2026-11]
     paths:
       - 'source/**'
       - 'Dockerfile'
