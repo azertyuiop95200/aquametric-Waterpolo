@@ -63,6 +63,7 @@ GUEST_ULTIMATE_ENABLED = WEB_DEMO_MODE or os.getenv("AQUAMETRIC_GUEST_ULTIMATE",
 OFFICIAL_REFRESH_LOOP_MINUTES = int(os.getenv("OFFICIAL_REFRESH_LOOP_MINUTES", "30"))
 ALLOWED_VIDEO_EXTENSIONS = {".mp4", ".webm", ".mov", ".m4v", ".ogv", ".ogg"}
 EVENT_TYPES = (
+    "possession_transition",
     "goal", "assist", "key_pass", "action_created", "touch", "centre_touch", "duel_won", "duel_lost", "pass_complete", "shot_on_target", "shot_off_target", "shot_blocked", "shot_unknown",
     "block", "interception", "recovery", "save", "bad_pass", "turnover", "foul",
     "exclusion", "exclusion_earned", "exclusion_committed", "penalty_earned", "penalty_committed",
@@ -675,6 +676,73 @@ def run_vision_scan(match_id: int, request: Request, db: Session = Depends(get_d
     return RedirectResponse(f"/matches/{match_id}/vision", status_code=303)
 
 
+@app.post("/matches/{match_id}/vision/tracklets")
+def local_tracklet_scan(match_id: int, request: Request, start_frame: int = Form(0),
+                        segment_id: int = Form(0), tracking_mode: str = Form("baseline"),
+                        db: Session = Depends(get_db)):
+    from models import MatchVideoSegment
+    from services.local_clip_scan import scan_clip
+    user = require_user(request, db)
+    match = db.get(Match, match_id)
+    if not match or match.owner_id != user.id:
+        raise HTTPException(404)
+    if segment_id:
+        segment = db.get(MatchVideoSegment, segment_id)
+        if not segment or segment.match_id != match.id:
+            raise HTTPException(404)
+        kind, path = segment.source_type, segment.video_path
+    else:
+        kind, path = match.video_source, match.video_path
+    if kind != "upload" or not path:
+        raise HTTPException(422, detail="Une vidéo locale téléversée est requise.")
+    source = UPLOAD_DIR / Path(path).name
+    if not source.is_file():
+        raise HTTPException(404, detail="Vidéo locale indisponible.")
+    try:
+        result = scan_clip(source, start_frame, tracking_mode=tracking_mode)
+    except ValueError as exc:
+        raise HTTPException(422, detail=str(exc)) from None
+    result.update(match_id=match.id, segment_id=segment_id or None)
+    from fastapi.responses import JSONResponse
+    return JSONResponse(result, headers={"Cache-Control": "private, no-store"})
+
+
+@app.post("/matches/{match_id}/vision/ball-motion")
+def local_ball_motion(match_id: int, request: Request, frame_index: int = Form(...),
+                      seed_a: int = Form(...), seed_b: int = Form(...),
+                      ax: float = Form(...), ay: float = Form(...),
+                      bx: float = Form(...), by: float = Form(...),
+                      reviewed: bool = Form(False), segment_id: int = Form(0),
+                      db: Session = Depends(get_db)):
+    from models import MatchVideoSegment
+    from services.ball_motion_review import scan_motion_clip
+    user = require_user(request, db)
+    match = db.get(Match, match_id)
+    if not match or match.owner_id != user.id:
+        raise HTTPException(404)
+    if segment_id:
+        segment = db.get(MatchVideoSegment, segment_id)
+        if not segment or segment.match_id != match.id:
+            raise HTTPException(404)
+        kind, path = segment.source_type, segment.video_path
+    else:
+        kind, path = match.video_source, match.video_path
+    if kind != "upload" or not path:
+        raise HTTPException(422, detail="Une vidéo locale téléversée est requise.")
+    source = UPLOAD_DIR / Path(path).name
+    if not source.is_file():
+        raise HTTPException(404, detail="Vidéo locale indisponible.")
+    seeds = [dict(frame=seed_a, x=ax, y=ay, reviewed=reviewed),
+             dict(frame=seed_b, x=bx, y=by, reviewed=reviewed)]
+    try:
+        result = scan_motion_clip(source, frame_index, seeds)
+    except ValueError as exc:
+        raise HTTPException(422, detail=str(exc)) from None
+    result.update(match_id=match.id, segment_id=segment_id or None)
+    from fastapi.responses import JSONResponse
+    return JSONResponse(result, headers={"Cache-Control": "private, no-store"})
+
+
 @app.get("/matches/{match_id}/vision/contact-sheet")
 def vision_contact_sheet(match_id: int, request: Request, db: Session = Depends(get_db)):
     user = require_user(request, db)
@@ -909,6 +977,18 @@ def add_event(
     game_clock_s: str = Form(""),
     outcome: str = Form(""),
     distance_m: str = Form(""),
+    p_start: str = Form(""),
+    p_before: str = Form("unknown"),
+    p_after: str = Form("unknown"),
+    p_bs: str = Form("unknown"),
+    p_as: str = Form("unknown"),
+    p_cause: str = Form("unknown"),
+    p_cv: str = Form(""),
+    p_dv: str = Form(""),
+    p_exact: str = Form(""),
+    p_prior: str = Form(""),
+    p_ra: str = Form("unknown"),
+    p_rv: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = require_user(request, db)
@@ -919,7 +999,7 @@ def add_event(
         raise HTTPException(400, detail="Unsupported event type.")
     if return_to == "report" and observed != "1":
         raise HTTPException(400, detail="Confirmer que cet événement a réellement été observé avant de l’ajouter.")
-    if second < 0 or second > 12 * 60 * 60:
+    if not __import__("math").isfinite(second) or second < 0 or second > 12 * 60 * 60:
         raise HTTPException(400, detail="Event time is outside the supported range.")
     if not 1 <= period <= 8:
         raise HTTPException(400, detail="Période invalide (1 à 8).")
@@ -958,7 +1038,19 @@ def add_event(
     if phase_tag not in PHASE_TAGS:
         phase_tag = "auto"
     # Structured optional evidence fields. Video time is not playing time.
-    if return_to == "report":
+    if event_type == "possession_transition":
+        if return_to != "report" or observed != "1":
+            raise HTTPException(400, detail="Revue manuelle confirmée requise.")
+        from services.possession_evidence import build_note
+        try:
+            note = build_note(float(p_start),second,p_before,p_after,p_bs,p_as,p_cause,
+                p_cv=="1",p_dv=="1",p_exact=="1",p_prior=="1",note,period,segment.id if segment else None,p_ra,p_rv=="1")
+        except (ValueError,TypeError) as exc:
+            raise HTTPException(400, detail=str(exc)) from None
+        pid=None
+        perspective="neutral"
+        phase_tag="auto"
+    elif return_to == "report":
         from services.elite_performance import END_LABELS, number
         evidence_tags = [f"period={period}"]
         if game_clock_s.strip():
@@ -1001,6 +1093,55 @@ def add_event(
     target = f"/matches/{match_id}/analysis/result#annotation" if return_to == "report" else f"/matches/{match_id}"
     return RedirectResponse(target, status_code=303)
 
+
+@app.post("/matches/{match_id}/review-reference")
+def import_match_review_reference(match_id: int, request: Request,
+    reference_file: UploadFile = File(...), home_color: str = Form(...),
+    same_match: str = Form(""), expected_digest: str = Form(""), db: Session = Depends(get_db)):
+    from models import MatchReviewReference
+    from services.review_reference_import import load, MAX_BYTES, COLORS
+    from sqlalchemy.exc import IntegrityError
+    user = require_user(request, db)
+    match = db.get(Match, match_id)
+    if not match or match.owner_id != user.id:
+        raise HTTPException(404)
+    if same_match != "1" or home_color not in COLORS:
+        raise HTTPException(400, detail="Confirmer le match et la couleur de notre équipe.")
+    try:
+        p, canonical, digest, period = load(reference_file.file.read(MAX_BYTES+1))
+    except (ValueError,TypeError,KeyError) as exc:
+        raise HTTPException(400, detail=str(exc)) from None
+    finally:
+        reference_file.file.close()
+    prior = db.scalar(select(MatchReviewReference).where(MatchReviewReference.match_id==match_id,MatchReviewReference.period==period))
+    try:
+        if prior:
+            from services.review_reference_revision import replace_reference
+            replace_reference(db,prior,p,canonical,digest,home_color,expected_digest)
+        else:
+            if expected_digest:
+                raise ValueError("La version à remplacer ne correspond pas à cette période.")
+            db.add(MatchReviewReference(match_id=match_id,period=period,digest=digest,home_color=home_color,payload_json=canonical))
+        db.commit()
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(409,detail=str(exc)) from None
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, detail="Import concurrent, recharger le rapport.") from None
+    return RedirectResponse(f"/matches/{match_id}/analysis/result#reviewReferences", status_code=303)
+
+@app.get("/matches/{match_id}/review-reference/{period}.json")
+def download_match_review_reference(match_id: int, period: int, request: Request, db: Session = Depends(get_db)):
+    from models import MatchReviewReference
+    from fastapi.responses import Response
+    user = require_user(request, db)
+    match = db.get(Match, match_id)
+    if not match or match.owner_id != user.id:
+        raise HTTPException(404)
+    row=db.scalar(select(MatchReviewReference).where(MatchReviewReference.match_id==match_id,MatchReviewReference.period==period))
+    if not row: raise HTTPException(404)
+    return Response(row.payload_json,media_type="application/json",headers={"Content-Disposition":f"attachment; filename=review-Q{period}.json","Cache-Control":"private, no-store"})
 
 @app.post("/matches/{match_id}/analysis/start")
 def start_analysis(match_id: int, request: Request, db: Session = Depends(get_db)):

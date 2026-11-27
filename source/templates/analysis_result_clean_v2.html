@@ -124,6 +124,7 @@
     {% elif source_embed %}
       <iframe id="reviewVideo" class="video-frame" src="{{source_embed}}&rel=0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen title="Replay du match"></iframe>
     {% endif %}
+    {% include "review_reference_form.html" %}
     <form id="reviewTagForm" action="/matches/{{match.id}}/events" method="post">
       <input name="return_to" type="hidden" value="report">
       <input id="reviewSegmentId" name="segment_id" type="hidden" value="">
@@ -216,6 +217,7 @@
         <button class="btn secondary" type="submit" name="event_type" value="bad_pass">Mauvaise passe</button>
         <button class="btn secondary" type="submit" name="event_type" value="pass_complete">Passe réussie</button>
         <button class="btn secondary" type="submit" name="event_type" value="key_pass">Passe clé</button>
+        {% include "possession_evidence_controls.html" %}
         <button class="btn secondary" type="submit" name="event_type" value="possession_end">Fin de possession</button>
         <button class="btn secondary" type="submit" name="event_type" value="power_play_end">Fin de 6v5</button>
         <button class="btn secondary" type="submit" name="event_type" value="penalty_kill_end">Fin de 5v6</button>
