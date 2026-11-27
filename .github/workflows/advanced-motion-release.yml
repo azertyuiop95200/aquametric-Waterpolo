@@ -77,14 +77,30 @@ jobs:
           assert 'Déplacements défensifs avant le tir' in html
           PY
 
-  live-release-six:
+  calibrated-http:
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
-      - name: Verify live release six and isolated guest report
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r source/requirements.txt
+      - working-directory: source
+        env:
+          DATABASE_URL: 'sqlite://'
+          AQUAMETRIC_VIDEO_ACTIONS: '0'
+          PYTHONPATH: ..:.
+        run: python -m unittest discover -s tests -p test_calibrated_http_review.py -v
+
+  live-release-seven:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Verify live release seven and isolated guest report
         env:
           BASE: https://aquametric-ultimate-guest.onrender.com
-          EXPECTED: d75f1dfc2a48eb6752fbd4aaf06e77207528af00
+          EXPECTED: c30f26211112056660c7553452ed746a141c39d8
         run: |
           set -euo pipefail
           tmp=$(mktemp -d)
