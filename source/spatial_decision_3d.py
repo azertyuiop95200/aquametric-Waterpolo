@@ -70,7 +70,7 @@ class Track:
             raise ValueError("nonfinite track")
         if self.radius < 0 or not 0 <= self.confidence <= 1:
             raise ValueError("invalid track")
-        if not isfinite(self.reach_elapsed_s) or not 0 <= self.reach_elapsed_s <= 3:
+        if not isfinite(self.reach_elapsed_s) or not 0 <= self.reach_elapsed_s <= 5:
             raise ValueError("Invalid reach elapsed time")
         if len(self.reach_segments)>3 or len({s.part for s in self.reach_segments})!=len(self.reach_segments):
             raise ValueError("Duplicate or excessive reach parts")
