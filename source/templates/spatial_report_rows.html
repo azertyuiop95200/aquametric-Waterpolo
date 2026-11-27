@@ -1,6 +1,7 @@
 <p>{{spatial_eligible_count|default(0)}} actions éligibles dans les preuves vérifiées ; {{spatial_reviews|default({})|length}} avec coordonnées renseignées. Les autres sont non mesurées.</p>
 {% for eid, row in (spatial_reviews|default({})).items() %}
 <article class="candidate"><h3>Action #{{eid}} · {{'%.2f'|format(row.result.decision_second)}} s</h3>
+{% if row.video_source is defined %}<p>{% if row.video_source.period %}Q{{row.video_source.period}} · {% endif %}{{row.video_source.label}} · action à {{'%.2f'|format(row.video_source.second)}} s locales.</p>{% endif %}
 <p>Source : {{row.result.source}} · σ supposé : {{row.result.sigma_m}} m · {{row.result.trials}} simulations par option.</p>
 {% if interactive_report|default(false) %}<p><a href="/matches/{{match.id}}/spatial?event={{eid}}">Voir la vidéo et la scène 3D</a> · <a href="/matches/{{match.id}}/spatial/{{eid}}/sandbox">Modifier la situation et simuler</a></p>{% endif %}
 <div style="overflow-x:auto"><table class="metric-table"><thead><tr><th>Option</th><th>Marge (m)</th><th>Dégagement simulé</th><th>Probabilité sportive</th></tr></thead><tbody>
