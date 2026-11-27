@@ -1,0 +1,13 @@
+{% if snapshot.collective_review is defined %}
+{% set review=snapshot.collective_review %}
+<section class="report-card section-wide" id="collectiveReview">
+<h2>Analyse tactique collective</h2>
+<p>Organisation, couloirs de passe, soutien, pointe et placement de gardienne. Calculs sur des séquences revues et des trajectoires métriques simultanées ; aucune possession ni identité inventée.</p>
+{% if review.reason %}<p>{{ review.reason }}</p>{% endif %}
+{% for tactical_report in review.reports %}
+<h3>Période {{ tactical_report.period }} · {{ tactical_report.start_s }}–{{ tactical_report.end_s }} s vidéo</h3>
+<p>Preuve revue : {{ tactical_report.possession_geometry[0].evidence }}</p>
+{% include 'possession_geometry_rows.html' %}
+{% endfor %}
+</section>
+{% endif %}

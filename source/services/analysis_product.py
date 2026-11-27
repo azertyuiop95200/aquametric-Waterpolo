@@ -422,6 +422,11 @@ def analysis_snapshot(db, match):
     except (ValueError, TypeError, KeyError, AttributeError, OverflowError):
         # Invalid or stale optional evidence must not break the existing report.
         snapshot["advanced_motion"] = {"status": "unavailable", "players": [], "scope": "partial_calibrated_video", "playing_seconds": None}
+    from services.collective_review import build as build_collective_review
+    try:
+        snapshot["collective_review"] = build_collective_review(snapshot, local_source=match.video_source=="upload" and bool(match.video_path))
+    except (ValueError, TypeError, KeyError, AttributeError, OverflowError):
+        snapshot["collective_review"] = {"status":"invalid","context":None,"reports":[],"reason":"Séquences incohérentes : revue nécessaire."}
     from services.recognition_quality import audit
     snapshot["recognition_quality"] = audit(snapshot["automatic"], snapshot["video_actions"])
     from services.statistical_audit import enrich_audit

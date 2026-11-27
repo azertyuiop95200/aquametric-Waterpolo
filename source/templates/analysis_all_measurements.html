@@ -36,6 +36,7 @@
 {% if snapshot.motion_performance is defined %}{% include 'motion_performance.html' %}{% else %}<p class="coach-report-muted">Cartographie : trajectoires identifiées et calibration du bassin requises.</p>{% endif %}
 {% include 'advanced_motion_rows.html' %}
 {% elif anchor=='coach-tactique' %}
+{% include 'collective_review_rows.html' %}
 {% if snapshot.tactical_sequences is defined %}{% include 'tactical_sequence_metrics.html' %}{% endif %}
 {% if snapshot.tactical %}<details><summary>Analyse tactique et limites de couverture</summary>{{render(snapshot.tactical,labels)}}</details>{% endif %}
 {% elif anchor=='coach-passes' and snapshot.advanced_observed is defined %}
@@ -61,4 +62,4 @@
 </section>
 {% elif snapshot.video_actions is defined %}{% include 'analysis_video_actions.html' %}{% endif %}
 
-{% if snapshot.statistics is not defined %}{% include 'advanced_motion_rows.html' %}{% endif %}
+{% if snapshot.statistics is not defined %}{% include 'advanced_motion_rows.html' %}{% include 'collective_review_rows.html' %}{% endif %}
