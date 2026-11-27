@@ -7,7 +7,7 @@
 <p>Vitesse horizontale hypothétique {{ a.nominal_horizontal_speed_mps }} m/s · hauteur de départ {{ a.start[2] }} m · justification : {{ a.evidence }}. Écart-type hypothétique {{ a.sigma_m }} m ; {{ a.trials }} tirages par option si supérieur à zéro. Erreur réelle de calibration inconnue.</p>
 {% if a.motion_mode is defined and a.motion_mode=='predecision_velocity' %}
 <h3>Déplacements défensifs avant le tir</h3>
-<p>Vitesses horizontales moyennes estimées sur des pistes continues antérieures au tir ; projection constante, sans réaction adaptative. Les positions initiales restent les positions interpolées de la revue spatiale. Les receveuses sont supposées immobiles.</p>
+<p>Vitesses horizontales moyennes estimées sur des pistes continues antérieures au tir ; projection constante, sans réaction adaptative. Positions initiales défensives projetées depuis la dernière observation brute antérieure, au plus 0,12 s. Aucun lissage centré utilisé pour ces vitesses. Origine du tir, receveuses et identités restent revues rétrospectivement ; ce n'est pas une prédiction en temps réel.</p>
 <table class="metric-table"><thead><tr><th>Défenseure</th><th>Vx (m/s)</th><th>Vy (m/s)</th><th>Durée observée (s)</th><th>Ancienneté de la dernière mesure (s)</th></tr></thead><tbody>
 {% for id,m in a.predecision_motion.items() %}<tr><td>{{ id }}</td><td>{{ '%.2f'|format(m.velocity[0]) }}</td><td>{{ '%.2f'|format(m.velocity[1]) }}</td><td>{{ '%.3f'|format(m.support_s) }}</td><td>{{ '%.3f'|format(m.age_s) }}</td></tr>{% endfor %}
 </tbody></table>

@@ -38,7 +38,7 @@ def track_frames(frames,seeds=None,max_gap=.25):
         if prev is None:
             for i,p in enumerate(seeds if seeds is not None else cap_proposals(frame)):
                 if not (0<=p['x']<=1 and 0<=p['y']<=1):continue
-                track={'id':i+1,'colour':p.get('colour','unknown'),'cap_number':None,'team':None,'origin':'manual_seed' if seeds is not None else 'colour_candidate','points':[{'second':round(t,3),'x':p['x'],'y':p['y']}]}
+                track={'id':i+1,'colour':p.get('colour','unknown'),'cap_number':None,'team':None,'origin':'manual_seed' if seeds is not None else 'colour_candidate','forward_from_s':round(t,3),'points':[{'second':round(t,3),'x':p['x'],'y':p['y']}]}
                 track['reading_frames']=[crop_observation(frame,track['points'][-1])]
                 active[i+1]=(np.array([p['x']*w,p['y']*h],dtype=np.float32),track); all_tracks.append(track)
         elif t-last>max_gap or prev.shape!=gray.shape or float(np.mean(cv2.absdiff(prev,gray)))>45:
@@ -74,6 +74,7 @@ def track_seed_bidirectional(before, after, seeds):
         tracks,n=track_frames(mapped,seeds)
         if reverse:
             for tr in tracks:
+                tr["forward_from_s"]=None
                 for p in tr["points"]:p["second"]=-p["second"]
                 tr["points"].reverse()
                 for p in tr["reading_frames"]:p["second"]=-p["second"]
@@ -86,6 +87,7 @@ def track_seed_bidirectional(before, after, seeds):
             merged[tr["id"]]=tr
         else:
             dest=merged[tr["id"]]
+            dest["forward_from_s"]=tr.get("forward_from_s")
             dest["points"]=sorted({p["second"]:p for p in dest["points"]+tr["points"]}.values(),key=lambda p:p["second"])
             dest["reading_frames"]=select_reading_frames(dest["reading_frames"]+tr["reading_frames"])
     return list(merged.values()),n1+n2
