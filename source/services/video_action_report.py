@@ -61,38 +61,94 @@ def _action_family(kind):
     return kind
 
 
+# Analysis convention, not a sport rule: close observations are review candidates.
+ACTION_DEDUP_VERSION = "boundary-audit-v2"
+LOCAL_TOLERANCE_S = .15
+CROSS_SEGMENT_TOLERANCE_S = .75
+_DEDUP_TAGS = ("period", "zone", "cage_zone", "hand", "shot_type", "pass_type")
+_BOUNDARY_TYPES = {"recovery", "interception", "possession_start", "possession_end",
+                   "turnover", "goalkeeper_restart"}
+
+
+def _known(value):
+    return value not in (None, "", "unknown")
+
+
 def canonical_actions(actions):
-    """Prevent counting goal+shot and assist+pass for the same visible action."""
+    """Retain uncertain boundary matches in the ledger, without inventing totals."""
+    from bisect import bisect_left, bisect_right
+
     priorities = {"goal": 4, "shot_on_target": 3, "assist": 4, "key_pass": 3,
                   "pass_complete": 2, "centre_touch": 2}
-    result = []
-    for action in sorted(actions, key=lambda row: (row["second"], -priorities.get(row["event_type"], 0))):
+    ordered = sorted((dict(row) for row in actions),
+                     key=lambda row: (row["second"], -priorities.get(row["event_type"], 0)))
+    boundaries = [row for row in ordered if row.get("counted") and
+                  row["event_type"] in _BOUNDARY_TYPES and _known(row["side"])]
+    boundary_times = [row["second"] for row in boundaries]
+
+    def separated(old, new):
+        if _known(old.get("period")) and _known(new.get("period")) and old["period"] != new["period"]:
+            return True
+        if _action_family(new["event_type"]) not in {"shot", "pass", "touch"}:
+            return False
+        # A confidently observed intervening change of possession or recovery
+        # is evidence against merging two actions. Never infer one from a gap.
+        lo = bisect_right(boundary_times, old["second"])
+        hi = bisect_left(boundary_times, new["second"])
+        return any(b["event_type"] in {"possession_start", "possession_end", "turnover", "goalkeeper_restart"}
+                   or b["side"] == new["side"] for b in boundaries[lo:hi])
+
+    groups = []
+    active = {}
+    for action in ordered:
         family = _action_family(action["event_type"])
-        duplicate = next((old for old in reversed(result[-10:]) if
-                         old["side"] == action["side"] and old["cap_number"] == action["cap_number"]
-                         and _action_family(old["event_type"]) == family
-                         and abs(old["second"] - action["second"]) <= (
-                             .75 if action["cap_number"] and old["segment_index"] != action["segment_index"] else .15)), None)
-        if duplicate:
-            # Contradictory outcomes are not resolved by taking the higher
-            # confidence score. Keep the observation in the ledger for review.
-            types = {duplicate["event_type"], action["event_type"]}
-            compatible = types <= {"goal", "shot_on_target"} or types <= {"assist", "key_pass", "pass_complete"} or types <= {"touch", "centre_touch"} or len(types) == 1
-            if not compatible:
-                duplicate["counted"] = False
-                duplicate["conflict"] = "Issues contradictoires dans les détections de la même action."
-                action["counted"] = False
-                action["conflict"] = duplicate["conflict"]
-                result.append(action)
-            elif duplicate.get("conflict"):
-                action["counted"] = False
-                action["conflict"] = duplicate["conflict"]
-                result.append(action)
-            elif (bool(action.get("counted")), priorities.get(action["event_type"], 0), action.get("confidence", 0)) > (bool(duplicate.get("counted")), priorities.get(duplicate["event_type"], 0), duplicate.get("confidence", 0)):
-                result[result.index(duplicate)] = action
+        key = (action["side"], action["cap_number"], family)
+        group = active.get(key)
+        if group:
+            previous = group[-1]
+            cross = previous["segment_index"] != action["segment_index"]
+            limit = CROSS_SEGMENT_TOLERANCE_S if cross and action["cap_number"] and _known(action["side"]) else LOCAL_TOLERANCE_S
+            if action["second"] - previous["second"] <= limit + 1e-9 and not separated(previous, action):
+                group.append(action)
+                continue
+        group = [action]
+        groups.append(group)
+        active[key] = group
+
+    result = []
+    for group in groups:
+        if len(group) == 1:
+            result.extend(group)
             continue
-        result.append(action)
-    return result
+        types = {row["event_type"] for row in group}
+        compatible = (len(types) == 1 or types <= {"goal", "shot_on_target"}
+                      or types <= {"assist", "key_pass", "pass_complete"}
+                      or types <= {"touch", "centre_touch"})
+        tag_disagreement = any(len({row.get(tag) for row in group if _known(row.get(tag))}) > 1
+                               for tag in _DEDUP_TAGS)
+        cross = len({row["segment_index"] for row in group}) > 1
+        span = group[-1]["second"] - group[0]["second"]
+        unresolved = not group[0]["cap_number"] or not _known(group[0]["side"])
+        reason = None
+        if not compatible:
+            reason = "Issues contradictoires dans les détections de la même action."
+        elif tag_disagreement:
+            reason = "Indices de localisation ou de geste incompatibles."
+        elif (cross and span > 1e-9) or span > LOCAL_TOLERANCE_S + 1e-9:
+            reason = "Rapprochement temporel ambigu : doublon ou actions distinctes."
+        elif unresolved:
+            reason = "Identité insuffisante pour fusionner les observations."
+        if reason:
+            for row in group:
+                row.update(counted=False, conflict=reason, dedup_status="review_required")
+            result.extend(group)
+        else:
+            best = max(group, key=lambda row: (bool(row.get("counted")),
+                       priorities.get(row["event_type"], 0), row.get("confidence", 0)))
+            best["dedup_status"] = "compatible_observations"
+            best["merged_observation_count"] = len(group)
+            result.append(best)
+    return sorted(result, key=lambda row: row["second"])
 
 
 def _event_proxy(action):
@@ -189,7 +245,9 @@ def action_report(db, match, *, run=None):
         action["clip_url"] = f"/matches/{match.id}/analysis/actions/{run.id}/{action['key']}/clip"
     counted = [a for a in rows if a["counted"]]
     result.update(available=bool(counted), events=rows, event_count=len(counted),
-                  excluded_count=len(rows) - len(counted), processed_seconds=round(processed, 2),
+                  excluded_count=len(rows) - len(counted), dedup_version=ACTION_DEDUP_VERSION,
+                  dedup_review_count=sum(a.get("dedup_status") == "review_required" for a in rows),
+                  processed_seconds=round(processed, 2),
                   duration_seconds=run.duration_seconds,
                   coverage_percent=round(min(100, processed / run.duration_seconds * 100), 1) if run.duration_seconds else 0,
                   team=summarize_actions([a for a in counted if a["side"] == "for"]),
