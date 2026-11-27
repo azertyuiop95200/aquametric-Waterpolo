@@ -398,6 +398,12 @@ def analysis_snapshot(db, match):
     from services.defensive_systems import metric_diagnostics
     snapshot["defensive_diagnostics"] = metric_diagnostics(summary.get("metric_field_map", {}), summary.get("identity_reviews", {}))
     snapshot["identity_analysis"]["calibration_revision"] = summary.get("metric_field_map", {}).get("revision", "")
+    from services.advanced_motion_report import build as build_advanced_motion
+    try:
+        snapshot["advanced_motion"] = build_advanced_motion(snapshot)
+    except (ValueError, TypeError, KeyError, AttributeError, OverflowError):
+        # Invalid or stale optional evidence must not break the existing report.
+        snapshot["advanced_motion"] = {"status": "unavailable", "players": [], "scope": "partial_calibrated_video", "playing_seconds": None}
     from services.recognition_quality import audit
     snapshot["recognition_quality"] = audit(snapshot["automatic"], snapshot["video_actions"])
     # Basic counters over an empty event set are implementation zeros, not
