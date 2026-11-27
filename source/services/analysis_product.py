@@ -538,7 +538,7 @@ def _html_report(match, snapshot, export_media=None) -> str:
     ocr_html = f"<h2>Lectures du score — à vérifier</h2><table>{observation_rows}</table>" if observation_rows else ""
     from jinja2 import Environment, FileSystemLoader, select_autoescape
     env = Environment(loader=FileSystemLoader(Path(__file__).resolve().parents[1] / "templates"), autoescape=select_autoescape())
-    statistics_html = env.get_template("analysis_all_measurements.html").render(snapshot=snapshot, match=match)
+    statistics_html = env.get_template("analysis_all_measurements.html").render(snapshot=snapshot, match=match, portable_vision_scans=export_media is not None)
     media_html = env.get_template("analysis_export_media.html").render(export_media=export_media or [])
     return f"""<!doctype html><html lang='fr'><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'><title>AquaMetric · Rapport sportif</title>
 <style>body{{font-family:Arial,sans-serif;max-width:1000px;margin:32px auto;padding:0 20px;color:#152b37;line-height:1.55}}h2,h3{{color:#0b5365}}table{{border-collapse:collapse;width:100%}}td,th{{border:1px solid #d5e0e3;padding:8px;text-align:left;overflow-wrap:anywhere}}th{{background:#e8f1f3}}small,.muted{{color:#536777}}img,video,iframe{{max-width:100%}}.report-card{{min-width:0}}.report-status{{padding:12px;border-left:4px solid #bc8129;background:#fbf5e9}}@media print{{body{{margin:0;padding:0}}tr{{break-inside:avoid}}}}</style>
