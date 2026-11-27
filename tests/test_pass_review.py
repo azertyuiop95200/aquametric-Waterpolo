@@ -222,3 +222,15 @@ class PassReviewTests(unittest.TestCase):
         self.assertIn("Arrivée seule, origine inconnue",html)
         self.assertIn("Arriv",html)
         self.assertIn("pas un temps de vol",html)
+
+    def test_observed_reception_delay(self):
+        self.assertEqual(self.validate()["actions"][0]["contact_to_control_evidence_s"],.08)
+        self.assertEqual(self.validate(control_frame=30)["actions"][0]["contact_to_control_evidence_s"],0)
+        self.assertIsNone(self.validate(contact_state="apparent")["actions"][0]["contact_to_control_evidence_s"])
+        self.assertIsNone(self.validate(**self.arrival())["actions"][0]["contact_to_control_evidence_s"])
+    def test_resolved_outcome_coverage(self):
+        p=self.validate()
+        self.assertEqual(p["teams"]["bleus"]["resolved_outcome_coverage_pct"],100)
+        self.assertIsNone(p["teams"]["blancs"]["resolved_outcome_coverage_pct"])
+        p=self.validate(outcome="unknown",related_event_id=None,event_relation=None)
+        self.assertEqual(p["teams"]["bleus"]["resolved_outcome_coverage_pct"],0)
