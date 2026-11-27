@@ -17,6 +17,8 @@ jobs:
       - run: pip install jinja2 fastapi sqlalchemy pytest pydantic opencv-python-headless numpy
       - run: python -m compileall -q source
       - working-directory: source
+        env:
+          PYTHONPATH: ..:.
         run: |
           python -m unittest discover -s tests -p test_advanced_motion_release.py -v
           python -m unittest discover -s tests -p test_advanced_occupation_release.py -v
