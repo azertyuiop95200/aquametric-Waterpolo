@@ -2,9 +2,9 @@
 from math import isfinite
 import cv2
 from services.local_object_tracking import scan
-from services.head_flow_tracking import scan_head_flow
+from services.head_flow_tracking import scan_head_flow, scan_head_flow_supported
 
-MODES={'baseline':scan,'head_flow':scan_head_flow}
+MODES={'baseline':scan,'head_flow':scan_head_flow,'head_flow_supported':scan_head_flow_supported}
 
 def scan_clip(path,start_frame=0,frame_count=75,*,tracking_mode='baseline'):
     if not isinstance(tracking_mode,str) or tracking_mode not in MODES:
@@ -41,7 +41,7 @@ def scan_clip(path,start_frame=0,frame_count=75,*,tracking_mode='baseline'):
         # All tracks remain experimental: this endpoint must never assert metric or roster validity.
         result.update(source_fps_reported=fps,source_frame_count_reported=total,first_frame=start_frame,
                       end_frame_exclusive=end,sample_stride=stride,time_basis="nominal_frame_index_divided_by_reported_fps",
-                      pts_validated=False,tracking_mode=tracking_mode,object_scope='heads_only' if tracking_mode=='head_flow' else 'heads_and_ball_candidates',
+                      pts_validated=False,tracking_mode=tracking_mode,object_scope='heads_only' if tracking_mode in {'head_flow','head_flow_supported'} else 'heads_and_ball_candidates',
                       statistical_use_allowed=False,identity_verified=False,metrics_validated=False)
         return result
     finally:c.release()
