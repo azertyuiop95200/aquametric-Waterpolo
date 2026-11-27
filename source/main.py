@@ -1074,6 +1074,55 @@ def add_event(
     return RedirectResponse(target, status_code=303)
 
 
+@app.post("/matches/{match_id}/review-reference")
+def import_match_review_reference(match_id: int, request: Request,
+    reference_file: UploadFile = File(...), home_color: str = Form(...),
+    same_match: str = Form(""), expected_digest: str = Form(""), db: Session = Depends(get_db)):
+    from models import MatchReviewReference
+    from services.review_reference_import import load, MAX_BYTES, COLORS
+    from sqlalchemy.exc import IntegrityError
+    user = require_user(request, db)
+    match = db.get(Match, match_id)
+    if not match or match.owner_id != user.id:
+        raise HTTPException(404)
+    if same_match != "1" or home_color not in COLORS:
+        raise HTTPException(400, detail="Confirmer le match et la couleur de notre équipe.")
+    try:
+        p, canonical, digest, period = load(reference_file.file.read(MAX_BYTES+1))
+    except (ValueError,TypeError,KeyError) as exc:
+        raise HTTPException(400, detail=str(exc)) from None
+    finally:
+        reference_file.file.close()
+    prior = db.scalar(select(MatchReviewReference).where(MatchReviewReference.match_id==match_id,MatchReviewReference.period==period))
+    try:
+        if prior:
+            from services.review_reference_revision import replace_reference
+            replace_reference(db,prior,p,canonical,digest,home_color,expected_digest)
+        else:
+            if expected_digest:
+                raise ValueError("La version à remplacer ne correspond pas à cette période.")
+            db.add(MatchReviewReference(match_id=match_id,period=period,digest=digest,home_color=home_color,payload_json=canonical))
+        db.commit()
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(409,detail=str(exc)) from None
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, detail="Import concurrent, recharger le rapport.") from None
+    return RedirectResponse(f"/matches/{match_id}/analysis/result#reviewReferences", status_code=303)
+
+@app.get("/matches/{match_id}/review-reference/{period}.json")
+def download_match_review_reference(match_id: int, period: int, request: Request, db: Session = Depends(get_db)):
+    from models import MatchReviewReference
+    from fastapi.responses import Response
+    user = require_user(request, db)
+    match = db.get(Match, match_id)
+    if not match or match.owner_id != user.id:
+        raise HTTPException(404)
+    row=db.scalar(select(MatchReviewReference).where(MatchReviewReference.match_id==match_id,MatchReviewReference.period==period))
+    if not row: raise HTTPException(404)
+    return Response(row.payload_json,media_type="application/json",headers={"Content-Disposition":f"attachment; filename=review-Q{period}.json","Cache-Control":"private, no-store"})
+
 @app.post("/matches/{match_id}/analysis/start")
 def start_analysis(match_id: int, request: Request, db: Session = Depends(get_db)):
     user = require_user(request, db)
