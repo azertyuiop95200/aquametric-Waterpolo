@@ -22,6 +22,10 @@ jobs:
         env:
           PYTHONPATH: source
         run: python -m unittest discover -s tests -p "test_ultimate_statistical*.py" -v
+      - name: Possession evidence regression
+        env:
+          PYTHONPATH: source
+        run: python -m unittest discover -s tests -p "test_possession_evidence.py" -v
       - name: Verify the report templates
         env:
           PYTHONPATH: source
