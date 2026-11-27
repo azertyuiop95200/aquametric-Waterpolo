@@ -12,7 +12,7 @@ PHASE_START_EVENTS = {
     "defensive_recovery_start": "defensive_recovery",
 }
 
-SHOT_EVENTS = {"goal", "shot_on_target", "shot_off_target", "shot_blocked", "block"}
+SHOT_EVENTS = {"goal", "shot_on_target", "shot_off_target", "shot_blocked"}
 LOSS_EVENTS = {"turnover", "bad_pass"}
 PASS_EVENTS = {"pass_complete", "assist"}
 
@@ -246,7 +246,7 @@ def build_phase_sequences(events):
             "goals_for": for_counts["goal"],
             "goals_against": against_counts["goal"],
             "losses_for": sum(for_counts[x] for x in LOSS_EVENTS),
-            "blocks_for": for_counts["block"] + for_counts["shot_blocked"],
+            "blocks_for": for_counts["block"],
             "fast_recovery": for_counts["fast_recovery"],
             "late_recovery": for_counts["late_recovery"],
             "time_to_first_shot": round(first_shot.second - second, 1) if first_shot else None,
