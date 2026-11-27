@@ -89,7 +89,8 @@ jobs:
             const page = await browser.newPage({viewport:{width:390,height:844}, isMobile:true, hasTouch:true});
             const base='http://127.0.0.1:10000';
             await page.goto(base+'/demo-login',{waitUntil:'networkidle'});
-            await page.waitForURL('**/my-team');
+            assert(new URL(page.url()).pathname === '/matches/new', 'demo login must open match analysis: '+page.url());
+            assert(await page.locator('#quickYoutubeAnalysis').count()===1,'match analysis entry is missing');
             const original=page.url();
             const toggle=page.locator('[data-menu-toggle]');
             assert(await toggle.isVisible(),'mobile menu button is not visible');
