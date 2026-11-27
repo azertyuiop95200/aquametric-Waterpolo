@@ -4,6 +4,7 @@
 <p>Les sources distinctes ne sont pas additionnées sans synchronisation vérifiée. Le temps vidéo n'est pas le temps de jeu.</p>
 {% for tactical_report in tactical_sequence.reports %}
 {% include 'advanced_tactical_report_rows.html' %}
+{% include 'possession_geometry_rows.html' %}
 <h3>Évolution des déplacements observés</h3>
 <div style="overflow-x:auto"><table class="metric-table"><thead><tr><th>Fenêtre vidéo (s)</th><th>Joueuse</th><th>Distance (m)</th><th>Vitesse (m/s)</th><th>Couverture</th></tr></thead><tbody>
 {% for w in tactical_report.timeline %}{% for p in w.movement %}<tr><td>{{ '%.1f'|format(w.start_s) }}–{{ '%.1f'|format(w.end_s) }}</td><td>{{ p.side }} · {{ p.cap_number }}</td><td>{{ '%.2f'|format(p.metrics.distance_m) if p.metrics and p.metrics.distance_m is not none else 'Non mesurée' }}</td><td>{{ '%.2f'|format(p.metrics.mean_speed_mps) if p.metrics and p.metrics.mean_speed_mps is not none else 'Non mesurée' }}</td><td>{{ '%.1f'|format(p.metrics.coverage*100) ~ ' %' if p.metrics else 'Non mesurée' }}</td></tr>{% endfor %}{% endfor %}
