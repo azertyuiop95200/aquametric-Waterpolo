@@ -3,6 +3,21 @@
 <section class="report-card" id="reviewPassesQ{{ref.period}}">
 <h3>Passes — référence vidéo partielle</h3>
 <p>{{pr.note}}</p>
+{% if pr.review_coverage %}
+{% set c=pr.review_coverage %}
+<h4>Couverture de la revue des passes</h4>
+<p>{{c.note}}</p>
+<table><tbody>
+<tr><th>Fenêtres plein cadre / recadrées</th><td>{{c.full_frame_windows}} / {{c.crop_windows}}</td></tr>
+<tr><th>Plages plein cadre enregistrées (union)</th><td>{{c.registered_full_frame_span_s}} s ({{c.registered_full_frame_span_pct}} %)</td></tr>
+<tr><th>Images plein cadre distinctes</th><td>{{c.distinct_full_frame_samples}} / {{c.total_source_frames}} ({{c.full_frame_sample_pct}} %)</td></tr>
+<tr><th>Images recadrées distinctes</th><td>{{c.distinct_crop_samples}}</td></tr>
+<tr><th>Durée sans fenêtre plein cadre inscrite</th><td>{{c.remaining_unregistered_span_s}} s</td></tr>
+</tbody></table>
+<details><summary>Intervalles non inscrits au registre ({{c.gaps|length}})</summary>
+{% for g in c.gaps %}<p>{{g.start_s}}–{{g.end_s}} s ({{g.duration_s}} s ; fin exclue)</p>{% endfor %}
+</details>
+{% endif %}
 <table><thead><tr><th>Équipe</th><th>Passes recensées</th><th>Réussies</th><th>Issues inconnues</th><th>Interceptées</th><th>Sorties</th><th>Déviées conservées</th></tr></thead><tbody>
 {% for color,stats in pr.teams.items() %}<tr><td>{{color}}{% if color==p.home_color %} (notre équipe){% endif %}</td><td>{{stats.observed_attempts}}</td><td>{{stats.completed}}</td><td>{{stats.unknown_outcomes}}</td><td>{{stats.intercepted}}</td><td>{{stats.out_of_play}}</td><td>{{stats.deflected_retained}}</td></tr>{% endfor %}
 </tbody></table>
