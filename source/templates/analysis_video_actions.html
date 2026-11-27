@@ -17,10 +17,21 @@
   {% for key,value in actions.team.basic.items() %}<tr><td>{{ actions.labels.get(key,key) }}</td>
   {% for side in ['team','opponent','unassigned'] %}<td>{{ actions[side].basic[key] if actions[side].basic[key] is not none else '— · non observé' }}</td>{% endfor %}</tr>{% endfor %}
   </tbody></table></div>
+  {% if actions.team.possession_efficiency is defined and actions.opponent.possession_efficiency is defined %}
+  <h3>Efficacité offensive des possessions observées</h3>
+  <p>Échantillon des possessions aux bornes exploitables. Les tirs et buts sont des détections automatiques, pas un relevé exhaustif du match. Les durées sont exprimées en temps vidéo.</p>
+  <div style="overflow-x:auto"><table class="metric-table"><thead><tr><th>Indicateur</th><th>{{ match.team.name }}</th><th>{{ match.opponent }}</th></tr></thead><tbody>
+  {% for key,value in actions.team.possession_efficiency.items() %}
+    <tr><th scope="row">{{ actions.labels.get(key,key) }}</th>
+    {% for side in ['team','opponent'] %}{% set measurement = actions[side].possession_efficiency.get(key) %}
+    <td>{{ measurement if measurement is not none else '— · non mesuré' }}</td>{% endfor %}</tr>
+  {% endfor %}
+  </tbody></table></div>
+  {% endif %}
   {% for side,name in [('team',match.team.name),('opponent',match.opponent),('unassigned','Équipe indéterminée')] %}
   <details><summary>{{ name }} · toutes les actions et leurs contextes</summary>
   {{ maps(actions[side]) }}
-  {% for key,data in actions[side].items() if key != 'basic' %}<h4>{{ actions.labels.get(key,key) }}</h4>{{ render(data,actions.labels) }}{% endfor %}
+  {% for key,data in actions[side].items() if key not in ['basic','possession_efficiency'] %}<h4>{{ actions.labels.get(key,key) }}</h4>{{ render(data,actions.labels) }}{% endfor %}
   </details>{% endfor %}
   <h3>Statistiques individuelles automatiques</h3>
   <p>L’équipe et le bonnet proviennent d’indices visuels proposés par le modèle. Un bonnet illisible reste indéterminé ; aucun nom n’est inventé.</p>
