@@ -33,3 +33,16 @@ Pour chaque observation : match_id, period, segment_id, temps_video_s et/ou inte
 | B05 | stockage/worker/Render non vérifiés | prêt à analyser + UX | workspace confirmé, sauvegarde, test persistance isolé | ouvert |
 ## Boucle horaire
 Chaque agent lit le plan et ses journaux ; choisit un lot avec critères de sortie ; mesure baseline, code, teste, produit un rapport ou export partiel si applicable, audite, corrige, reteste, consigne SHA/commandes/logs/artefact, dépendances et prochaine action. Aucun résultat de test anticipé. L'intégrateur consolide les handoffs, ne répète pas les mêmes tâches en échec sans alternative.
+
+## Ordre prioritaire confirmé par l'utilisateur — V3.1 (27/11/2026)
+1. Résoudre les conflits V3 et conserver les travaux récents : PR47 synchronisée avec 24ce9aa ; merge 9af6790 sur branche V3 seulement ; 17 commits manquants ramenés à 0. Valider le nouveau SHA, pas uniquement l'ancien résultat 259 tests.
+2. Récupérer les annotations et résultats privés des agents via dossier Drive de passation autorisé ; vérifier relecture, SHA256 et provenance ; aucun fichier privé dans GitHub public.
+3. Réunir les modules statistiques et les moteurs vidéo dans un snapshot commun ; tester les routes HTTP propriétaire/tiers, exports et erreurs.
+4. Améliorer la reconnaissance du ballon et des joueuses sur référence indépendante ; mesurer précision, rappel, continuité et erreurs d'identité.
+5. Valider la calibration dynamique et ses repères indépendants, avec incertitude et contrôle des changements de caméra.
+6. Calculer déplacements, vitesses, rotations et temps de jeu uniquement dans leur domaine validé ; distinguer temps vidéo observé et temps réglementaire.
+7. Intégrer cartographies, tirs, réseaux de passes et géométrie 3D conditionnelle ; conserver les limites et preuves.
+8. Produire V3.1 avec le moteur réellement intégré sur GWP-CNM Q1, même partiel ; aucune statistique inventée.
+9. Auditer lisibilité, exhaustivité, attribution, unités, dénominateurs et cohérence des exports ; corriger et rejouer.
+10. Valider puis déployer progressivement, avec sauvegarde, contrôle du SHA live et parcours réel autorisé ; ne pas fusionner une PR non validée. Les agents poursuivent les tâches indépendantes en parallèle, sans franchir un jalon dépendant non validé.
+Suivi : chaque cycle relire ce registre et le ROADMAP ; mettre à jour preuves, état, propriétaire, blocage et prochaine action. Aucun cycle ne remplace le rapport sportif par le seul nombre de tests.
