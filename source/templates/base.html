@@ -17,7 +17,7 @@
   <!-- V12.2 compatibility markers: player-metrics-v122.css?v=12.2.0.2 · player-metrics-v122.js?v=12.2.0.2 -->
   <link rel="stylesheet" href="/static/player-metrics-v122.css?v=12.2.0.3">
   <link rel="stylesheet" href="/static/workspace.css?v=20260908">
-  <meta name="description" content="Votre espace water-polo : analyses, résultats, scouting, tactique et simulation.">
+  <meta name="description" content="Votre espace d’analyse water-polo : vidéo, statistiques, tactique et rapports.">
 </head>
 <body class="{% if user %}app-body{% else %}public-body{% endif %}">
 <a class="skip-link" href="#main-content">Aller au contenu</a>
@@ -26,38 +26,13 @@
   <aside class="sidebar" id="sidebar" aria-label="Navigation principale">
     <div class="sidebar-head"><a class="brand-lockup" href="/dashboard"><span class="brand-mark">A</span><span><b>{{ app_name }}</b><small data-i18n="brand.tagline">Water Polo Intelligence</small></span></a><button class="menu-close" type="button" data-menu-close aria-label="Close menu">×</button></div>
     <div class="language-dock"><small>Language · Langue · Lingua · Idioma · Язык</small><div class="language-buttons"><button type="button" data-lang-choice="en">EN</button><button type="button" data-lang-choice="fr">FR</button><button type="button" data-lang-choice="it">IT</button><button type="button" data-lang-choice="es">ES</button><button type="button" data-lang-choice="ru">RU</button></div></div>
-    <nav class="side-nav" aria-label="Primary">
-      <small class="nav-group-title">Mon espace</small>
-      <a class="{% if request.url.path == '/dashboard' %}active{% endif %}" href="/dashboard"><span>D</span><b class="nav-label" data-i18n="nav.dashboard">Dashboard</b></a>
-      <a class="{% if request.url.path == '/my-team' %}active{% endif %}" href="/my-team"><span>★</span><b class="nav-label" data-i18n="nav.my_team">My Team</b></a>
-
-      <small class="nav-group-title">Matchs et résultats</small>
-      <a class="{% if request.url.path.startswith('/matches/new') %}active{% endif %}" href="/matches/new"><span>+</span><b class="nav-label" data-i18n="nav.analyze">Analyze</b></a>
-      <a class="{% if request.url.path == '/competitions' %}active{% endif %}" href="/competitions"><span>R</span><b class="nav-label">Résultats & classements</b></a>
-      <a class="{% if request.url.path == '/matches' or (request.url.path.startswith('/matches/') and '/tactics' not in request.url.path) %}active{% endif %}" href="/matches"><span>M</span><b class="nav-label" data-i18n="nav.matches">Matches</b></a>
-      <a class="{% if request.url.path == '/analysis-history' %}active{% endif %}" href="/analysis-history"><span>↺</span><b class="nav-label" data-i18n="nav.analysis_history">Analysis History</b></a>
-      <a class="{% if request.url.path == '/calendar' %}active{% endif %}" href="/calendar"><span>C</span><b class="nav-label" data-i18n="nav.calendar">Calendar</b></a>
-
-      <small class="nav-group-title">Scouting et recrutement</small>
-      <a class="{% if request.url.path.startswith('/player-intelligence') or request.url.path.startswith('/profiles/players') %}active{% endif %}" href="/player-intelligence"><span>◎</span><b class="nav-label">Fiches joueuses</b></a>
-      <a class="{% if request.url.path.startswith('/coaches') or request.url.path.startswith('/coach-intelligence') %}active{% endif %}" href="/coaches"><span>HC</span><b class="nav-label" data-i18n="nav.coaches">Coaches</b></a>
-      <a class="{% if request.url.path.startswith('/national-teams') %}active{% endif %}" href="/national-teams"><span>N</span><b class="nav-label" data-i18n="nav.national_teams">National teams</b></a>
-      <a class="{% if request.url.path.startswith('/scouting') %}active{% endif %}" href="/scouting"><span>R</span><b class="nav-label">Recrutement</b></a>
-      <a class="{% if request.url.path.startswith('/transfer-watch') %}active{% endif %}" href="/transfer-watch"><span>↻</span><b class="nav-label" data-i18n="nav.transfer_watch">Transfer Watch</b></a>
-
-      <small class="nav-group-title">Préparation</small>
-      <a class="{% if request.url.path == '/knowledge' %}active{% endif %}" href="/knowledge"><span>TK</span><b class="nav-label">Tactique & Connaissance</b></a>
-      <a class="{% if request.url.path.startswith('/analysis/video-session-elite') %}active{% endif %}" href="/analysis/video-session-elite"><span>▶</span><b class="nav-label">Séances vidéo</b></a>
-      <a class="{% if request.url.path.startswith('/simulation') %}active{% endif %}" href="/simulation"><span>~</span><b class="nav-label" data-i18n="nav.simulation">Simulation</b></a>
-      <a class="{% if request.url.path.startswith('/france-intelligence') %}active{% endif %}" href="/france-intelligence"><span>FR</span><b class="nav-label" data-i18n="nav.france_intel">France Intel</b></a>
-
-      <small class="nav-group-title">Données et ressources</small>
-      <a class="{% if request.url.path.startswith('/teams') %}active{% endif %}" href="/teams"><span>T</span><b class="nav-label" data-i18n="nav.teams">Teams</b></a>
-      <a class="{% if request.url.path.startswith('/players') %}active{% endif %}" href="/players"><span>P</span><b class="nav-label" data-i18n="nav.players">Players</b></a>
-      <a class="{% if request.url.path.startswith('/player-data') %}active{% endif %}" href="/player-data"><span>Σ</span><b class="nav-label" data-i18n="nav.player_data">Player Data</b></a>
-      <a class="{% if request.url.path == '/evidence-coverage' %}active{% endif %}" href="/evidence-coverage"><span>✓</span><b class="nav-label">Traçabilité des données</b></a>
-      <a class="{% if request.url.path.startswith('/analysis-library') %}active{% endif %}" href="/analysis-library"><span>A</span><b class="nav-label">Bibliothèque de matchs</b></a>
-      <a class="{% if request.url.path == '/benchmarks' %}active{% endif %}" href="/benchmarks"><span>B</span><b class="nav-label" data-i18n="nav.benchmarks">Benchmarks</b></a>
+    <nav class="side-nav" aria-label="Navigation principale" data-analysis-first-nav>
+      <a href="/dashboard"{% if request.url.path == '/dashboard' %} class="active" aria-current="page"{% endif %}><span aria-hidden="true">D</span><b class="nav-label" data-i18n="nav.dashboard">Accueil</b></a>
+      <a href="/matches/new"{% if request.url.path.startswith('/matches/new') %} class="active" aria-current="page"{% endif %}><span aria-hidden="true">+</span><b class="nav-label" data-i18n="nav.analyze">Analyser un match</b></a>
+      <a href="/matches"{% if request.url.path == '/matches' or (request.url.path.startswith('/matches/') and not request.url.path.startswith('/matches/new') and '/tactics' not in request.url.path and '/report' not in request.url.path and '/analysis/result' not in request.url.path) %} class="active" aria-current="page"{% endif %}><span aria-hidden="true">Σ</span><b class="nav-label" data-i18n="nav.matches">Matchs et statistiques</b></a>
+      <a href="/knowledge"{% if request.url.path == '/knowledge' or '/tactics' in request.url.path %} class="active" aria-current="page"{% endif %}><span aria-hidden="true">TK</span><b class="nav-label" data-i18n="nav.tactical_chess">Tactique</b></a>
+      <a href="/analysis-history"{% if request.url.path == '/analysis-history' or '/report' in request.url.path or '/analysis/result' in request.url.path %} class="active" aria-current="page"{% endif %}><span aria-hidden="true">↺</span><b class="nav-label" data-i18n="nav.analysis_history">Rapports et historique</b></a>
+      <a href="/analysis-library"{% if request.url.path.startswith('/analysis-library') %} class="active" aria-current="page"{% endif %}><span aria-hidden="true">A</span><b class="nav-label" data-i18n="nav.analysis_library">Bibliothèque</b></a>
     </nav>
     <div class="sidebar-foot"><div class="data-trust"><i></i><span><b data-i18n="trust.title">Evidence-first analysis</b><small data-i18n="trust.subtitle">Uncertain data stays uncertain</small></span></div><form method="post" action="/logout"><button class="ghost full" data-i18n="action.logout">Log out</button></form></div>
   </aside>
