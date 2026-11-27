@@ -336,3 +336,42 @@ def test_possession_cross_segment_boundary_never_pairs():
     from services.video_action_report import bounded_possessions
     row = _possession_row
     assert bounded_possessions([row("possession_start", 1), row("possession_end", 5, 1)])["count"] is None
+
+
+def test_possession_efficiency_mixed_sample_and_denominators():
+    from services.video_action_report import possession_efficiency
+    def interval(shots, goals, passes, duration, first):
+        return dict(shots=shots, goals=goals, passes=passes,
+                    video_duration_seconds=duration, first_shot_after_seconds=first)
+    result = possession_efficiency([interval(2, 1, 3, 10, 4), interval(0, 0, 2, 6, None),
+                                    interval(1, 0, 1, 8, 2)])
+    assert result == dict(possession_sample_count=3, possessions_with_shot=2,
+        possessions_without_observed_shot=1, possessions_with_goal=1,
+        possession_shot_rate_pct=66.67, possession_goal_rate_pct=33.33,
+        mean_shots_per_possession=1.0, mean_passes_per_possession=2.0,
+        mean_possession_video_seconds=8.0, first_shot_sample_count=2, mean_first_shot_video_seconds=3.0)
+
+
+def test_possession_efficiency_no_sample_vs_zero_detected_shots():
+    from services.video_action_report import possession_efficiency
+    empty = possession_efficiency([])
+    assert empty["possession_sample_count"] == empty["first_shot_sample_count"] == 0
+    assert all(v is None for k, v in empty.items() if not k.endswith("sample_count"))
+    zero = possession_efficiency([dict(shots=0, goals=0, passes=0,
+        video_duration_seconds=5, first_shot_after_seconds=None)])
+    assert zero["possession_shot_rate_pct"] == zero["possession_goal_rate_pct"] == 0
+    assert zero["mean_first_shot_video_seconds"] is None
+
+
+def test_possession_efficiency_report_collective_only(db_match):
+    db, match = db_match
+    save_run(db, match, [action("possession_start", second=1), action("pass_complete", second=3, cap=5),
+        action("goal", second=7), action("possession_end", second=8)], duration=30)
+    report = action_report(db, match)
+    efficiency = report["team"]["possession_efficiency"]
+    assert efficiency["possession_sample_count"] == 1
+    assert efficiency["mean_passes_per_possession"] == 1
+    assert efficiency["possession_goal_rate_pct"] == 100
+    assert report["opponent"]["possession_efficiency"]["possession_goal_rate_pct"] is None
+    assert all("possession_efficiency" not in p["report"] for p in report["players"])
+    assert all(p["report"]["observed_possessions"]["count"] is None for p in report["players"])
