@@ -84,7 +84,11 @@ def canonical_actions(actions):
                 action["counted"] = False
                 action["conflict"] = duplicate["conflict"]
                 result.append(action)
-            elif priorities.get(action["event_type"], 0) > priorities.get(duplicate["event_type"], 0):
+            elif duplicate.get("conflict"):
+                action["counted"] = False
+                action["conflict"] = duplicate["conflict"]
+                result.append(action)
+            elif (bool(action.get("counted")), priorities.get(action["event_type"], 0), action.get("confidence", 0)) > (bool(duplicate.get("counted")), priorities.get(duplicate["event_type"], 0), duplicate.get("confidence", 0)):
                 result[result.index(duplicate)] = action
             continue
         result.append(action)
