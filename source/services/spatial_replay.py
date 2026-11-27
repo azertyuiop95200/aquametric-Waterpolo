@@ -20,7 +20,7 @@ def label(value):
         raise ValueError("Invalid label")
     return value.strip()
 
-def review(data, trials=160):
+def review(data, trials=160, *, goal_map=None):
     if not isinstance(data,dict):
         raise ValueError("Expected object")
     if data.get("source") not in ("manual_video","calibrated_tracking"):
@@ -102,7 +102,7 @@ def review(data, trials=160):
     ids=[o["id"] for o in output]
     if len(set(ids))!=len(ids) or data["chosen"] not in ids:
         raise ValueError("Chosen action missing or duplicate option")
-    return dict(model_version="replay-3",source=data["source"],start=start,
+    result=dict(model_version="replay-3",source=data["source"],start=start,
                 defenders=[dict(id=d.id,position=d.position,velocity=d.velocity,radius=d.radius,confidence=d.confidence,reach_elapsed_s=d.reach_elapsed_s,reach_segments=[dict(part=s.part,start_offset=s.start_offset,end_offset=s.end_offset,radius=s.radius,target_start_offset=s.target_start_offset,target_end_offset=s.target_end_offset,reaction_s=s.reaction_s,motion_s=s.motion_s) for s in d.reach_segments]) for d in tracks],
                 length_m=length,width_m=width,goal_x=goal_x,chosen=data["chosen"],options=output,
                 goal_angles=goal_angles(start,goal_x,width/2) if abs(start[0]-goal_x)>1e-8 else None,
@@ -111,3 +111,12 @@ def review(data, trials=160):
                 "Constant defender velocity; optional supplied reach poses interpolate linearly after reaction delay, then hold; not an anatomical or measured reaction model",
                 "Spherical proxy retained when no body capsule is supplied; clearance is conditional on modeled geometry, not anatomical coverage",
                 "Manual or supplied positions are not automatically reconstructed from pixels"])
+
+    if goal_map is not None:
+        from services.spatial_goal_coverage import goal_coverage
+        keeper_id=label(goal_map["keeper_id"])
+        if keeper_id not in {d.id for d in tracks}:
+            raise ValueError("Select an explicitly supplied goalkeeper")
+        result["goal_coverage"]=goal_coverage(start,goal_x,width,tracks,keeper_id,complete,
+            number(goal_map["speed"],2,30))
+    return result
