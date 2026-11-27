@@ -92,6 +92,10 @@ def validate_pass_review(reference, duration):
             check(c==k,'Maîtrise au premier contact non démontrée.')
         if quality=='failed':
             check(outcome in {'intercepted','out_of_play'} and c is not None and r['contact_state']=='observed','Échec de réception non démontré.')
+        if r.get('defensive_intervention')=='blocked':
+            check(outcome!='completed','Blocage incompatible avec une réception directe réussie.')
+        if r.get('defensive_intervention')=='none_observed':
+            check(r.get('deflection_observed') is not True and outcome!='intercepted','Intervention défensive contradictoire.')
         if r.get('defensive_intervention')=='deflected':
             check(r.get('deflection_observed') is True,'Déviation non démontrée.')
         ev=r.get('related_event_id');relation=r.get('event_relation');iv=r.get('related_interval_id')
