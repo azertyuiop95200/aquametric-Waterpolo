@@ -32,3 +32,38 @@ def estimate(player,t,L,W,*,window=.6,min_support=.3,max_age=.12):
 
 def in_bounds(position,velocity,horizon,L,W):
     return all(0<=position[i]+velocity[i]*horizon<=bound for i,bound in enumerate((L,W)))
+
+
+def estimate_reviewed(snapshot, identity, t, L, W):
+    """Use a single reviewed forward track, unsmoothed projection only.
+    Identity and calibration are retrospective reviews, not online predictions.
+    Ambiguous simultaneous tracks are withheld instead of fused.
+    """
+    summary=(snapshot.get('automatic') or {}).get('summary') or {}
+    metric=summary.get('metric_field_map') or {}
+    ref=metric.get('reference_second')
+    if not num(ref) or not 0<=ref<=t:return None
+    reviews=(summary.get('identity_reviews') or {}).get('tracks') or {}
+    candidates=[]
+    for track in metric.get('tracks',[]):
+        key=str(track['id']);r=reviews.get(key,{})
+        if r.get('provenance')!='coach_review' or not r.get('evidence') or f"{r.get('side')}:{r.get('cap_number')}"!=identity:continue
+        seed=track.get('forward_from_s')
+        if not num(seed) or not 0<=seed<=t:continue
+        segments=[]
+        for seg in track.get('raw_segments',[]):
+            run=[]
+            for p in seg:
+                time,x,y=(p.get(k) for k in ('second','x_m','y_m'))
+                if all(map(num,(time,x,y))) and seed<=time<=t and 0<=x<=L and -W/2<=y<=W/2:
+                    run.append(dict(second=time,x_m=x,y_m=y+W/2))
+                else:
+                    if run:segments.append(run);run=[]
+            if run:segments.append(run)
+        m=estimate({'segments':segments},t,L,W)
+        if m is None:continue
+        m['track_id']=key;m['forward_from_s']=seed;m['reference_second']=ref;m['provenance']='unsmoothed_forward_metric_v1'
+        m['position_xy']=[m['end_xy'][i]+m['velocity'][i]*m['age_s'] for i in (0,1)]
+        if not 0<=m['position_xy'][0]<=L or not 0<=m['position_xy'][1]<=W:continue
+        candidates.append(m)
+    return candidates[0] if len(candidates)==1 else None
