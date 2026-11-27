@@ -591,13 +591,13 @@ def save_identity_review(match_id:int,request:Request,payload:dict,db:Session=De
 @router.post("/matches/{match_id}/analysis/collective-review")
 def save_collective_review(
     match_id:int, request:Request, binding:str=Form(...), action:str=Form("add"),
-    start_s:float=Form(0), end_s:float=Form(0), period:int=Form(1),
+    start_s:float|None=Form(None), end_s:float|None=Form(None), period:int|None=Form(None),
     attacking_side:str=Form("for"), attackers:list[str]=Form([]), defenders:list[str]=Form([]),
-    carrier:str=Form(""), goal_x:float=Form(0), control_reviewed:bool=Form(False),
+    carrier:str=Form(""), goal_x:float|None=Form(None), control_reviewed:bool=Form(False),
     roster_reviewed:bool=Form(False), evidence:str=Form(""),
     center:str=Form(""), marker:str=Form(""), keeper:str=Form(""),
     goal_width_m:str=Form(""), assumed_lateral_span_m:str=Form(""),
-    before_s:float=Form(0), after_s:float=Form(0), losing_side:str=Form(""),
+    before_s:float|None=Form(None), after_s:float|None=Form(None), losing_side:str=Form(""),
     unique_change_reviewed:bool=Form(False), continuous_play_reviewed:bool=Form(False),
     field_players_only:bool=Form(False),
     db:Session=Depends(get_db),
