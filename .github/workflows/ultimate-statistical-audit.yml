@@ -17,7 +17,7 @@ jobs:
       - name: Compile edited Python modules
         run: python -m py_compile source/main.py source/services/elite_performance.py source/services/spatial_match_analysis.py source/services/analysis_product.py source/services/statistical_audit.py source/services/advanced_observed_metrics.py source/services/tracking_performance.py source/services/lineup_performance.py source/services/tactical_sequence_metrics.py
       - name: Install template test dependency
-        run: pip install jinja2 sqlalchemy
+        run: pip install jinja2 sqlalchemy numpy opencv-python-headless
       - name: Focused evidence audit tests
         env:
           PYTHONPATH: source
@@ -35,6 +35,14 @@ jobs:
           for suite in test_review_reference_import.py test_pass_review.py test_review_coverage.py test_retrospective_review.py test_possession_context.py; do
             python -m unittest discover -s tests -p "$suite" -v || exit 1
           done
+      - name: Experimental vision and calibration regression
+        env:
+          PYTHONPATH: source
+        run: |
+          python -m py_compile source/services/local_object_tracking.py source/services/head_flow_tracking.py source/services/local_clip_scan.py source/services/ball_motion_review.py source/services/calibration_validation.py source/services/detection_evaluation.py source/services/learned_head.py
+          for suite in test_local_object_tracking.py test_head_flow_tracking.py test_clip_tracking_mode.py test_ball_motion_review.py test_calibration_validation.py test_detection_evaluation.py test_learned_head.py; do
+            python -m unittest discover -s tests -p "$suite" -v || exit 1
+          done
       - name: Verify the report templates
         env:
           PYTHONPATH: source
@@ -43,7 +51,7 @@ jobs:
           python - <<'PY'
           from jinja2 import Environment, FileSystemLoader
           e=Environment(loader=FileSystemLoader('source/templates'))
-          for name in ('statistical_audit.html','advanced_observed_metrics.html','analysis_all_measurements.html','analysis_result_clean_v2.html','motion_performance.html','lineup_performance.html','tactical_sequence_metrics.html'):
+          for name in ('statistical_audit.html','advanced_observed_metrics.html','analysis_all_measurements.html','analysis_result_clean_v2.html','motion_performance.html','lineup_performance.html','tactical_sequence_metrics.html','vision.html'):
               e.get_template(name)
               print(name, 'compiled')
           from types import SimpleNamespace
