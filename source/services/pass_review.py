@@ -138,6 +138,8 @@ def summarize_pass_review(reference,duration):
             if conflicts:d['shot_link_status']='opponent_control_observed'
         else:d['shot_link_conflict_ids']=[]
         d['arrival_to_control_evidence_s']=round((r['control_frame']-r['arrival_first_frame'])/fps,6) if r['state']=='arrival_only' and r.get('control_frame') is not None else None
+        # Only observed contact and direct control support a reception delay.
+        d['contact_to_control_evidence_s']=round((r['control_frame']-r['contact_frame'])/fps,6) if r['state']=='observed_pass' and r['outcome']=='completed' and r.get('contact_state')=='observed' and r.get('contact_frame') is not None else None
         d['key_pass_verified']=False
         d['assist_verified']=False
         output.append(d)
@@ -150,6 +152,7 @@ def summarize_pass_review(reference,duration):
         summary['resolved_completion_denominator']=counts['completed']+summary['confirmed_failed']
         n=summary['resolved_completion_denominator']
         summary['observed_resolved_completion_pct']=round(100*counts['completed']/n,2) if n else None
+        summary['resolved_outcome_coverage_pct']=round(100*n/len(actions),2) if actions else None
         for field in ('accuracy','defensive_intervention','reception_quality'):
             summary[field+'_counts']=dict(Counter(r.get(field,'unknown') for r in actions))
     return dict(actions=output,teams=teams,states=dict(Counter(r['state'] for r in rows)),fps=fps,coverage_complete=False,note='Revue partielle. Durée jusqu’à une image de maîtrise, non temps de vol exact. Aucun taux global ni attribution individuelle.')
