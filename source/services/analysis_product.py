@@ -420,6 +420,11 @@ def analysis_snapshot(db, match):
         snapshot["shot_context"] = build_shot_context(snapshot,local_source=match.video_source=="upload" and bool(match.video_path))
     except (ValueError,TypeError,KeyError,AttributeError,OverflowError):
         snapshot["shot_context"]={"status":"invalid","context":None,"rows":[],"reason":"Revues de tir incohérentes."}
+    from services.spatial_context_3d import build as build_spatial_3d
+    try:
+        snapshot["spatial_3d"] = build_spatial_3d(snapshot,local_source=match.video_source=="upload" and bool(match.video_path))
+    except (ValueError,TypeError,KeyError,AttributeError,OverflowError):
+        snapshot["spatial_3d"]={"status":"invalid","context":None,"rows":[],"reason":"Simulation 3D incohérente."}
     from services.recognition_quality import audit
     snapshot["recognition_quality"] = audit(snapshot["automatic"], snapshot["video_actions"])
     # Basic counters over an empty event set are implementation zeros, not
