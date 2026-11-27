@@ -84,4 +84,21 @@ class CoachReportIntegration(unittest.TestCase):
             (folder/"v3-synthetic.html").write_text('<!doctype html><html lang="fr"><meta charset="utf-8"><title>Rapport V3 synthétique</title><h1>Test synthétique — aucun match réel</h1>'+html+'</html>',encoding="utf-8")
             (folder/"v3-synthetic.json").write_text(json.dumps({"fixture":True,"snapshot":s},ensure_ascii=False,indent=2,default=str),encoding="utf-8")
 
+    def test_reference_remains_distinct_in_coach_report(self):
+        from test_review_reference_import import fixture, read
+        from services.review_reference_import import summarize
+        p, canonical, digest, period=read(fixture())
+        _,s=render([])
+        s["review_references"]=[dict(period=period,digest=digest,revision_count=0,report=summarize(p,"bleus"))]
+        match=SimpleNamespace(team=SimpleNamespace(name="Blanc"),opponent="Bleu")
+        html=ENV.get_template("analysis_all_measurements.html").render(snapshot=s,match=match)
+        self.assertIn("distinctes des statistiques confirmées",html)
+        self.assertEqual(html.count('id="reviewReferences"'),1)
+        self.assertEqual(s["review_references"][0]["report"]["verified_match_event_count"],0)
+        self.assertEqual(len(s["review_references"][0]["report"]["events"]),1)
+        self.assertTrue(all(x["value"] is None for x in s["statistical_audit"]["team"]))
+        self.assertEqual(s["possession_evidence"]["rows"],[])
+        self.assertIn("&lt;script&gt;",html)
+        self.assertNotIn("<script>",html)
+
 if __name__=="__main__":unittest.main()
