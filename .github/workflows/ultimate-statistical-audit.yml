@@ -21,6 +21,7 @@ jobs:
       - name: Focused evidence audit tests
         env:
           PYTHONPATH: source
+          AQUAMETRIC_V3_FIXTURE_DIR: /tmp/aquametric-v3-fixture
         run: python -m unittest discover -s tests -p "test_ultimate_statistical*.py" -v
       - name: Possession evidence regression
         env:
@@ -51,3 +52,11 @@ jobs:
               assert len(html)>200 and 'Joueuse test' in html if name!='tactical_sequence_metrics.html' else len(html)>200
               print(name,'rendered empty evidence sample')
           PY
+
+      - name: Publish synthetic integrated report
+        uses: actions/upload-artifact@v4
+        with:
+          name: v3-synthetic-possession-report
+          path: /tmp/aquametric-v3-fixture/
+          if-no-files-found: error
+          retention-days: 7
