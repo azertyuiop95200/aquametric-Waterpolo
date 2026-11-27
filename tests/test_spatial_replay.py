@@ -68,4 +68,18 @@ class ReviewTests(unittest.TestCase):
         x["complete_defence"]=False
         self.assertIsNone(review(x,16)["options"][0]["closest_part"])
 
+    def test_sandbox_preserves_reaction_clock_and_baseline(self):
+        from services.spatial_sandbox import sandbox
+        x=scene()
+        x["defenders"][0]["reach_segments"]=[dict(part="left_arm",start_offset=[0,0,0],
+            end_offset=[0,0,.4],radius=.12,target_start_offset=[0,0,0],
+            target_end_offset=[0,-1.3,0],reaction_s=.25,motion_s=.2)]
+        old=deepcopy(x)
+        before=review(x,16)
+        after=sandbox(x,dict(delay_s=.5,suggest=False),16)
+        self.assertEqual(before["defenders"][0]["reach_elapsed_s"],0)
+        self.assertEqual(after["defenders"][0]["reach_elapsed_s"],.5)
+        self.assertEqual(after["defenders"][0]["reach_segments"][0]["reaction_s"],.25)
+        self.assertEqual(x,old)
+
 if __name__=="__main__":unittest.main()
