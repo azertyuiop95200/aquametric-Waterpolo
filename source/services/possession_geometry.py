@@ -6,12 +6,14 @@ try:
     from services.spatial_dominance import SpaceAccumulator
     from services.support_geometry import SupportAccumulator
     from services.center_geometry import CenterAccumulator
+    from services.goalkeeper_geometry import KeeperAccumulator
 except ModuleNotFoundError as e:
     if e.name != 'services': raise
     from tactical_trajectories import _interval, _exposure
     from spatial_dominance import SpaceAccumulator
     from support_geometry import SupportAccumulator
     from services.center_geometry import CenterAccumulator
+    from goalkeeper_geometry import KeeperAccumulator
 
 
 def number(v): return type(v) in (int,float) and isfinite(v)
@@ -54,6 +56,8 @@ def analyze_window(report, window, *, lane_radius_m=.65, proximity_m=1.5, max_st
     support=SupportAccumulator(A,D,carrier,window['goal_x'],report['length_m'])
     role=window.get('center_review')
     center=CenterAccumulator(role,A,D,window['goal_x'],report['length_m'],report['width_m'],error=window.get('position_error_bound_m')) if role is not None else None
+    keeper_role=window.get('keeper_review')
+    keeper=KeeperAccumulator(keeper_role,carrier,D,window['goal_x'],report['length_m'],report['width_m']) if keeper_role is not None else None
     rows={}; duplicates=set()
     for p in report['players']:
         k=f"{p['side']}:{p['cap_number']}"
@@ -106,6 +110,7 @@ def analyze_window(report, window, *, lane_radius_m=.65, proximity_m=1.5, max_st
             lanes[i][k]+=dt; state[i]=('clear_2d','obstructed_2d','indeterminate')[k]
         support.add(edges,t,u,state)
         if center is not None: center.add(edges,t,u)
+        if keeper is not None: keeper.add(edges,t,u)
         if not snapshots: snapshots.append({'second':(t+u)/2,'positions':mid,'lanes':state})
     def value(v): return v if observed else None
     return {'id':window.get('id'),'start_s':a,'end_s':b,'attacking_side':side,'goal_x':window['goal_x'],
@@ -115,4 +120,4 @@ def analyze_window(report, window, *, lane_radius_m=.65, proximity_m=1.5, max_st
             'lanes':[{'receiver':i,'clear_s':value(v[0]),'obstructed_s':value(v[1]),'indeterminate_s':value(v[2]),'clear_fraction':v[0]/observed if observed else None} for i,v in lanes.items()],
             'snapshot':snapshots[0] if snapshots else None,'lane_radius_m':lane_radius_m,'proximity_m':proximity_m,
             'status':'experimental_planar_proxy','game_duration_s':None,'position_error_m':None,
-            'spatial_dominance':space.result(),'offball_support':support.result(),'center_geometry':center.result() if center is not None else None}
+            'spatial_dominance':space.result(),'offball_support':support.result(),'center_geometry':center.result() if center is not None else None,'keeper_geometry':keeper.result() if keeper is not None else None}
