@@ -19,6 +19,6 @@
 <label><input name="roster_reviewed" type="checkbox" value="true" required> Effectif défensif complet et but attaqué revus</label>
 <button name="action" value="add_shot">Enregistrer le contexte du tir</button>
 </form></details>
-{% else %}<p>Un tir cartographié avec identité revue et une action confirmée avec position et identité revues sont nécessaires.</p>{% endif %}
+{% else %}<p>Un tir cartographié avec identité revue et une action confirmée avec position et identité revues sont nécessaires. Si la calibration est antérieure à la liaison explicite de la source, refaire la calibration de la vidéo principale.</p>{% endif %}
 {% if r.rows or (r.excluded_reviews is defined and r.excluded_reviews) %}<details><summary>Réinitialiser les revues de tir</summary><form method="post" action="/matches/{{ match.id }}/analysis/collective-review"><input type="hidden" name="binding" value='{{ ctx|tojson }}'><button name="action" value="clear_shot">Effacer uniquement les revues de tir</button></form></details>{% endif %}
 </section>{% endif %}
