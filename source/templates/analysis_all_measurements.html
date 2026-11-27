@@ -37,7 +37,8 @@
 {% elif anchor=='coach-tactique' %}
 {% if snapshot.tactical_sequences is defined %}{% include 'tactical_sequence_metrics.html' %}{% endif %}
 {% if snapshot.tactical %}<details><summary>Analyse tactique et limites de couverture</summary>{{render(snapshot.tactical,labels)}}</details>{% endif %}
-{% elif anchor=='coach-passes' and snapshot.advanced_observed is defined %}{% include 'advanced_observed_metrics.html' %}
+{% elif anchor=='coach-passes' and snapshot.advanced_observed is defined %}
+{% for side,name in [('for',match.team.name),('against',match.opponent)] %}{% set d=snapshot.advanced_observed.sides[side] %}<details><summary>{{name}} · Possessions appariées, réseau de passes et mesures calibrées</summary>{% for key in ['goals_per_possession','possession_duration','passes_per_possession','pass_network','numeric'] if key in d %}<h4>{{labels.get(key,key|replace('_',' '))}}</h4>{{render(d[key],labels)}}{% endfor %}</details>{% endfor %}
 {% endif %}
 </section>
 {% endfor %}
@@ -51,7 +52,7 @@
 <section class="coach-report-section" id="coach-preuves"><h3>11 · Preuves, couverture et méthode</h3>
 {% if snapshot.reference %}<details><summary>Statistiques de la feuille publique associée — source distincte de la vidéo</summary>{{render(snapshot.reference,labels)}}</details>{% endif %}
 {% for side,name in [('team',match.team.name),('opponent',match.opponent)] %}<details><summary>Registre complet · {{name}}</summary>{% for key,data in stats[side].items() if key != 'evaluation' %}<h4>{{labels.get(key,key|replace('_',' '))}}</h4>{{render(data,labels)}}{% endfor %}</details>{% endfor %}
-{% if snapshot.statistical_audit is defined %}<details><summary>Audit statistique et dénominateurs</summary>{% include 'statistical_audit.html' %}</details>{% endif %}
+{% if snapshot.statistical_audit is defined %}{% set audit=snapshot.statistical_audit %}<details><summary>Audit statistique et dénominateurs</summary><p>{{audit.note}}</p>{% for issue in audit.issues %}<p>{{issue.detail}}</p>{% endfor %}{% for side,name in [('team',match.team.name),('opponent',match.opponent)] %}<h4>{{name}}</h4>{{render(audit[side]|rejectattr('key','in',['overall','performance_score','confidence_score'])|list,labels)}}{% endfor %}<h4>Références</h4>{{render(audit.sources,labels)}}</details>{% endif %}
 {% if snapshot.video_actions is defined %}{% include 'analysis_video_actions.html' %}{% endif %}
 </section>
 </section>
