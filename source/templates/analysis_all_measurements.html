@@ -1,23 +1,61 @@
 {% from 'measurement_tables.html' import render %}
-{% if snapshot.statistical_audit is defined %}{% include "statistical_audit.html" %}{% endif %}
-{% if snapshot.video_actions is defined %}{% include 'analysis_video_actions.html' %}{% endif %}
 {% if snapshot.statistics is defined %}
+{% set stats=snapshot.statistics %}
+{% set labels=stats.labels %}
 <section class="report-card section-wide" id="completeMatchStatistics">
+<style>
+.coach-report-nav{display:flex;flex-wrap:wrap;gap:.5rem;margin:1rem 0}.coach-report-nav a{border:1px solid currentColor;border-radius:.5rem;padding:.45rem .7rem;text-decoration:none}.coach-report-section{margin:1.5rem 0;scroll-margin-top:6rem}.coach-report-scroll{overflow-x:auto}.coach-report-table{width:100%;border-collapse:collapse}.coach-report-table th,.coach-report-table td{text-align:left;padding:.6rem;border-bottom:1px solid var(--border,#50616a);vertical-align:top}.coach-report-table th:first-child{width:42%}.coach-report-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}.coach-report-section details{margin:.5rem 0}.coach-report-section summary{cursor:pointer;padding:.4rem 0}.coach-report-muted{opacity:.82;font-size:.92em}@media(max-width:700px){.coach-report-pair{grid-template-columns:1fr}}@media print{.coach-report-nav{display:none}.coach-report-section{break-inside:auto}}
+</style>
 <h2>Toutes les statistiques du match</h2>
-<p>{{ snapshot.statistics.note }}</p>
-<p>{{ snapshot.statistics.excluded_unverified_events }} événement(s) non confirmé(s) exclu(s) des calculs.</p>
-{% if snapshot.reference %}<details><summary>Statistiques de la feuille publique associée — source distincte de la vidéo</summary>{{ render(snapshot.reference,snapshot.statistics.labels) }}</details>{% endif %}
-{% if snapshot.tactical %}<details><summary>Analyse tactique et limites de couverture</summary>{{ render(snapshot.tactical,snapshot.statistics.labels) }}</details>{% endif %}
-{% for side,name in [('team',match.team.name),('opponent',match.opponent)] %}
-<h3>{{ name }}</h3>{{ render(snapshot.statistics[side].basic, snapshot.statistics.labels) }}
-{% for key,data in snapshot.statistics[side].items() if key != 'basic' %}
-<details><summary>{{ snapshot.statistics.labels.get(key,key) }}</summary>{{ render(data,snapshot.statistics.labels) }}</details>
-{% endfor %}{% endfor %}
-<h2>Statistiques individuelles du match</h2>
-{% for person in snapshot.statistics.players %}
-<details><summary>{{ person.name }} · {{ match.team.name if person.perspective == 'for' else match.opponent }}{% if person.cap_number is not none %} · bonnet {{ person.cap_number }}{% endif %}</summary>
-{{ render(person.report, snapshot.statistics.labels) }}
-</details>
-{% else %}<p>Aucune action confirmée attribuée. Les données individuelles ne sont pas déduites du score collectif.</p>{% endfor %}
-</section>
+<p>{{ stats.note }}</p>
+<p class="coach-report-muted">{{ stats.excluded_unverified_events }} événement(s) non confirmé(s) exclu(s) des calculs. Aucun score composite de joueuse dans ce rapport sportif.</p>
+{% set groups=[
+ ('coach-collectif','Collectif',['events','goals','touches','centre_touches'],['coverage']),
+ ('coach-possessions','Possessions et pertes',['turnovers'],['possessions','losses']),
+ ('coach-tirs','Tirs et efficacité',['shots','shots_on_target','shots_off_target','shots_blocked','scoring_efficiency_pct','shot_accuracy_pct'],['shots']),
+ ('coach-passes','Passes et création',['pass_attempts','passes_completed','passes_failed','pass_completion_pct','assists','key_passes','actions_created'],['passes']),
+ ('coach-gardiennes','Gardiennes',['saves'],[]),
+ ('coach-defense','Défense, duels et discipline',['duels_won','duels_lost','ball_wins','interceptions','recoveries','blocks','fouls','exclusions_earned','exclusions_committed','penalties_earned','penalties_committed'],['pressure']),
+ ('coach-phases','Phases, transitions et chronologie',['fast_recoveries','late_recoveries'],['phases','periods']),
+ ('coach-mouvement','Temps de jeu et cartométrie',['distance_m','sprint_5m_s','sprint_10m_s','max_swim_speed_mps'],['physical_measurements']),
+ ('coach-tactique','Tactique et décisions',[],['decisions','qualitative'])
+] %}
+<nav class="coach-report-nav" aria-label="Sommaire du rapport sportif">{% for anchor,title,keys,details in groups %}<a href="#{{anchor}}">{{title}}</a>{% endfor %}<a href="#coach-individuel">Joueuses</a><a href="#coach-preuves">Preuves et méthodes</a></nav>
+{% for anchor,title,keys,details in groups %}
+<section class="coach-report-section" id="{{anchor}}">
+<h3>{{loop.index}} · {{title}}</h3>
+{% if keys %}<div class="coach-report-scroll"><table class="coach-report-table"><thead><tr><th scope="col">Indicateur</th><th scope="col">{{match.team.name}}</th><th scope="col">{{match.opponent}}</th></tr></thead><tbody>
+{% for key in keys %}<tr><th scope="row">{{labels.get(key,key|replace('_',' '))}}</th>{% for side in ['team','opponent'] %}{% set val=stats[side].basic.get(key) %}<td>{% if val is none %}<span class="unmeasured">Non mesuré</span>{% else %}{{val}}{% if val == 0 and key != 'events' %}<small class="coach-report-muted"> · échantillon</small>{% endif %}{% endif %}</td>{% endfor %}</tr>{% endfor %}
+</tbody></table></div>{% endif %}
+{% if details %}<div class="coach-report-pair">{% for side,name in [('team',match.team.name),('opponent',match.opponent)] %}<div><h4>{{name}}</h4>{% for key in details if key in stats[side] %}<details><summary>{{labels.get(key,key|replace('_',' '))}}</summary>{{render(stats[side][key],labels)}}</details>{% else %}<p>Non mesuré.</p>{% endfor %}</div>{% endfor %}</div>{% endif %}
+{% if anchor=='coach-possessions' %}
+{% if snapshot.possession_evidence is defined %}{% include 'possession_evidence.html' %}{% endif %}
+{% if snapshot.review_references is defined %}{% include 'review_reference_report.html' %}{% endif %}
+{% elif anchor=='coach-mouvement' %}
+{% if snapshot.lineup_performance is defined %}{% include 'lineup_performance.html' %}{% else %}<p class="coach-report-muted">Temps de jeu : registre de rotations et horloge synchronisée requis.</p>{% endif %}
+{% if snapshot.motion_performance is defined %}{% include 'motion_performance.html' %}{% else %}<p class="coach-report-muted">Cartographie : trajectoires identifiées et calibration du bassin requises.</p>{% endif %}
+{% elif anchor=='coach-tactique' %}
+{% if snapshot.tactical_sequences is defined %}{% include 'tactical_sequence_metrics.html' %}{% endif %}
+{% if snapshot.tactical %}<details><summary>Analyse tactique et limites de couverture</summary>{{render(snapshot.tactical,labels)}}</details>{% endif %}
+{% elif anchor=='coach-passes' and snapshot.advanced_observed is defined %}
+{% for side,name in [('for',match.team.name),('against',match.opponent)] %}{% set d=snapshot.advanced_observed.sides[side] %}<details><summary>{{name}} · Possessions appariées, réseau de passes et mesures calibrées</summary>{% for key in ['goals_per_possession','possession_duration','passes_per_possession','pass_network','numeric'] if key in d %}<h4>{{labels.get(key,key|replace('_',' '))}}</h4>{{render(d[key],labels)}}{% endfor %}</details>{% endfor %}
 {% endif %}
+</section>
+{% endfor %}
+<section class="coach-report-section" id="coach-individuel"><h3>10 · Statistiques individuelles du match</h3>
+{% for person in stats.players if person.player_id is not none %}
+<details><summary>{{person.name}} · {{match.team.name if person.perspective=='for' else match.opponent}}{% if person.cap_number is not none %} · bonnet {{person.cap_number}}{% endif %}</summary>
+{% for key,data in person.report.items() if key != 'evaluation' %}<h4>{{labels.get(key,key|replace('_',' '))}}</h4>{{render(data,labels)}}{% endfor %}</details>
+{% else %}<p>Aucune joueuse identifiée dans les actions confirmées. Les données individuelles ne sont pas déduites du score collectif.</p>{% endfor %}
+{% for person in stats.players if person.player_id is none %}<details><summary>Actions non attribuées · {{match.team.name if person.perspective=='for' else match.opponent}}</summary>{% for key,data in person.report.items() if key != 'evaluation' %}<h4>{{labels.get(key,key|replace('_',' '))}}</h4>{{render(data,labels)}}{% endfor %}</details>{% endfor %}
+</section>
+<section class="coach-report-section" id="coach-preuves"><h3>11 · Preuves, couverture et méthode</h3>
+{% if snapshot.reference %}<details><summary>Statistiques de la feuille publique associée — source distincte de la vidéo</summary>{{render(snapshot.reference,labels)}}</details>{% endif %}
+{% for side,name in [('team',match.team.name),('opponent',match.opponent)] %}<details><summary>Registre complet · {{name}}</summary>{% for key,data in stats[side].items() if key != 'evaluation' %}<h4>{{labels.get(key,key|replace('_',' '))}}</h4>{{render(data,labels)}}{% endfor %}</details>{% endfor %}
+{% if snapshot.statistical_audit is defined %}{% set audit=snapshot.statistical_audit %}<details><summary>Audit statistique et dénominateurs</summary><p>{{audit.note}}</p>{% for issue in audit.issues %}<p>{{issue.detail}}</p>{% endfor %}{% for side,name in [('team',match.team.name),('opponent',match.opponent)] %}<h4>{{name}}</h4>{{render(audit[side]|rejectattr('key','in',['overall','performance_score','confidence_score'])|list,labels)}}{% endfor %}<h4>Références</h4>{{render(audit.sources,labels)}}</details>{% endif %}
+{% if snapshot.statistical_audit is defined %}<details><summary>Registre scientifique individuel · unités, états et preuves</summary>{% for player in audit.players %}<h4>{{player.name}} · {{'Équipe' if player.side=='for' else 'Adversaire'}}</h4>{{render(player.metrics|rejectattr('key','in',['overall','performance_score','confidence_score'])|list,labels)}}{% else %}<p>Pas d'action attribuée à une joueuse.</p>{% endfor %}</details>{% endif %}
+{% if snapshot.advanced_observed is defined %}<details><summary>Mesures calibrées par joueuse</summary>{% for player in snapshot.advanced_observed.players %}<h4>{{player.name}}</h4>{{render(player.numeric,labels)}}{% endfor %}</details>{% endif %}
+{% if snapshot.video_actions is defined %}{% include 'analysis_video_actions.html' %}{% endif %}
+</section>
+</section>
+{% elif snapshot.video_actions is defined %}{% include 'analysis_video_actions.html' %}{% endif %}
