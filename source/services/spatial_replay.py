@@ -54,7 +54,7 @@ def review(data, trials=160):
             number(s.get("reaction_s",0),0,3),number(s.get("motion_s",.3),.05,2)) for s in parts)
         tracks.append(Track(label(d["id"]),xyz(d["position"],bounds),
                      xyz(d["velocity"],((-3,3),(-3,3),(-3,3))),
-                     number(d["radius"],.15,1.8),number(d["confidence"],0,1),segments,number(d.get("reach_elapsed_s",0),0,3)))
+                     number(d["radius"],.15,1.8),number(d["confidence"],0,1),segments,number(d.get("reach_elapsed_s",0),0,5)))
     if len({d.id for d in tracks})!=len(tracks):
         raise ValueError("Duplicate defender")
     if not isinstance(data.get("chosen"),str):
