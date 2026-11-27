@@ -60,3 +60,5 @@
 </section>
 </section>
 {% elif snapshot.video_actions is defined %}{% include 'analysis_video_actions.html' %}{% endif %}
+
+{% if snapshot.statistics is not defined %}{% include 'advanced_motion_rows.html' %}{% endif %}
