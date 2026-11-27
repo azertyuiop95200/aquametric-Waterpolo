@@ -188,3 +188,37 @@ class PassReviewTests(unittest.TestCase):
         self.reject(accuracy="perfect")
         self.reject(defensive_intervention="deflected")
         self.reject(reception_quality="failed")
+
+    def arrival(self, **kw):
+        return dict(state="arrival_only",team=None,arrival_first_frame=22,
+            release_last_held_frame=None,release_first_free_frame=None,
+            outcome="unknown",distinct_receiver=None,direct_sequence=None,
+            sender_role="unknown",related_event_id=None,event_relation=None,**kw)
+    def test_arrival_control_not_pass(self):
+        p=self.validate(**self.arrival());a=p["actions"][0]
+        self.assertEqual(a["arrival_to_control_evidence_s"],.4)
+        self.assertIsNone(a["release_to_control_evidence_s"])
+        self.assertEqual(a["control_team"],"bleus")
+        self.assertEqual(p["states"]["arrival_only"],1)
+        self.assertEqual(p["teams"]["bleus"]["observed_attempts"],0)
+        self.assertIsNone(p["teams"]["bleus"]["observed_resolved_completion_pct"])
+    def test_arrival_no_control(self):
+        p=self.validate(**self.arrival(control_frame=None,control_team=None,contact_frame=None,contact_state="unknown"))
+        self.assertIsNone(p["actions"][0]["arrival_to_control_evidence_s"])
+    def test_arrival_invalid_order(self):
+        self.reject(**self.arrival(control_frame=21))
+    def test_arrival_no_sender_or_success(self):
+        a=self.arrival();a["team"]="bleus";self.reject(**a)
+        a=self.arrival();a["outcome"]="completed";self.reject(**a)
+        a=self.arrival();a["direct_sequence"]=True;self.reject(**a)
+    def test_arrival_requires_no_release(self):
+        a=self.arrival();a.update(release_last_held_frame=20,release_first_free_frame=21);self.reject(**a)
+    def test_arrival_before_water(self):
+        self.reject(**self.arrival(water_seen_frame=21))
+    def test_arrival_render(self):
+        p=self.validate(**self.arrival())
+        env=Environment(loader=FileSystemLoader("source/templates"),autoescape=select_autoescape())
+        html=env.get_template("pass_review_report.html").render(p={"pass_review":p,"home_color":"bleus"},ref={"period":1})
+        self.assertIn("Arrivée seule, origine inconnue",html)
+        self.assertIn("Arriv",html)
+        self.assertIn("pas un temps de vol",html)
