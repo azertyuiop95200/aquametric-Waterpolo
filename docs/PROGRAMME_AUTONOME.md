@@ -38,3 +38,8 @@ Ce document suit le développement, pas les données privées de match. Ne pas y
 - R7 : commits b82d66e et 2d2a1d8 : contrôle des départs successifs et unicité du lien direct au tir. CI précédente 45916914090 signalée réussie ; recompter les tests depuis les logs.
 - R8 : commits 5c2f1b6, f81fa0e, 6ca5e4f : export explicite shot_link_status=temporal_only, key_pass_verified=false et assist_verified=false ; avertissement HTML et test de non-attribution. Ne pas confondre association temporelle et continuité prouvée. CI à vérifier avant validation.
 - Prochaine action : vérifier CI R8, tester import réel hors production, définir preuve positive de continuité et contradictions inter-registres. Aucun nouveau relevé vidéo ni déploiement dans ce cycle.
+
+## Révision 9 — contradictions passe-tir (27 novembre 2026)
+- Code c5640d36758095f7c5f228b0e481d456e2c4a472 : contrôle adverse observé dans l'intervalle maîtrise–tir, identifiants des fenêtres exportés. CI 45945180270 terminée avec succès, avant ajout des tests ciblés.
+- Ajout de cinq tests synthétiques : contrôle observé, apparent, hors intervalle, borne du tir, rendu HTML. Le rapport affiche désormais la contradiction et les identifiants associés. Nouvelle CI à vérifier; aucune attribution positive ni validation vidéo supplémentaire.
+- Reprise : vérifier CI des cinq tests, puis audit des reprises attribuées et de la continuité. Ne pas fusionner ni redéployer avant validation et sauvegarde. Aucun fichier privé publié.
