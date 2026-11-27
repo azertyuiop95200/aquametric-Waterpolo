@@ -74,6 +74,7 @@ def sandbox(baseline, edits, trials=32):
             target=advance(target,xyz(o.get("receiver_velocity",[0,0,0]),vb),delay+t)
         scene["options"].append(dict(old,target=list(target),duration_s=t))
     proposed=[]
+    receiver_velocities={o["id"]:o.get("receiver_velocity",[0,0,0]) for o in opts if original_opts[o["id"]]["kind"]=="pass"}
     if edits.get("suggest",True):
         # Generate passes only to supplied receiver proxies; never invent a teammate.
         for o in opts:
@@ -93,6 +94,7 @@ def sandbox(baseline, edits, trials=32):
                 continue
             scene["options"].append(dict(id=ident,kind="pass",target=target,duration_s=t))
             proposed.append(ident)
+            receiver_velocities[ident]=list(v)
         for name,dy,z in [("gauche basse",-1.15,.22),("droite basse",1.15,.22),
                            ("gauche haute",-1.15,.68),("droite haute",1.15,.68),("centre",0,.45)]:
             if len(scene["options"])>=12: break
@@ -106,7 +108,11 @@ def sandbox(baseline, edits, trials=32):
             proposed.append(ident)
     keeper_id=edits.get("keeper_id")
     goal_map={"keeper_id":keeper_id,"speed":speed} if keeper_id else None
-    result=review(scene,trials=trials,goal_map=goal_map)
+    sequence=None
+    if edits.get("two_step") is True:
+        sequence=dict(reception_s=edits.get("reception_s",.25),budget_s=edits.get("sequence_budget_s"),
+                      receiver_velocities=receiver_velocities)
+    result=review(scene,trials=trials,goal_map=goal_map,sequence=sequence)
     result.update(mode="coach_hypothesis",delay_s=delay,proposed_ids=proposed,
                   baseline_decision_second=baseline["decision_second"],
                   model_assumptions={"nominal_ball_horizontal_speed_m_s":speed,
