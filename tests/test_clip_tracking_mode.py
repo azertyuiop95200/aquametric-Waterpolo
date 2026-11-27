@@ -25,3 +25,11 @@ class ClipModesTests(unittest.TestCase):
             with self.assertRaises(ValueError):scan_clip(self.p,2,7)
     def test_tail(self):
         r=scan_clip(self.p,10,75,tracking_mode='head_flow');self.assertEqual(r['end_frame_exclusive'],12);self.assertEqual([f['source_frame_index'] for f in r['frames']],[10])
+
+    def test_supported_mode(self):
+        r=scan_clip(self.p,2,7,tracking_mode='head_flow_supported')
+        self.assertEqual(r['engine'],'head-flow-supported-v3')
+        self.assertEqual(r['min_detector_support'],2)
+        self.assertEqual(r['object_scope'],'heads_only')
+        self.assertEqual([x['source_frame_index'] for x in r['frames']],[2,4,6,8])
+        self.assertFalse(r['statistical_use_allowed'])
