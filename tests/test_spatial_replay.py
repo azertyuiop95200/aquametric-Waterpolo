@@ -51,4 +51,21 @@ class ReviewTests(unittest.TestCase):
         b=review(x,16)
         self.assertAlmostEqual(a["options"][0]["clearance_m"],b["options"][0]["clearance_m"])
 
+    def test_reach_geometry_survives_replay_and_sandbox(self):
+        from services.spatial_sandbox import sandbox
+        x=scene()
+        x["defenders"][0].update(position=[21.,11.3,1.],radius=.3)
+        x["options"][0]["duration_s"]=.3
+        a=review(x,32)
+        x["defenders"][0]["reach_segments"]=[dict(part="left_arm",start_offset=[0,0,0],end_offset=[0,-1.3,0],radius=.12)]
+        b=review(x,32)
+        self.assertLess(b["options"][0]["clearance_m"],a["options"][0]["clearance_m"])
+        self.assertLessEqual(b["options"][0]["clearance_frequency"],a["options"][0]["clearance_frequency"])
+        self.assertEqual(b["options"][0]["closest_part"],"left_arm")
+        self.assertEqual(b["defenders"][0]["reach_segments"][0]["part"],"left_arm")
+        c=sandbox(x,dict(suggest=False),32)
+        self.assertEqual(c["options"][0]["closest_part"],"left_arm")
+        x["complete_defence"]=False
+        self.assertIsNone(review(x,16)["options"][0]["closest_part"])
+
 if __name__=="__main__":unittest.main()
