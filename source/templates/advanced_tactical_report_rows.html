@@ -14,8 +14,15 @@
 <svg role="img" aria-label="Occupation spatiale observée du bonnet {{ p.cap_number }}" viewBox="0 0 {{ r.length_m }} {{ r.width_m }}" style="width:100%;max-width:420px;display:block;background:#e8f3f8;border:1px solid #4893b0">
 {% for c in p.map.cells %}<rect x="{{ c.x }}" y="{{ c.y }}" width="{{ c.w }}" height="{{ c.h }}" fill="#1764aa" fill-opacity="{{ c.share }}"><title>{{ '%.3f'|format(c.seconds) }} s observées</title></rect>{% endfor %}
 <line x1="{{ r.length_m/2 }}" y1="0" x2="{{ r.length_m/2 }}" y2="{{ r.width_m }}" stroke="#4893b0" stroke-width=".06"/>
+{% for seg in p.segments %}<polyline points="{% for v in seg %}{{ v.x_m }},{{ v.y_m }} {% endfor %}" fill="none" stroke="#164e63" stroke-width=".09"/>{% endfor %}
+{% for t in p.metrics.directional_effort.turns %}<circle cx="{{ t.x_m }}" cy="{{ t.y_m }}" r=".19" fill="#b45309"><title>{{ '%.1f'|format(t.second) }} s · {{ '%.1f'|format(t.angle_deg) }}°</title></circle>{% endfor %}
 </svg>
 <p>Temps observé {{ '%.2f'|format(p.map.observed_s) }} s · distance {{ '%.2f'|format(p.metrics.distance_m) }} m · sprints {{ p.metrics.sprint_count }} (seuil expérimental). Accélération : {{ '%.2f'|format(p.metrics.peak_speed_increase_mps2) if p.metrics.peak_speed_increase_mps2 is not none else 'Non mesurée' }} m/s². Décélération : {{ '%.2f'|format(p.metrics.peak_speed_decrease_mps2) if p.metrics.peak_speed_decrease_mps2 is not none else 'Non mesurée' }} m/s².</p>
+{% set d=p.metrics.directional_effort %}
+<p>Trajectoires : bleu foncé ; changements de direction : orange (seuil {{ d.turn_threshold_deg }}°, vitesse minimale {{ d.turn_min_speed_mps }} m/s).</p>
+<p>Changements de direction : {{ d.turn_count if d.turn_count is not none else 'Non mesurés' }} · accélération vectorielle maximale estimée : {{ '%.2f'|format(d.peak_vector_acceleration_mps2) if d.peak_vector_acceleration_mps2 is not none else 'Non mesurée' }} m/s² · paires de sprints rapprochés : {{ d.repeated_sprint_pairs if d.repeated_sprint_pairs is not none else 'Non mesurées' }}.</p>
+<p>Suivi : {{ '%.2f'|format(p.track_quality.overlap_s) }} s de chevauchement · {{ '%.2f'|format(p.track_quality.conflict_s) }} s de conflit exclu · {{ p.track_quality.rejected_edges }} intervalles rejetés.</p>
+<details><summary>Épisodes de sprint et intervalles observés</summary><ul>{% for e in d.sprint_episodes %}<li>{{ '%.2f'|format(e.start_s) }}–{{ '%.2f'|format(e.end_s) }} s vidéo · {{ '%.2f'|format(e.duration_s) }} s</li>{% else %}<li>Aucun épisode répondant aux seuils dans les intervalles observés.</li>{% endfor %}</ul><p>Intervalles entre sprints rapprochés (s) : {% for g in d.observed_inter_sprint_gaps_s %}{{ '%.2f'|format(g) }}{% if not loop.last %} · {% endif %}{% else %}Non documentés{% endfor %}. Ils ne mesurent pas la récupération physiologique.</p></details>
 {% else %}<p>Trajectoire métrique exploitable indisponible.</p>{% endif %}</article>{% endfor %}
 <h3>Carte des tirs et des passes documentés en 3D</h3>
 <svg role="img" aria-label="Projections des actions documentées" viewBox="0 0 {{ r.length_m }} {{ r.width_m }}" style="width:100%;max-width:600px;display:block;background:#e8f3f8;border:1px solid #4893b0">
