@@ -63,13 +63,15 @@ def measure(points):
                 segments.append(current);current=[];rejected+=1
         current.append(p)
     if current:segments.append(current)
+    # Preserve unsmoothed samples separately; centered smoothing is retrospective.
+    raw_segments=[[dict(p) for p in s] for s in segments]
     segments=[s for s in segments if len(s)>=5]
     for s in segments:
         xy=np.array([[p["x_m"],p["y_m"]] for p in s]);sm=np.array([np.median(xy[max(0,i-2):i+3],axis=0) for i in range(len(xy))])
         for p,v in zip(s,sm):p["x_m"],p["y_m"]=map(float,v)
     seconds=sum(s[-1]["second"]-s[0]["second"] for s in segments)
     distance=sum(sum(hypot(b["x_m"]-a["x_m"],b["y_m"]-a["y_m"]) for a,b in zip(s,s[1:])) for s in segments)
-    return {"segments":segments,"observed_seconds":round(seconds,3),"distance_m":round(distance,2) if seconds>=.5 else None,"rejected_jumps":rejected}
+    return {"segments":segments,"raw_segments":raw_segments,"observed_seconds":round(seconds,3),"distance_m":round(distance,2) if seconds>=.5 else None,"rejected_jumps":rejected}
 
 def build_map(path,tracking,anchors,polygon,width=20.,length=25.,reference_second=0.,shots=()):
     cal=calibrate(anchors,width,length);cap=cv2.VideoCapture(str(path));cache={};quality=[]
@@ -95,7 +97,7 @@ def build_map(path,tracking,anchors,polygon,width=20.,length=25.,reference_secon
             for p in tr.get("points",[])[:100]:
                 t=float(p["second"]);xy=project_at(t,float(p["x"]),float(p["y"]))
                 pts.append({"second":t,"x_m":xy[0],"y_m":xy[1]} if xy is not None else None)
-            tracks.append({"id":tr["id"],"colour":tr.get("colour","unknown"),"cap_number":None,"team":None,**measure(pts)})
+            tracks.append({"id":tr["id"],"colour":tr.get("colour","unknown"),"cap_number":None,"team":None,"forward_from_s":tr.get("forward_from_s"),**measure(pts)})
         mapped=[]
         for s in list(shots)[:30]:
             t=float(s["second"]);xy=project_at(t,float(s["x"]),float(s["y"]))
