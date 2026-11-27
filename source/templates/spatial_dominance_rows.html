@@ -1,0 +1,20 @@
+{% set d=p.spatial_dominance %}
+<h4>Répartition spatiale et rapports numériques locaux</h4>
+<p>Proximité à la joueuse la plus proche, pas contrôle réel ni temps d'intervention. Grille {{ d.cell_m }} m ; rayon local {{ d.local_radius_m }} m. Les moyennes portent sur {{ '%.2f'|format(d.observed_s) }} s de suivi commun.</p>
+{% if d.nominal_mean_area_m2 is not none %}
+{% for mode,title,areas in [('nominal','Proximité descriptive',d.nominal_mean_area_m2),('robust','Attribution prudente sous borne d’erreur',d.robust_mean_area_m2)] %}
+<h5>{{ title }}</h5>
+{% if areas is not none %}
+{% set L=tactical_report.length_m %}{% set W=tactical_report.width_m %}
+<svg role="img" aria-label="{{ title }}" viewBox="-1 -1 {{ L+2 }} {{ W+3 }}" preserveAspectRatio="xMidYMid meet" style="width:100%;max-width:600px;background:#fff;border:1px solid #4893b0">
+{% for c in d.cells %}{% set f=c[mode] %}{% set a=f.attack %}{% set b=f.defence %}{% set n=f.neutral_or_unresolved %}
+<rect x="{{ c.x }}" y="{{ c.y }}" width="{{ c.w }}" height="{{ c.h }}" fill="rgb({{ (37*a+185*b+180*n)|round|int }},{{ (99*a+28*b+180*n)|round|int }},{{ (235*a+28*b+180*n)|round|int }})"><title>Attaque {{ '%.1f'|format(a*100) }} %, défense {{ '%.1f'|format(b*100) }} %, neutre ou incertain {{ '%.1f'|format(n*100) }} % du suivi commun.</title></rect>{% endfor %}
+<rect x="0" y="0" width="{{ L }}" height="{{ W }}" fill="none" stroke="#334155" stroke-width="0.08"/><line x1="{{ L/2 }}" y1="0" x2="{{ L/2 }}" y2="{{ W }}" stroke="#334155" stroke-width="0.06" stroke-dasharray="0.3 0.2"/>
+<line x1="0" y1="{{ W+0.7 }}" x2="5" y2="{{ W+0.7 }}" stroke="#164e63" stroke-width="0.12"/><text x="2.5" y="{{ W+1.5 }}" font-size="0.65" text-anchor="middle" fill="#164e63">5 m</text></svg>
+<p>Bleu : attaque ; rouge : défense ; gris : neutre/indéterminé. Couleurs mélangées selon la part du temps commun ; détail au survol.</p>
+<table class="metric-table"><thead><tr><th>Attaque (m²)</th><th>Défense (m²)</th><th>Neutre / indéterminé (m²)</th></tr></thead><tbody><tr>{% for k in ['attack','defence','neutral_or_unresolved'] %}<td>{{ '%.2f'|format(areas[k]) }}</td>{% endfor %}</tr></tbody></table>
+{% else %}<p>Non calculable : aucune borne d'erreur de position fournie. L'incertitude inconnue n'est pas assimilée à zéro.</p>{% endif %}{% endfor %}
+{% if d.position_error_bound_m is not none %}<p>Borne de position fournie : {{ d.position_error_bound_m }} m par joueuse ; résultats conditionnels à cette hypothèse, non certifiée par le moteur.</p>{% endif %}
+<table class="metric-table"><thead><tr><th>Attaquante</th><th>Effectif local attaque (moy.)</th><th>Défense (moy.)</th><th>Surnombre nominal (s)</th><th>Surnombre sous borne (s)</th></tr></thead><tbody>{% for l in d.local %}<tr><td>{{ l.id }}</td><td>{{ '%.2f'|format(l.mean_attackers) }}</td><td>{{ '%.2f'|format(l.mean_defenders) }}</td><td>{{ '%.2f'|format(l.nominal_s.attack) }}</td><td>{{ '%.2f'|format(l.robust_s.attack) if l.robust_s is not none else 'Non mesuré' }}</td></tr>{% endfor %}</tbody></table>
+<p>L'attaquante de référence est incluse dans l'effectif local. Un surnombre dans le rayon ne prouve ni disponibilité, ni choix optimal, ni supériorité réglementaire.</p>
+{% else %}<p>Aucun intervalle commun exploitable : surfaces et effectifs locaux non mesurés.</p>{% endif %}
