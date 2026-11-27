@@ -460,6 +460,8 @@ def analysis_snapshot(db, match):
         row["delta"] = row["team"] - row["opponent"] if row["team"] is not None and row["opponent"] is not None else None
     from spatial_review_routes import report_snapshot
     snapshot['spatial_decision'] = report_snapshot(db, match)
+    from services.vision_scan_evidence import report as vision_scan_report
+    snapshot['vision_scan_evidence'] = vision_scan_report(db, match)
     return snapshot
 
 

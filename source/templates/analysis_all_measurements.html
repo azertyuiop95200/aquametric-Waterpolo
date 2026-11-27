@@ -37,6 +37,7 @@
 {% include 'recovery_review_rows.html' %}
 {% elif anchor=='coach-mouvement' %}
 {% if snapshot.lineup_performance is defined %}{% include 'lineup_performance.html' %}{% else %}<p class="coach-report-muted">Temps de jeu : registre de rotations et horloge synchronisée requis.</p>{% endif %}
+{% include 'vision_scan_evidence.html' %}
 {% if snapshot.motion_performance is defined %}{% include 'motion_performance.html' %}{% else %}<p class="coach-report-muted">Cartographie : trajectoires identifiées et calibration du bassin requises.</p>{% endif %}
 {% include 'advanced_motion_rows.html' %}
 {% elif anchor=='coach-tactique' %}

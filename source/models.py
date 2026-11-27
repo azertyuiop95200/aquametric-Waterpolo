@@ -68,6 +68,21 @@ class Match(Base):
     events = relationship("Event", back_populates="match", cascade="all, delete-orphan")
     media_artifacts = relationship("MediaArtifact", back_populates="match", cascade="all, delete-orphan")
     review_references = relationship("MatchReviewReference", back_populates="match", cascade="all, delete-orphan")
+    vision_scans = relationship("VisionScanEvidence", cascade="all, delete-orphan")
+
+class VisionScanEvidence(Base):
+    """Private experimental scans, never a confirmed Event or metric track."""
+    __tablename__ = "vision_scan_evidence_v1"
+    from sqlalchemy import UniqueConstraint
+    __table_args__ = (UniqueConstraint("match_id", "digest", name="uq_vision_scan_digest"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    match_id: Mapped[int] = mapped_column(ForeignKey("matches.id"), index=True)
+    segment_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    source_binding: Mapped[str] = mapped_column(String(64))
+    digest: Mapped[str] = mapped_column(String(64))
+    kind: Mapped[str] = mapped_column(String(30))
+    payload_json: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 class MatchReviewReference(Base):
     """Private, replaceable reference per period; never a verified Event."""

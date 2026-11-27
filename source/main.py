@@ -702,7 +702,12 @@ def local_tracklet_scan(match_id: int, request: Request, start_frame: int = Form
         result = scan_clip(source, start_frame, tracking_mode=tracking_mode)
     except ValueError as exc:
         raise HTTPException(422, detail=str(exc)) from None
-    result.update(match_id=match.id, segment_id=segment_id or None)
+    from services.vision_scan_evidence import save_scan
+    try:
+        evidence=save_scan(db, match, segment if segment_id else None, "tracklets", result, source)
+    except ValueError as exc:
+        raise HTTPException(422, detail=str(exc)) from None
+    result.update(match_id=match.id, segment_id=segment_id or None, evidence_id=evidence.id)
     from fastapi.responses import JSONResponse
     return JSONResponse(result, headers={"Cache-Control": "private, no-store"})
 
@@ -738,10 +743,27 @@ def local_ball_motion(match_id: int, request: Request, frame_index: int = Form(.
         result = scan_motion_clip(source, frame_index, seeds)
     except ValueError as exc:
         raise HTTPException(422, detail=str(exc)) from None
-    result.update(match_id=match.id, segment_id=segment_id or None)
+    from services.vision_scan_evidence import save_scan
+    try:
+        evidence=save_scan(db, match, segment if segment_id else None, "ball_motion", result, source)
+    except ValueError as exc:
+        raise HTTPException(422, detail=str(exc)) from None
+    result.update(match_id=match.id, segment_id=segment_id or None, evidence_id=evidence.id)
     from fastapi.responses import JSONResponse
     return JSONResponse(result, headers={"Cache-Control": "private, no-store"})
 
+
+@app.get("/matches/{match_id}/vision/scans/{scan_id}.json")
+def vision_scan_json(match_id: int, scan_id: int, request: Request, db: Session = Depends(get_db)):
+    from models import VisionScanEvidence
+    from services.vision_scan_evidence import read_scan
+    from fastapi.responses import JSONResponse
+    user=require_user(request, db)
+    match=db.get(Match,match_id)
+    row=db.get(VisionScanEvidence,scan_id)
+    if not match or match.owner_id!=user.id or not row or row.match_id!=match.id:
+        raise HTTPException(404)
+    return JSONResponse(read_scan(row),headers={"Cache-Control":"private, no-store"})
 
 @app.get("/matches/{match_id}/vision/contact-sheet")
 def vision_contact_sheet(match_id: int, request: Request, db: Session = Depends(get_db)):
