@@ -131,3 +131,32 @@ class PassReviewTests(unittest.TestCase):
         self.assertEqual(a["shot_link_status"],"temporal_only")
         self.assertFalse(a["key_pass_verified"])
         self.assertFalse(a["assist_verified"])
+
+    def conflict_sample(self, state="observed", start=1.5, end=1.8):
+        p=sample()
+        i=p["reference"]["possession_review_intervals"][0]
+        i.update(start_s=start,end_s=end,before_state=state,after_team="bleus")
+        return summarize(read(p)[0],"bleus")["pass_review"]["actions"][0]
+    def test_observed_opponent_conflict(self):
+        a=self.conflict_sample()
+        self.assertEqual(a["shot_link_status"],"opponent_control_observed")
+        self.assertEqual(a["shot_link_conflict_ids"],["P1"])
+        self.assertFalse(a["key_pass_verified"])
+        self.assertFalse(a["assist_verified"])
+    def test_apparent_opponent_not_conflict(self):
+        a=self.conflict_sample(state="apparent")
+        self.assertEqual(a["shot_link_status"],"temporal_only")
+        self.assertEqual(a["shot_link_conflict_ids"],[])
+    def test_opponent_outside_gap(self):
+        a=self.conflict_sample(start=2.3,end=2.5)
+        self.assertEqual(a["shot_link_status"],"temporal_only")
+    def test_conflict_at_shot_boundary(self):
+        self.assertEqual(self.conflict_sample(start=2,end=2.1)["shot_link_status"],"opponent_control_observed")
+    def test_conflict_rendered(self):
+        p=sample()
+        p["reference"]["possession_review_intervals"][0].update(start_s=1.5,end_s=1.8)
+        s=summarize(read(p)[0],"bleus")
+        env=Environment(loader=FileSystemLoader("source/templates"),autoescape=select_autoescape())
+        h=env.get_template("review_reference_report.html").render(snapshot={"review_references":[dict(period=1,digest="a"*64,report=s)]})
+        self.assertIn("Contrôle adverse observé",h)
+        self.assertIn("Fenêtres contradictoires : P1",h)
