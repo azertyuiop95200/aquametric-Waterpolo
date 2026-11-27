@@ -1,0 +1,15 @@
+{# Reusable section for both the interactive and portable report. #}
+{% if tactical_sequence is defined and tactical_sequence %}
+<section class="advanced-tactical-sequence"><h2>Suivi tactique du match par période et source</h2>
+<p>Les sources distinctes ne sont pas additionnées sans synchronisation vérifiée. Le temps vidéo n'est pas le temps de jeu.</p>
+{% for tactical_report in tactical_sequence.reports %}
+{% include 'advanced_tactical_report_rows.html' %}
+<h3>Évolution des déplacements observés</h3>
+<div style="overflow-x:auto"><table class="metric-table"><thead><tr><th>Fenêtre vidéo (s)</th><th>Joueuse</th><th>Distance (m)</th><th>Vitesse (m/s)</th><th>Couverture</th></tr></thead><tbody>
+{% for w in tactical_report.timeline %}{% for p in w.movement %}<tr><td>{{ '%.1f'|format(w.start_s) }}–{{ '%.1f'|format(w.end_s) }}</td><td>{{ p.side }} · {{ p.cap_number }}</td><td>{{ '%.2f'|format(p.metrics.distance_m) if p.metrics and p.metrics.distance_m is not none else 'Non mesurée' }}</td><td>{{ '%.2f'|format(p.metrics.mean_speed_mps) if p.metrics and p.metrics.mean_speed_mps is not none else 'Non mesurée' }}</td><td>{{ '%.1f'|format(p.metrics.coverage*100) ~ ' %' if p.metrics else 'Non mesurée' }}</td></tr>{% endfor %}{% endfor %}
+</tbody></table></div>
+<h3>Transitions documentées</h3>
+<div style="overflow-x:auto"><table class="metric-table"><thead><tr><th>Preuve</th><th>Fenêtre vidéo (s)</th><th>Progression signée (m)</th><th>Vitesse projetée (m/s)</th><th>Repli</th></tr></thead><tbody>{% for t in tactical_report.transitions %}<tr><td>#{{ t.id }}</td><td>{{ t.start_s }}–{{ t.end_s }}</td><td>{{ '%.2f'|format(t.progress_m) if t.progress_m is not none else 'Non mesurée' }}</td><td>{{ '%.2f'|format(t.mean_progress_mps) if t.mean_progress_mps is not none else 'Non mesurée' }}</td><td>Non mesuré</td></tr>{% else %}<tr><td colspan="5">Aucune transition métrique documentée.</td></tr>{% endfor %}</tbody></table></div>
+<p>La vitesse projetée entre deux bornes de preuve n'est pas la vitesse effective d'une contre-attaque.</p>
+{% endfor %}</section>
+{% endif %}
