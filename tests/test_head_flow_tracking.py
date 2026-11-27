@@ -47,3 +47,47 @@ class HeadFlowTests(unittest.TestCase):
         with self.assertRaises(ValueError):scan_head_flow([],3)
     def test_empty(self):
         r=scan_head_flow([]);self.assertEqual(r['tracklets_total'],0);self.assertFalse(r['metrics_validated'])
+
+
+class SupportedFlowTests(unittest.TestCase):
+    def run_supported(self, ds, flow):
+        fs=[(i*.04,image(300+i*3)) for i in range(len(ds))]
+        with patch(M+'.detect',side_effect=ds),patch(M+'._flow',side_effect=flow):
+            return scan_head_flow(fs,min_detector_support=2)
+
+    def test_single_candidate_does_not_seed_propagation(self):
+        r=self.run_supported([[det()],[],[]], [[(303,300)]])
+        self.assertEqual(r['flow_only_points'],0)
+        self.assertEqual(r['flow_support_withheld'],1)
+        self.assertEqual(r['frames'][0]['detections'][0]['point_source'],'detector')
+
+    def test_two_independent_observations_seed_short_gap(self):
+        r=self.run_supported([[det()],[det(303)],[],[],[]],
+                             [[(303,300)],[(306,300)],[(309,300)],[(312,300)]])
+        self.assertEqual(r['flow_only_points'],2)
+        self.assertEqual(r['frames'][2]['detections'][0]['detector_support'],2)
+        self.assertEqual(r['frames'][4]['detections'],[])
+        self.assertFalse(r['identity_verified'])
+
+    def test_red_cap_independent_candidate_preserved(self):
+        r=self.run_supported([[det(colour='cap_red')],[]],[[(303,300)]])
+        self.assertEqual(r['frames'][0]['detections'][0]['colour'],'cap_red')
+        self.assertEqual(r['flow_only_points'],0)
+
+    def test_support_restarts_after_gap(self):
+        r=self.run_supported([[det()],[det(303)],[],[det(309)],[]],
+                             [[(303,300)],[(306,300)],[(309,300)],[(312,300)]])
+        self.assertEqual(r['flow_only_points'],1)
+        self.assertEqual(r['frames'][3]['detections'][0]['detector_support'],1)
+        self.assertEqual(r['flow_support_withheld'],1)
+
+    def test_historical_replay_keeps_raw_points_and_rejects_chain(self):
+        from services.head_flow_tracking import audit_flow_support
+        r=seq([[det()],[],[],[det(309)],[det(312)],[]],
+              flow=[[(303,300)],[(306,300)],[(309,300)],[(312,300)],[(315,300)]])
+        import copy
+        old=copy.deepcopy(r)
+        a=audit_flow_support(r['frames'])
+        self.assertEqual((a['detector_points'],a['flow_retained'],a['flow_withheld']),(3,1,2))
+        self.assertIsNone(a['precision'])
+        self.assertEqual(r,old)
