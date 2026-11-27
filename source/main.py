@@ -5,7 +5,7 @@ import asyncio
 import json
 from contextlib import asynccontextmanager
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs, urlencode
 
 from fastapi import FastAPI, Request, Depends, Form, UploadFile, File, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
@@ -42,6 +42,8 @@ from services.france_intelligence import seed_france_intelligence, france_dashbo
 from services.advanced_metrics import METRIC_GROUPS, event_metric_summary, shot_map_summary
 from services.tactical_chess import DEFENCE_PLAYBOOK, recommend_counter_plan
 from services.simulation import simulate_matchup, SIM_TEAMS, absence_availability
+from models import GoogleIdentity  # register OIDC mapping table before create_all
+from google_oauth_routes import router as google_oauth_router, google_ready
 from extensions import install_extensions
 from security import install_security
 
@@ -55,6 +57,9 @@ MAX_UPLOAD_MB = int(os.getenv("MAX_UPLOAD_MB", "1024"))
 MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024
 AUTO_REFRESH_OFFICIAL_DATA = os.getenv("AUTO_REFRESH_OFFICIAL_DATA", "0") == "1"
 WEB_DEMO_MODE = os.getenv("WEB_DEMO_MODE", "0") == "1"
+# Guest Ultimate is explicitly opt-in; enabling on validation must NOT make
+# private production accounts or their matches publicly accessible.
+GUEST_ULTIMATE_ENABLED = WEB_DEMO_MODE or os.getenv("AQUAMETRIC_GUEST_ULTIMATE", "0") == "1"
 OFFICIAL_REFRESH_LOOP_MINUTES = int(os.getenv("OFFICIAL_REFRESH_LOOP_MINUTES", "30"))
 ALLOWED_VIDEO_EXTENSIONS = {".mp4", ".webm", ".mov", ".m4v", ".ogv", ".ogg"}
 EVENT_TYPES = (
@@ -96,6 +101,7 @@ app.add_middleware(
     https_only=os.getenv("COOKIE_SECURE", "0") == "1",
 )
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
+app.include_router(google_oauth_router)
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
 
 Base.metadata.create_all(engine)
@@ -145,10 +151,14 @@ def require_user(request: Request, db: Session):
 
 
 def ctx(**kwargs):
-    return {"app_name": APP_NAME, "web_demo_mode": WEB_DEMO_MODE, **kwargs}
+    return {"app_name": APP_NAME, "web_demo_mode": WEB_DEMO_MODE,
+            "google_login_enabled": google_ready(), "guest_ultimate_enabled": GUEST_ULTIMATE_ENABLED,
+            **kwargs}
 
 
 def render(request: Request, template_name: str, status_code: int = 200, **kwargs):
+    kwargs.setdefault("web_demo_mode", WEB_DEMO_MODE or bool(request.session.get("web_demo")))
+    kwargs.setdefault("guest_ultimate_enabled", GUEST_ULTIMATE_ENABLED)
     return templates.TemplateResponse(request, template_name, ctx(**kwargs), status_code=status_code)
 
 
@@ -222,18 +232,48 @@ def knowledge_page(request: Request, db: Session = Depends(get_db)):
     )
 
 
+def _demo_analysis_destination(value: str) -> str:
+    """Only permit a prefilled new-match form, never an external redirect."""
+    parsed = urlparse(value or "")
+    if parsed.scheme or parsed.netloc or parsed.path != "/matches/new":
+        return "/my-team"
+    video_url = parse_qs(parsed.query).get("video_url", [""])[0]
+    if not youtube_embed(video_url):
+        if parsed.path == "/matches/new" and not video_url:
+            return "/matches/new"
+        return "/my-team"
+    params = {"video_url": video_url}
+    fields = parse_qs(parsed.query)
+    for field in ("team_name", "opponent", "competition"):
+        value = fields.get(field, [""])[0].strip()[:160]
+        if value:
+            params[field] = value
+    category = fields.get("category", [""])[0]
+    if category in {"Women", "Men", "Mixed/Other"}:
+        params["category"] = category
+    return "/matches/new?" + urlencode(params)
+
+
 @app.get("/demo-login")
-def demo_login(request: Request, db: Session = Depends(get_db)):
+def demo_login(request: Request, next: str = "", db: Session = Depends(get_db)):
     """Create an isolated temporary demo workspace for this browser session.
 
     Intended for free/ephemeral web deployments. No password is required and
     the data is allowed to disappear when the free host restarts.
     """
-    if not WEB_DEMO_MODE:
+    if not (GUEST_ULTIMATE_ENABLED or WEB_DEMO_MODE):
         raise HTTPException(status_code=404)
+    fallback = "/matches/new?" + urlencode({
+        "video_url": os.getenv("AQUAMETRIC_TARGET_VIDEO_URL", ""),
+        "team_name": os.getenv("AQUAMETRIC_TARGET_TEAM_NAME", ""),
+        "opponent": os.getenv("AQUAMETRIC_TARGET_OPPONENT", ""),
+        "competition": os.getenv("AQUAMETRIC_TARGET_COMPETITION", ""),
+        "category": os.getenv("AQUAMETRIC_TARGET_CATEGORY", "Women"),
+    })
+    destination = _demo_analysis_destination(next or fallback)
     current = current_user(request, db)
     if current:
-        return RedirectResponse("/dashboard", status_code=303)
+        return RedirectResponse(destination if destination != "/my-team" else "/dashboard", status_code=303)
     token = uuid.uuid4().hex[:12]
     user = User(
         email=f"webdemo-{token}@aquametric.local",
@@ -248,7 +288,8 @@ def demo_login(request: Request, db: Session = Depends(get_db)):
     request.session.clear()
     request.session["user_id"] = user.id
     request.session["web_demo"] = True
-    return RedirectResponse("/my-team", status_code=303)
+    request.session["guest_ultimate"] = True
+    return RedirectResponse(destination, status_code=303)
 
 @app.get("/register", response_class=HTMLResponse)
 def register_page(request: Request):
@@ -294,9 +335,17 @@ def logout(request: Request):
     return RedirectResponse("/", status_code=303)
 
 
+@app.get("/guest/ultimate")
+def guest_ultimate(request: Request, db: Session = Depends(get_db)):
+    """Start an isolated guest session and go straight to Ultimate analysis."""
+    if not GUEST_ULTIMATE_ENABLED:
+        raise HTTPException(status_code=404, detail="L'accès invité Ultimate est désactivé.")
+    return demo_login(request, next="/matches/new", db=db)
+
+
 @app.get("/guest", response_class=HTMLResponse)
-def guest(request: Request):
-    return render(request, "guest.html", demo=None)
+def guest(request: Request, db: Session = Depends(get_db)):
+    return render(request, "guest.html", demo=None, user=current_user(request, db))
 
 
 @app.post("/guest", response_class=HTMLResponse)
@@ -452,7 +501,12 @@ def matches_page(request: Request, db: Session = Depends(get_db)):
 def new_match_page(request: Request, db: Session = Depends(get_db)):
     user = require_user(request, db)
     teams = db.scalars(select(Team).where(Team.owner_id == user.id).order_by(Team.name)).all()
-    return render(request, "match_new.html", user=user, teams=teams, max_upload_mb=MAX_UPLOAD_MB)
+    return render(request, "match_new.html", user=user, teams=teams, max_upload_mb=MAX_UPLOAD_MB,
+                  target_video_url=os.getenv("AQUAMETRIC_TARGET_VIDEO_URL", ""),
+                  target_team_name=os.getenv("AQUAMETRIC_TARGET_TEAM_NAME", ""),
+                  target_opponent=os.getenv("AQUAMETRIC_TARGET_OPPONENT", ""),
+                  target_competition=os.getenv("AQUAMETRIC_TARGET_COMPETITION", ""),
+                  target_category=os.getenv("AQUAMETRIC_TARGET_CATEGORY", "Women"))
 
 
 @app.post("/matches")
@@ -506,6 +560,9 @@ def match_video(match_id: int, request: Request, db: Session = Depends(get_db)):
     match = db.get(Match, match_id)
     if not match or match.owner_id != user.id or not match.video_path:
         raise HTTPException(404)
+    if match.video_source == "cloud":
+        from large_video_routes import cloud_video_redirect
+        return cloud_video_redirect(match)
     path = UPLOAD_DIR / Path(match.video_path).name
     if not path.exists():
         raise HTTPException(404)
@@ -839,6 +896,12 @@ def add_event(
     note: str = Form(""),
     perspective: str = Form("for"),
     phase_tag: str = Form("auto"),
+    return_to: str = Form(""),
+    observed: str = Form(""),
+    period: int = Form(1),
+    segment_id: str = Form(""),
+    coord_x: str = Form(""),
+    coord_y: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = require_user(request, db)
@@ -847,8 +910,32 @@ def add_event(
         raise HTTPException(404)
     if event_type not in EVENT_TYPES:
         raise HTTPException(400, detail="Unsupported event type.")
+    if return_to == "report" and observed != "1":
+        raise HTTPException(400, detail="Confirmer que cet événement a réellement été observé avant de l’ajouter.")
     if second < 0 or second > 12 * 60 * 60:
         raise HTTPException(400, detail="Event time is outside the supported range.")
+    if not 1 <= period <= 8:
+        raise HTTPException(400, detail="Période invalide (1 à 8).")
+    from math import isfinite
+    from models import MatchVideoSegment, EventPosition
+    segment = None
+    if segment_id:
+        if not segment_id.isdecimal():
+            raise HTTPException(400, detail="Identifiant de vidéo invalide.")
+        segment=db.get(MatchVideoSegment,int(segment_id))
+        if not segment or segment.match_id!=match.id:
+            raise HTTPException(404, detail="Cette vidéo n'appartient pas au match.")
+        period=segment.period
+    x = y = None
+    if coord_x.strip() or coord_y.strip():
+        if not coord_x.strip() or not coord_y.strip():
+            raise HTTPException(400, detail="Place le point complet sur la carte (X et Y).")
+        try:
+            x,y=float(coord_x),float(coord_y)
+        except (TypeError,ValueError):
+            raise HTTPException(400, detail="Coordonnées non numériques.") from None
+        if not (isfinite(x) and isfinite(y) and 0<=x<=100 and 0<=y<=100):
+            raise HTTPException(400, detail="Le point doit être compris entre 0 et 100 sur chaque axe.")
 
     pid = None
     if player_id:
@@ -875,8 +962,16 @@ def add_event(
     db.add(event)
     db.flush()
     db.add(EventContext(event_id=event.id, perspective=perspective, phase_tag=phase_tag))
+    if return_to == "report" or segment or x is not None:
+        db.add(EventPosition(
+            event_id=event.id,segment_id=segment.id if segment else None,
+            period=period,segment_second=second,
+            x_pct=x,y_pct=y,provenance="manual_verified",
+        ))
     db.commit()
-    return RedirectResponse(f"/matches/{match_id}", status_code=303)
+    # Only accept this internal destination. Never redirect to user-supplied URLs.
+    target = f"/matches/{match_id}/analysis/result#annotation" if return_to == "report" else f"/matches/{match_id}"
+    return RedirectResponse(target, status_code=303)
 
 
 @app.post("/matches/{match_id}/analysis/start")

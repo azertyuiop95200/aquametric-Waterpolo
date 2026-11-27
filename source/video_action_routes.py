@@ -6,7 +6,7 @@ from pathlib import Path
 from threading import Lock
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Form, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -50,6 +50,22 @@ def run_upload_actions(match_id):
             run_video_actions(db, match, UPLOAD_DIR / Path(match.video_path).name)
 
 
+def run_segment_actions(match_id: int, segment_id: int):
+    """Analyze an independently uploaded quarter; keep its own source run."""
+    from analysis_product_routes import UPLOAD_DIR
+    from models import MatchVideoSegment
+    with SessionLocal() as db:
+        match = db.get(Match, match_id)
+        segment = db.get(MatchVideoSegment, segment_id)
+        if not match or not segment or segment.match_id != match.id:
+            return
+        if segment.source_type != "upload" or not segment.video_path:
+            return
+        file_path = UPLOAD_DIR / Path(segment.video_path).name
+        if file_path.is_file():
+            run_video_actions(db, match, file_path)
+
+
 def upload_analysis_background(match_id, job_id, include_audio):
     from analysis_product_routes import UPLOAD_DIR, EVIDENCE_DIR
     from services.complete_analysis_runner import run_complete_analysis
@@ -80,15 +96,45 @@ def actions_status(match_id: int, request: Request, db: Session = Depends(get_db
     return JSONResponse(progress, headers={"Cache-Control": "private, no-store"})
 
 
+@router.get("/matches/{match_id}/analysis/actions/live")
+def live_actions(match_id: int, request: Request, db: Session = Depends(get_db)):
+    """Per-sequence automatic provisional counters, without a page reload."""
+    _, match = _owned(match_id, request, db)
+    from services.live_action_dashboard import live_action_dashboard
+    return JSONResponse(live_action_dashboard(db, match), headers={
+        "Cache-Control": "private, no-store",
+        "X-Content-Type-Options": "nosniff",
+    })
+
+
 @router.post("/matches/{match_id}/analysis/actions/start")
 def start_actions(match_id: int, request: Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     from analysis_product_routes import UPLOAD_DIR
     from services.capture_report_progress import latest_capture_root
     _, match = _owned(match_id, request, db)
+    from services.guest_ultimate import prohibit_paid_analysis
+    prohibit_paid_analysis(request)
     if not provider_configuration()["configured"]:
         raise HTTPException(503, detail=provider_configuration()["message"])
     if not run_progress(db, match)["active"]:
-        if match.video_source == "upload" and match.video_path and (UPLOAD_DIR / Path(match.video_path).name).is_file():
+        from services.video_action_report import latest_run
+        previous=latest_run(db,match.id)
+        if previous and previous.source_kind=="youtube_direct":
+            from services.youtube_direct_actions import prepare_run,run_direct_youtube_actions
+            from services.video_action_provider import VideoActionError
+            try:
+                run,scheduled=prepare_run(db,match,previous.duration_seconds)
+            except (ValueError,VideoActionError) as exc:
+                raise HTTPException(422,"La reprise YouTube nécessite une durée de vidéo valide.") from None
+            if scheduled:
+                background_tasks.add_task(run_direct_youtube_actions,match.id,run.id)
+        elif previous and previous.source_kind=="cloud":
+            from services.cloud_video_actions import run_cloud_video_actions
+            background_tasks.add_task(run_cloud_video_actions,match.id,previous.source_path)
+        elif match.video_source=="cloud" and match.video_path:
+            from services.cloud_video_actions import run_cloud_video_actions
+            background_tasks.add_task(run_cloud_video_actions,match.id,match.video_path)
+        elif match.video_source == "upload" and match.video_path and (UPLOAD_DIR / Path(match.video_path).name).is_file():
             background_tasks.add_task(run_upload_actions, match.id)
         else:
             root = latest_capture_root(match)
@@ -96,6 +142,34 @@ def start_actions(match_id: int, request: Request, background_tasks: BackgroundT
                 raise HTTPException(422, detail="Aucun fichier vidéo exploitable n’est conservé pour ce dossier. Importe la vidéo ou reprends sa capture.")
             background_tasks.add_task(run_capture_actions, match.id, str(root))
     return RedirectResponse(f"/matches/{match.id}/analysis/result?action_queued=1", status_code=303)
+
+
+@router.post("/matches/{match_id}/analysis/youtube/direct")
+def start_public_youtube_direct(
+    match_id: int, request: Request, background_tasks: BackgroundTasks,
+    duration_minutes: float = Form(..., gt=0, le=240),
+    db: Session = Depends(get_db),
+):
+    """No YouTube download/capture; provider reads allowed public video URL."""
+    from services.youtube_direct_actions import (
+        action_plan, canonical_public_youtube, prepare_run, run_direct_youtube_actions,
+    )
+    from services.video_action_provider import VideoActionError
+    _,match=_owned(match_id,request,db)
+    from services.guest_ultimate import prohibit_paid_analysis
+    prohibit_paid_analysis(request)
+    if match.video_source!="youtube" or not match.video_url:
+        raise HTTPException(400,"Une vidéo YouTube valide est nécessaire.")
+    try:
+        canonical_public_youtube(match.video_url)
+        duration=round(duration_minutes*60,3)
+        action_plan(duration)
+        run,scheduled=prepare_run(db,match,duration)
+    except (ValueError,VideoActionError) as exc:
+        raise HTTPException(400 if isinstance(exc,ValueError) else 503,str(exc)) from None
+    if scheduled:
+        background_tasks.add_task(run_direct_youtube_actions,match.id,run.id)
+    return RedirectResponse(f"/matches/{match.id}/analysis/result#liveAutomaticStats",status_code=303)
 
 
 @router.get("/matches/{match_id}/analysis/actions/{run_id}/{action_key}/clip")
@@ -111,6 +185,26 @@ def action_clip(match_id: int, run_id: int, action_key: str, request: Request, d
     action = next((a for a in report["events"] if a["key"] == action_key), None)
     if not action:
         raise HTTPException(404, detail="Action introuvable.")
+    if run.source_kind=="youtube_direct":
+        from services.youtube_direct_actions import canonical_public_youtube
+        from services.video import timestamped_video_url
+        try:
+            url=canonical_public_youtube(run.source_path)
+        except ValueError:
+            raise HTTPException(410,"La référence YouTube a changé.") from None
+        return RedirectResponse(timestamped_video_url(url,action["second"]),status_code=307)
+    if run.source_kind=="cloud":
+        from services import large_video_storage as storage
+        from models import LargeVideoUpload
+        row=db.scalar(select(LargeVideoUpload).where(
+            LargeVideoUpload.owner_id==match.owner_id,
+            LargeVideoUpload.match_id==match.id,
+            LargeVideoUpload.object_key==run.source_path,
+            LargeVideoUpload.status=="complete"))
+        if not row:
+            raise HTTPException(404,"Vidéo cloud non associée au match.")
+        destination=storage.signed_video_url(run.source_path)
+        return RedirectResponse(destination+f"#t={max(0,int(action['second']))}",status_code=307)
     source_name = f"video_actions_{run.id}"
     marker = f"action_key={action_key} "
     with _CLIP_LOCK:

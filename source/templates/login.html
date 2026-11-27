@@ -1,1 +1,28 @@
-{% extends 'base.html' %}{% block content %}<div class="panel narrow"><h1>Login</h1>{% if error %}<p class="error">{{error}}</p>{% endif %}<form method="post"><label>Email<input type="email" name="email" required></label><label>Password<input type="password" name="password" required></label><button class="btn">Login</button></form></div>{% endblock %}
+{% extends 'base.html' %}
+{% block content %}
+<div class="panel narrow" style="max-width:480px;margin:auto">
+  <span class="eyebrow">ACCÈS AQUAMETRIC</span>
+  <h1>Se connecter</h1>
+  {% if error %}<p class="error">{{error}}</p>{% endif %}
+  {% if request.query_params.get('google_error') %}
+    <p class="error">La connexion Google a été annulée ou n’a pas pu être vérifiée. Réessaie ou utilise tes anciens identifiants.</p>
+  {% endif %}
+  {% if google_login_enabled %}
+    <a id="googleLoginAction" class="btn primary" style="display:block;text-align:center;margin:16px 0" href="/auth/google?next=/matches/new">
+      Continuer avec Google
+    </a>
+    <p class="mode-note">Avec la même adresse Gmail vérifiée, retrouve ton compte AquaMetric existant et ses matchs. Pour les autres adresses, une confirmation peut être nécessaire.</p>
+  {% else %}
+    <div class="notice">La connexion Google sera proposée dès l’activation de l’identifiant OAuth par l’administrateur. Tu peux utiliser ton email et ton mot de passe existants.</div>
+  {% endif %}
+  <form method="post" action="/login">
+    <label>Email<input type="email" name="email" autocomplete="email" required></label>
+    <label>Mot de passe<input type="password" name="password" autocomplete="current-password" required></label>
+    <button class="btn" type="submit">Se connecter avec un mot de passe</button>
+  </form>
+  <div class="actions" style="margin-top:14px">
+    {% if guest_ultimate_enabled %}<a class="btn secondary" href="/guest/ultimate">Essayer Ultimate en invité</a>{% endif %}
+    <a class="btn secondary" href="/register">Créer un compte</a>
+  </div>
+</div>
+{% endblock %}

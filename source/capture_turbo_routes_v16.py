@@ -27,6 +27,7 @@ from capture_turbo_routes import _FAST_CAPTURE_SENTINEL, _read_state, _write_sta
 from db import SessionLocal, get_db
 from models import Match
 from services.live_frame_match_analysis import live_frame_coverage, run_live_frame_analysis
+from services.capture_source_quality import capture_source_quality, capture_is_unverified
 
 log = logging.getLogger("aquametric.browser_capture.v16")
 
@@ -56,7 +57,9 @@ def _write_report_marker(root: Path, state: dict) -> dict:
     payload = {
         "status": str(state.get("status") or "partial"),
         "analysis_percent": 100.0,
-        "read_percent": max(100.0, float(state.get("read_percent") or 0.0)),
+        # Finished processing (analysis_percent=100) is NOT equivalent to
+        # watching the whole video (read_percent may be 35 for manual stop).
+        "read_percent": max(0.0, min(100.0, float(state.get("read_percent") or 0.0))),
         "phase": str(state.get("phase") or "rapport disponible"),
         "redirect": str(state.get("redirect") or ""),
         "finalization_engine": str(state.get("finalization_engine") or "report-first-v16"),
@@ -77,6 +80,10 @@ def _write_report_marker(root: Path, state: dict) -> dict:
         "evidence_coverage_ratio",
         "finalization_job_status",
         "finalization_job_progress",
+        "capture_source_quality",
+        "source_coverage_percent",
+        "client_finish_reason",
+        "client_finish_read_percent",
     ):
         if key in state:
             payload[key] = state[key]
@@ -114,12 +121,24 @@ def _terminal_from_marker(root: Path, current: dict | None = None) -> dict:
     return state
 
 
-def _publish_report_first(match_id: int, root: Path) -> dict:
+def _publish_report_first(match_id: int, root: Path, *, client_finish_reason: str = "", client_read_percent: float | None = None) -> dict:
     """Persist a truthful report using only evidence already obtained live."""
     existing = _read_report_marker(root)
     if existing:
         return _terminal_from_marker(root, _read_state(root))
 
+    received = _read_state(root)
+    # The request parameters are authoritative. An older finalizer can
+    # overwrite progress.json before we publish the report-first marker.
+    final_reason = client_finish_reason or received.get("client_finish_reason") or "normal"
+    manual_stop = final_reason == "manual_stop"
+    try:
+        percentage = client_read_percent if client_read_percent is not None else received.get("client_finish_read_percent")
+        video_read_percent = float(percentage or 0)
+        from math import isfinite
+        video_read_percent = max(0.0, min(100.0, video_read_percent)) if isfinite(video_read_percent) else 0.0
+    except (TypeError, ValueError):
+        video_read_percent = 0.0
     state = v15.v14._publish_fallback_report(
         match_id,
         str(root),
@@ -127,10 +146,17 @@ def _publish_report_first(match_id: int, root: Path) -> dict:
     )
     if not state:
         return {}
+    # Decoding pixels alone is not proof of footage: headless YouTube can show
+    # a bot challenge for the entire 82-minute timeline.
+    quality = capture_source_quality(root, _read_state(root))
+    blocked = capture_is_unverified(quality)
+    state["capture_source_quality"] = quality
     state.update({
         "status": "partial",
         "analysis_percent": 100.0,
-        "read_percent": 100.0,
+        "read_percent": round(video_read_percent, 2) if manual_stop else 100.0,
+        "source_coverage_percent": round(video_read_percent, 2) if manual_stop else 100.0,
+        "client_finish_reason": "manual_stop" if manual_stop else received.get("client_finish_reason", "normal"),
         "phase": "rapport disponible immédiatement · enrichissement IA en arrière-plan",
         "redirect": f"/matches/{match_id}/analysis/result",
         "finalization_engine": "report-first-v16",
@@ -141,6 +167,18 @@ def _publish_report_first(match_id: int, root: Path) -> dict:
         "media_status": "queued",
         "v16_report_published_at": time.time(),
     })
+    if blocked:
+        state.update({
+            "report_quality": "capture_source_unverified",
+            "phase": "Vidéo non visible : écran statique ou vérification du lecteur",
+            "enrichment_status": "skipped",
+            "media_status": "skipped",
+        })
+        with SessionLocal() as db:
+            match = db.get(Match, match_id)
+            if match:
+                match.status = "browser_capture_source_unverified"
+                db.commit()
     _write_state(root, state)
     try:
         v15._clear_start_marker(root)
@@ -158,7 +196,9 @@ def _publish_report_first(match_id: int, root: Path) -> dict:
     state.update({
         "status": "partial",
         "analysis_percent": 100.0,
-        "read_percent": 100.0,
+        "read_percent": round(video_read_percent, 2) if manual_stop else 100.0,
+        "source_coverage_percent": round(video_read_percent, 2) if manual_stop else 100.0,
+        "client_finish_reason": "manual_stop" if manual_stop else received.get("client_finish_reason", "normal"),
         "phase": "rapport disponible immédiatement · enrichissement IA en arrière-plan",
         "redirect": f"/matches/{match_id}/analysis/result",
         "finalization_engine": "report-first-v16",
@@ -171,6 +211,14 @@ def _publish_report_first(match_id: int, root: Path) -> dict:
         "finalization_job_status": "partial",
         "finalization_job_progress": 100,
     })
+    if blocked:
+        state.update({
+            "capture_source_quality": quality,
+            "report_quality": "capture_source_unverified",
+            "phase": "Échec de validation des images : importer un fichier ou annoter le replay",
+            "enrichment_status": "skipped",
+            "media_status": "skipped",
+        })
     _write_state(root, state)
     _write_report_marker(root, state)
     log.info(
@@ -277,7 +325,7 @@ def _verify_after_publish(
         state.update({
             "status": "partial",
             "analysis_percent": 100.0,
-            "read_percent": 100.0,
+            "read_percent": state.get("source_coverage_percent", 100.0) if state.get("client_finish_reason") == "manual_stop" else 100.0,
             "report_ready": True,
             "phase": "analyse partielle disponible" if outcome == "partial" else "analyse sans mesures sportives",
             "redirect": f"/matches/{match_id}/analysis/result",
@@ -422,13 +470,40 @@ def turbo_finish_capture(
     raw_segments = int(state.get("parallel_segments") or parallel_segments or 1)
     segments = 4 if raw_segments >= 4 else (2 if raw_segments >= 2 else 1)
 
-    published = _publish_report_first(match_id, root)
+    published = _publish_report_first(
+        match_id, root,
+        client_finish_reason=client_finish_reason,
+        client_read_percent=client_read_percent,
+    )
     if not published:
         # Explicit failure is preferable to another invisible 89% wait.
         return JSONResponse(
             {"ok": False, "accepted": False, "error": "Le rapport initial n'a pas pu être publié."},
             status_code=500,
         )
+
+    if client_finish_reason == "manual_stop":
+        # The older V15/V14 finishers may have already published their own
+        # 100%-read state before V16 returns. The authenticated finish request
+        # knows precisely the user-observed share and must win over that legacy
+        # state and over any report marker written by older wrappers.
+        from math import isfinite
+        try:
+            percent = float(client_read_percent)
+            percent = max(0.0, min(100.0, percent)) if isfinite(percent) else 0.0
+        except (ValueError, TypeError):
+            percent = 0.0
+        published.update({
+            "read_percent": round(percent, 2),
+            "source_coverage_percent": round(percent, 2),
+            "client_finish_reason": "manual_stop",
+        })
+        _write_state(root, published)
+        _write_report_marker(root, published)
+
+    if capture_is_unverified(published.get("capture_source_quality", {})):
+        # Do not run OCR/action recognition over a YouTube verification screen.
+        return JSONResponse(_finish_payload(match_id, session_id, published))
 
     background_tasks.add_task(
         _verify_after_publish,

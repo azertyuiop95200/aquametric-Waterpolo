@@ -72,9 +72,16 @@ if not getattr(_capture_v16.run_live_frame_analysis, "_aquametric_v16_bounded_oc
 if not getattr(_capture_v16._publish_report_first, "_aquametric_visual_prepublication", False):
     _V16_ORIGINAL_PUBLISH_REPORT_FIRST = _capture_v16._publish_report_first
 
-    def _v16_publish_report_with_visual_review(match_id, root):
-        state = _V16_ORIGINAL_PUBLISH_REPORT_FIRST(match_id, root)
+    def _v16_publish_report_with_visual_review(match_id, root, **kwargs):
+        # V16 report first now accepts manual-stop coverage hints; forwarding
+        # these is mandatory, otherwise every /finish raises TypeError.
+        state = _V16_ORIGINAL_PUBLISH_REPORT_FIRST(match_id, root, **kwargs)
         if not state:
+            return state
+        from services.capture_source_quality import capture_is_unverified
+        if capture_is_unverified(state.get("capture_source_quality", {})):
+            # A static YouTube anti-bot challenge is not a water-polo event.
+            # Avoid creating false Vision rows and candidate moments at source.
             return state
         try:
             from services.report_first_visual import publish_report_first_visual

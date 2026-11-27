@@ -4,6 +4,80 @@
 <header><small>AQUAMETRIC · RAPPORT DU DOSSIER SAUVEGARDÉ</small><h1>{{match.team.name}} - {{match.opponent}}</h1><p>{{match.competition or 'Compétition non renseignée'}} · {{match.match_date or 'Date non renseignée'}} · {{match.team.category}}</p><p>Match n°{{match.id}} · Export du {{generated_at}}</p></header>
 {% if match.video_url %}<p>Source enregistrée : <a href="{{match.video_url}}">{{match.video_url}}</a></p>{% endif %}
 {% if not snapshot.vision.available and not snapshot.video_actions.available %}<div class="notice"><b>Vidéo identifiée mais non analysée</b><p>Aucun rapport Vision n’est enregistré pour ce dossier. Le lien seul ne permet pas d’observer le match. Aucune conclusion visuelle ou note de joueuse n’est produite ici.</p></div>{% elif snapshot.vision.available %}<p>Pré-analyse Vision : {{snapshot.vision.sample_count}} images échantillonnées sur {{snapshot.vision.duration_seconds}} secondes de source décodable. Un échantillonnage ne constitue pas une lecture exhaustive du match.</p>{% endif %}
+{% if match.video_source == "cloud" %}
+<div class="notice"><h2>Vidéo volumineuse sauvegardée dans le cloud</h2>
+<p>Le fichier a été reçu et vérifié dans un stockage privé. Le transfert ne prouve aucun but, tir ou autre événement sportif. L'analyse automatique des fichiers cloud sur cet hébergement n'est pas encore configurée. Le codage manuel du replay est possible sur le site AquaMetric.</p>
+</div>
+{% endif %}
+{% if snapshot.source_facts %}
+<div class="notice"><h2>Score déclaré par l'auteur de la vidéo (non mesuré par l'OCR)</h2>
+<p><strong>{{snapshot.source_facts.home_team}} {{snapshot.source_facts.home_goals}} – {{snapshot.source_facts.away_goals}} {{snapshot.source_facts.away_team}}</strong>
+ · écart {{snapshot.source_facts.goal_difference_home}} buts</p>
+<p>Source : <a href="{{snapshot.source_facts.source_url}}">{{snapshot.source_facts.source_title}}</a>.
+Date de rencontre indiquée au <a href="{{snapshot.source_facts.fixture_source}}">calendrier fédéral</a> : {{snapshot.source_facts.match_date}}.
+Ce résultat annoncé ne prouve ni les tirs, ni les exclusions, ni les statistiques par joueuse.</p></div>
+{% endif %}
+{% if snapshot.capture_source_quality.get("status") in ["blocked","static_unverified"] %}
+<div class="notice"><h2>Capture vidéo inexploitable</h2>
+<p>La vidéo enregistrée montre un écran de contrôle du lecteur ou une image fixe.
+Les moments d'activité et les lectures OCR de cette capture ne sont pas des faits sportifs et ont été écartés. Importez un fichier vidéo lisible ou annotez manuellement une vidéo accessible.</p></div>
+{% endif %}
+<h2>Analyse réellement annotée · échantillon vérifié</h2>
+<p>{{review_metrics.verified_count}} action(s) confirmée(s) et datée(s). Les statistiques suivantes sont partielles, jamais extrapolées au match complet.</p>
+<table><thead><tr><th>Mesure</th><th>{{match.team.name}}</th><th>{{match.opponent}}</th></tr></thead><tbody>
+{% for title,key in [("Buts observés","tagged_goals"),("Tirs observés","tagged_shots"),("Conversion tirs (%)","shot_conversion_pct"),("Pertes","tagged_turnovers"),("Arrêts","tagged_saves"),("Exclusions obtenues","tagged_exclusions_earned"),("Exclusions concédées","tagged_exclusions_committed"),("Récupérations","tagged_recoveries")] %}
+<tr><td>{{title}}</td><td>{{review_metrics.team[key] if review_metrics.team.tagged_events and review_metrics.team[key] is not none else '—'}}</td><td>{{review_metrics.opponent[key] if review_metrics.opponent.tagged_events and review_metrics.opponent[key] is not none else '—'}}</td></tr>
+{% endfor %}
+</tbody></table>
+{% if review_metrics.players %}
+<h2>Joueuses avec actions réellement attribuées</h2>
+<table><thead><tr><th>Joueuse</th><th>Buts</th><th>Tirs</th><th>Passes décisives</th></tr></thead><tbody>
+{% for player in review_metrics.players %}<tr><td>{{player.name}}</td><td>{{player.tagged_goals}}</td><td>{{player.tagged_shots}}</td><td>{{player.tagged_assists}}</td></tr>{% endfor %}
+</tbody></table>
+{% endif %}
+<h2>Carte de tirs · positions relevées et confirmées</h2>
+<p><strong>{{spatial_stats.shots_mapped}} tir(s) localisé(s) / {{spatial_stats.shots_reviewed}} tir(s) annoté(s)</strong> · {{video_segments|length}} source(s) vidéo associée(s). Les points sont placés par observation et se rapportent au demi-bassin offensif normalisé ; leur absence ne signifie pas zéro tir.</p>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 440" style="display:block;width:100%;max-width:650px;background:#e9f4f8">
+  <rect x="50" y="50" width="500" height="345" fill="#58bdea" stroke="#115c8d" stroke-width="3"/>
+  <line x1="50" y1="113" x2="550" y2="113" stroke="#db3939" stroke-dasharray="8 8" stroke-width="3"/>
+  <line x1="50" y1="188" x2="550" y2="188" stroke="#f4dc46" stroke-dasharray="8 8" stroke-width="3"/>
+  <line x1="50" y1="220" x2="550" y2="220" stroke="#57b365" stroke-dasharray="8 8" stroke-width="3"/>
+  <path d="M250 50 V26 H350 V50" fill="none" stroke="#115c8d" stroke-width="5"/>
+  <text x="300" y="18" font-size="15" fill="#133c5d" text-anchor="middle">CAGE ATTAQUÉE</text>
+  {% for p in spatial_stats.points %}
+  {% if p.event_type in ['goal','shot_on_target','shot_off_target','shot_blocked'] %}
+    <circle cx="{{50 + p.x*5}}" cy="{{50 + p.y*3.45}}" r="7"
+      fill="{{'#f97316' if p.event_type=='goal' else '#087f9a' if p.event_type=='shot_on_target' else '#bb29ba'}}"
+      stroke="{{'#0c2551' if p.side=='against' else '#ffffff'}}" stroke-width="2">
+      <title>Q{{p.period}} · {{p.event_type}} · {{p.player or 'Joueuse inconnue'}} · {{p.second}} s · coord X{{p.x}} Y{{p.y}}</title>
+    </circle>
+  {% endif %}
+  {% endfor %}
+  <text x="300" y="425" font-size="14" fill="#124265" text-anchor="middle">Milieu du bassin · distance relative</text>
+</svg>
+<p>Orange = but observé, turquoise = tir cadré non marqué, violet = autre tir. Bord foncé = adversaire. Aucun xG n'est estimé sans modèle entraîné et validé.</p>
+{% if spatial_stats.points %}
+<table><thead><tr><th>QT</th><th>Vidéo (s)</th><th>Événement</th><th>Joueuse</th><th>Coord. (%)</th><th>Preuve</th></tr></thead><tbody>
+{% for p in spatial_stats.points %}<tr>
+<td>Q{{p.period}}</td><td>{{p.second}}</td><td>{{p.event_type}}</td><td>{{p.player or 'Non attribuée'}}</td>
+<td>{{p.x}}, {{p.y}}</td>
+<td>{% if p.proof_url %}<a href="{{p.proof_url}}">Séquence</a>{% else %}Non disponible{% endif %}</td>
+</tr>{% endfor %}
+</tbody></table>
+{% else %}<p>Aucun point encore mesuré. Le rapport ne doit pas en créer artificiellement.</p>{% endif %}
+<h2>Efficacité par zone du demi-bassin</h2>
+<table><thead><tr><th>Zone</th><th>{{match.team.name}}</th><th>{{match.opponent}}</th></tr></thead><tbody>
+{% for i in range(9) %}
+{% set a=spatial_stats.shot_zones['for'][i] %}{% set b=spatial_stats.shot_zones['against'][i] %}
+<tr><td>{{a.zone}}</td>
+<td>{% if a.shots %}{{a.goals}} / {{a.shots}} · {{a.conversion_pct}} %{% else %}—{% endif %}</td>
+<td>{% if b.shots %}{{b.goals}} / {{b.shots}} · {{b.conversion_pct}} %{% else %}—{% endif %}</td></tr>
+{% endfor %}
+</tbody></table>
+<h2>Enregistrements du match</h2>
+{% for s in video_segments %}<p>Q{{s.period}} · {{s.label}} · {{s.source_type}}
+{% if s.video_url %}· <a href="{{s.video_url}}">Lien de la vidéo</a>{% endif %}</p>
+{% else %}<p>Aucune vidéo ajoutée à ce dossier.</p>{% endfor %}
 {% include "analysis_scoreboard_evidence.html" %}
 {% include "analysis_all_measurements.html" %}
 {% include "analysis_export_media.html" %}

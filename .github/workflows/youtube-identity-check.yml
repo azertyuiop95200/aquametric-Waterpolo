@@ -1,0 +1,41 @@
+name: AquaMetric Target YouTube Video Identity Check
+
+on:
+  push:
+    branches: [fix/youtube-report-intake-2026-11]
+    paths:
+      - '.github/workflows/youtube-identity-check.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  youtube-video-metadata:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Look up metadata via YouTube public oEmbed, without downloading video
+        run: |
+          set -eu
+          url='https://www.youtube.com/oembed?url=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3Df_WzRHjybgU&format=json'
+          status=$(curl -sS -L --max-time 20 -w '%{http_code}' -o /tmp/youtube-identity.json "$url" || true)
+          echo "youtube_oembed_http=$status"
+          if [ "$status" != '200' ]; then
+            echo 'Could not confirm video title, author or accessibility from public metadata.'
+            head -c 200 /tmp/youtube-identity.json || true
+            exit 0
+          fi
+          python - <<'PY'
+          import json
+          p=json.load(open('/tmp/youtube-identity.json'))
+          print('video_title:',p.get('title', 'unknown'))
+          print('video_author:',p.get('author_name','unknown'))
+          print('video_url: https://www.youtube.com/watch?v=f_WzRHjybgU')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: youtube-f_WzRHjybgU-metadata
+          path: /tmp/youtube-identity.json
+          if-no-files-found: ignore

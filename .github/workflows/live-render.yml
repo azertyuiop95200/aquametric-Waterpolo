@@ -85,13 +85,23 @@ jobs:
           cookie=/tmp/aquametric-analysis-cookie.txt
           curl -L --max-time 45 -fsS -c "$cookie" -b "$cookie" "$base/demo-login" >/tmp/demo.html
           curl -L --max-time 45 -fsS -c "$cookie" -b "$cookie" "$base/analysis-library" >/tmp/analysis-library.html
-          grep -q 'analysis-metrics-surface.js?v=12.2.0' /tmp/analysis-library.html
-          grep -q 'automatic-video-measurements.js?v=12.2.0' /tmp/analysis-library.html
-          grep -q 'premium-product.js?v=12.2.0' /tmp/analysis-library.html
-          grep -q 'Résultats, vidéos, preuves et ZIP' /tmp/analysis-library.html
-          grep -q 'vision / OCR / événements' /tmp/analysis-library.html
-          grep -q 'Analyse réelle, pas vitrine démo.' /tmp/analysis-library.html
-          grep -q 'Replays directement lisibles + données publiées' /tmp/analysis-library.html
+          # The library and its scripts need to be tested independently:
+          # don't silently reduce the check to HTTP 200 or an authentication page.
+          require_library_fragment() {
+            if ! grep -Fq -- "$1" /tmp/analysis-library.html; then
+              echo "::error::Live Analysis Library HTML is missing required fragment: $1"
+              echo "Page title: $(grep -o '<title>[^<]*</title>' /tmp/analysis-library.html | head -1 || true)"
+              echo "Page size: $(wc -c </tmp/analysis-library.html) bytes"
+              exit 1
+            fi
+          }
+          require_library_fragment 'analysis-metrics-surface.js?v=12.2.0'
+          require_library_fragment 'automatic-video-measurements.js?v=12.2.0'
+          require_library_fragment 'premium-product.js?v=12.2.0'
+          require_library_fragment 'Résultats, vidéos, preuves et ZIP'
+          require_library_fragment 'vision / OCR / événements'
+          require_library_fragment 'Analyse réelle, pas vitrine démo.'
+          require_library_fragment 'Replays directement lisibles + données publiées'
           echo 'AquaMetric V12.2 current Analysis Library surface is live.'
 
       - name: Verify improved Ultimate analysis assets and routes

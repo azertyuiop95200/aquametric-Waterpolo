@@ -1,0 +1,88 @@
+name: AquaMetric Granville Marseille YouTube Intake E2E
+
+on:
+  push:
+    branches: [fix/youtube-report-intake-2026-11]
+    paths:
+      - '.github/workflows/youtube-target-staging-e2e.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  target-match-intake:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Verify isolated staging version and real YouTube match intake
+        env:
+          BASE: https://aquametric-youtube-validation.onrender.com
+        run: |
+          set -euo pipefail
+          tmp=$(mktemp -d)
+          trap 'rm -rf "$tmp"' EXIT
+          echo 'Checking staging health and exact analysis configuration'
+          found=''
+          for attempt in $(seq 1 36); do
+            health=$(curl -LfsS --max-time 25 "$BASE/health" 2>/dev/null || true)
+            if echo "$health" | grep -q 'a1d084c908625df294b487c2e93b5d280d431945'; then
+              found=true; break
+            fi
+            sleep 10
+          done
+          test "$found" = true || { echo "::error::Requested prefilled-match release is not deployed"; exit 1; }
+          status=$(curl -LfsS --max-time 30 "$BASE/health/video-actions")
+          echo "Action engine readiness: $status"
+          echo "$status" | grep -q '"configured":false'
+          echo 'Logging in to a disposable isolated demo account'
+          curl -sS --max-time 40 -D "$tmp/login.headers" -o "$tmp/login.body" -c "$tmp/cookies" -b "$tmp/cookies" "$BASE/demo-login"
+          next=$(awk 'BEGIN {IGNORECASE=1} tolower($1)=="location:" {gsub("\r", "", $2); print $2}' "$tmp/login.headers" | tail -1)
+          echo "Demo destination: $next"
+          test -n "$next"
+          echo "$next" | grep -q '/matches/new'
+          echo "$next" | grep -q 'f_WzRHjybgU'
+          curl -sS -L -f --max-time 40 -c "$tmp/cookies" -b "$tmp/cookies" "$BASE$next" -o "$tmp/new-match.html"
+          grep -q 'value="Granville WP"' "$tmp/new-match.html"
+          grep -q 'value="CN Marseille"' "$tmp/new-match.html"
+          grep -q 'f_WzRHjybgU' "$tmp/new-match.html"
+          echo 'Creating a real match dossier without inventing sporting events'
+          curl -sS --max-time 40 -D "$tmp/create.headers" -o "$tmp/create.body" \
+            -c "$tmp/cookies" -b "$tmp/cookies" -H "Origin: $BASE" \
+            --data-urlencode 'team_name=Granville WP' \
+            --data-urlencode 'opponent=CN Marseille' \
+            --data-urlencode 'category=Women' \
+            --data-urlencode 'competition=Élite féminine' \
+            --data-urlencode 'video_url=https://www.youtube.com/watch?v=f_WzRHjybgU' \
+            --data-urlencode 'input_device=desktop' \
+            "$BASE/analysis/url/create"
+          location=$(awk 'BEGIN {IGNORECASE=1} tolower($1)=="location:" {gsub("\r", "", $2); print $2}' "$tmp/create.headers" | tail -1)
+          echo "Capture destination: $location"
+          echo "$location" | grep -q '/analysis/browser-capture'
+          id=$(echo "$location" | sed -n 's#^/matches/\([0-9][0-9]*\)/.*#\1#p')
+          test -n "$id"
+          curl -sS -L -f --max-time 40 -c "$tmp/cookies" -b "$tmp/cookies" "$BASE$location" -o "$tmp/capture.html"
+          echo "Capture HTML received $(wc -c < "$tmp/capture.html") bytes"
+          for expected in 'id="startCapture"' 'f_WzRHjybgU'; do
+            grep -Fq "$expected" "$tmp/capture.html" || {
+              echo "::error::Missing capture page marker: $expected"
+              grep -Eo '<h1[^>]*>[^<]*|<title>[^<]*' "$tmp/capture.html" | head -5 || true
+              exit 1
+            }
+          done
+          echo "Capture page verified for match $id"
+          curl -sS -L -f --max-time 40 -c "$tmp/cookies" -b "$tmp/cookies" "$BASE/matches/$id/analysis/result" -o "$tmp/result.html"
+          echo "Result HTML received $(wc -c < "$tmp/result.html") bytes"
+          for expected in 'Granville WP' 'CN Marseille' 'non mesuré'; do
+            grep -Fq "$expected" "$tmp/result.html" || {
+              echo "::error::Missing report page marker: $expected"
+              grep -Eo '<h1[^>]*>[^<]*|<h2[^>]*>[^<]*' "$tmp/result.html" | head -8 || true
+              exit 1
+            }
+          done
+          echo "No invented metrics on report page"
+          # No capture initiated by CI: its pixels were never read, so the report must be non-measured.
+          curl -sS -f --max-time 40 -c "$tmp/cookies" -b "$tmp/cookies" "$BASE/matches/$id/analysis/report.html" -o "$tmp/report.html"
+          grep -q 'Granville WP' "$tmp/report.html"
+          grep -q 'CN Marseille' "$tmp/report.html"
+          echo "TARGET_MATCH_E2E_OK: match $id, YouTube video recognised, report non-fabricated"

@@ -1,0 +1,74 @@
+{# Independent automatic detection channel: refreshed in-place while replay plays. #}
+<section class="report-card section-wide status-live" id="liveAutomaticStats"
+         data-url="/matches/{{match.id}}/analysis/actions/live">
+  <div class="hero-top">
+    <div>
+      <span class="eyebrow">ANALYSE AUTOMATIQUE · MISE À JOUR PROGRESSIVE</span>
+      <h2>Statistiques détectées pendant le traitement</h2>
+    </div>
+    <span class="chip" id="liveAutoStatus">Vérification du moteur…</span>
+  </div>
+  <p id="liveAutoMessage" role="status" aria-live="polite">Connexion aux résultats des séquences vidéo…</p>
+  <p class="evidence-note"><strong>Ce tableau est provisoire.</strong> Les détections sont calculées sur les séquences effectivement traitées, et ne sont pas des actions confirmées par un entraîneur. Les valeurs ne sont jamais ajoutées automatiquement aux statistiques vérifiées ou à la carte des tirs.</p>
+  <p class="evidence-note"><strong id="liveAutoProgress">0 / 0 séquences traitées</strong>
+     · <span id="liveAutoDetected">Aucune détection disponible</span>
+     · Les statistiques se réactualisent sans arrêter le lecteur vidéo.</p>
+  <div style="overflow-x:auto">
+    <table class="metric-table" id="liveAutoTable">
+      <thead><tr><th>Mesure détectée par IA</th>
+      <th>{{match.team.name}}</th><th>{{match.opponent}}</th><th>Équipe indéterminée</th></tr></thead>
+      <tbody>
+      {% for label,key in [("Buts","goals"),("Tirs (buts inclus)","shots"),("Arrêts","saves"),("Pertes de balle","turnovers"),("Passes décisives","assists"),("Exclusions obtenues","exclusions_earned"),("Exclusions commises","exclusions_committed"),("Efficacité au tir (%)","efficiency_pct")] %}
+      <tr><th>{{label}}</th>
+        {% for side in ["for","against","unknown"] %}
+          <td data-auto-side="{{side}}" data-auto-field="{{key}}" class="unmeasured">—</td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <h3>Progression par vidéo</h3>
+  <div id="liveAutoSources" class="event-list">
+    <p class="unmeasured">Aucune séquence traitée.</p>
+  </div>
+  <h3>Dernières actions détectées (à contrôler)</h3>
+  <div id="liveAutoTimeline" class="event-list">
+    <p class="unmeasured">Aucune action sportive reconnue pour le moment.</p>
+  </div>
+  <div class="actions" id="liveAutoStartAction" data-source="{{match.video_source}}" data-guest="{{'1' if request.session.get('web_demo') else '0'}}" hidden>
+    {% if match.video_source in ["upload","cloud","youtube"] %}
+    <form action="/matches/{{match.id}}/analysis/actions/start" method="post">
+      <button class="btn secondary" type="submit">Analyser ou reprendre les intervalles manquants</button>
+    </form>
+    {% endif %}
+  </div>
+  {% if match.video_source == 'youtube' %}
+  <div class="source-forms" id="directYoutubeAnalysis">
+    <form action="/matches/{{match.id}}/analysis/youtube/direct" method="post">
+      <h3>Analyser directement le YouTube public · sans capture d'écran</h3>
+      <p class="evidence-note">Gemini peut consulter une vidéo YouTube publique par intervalles de 60 secondes. Saisis sa durée réelle (visible sur le lecteur YouTube), puis lance l'analyse : les statistiques provisoires apparaîtront dans ce tableau au fur et à mesure. Les liens privés ou non répertoriés peuvent ne pas être pris en charge.</p>
+      <label>Durée réelle de la vidéo (minutes)
+        <input name="duration_minutes" type="number" min="0.1" max="240" step="0.1" placeholder="Ex. 82.5" required>
+      </label>
+      <button type="submit" class="btn" {% if not snapshot.video_actions.configured or request.session.get('web_demo') %}disabled{% endif %}>
+        Analyser automatiquement ce replay YouTube
+      </button>
+      {% if request.session.get('web_demo') %}
+        <p class="evidence-note">En invité, l'analyse IA payante est désactivée. Tu peux lire le match, annoter les actions réelles et produire un rapport sans compte.</p>
+      {% elif not snapshot.video_actions.configured %}
+        <p class="evidence-note">Bouton désactivé : le moteur Gemini doit être connecté sur le serveur avant de pouvoir générer des statistiques automatiques.</p>
+      {% else %}
+        <p class="evidence-note">La première exécution et les reprises consomment du quota API. Les intervalles terminés sont conservés et ne sont pas retraités lors d'une reprise.</p>
+      {% endif %}
+    </form>
+    <div>
+      <h3>Source non publique, inaccessible ou partiellement lisible ?</h3>
+      <p>La <a href="/matches/{{match.id}}/analysis/browser-capture">capture depuis ton navigateur</a> reste disponible si tu peux légalement regarder la vidéo mais que le fournisseur ne peut pas lire le lien direct. Les captures non validées ne sont pas comptées comme des actions sportives.</p>
+      <p class="evidence-note">La durée saisie définit la couverture demandée, pas une garantie que chaque seconde ou action sera reconnue. Les intervalles manquants restent visibles dans le rapport.</p>
+    </div>
+  </div>
+  {% endif %}
+  <p class="evidence-note" id="liveAutoPrivacyNote">Sans vidéo lisible ou moteur d'analyse configuré, aucun chiffre ne sera simulé.</p>
+</section>
+<script defer src="/static/live-auto-stats.js"></script>

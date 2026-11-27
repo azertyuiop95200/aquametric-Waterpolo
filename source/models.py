@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from sqlalchemy import String, Integer, Float, ForeignKey, DateTime, Text, Boolean
+from sqlalchemy import String, Integer, BigInteger, Float, ForeignKey, DateTime, Text, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from db import Base
 
@@ -12,6 +12,15 @@ class User(Base):
     country: Mapped[str] = mapped_column(String(80), default="")
     preferred_language: Mapped[str] = mapped_column(String(10), default="en")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+class GoogleIdentity(Base):
+    """Stable Google OpenID Connect subject mapping; never use email as ID."""
+    __tablename__ = "google_identities"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    sub: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+
 
 class Club(Base):
     __tablename__ = "clubs"
@@ -58,6 +67,51 @@ class Match(Base):
     team = relationship("Team")
     events = relationship("Event", back_populates="match", cascade="all, delete-orphan")
     media_artifacts = relationship("MediaArtifact", back_populates="match", cascade="all, delete-orphan")
+
+class MatchVideoSegment(Base):
+    """One real video belonging to a match (quarter, period, or other recording)."""
+    __tablename__ = "match_video_segments"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    match_id: Mapped[int] = mapped_column(ForeignKey("matches.id"), index=True)
+    period: Mapped[int] = mapped_column(Integer, default=1)
+    part_index: Mapped[int] = mapped_column(Integer, default=1)
+    label: Mapped[str] = mapped_column(String(100), default="")
+    source_type: Mapped[str] = mapped_column(String(20))  # youtube | url | upload | cloud
+    video_url: Mapped[str] = mapped_column(Text, default="")
+    video_path: Mapped[str] = mapped_column(Text, default="")
+    duration_seconds: Mapped[float] = mapped_column(Float, default=0.0)
+    match = relationship("Match")
+
+
+class EventPosition(Base):
+    """Measured/reviewed shot or action coordinate, never inferred from a title."""
+    __tablename__ = "event_positions"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    event_id: Mapped[int] = mapped_column(ForeignKey("events.id"), unique=True, index=True)
+    segment_id: Mapped[int | None] = mapped_column(ForeignKey("match_video_segments.id"), nullable=True)
+    period: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    segment_second: Mapped[float | None] = mapped_column(Float, nullable=True)
+    x_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
+    y_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
+    provenance: Mapped[str] = mapped_column(String(50), default="manual_verified")
+
+
+class LargeVideoUpload(Base):
+    """S3-compatible multipart upload, persisted independently of Render's disk."""
+    __tablename__ = "large_video_uploads"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    object_key: Mapped[str] = mapped_column(String(255), unique=True)
+    upload_id: Mapped[str] = mapped_column(Text)
+    filename: Mapped[str] = mapped_column(String(255))
+    mime_type: Mapped[str] = mapped_column(String(100))
+    total_bytes: Mapped[int] = mapped_column(BigInteger)
+    part_bytes: Mapped[int] = mapped_column(BigInteger)
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+    status: Mapped[str] = mapped_column(String(32), default="uploading")
+    match_id: Mapped[int | None] = mapped_column(ForeignKey("matches.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+
 
 class Event(Base):
     __tablename__ = "events"

@@ -1,0 +1,81 @@
+name: AquaMetric Review Desk Measured Stats Staging Smoke
+
+on:
+  push:
+    branches: [fix/youtube-report-intake-2026-11]
+    paths:
+      - '.github/workflows/review-desk-stage-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  review-desk-staging:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Verify live match report, tagging and portable export on staging
+        env:
+          BASE: https://aquametric-youtube-validation.onrender.com
+        run: |
+          set -euo pipefail
+          tmp=$(mktemp -d)
+          trap 'rm -rf "$tmp"' EXIT
+          for n in $(seq 1 40); do
+            health=$(curl -LfsS --max-time 30 "$BASE/health" 2>/dev/null || true)
+            if echo "$health" | grep -q 'd94a793860d1a435f75bf783514c2e1a51778bfe'; then
+              echo "Validated staging commit: $health"
+              break
+            fi
+            if [ "$n" = 40 ]; then echo "::error::Review desk deployment not live"; exit 1; fi
+            sleep 10
+          done
+          curl -sS --max-time 45 -D "$tmp/login.hdr" -o "$tmp/login.html" -c "$tmp/cookies" -b "$tmp/cookies" "$BASE/demo-login"
+          redirect=$(awk 'tolower($1)=="location:" {gsub("\r", "", $2); print $2}' "$tmp/login.hdr" | tail -1)
+          echo "Demo redirect contains video id? $(echo "$redirect" | grep -c f_WzRHjybgU || true)"
+          echo "$redirect" | grep -Fq 'f_WzRHjybgU'
+          # Separate review QA fixture, never represent these test events as
+          # sports facts of the real Granville-Marseille match.
+          curl -sS -D "$tmp/create.hdr" -o "$tmp/create.html" -c "$tmp/cookies" -b "$tmp/cookies" -H "Origin: $BASE" \
+            --data-urlencode 'team_name=Match de test' \
+            --data-urlencode 'opponent=Adversaire de test' \
+            --data-urlencode 'category=Women' \
+            --data-urlencode 'competition=QA uniquement' \
+            --data-urlencode 'video_url=https://www.youtube.com/watch?v=f_WzRHjybgU' \
+            --data-urlencode 'input_device=desktop' \
+            "$BASE/analysis/url/create"
+          loc=$(awk 'tolower($1)=="location:" {gsub("\r", "", $2); print $2}' "$tmp/create.hdr" | tail -1)
+          match_id=$(echo "$loc" | sed -n 's#^/matches/\([0-9][0-9]*\)/.*#\1#p')
+          test -n "$match_id"
+          echo "QA match ID $match_id"
+          curl -sS -L -f --max-time 40 -c "$tmp/cookies" -b "$tmp/cookies" "$BASE$loc" -o "$tmp/capture.html"
+          grep -Fq "/matches/$match_id/analysis/result#annotation" "$tmp/capture.html"
+          grep -Fq 'id="actionEngineReadiness"' "$tmp/capture.html"
+          echo "Studio direct tagging shortcut and IA readiness visible"
+          curl -sS -L -f --max-time 40 -c "$tmp/cookies" -b "$tmp/cookies" "$BASE/matches/$match_id/analysis/result" -o "$tmp/report-before.html"
+          grep -Fq 'id="annotation"' "$tmp/report-before.html"
+          grep -Fq 'id="observedKPIs"' "$tmp/report-before.html"
+          grep -Fq 'Résultat annoncé par la source' "$tmp/report-before.html"
+          grep -Fq '0 action(s) confirmée(s)' "$tmp/report-before.html"
+          echo "Review desk before tagging OK"
+          curl -sS --max-time 40 -D "$tmp/tag.hdr" -o "$tmp/tag.html" -c "$tmp/cookies" -b "$tmp/cookies" -H "Origin: $BASE" \
+            --data-urlencode 'event_type=goal' \
+            --data-urlencode 'second=124.5' \
+            --data-urlencode 'perspective=for' \
+            --data-urlencode 'phase_tag=power_play' \
+            --data-urlencode 'note=QA synthetic event - not a real game action' \
+            --data-urlencode 'return_to=report' \
+            --data-urlencode 'observed=1' \
+            "$BASE/matches/$match_id/events"
+          grep -Fq '/analysis/result#annotation' "$tmp/tag.hdr"
+          curl -sS -L -f --max-time 40 -c "$tmp/cookies" -b "$tmp/cookies" "$BASE/matches/$match_id/analysis/result" -o "$tmp/report-after.html"
+          grep -Fq '1 action(s) confirmée(s)' "$tmp/report-after.html"
+          grep -Fq 'Conversion des tirs annotés' "$tmp/report-after.html"
+          grep -Fq 'QA synthetic event' "$tmp/report-after.html"
+          echo "Verified sports-tag computation and timeline: OK"
+          curl -sS -L -f --max-time 40 -c "$tmp/cookies" -b "$tmp/cookies" "$BASE/matches/$match_id/analysis/report.html" -o "$tmp/export.html"
+          grep -Fq 'Buts observés' "$tmp/export.html"
+          grep -Fq 'Score déclaré par' "$tmp/export.html"
+          echo "Portable evidence-first report: OK"
+          echo "LIVE_REVIEW_DESK_MEASURED_STATS_OK"

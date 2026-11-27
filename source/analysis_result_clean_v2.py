@@ -51,6 +51,12 @@ def clean_analysis_result(match_id: int, request: Request, db: Session = Depends
     events = list(snapshot.get("verified_events") or [])
     sequences = sequence_gallery(db, match, max_total=72)
     source_embed = youtube_embed(match.video_url) if match.video_url else ""
+    from services.quick_tag_analytics import reviewed_match_metrics
+    review_metrics = reviewed_match_metrics(events, match.video_url or "")
+    from match_video_segments_routes import segment_rows
+    from services.spatial_match_analysis import spatial_match_dashboard
+    video_segments=segment_rows(db, match)
+    spatial_stats=spatial_match_dashboard(db, match, video_segments)
     return TEMPLATES.TemplateResponse(
         request,
         "analysis_result_clean_v2.html",
@@ -69,6 +75,10 @@ def clean_analysis_result(match_id: int, request: Request, db: Session = Depends
             "sequences": sequences,
             "sequence_summary": sequence_summary(sequences),
             "source_embed": source_embed,
+            "players": sorted(match.team.players, key=lambda p: (p.cap_number or 99, p.name)),
+            "review_metrics": review_metrics,
+            "video_segments": video_segments,
+            "spatial_stats": spatial_stats,
             "capture_progress": report_progress(match, db=db),
             "category": getattr(match.team, "category", "") or "Non précisée",
         },
@@ -88,11 +98,20 @@ def download_analysis_report(match_id: int, request: Request, db: Session = Depe
                     for row in snapshot['artifacts'] if row.get('artifact_type') == 'clip'
                     and row.get('file_path') and (EVIDENCE_DIR / Path(row['file_path']).name).is_file()]
     attach_export_clips(snapshot['video_actions'], export_media)
+    from services.quick_tag_analytics import reviewed_match_metrics
+    review_metrics = reviewed_match_metrics(snapshot["verified_events"], match.video_url or "")
+    from match_video_segments_routes import segment_rows
+    from services.spatial_match_analysis import spatial_match_dashboard
+    video_segments=segment_rows(db,match)
+    spatial_stats=spatial_match_dashboard(db,match,video_segments)
     return TEMPLATES.TemplateResponse(request, 'analysis_report_portable.html', {
         'match': match, 'snapshot': snapshot,
         'generated_at': datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC'),
         'for_verified': _verified_side(snapshot['verified_events'], 'for'),
         'against_verified': _verified_side(snapshot['verified_events'], 'against'),
+        'review_metrics': review_metrics,
+        'video_segments': video_segments,
+        'spatial_stats': spatial_stats,
         'export_media': export_media,
     }, headers={'Content-Disposition': f'attachment; filename="rapport-match-{match.id}.html"',
                 'Cache-Control': 'private, no-store'})

@@ -2,27 +2,39 @@
 {% block content %}
 <style>
 .device-choice{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:18px 0}.device-choice button{min-height:104px;text-align:left;padding:18px;border:1px solid var(--border,#294754);border-radius:18px;background:var(--panel,#0b202b);color:inherit;cursor:pointer}.device-choice button:hover,.device-choice button.active{border-color:#38bdf8;box-shadow:0 0 0 2px rgba(56,189,248,.14)}.device-choice strong{display:block;font-size:18px;margin-bottom:6px}.device-choice small{display:block;opacity:.78;line-height:1.4}.analysis-mode{display:none;margin-top:16px;padding:16px;border:1px solid rgba(255,255,255,.1);border-radius:16px;background:rgba(255,255,255,.025)}.analysis-mode.active{display:block}.mode-note{margin:0 0 12px;opacity:.82}.analysis-mode .actions{margin-top:12px}.scope-box{margin-top:14px;padding:14px;border:1px solid rgba(255,255,255,.1);border-radius:14px;background:rgba(255,255,255,.02)}.scope-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.scope-grid[hidden]{display:none}@media(max-width:700px){.device-choice,.scope-grid{grid-template-columns:1fr}.device-choice button{min-height:92px}}
+.analysis-quickstart{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:16px 0 22px}
+.analysis-quickstart button,.analysis-quickstart a{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:5px;min-height:84px;padding:14px;border-radius:14px;border:1px solid rgba(56,189,248,.34);background:rgba(56,189,248,.09);color:inherit;font:inherit;text-align:left;text-decoration:none;cursor:pointer}
+.analysis-quickstart button:hover,.analysis-quickstart button:focus-visible,.analysis-quickstart a:hover,.analysis-quickstart a:focus-visible{outline:2px solid #38bdf8;outline-offset:2px}
+.analysis-quickstart small{font-size:12px;line-height:1.4;opacity:.8}
+@media(max-width:650px){.analysis-quickstart{grid-template-columns:1fr}.analysis-quickstart button,.analysis-quickstart a{min-height:62px}}
 </style>
 <div class="panel">
   <span class="eyebrow">NOUVELLE ANALYSE</span>
   <h1>Créer une analyse de match</h1>
+  <div class="analysis-quickstart" role="group" aria-label="Accès rapide à l'analyse du match">
+    <button id="quickYoutubeAnalysis" type="button"><strong>1. Lien YouTube</strong><small>Coller une vidéo publique et créer le dossier d'analyse</small></button>
+    <button id="quickFileAnalysis" type="button"><strong>2. Importer une vidéo</strong><small>MP4/MOV/WebM classique, sans bucket R2/S3</small></button>
+    <a id="quickReports" href="/analysis-history"><strong>3. Mes rapports</strong><small>Revoir les matchs enregistrés et leurs statistiques</small></a>
+  </div>
+
   <form method="post" action="/matches" enctype="multipart/form-data" id="analysisForm">
+    <input type="hidden" name="return_to_report" value="1">
     <input type="hidden" id="analysisInputDevice" name="input_device" value="desktop">
     <div class="formgrid">
       <label>Équipe à analyser
-        <input name="team_name" list="analysis-team-catalog" value="{{default_team_name or ''}}" placeholder="Ex. Granville, Barceloneta, Vouliagmeni…" autocomplete="off" required>
+        <input name="team_name" list="analysis-team-catalog" value="{{request.query_params.get('team_name', target_team_name or default_team_name or '')}}" placeholder="Ex. Granville, Barceloneta, Vouliagmeni…" autocomplete="off" required>
       </label>
       <label>Adversaire
-        <input name="opponent" list="analysis-team-catalog" placeholder="Nom libre, même absent de la base" autocomplete="off" required>
+        <input name="opponent" list="analysis-team-catalog" value="{{request.query_params.get('opponent', target_opponent or '')}}" placeholder="Nom libre, même absent de la base" autocomplete="off" required>
       </label>
       <label>Catégorie
         <select name="category" required>
-          <option value="Women">Féminin</option>
-          <option value="Men">Masculin</option>
-          <option value="Mixed/Other">Mixte / autre</option>
+          <option value="Women" {% if request.query_params.get('category', target_category or 'Women') == 'Women' %}selected{% endif %}>Féminin</option>
+          <option value="Men" {% if request.query_params.get('category') == 'Men' %}selected{% endif %}>Masculin</option>
+          <option value="Mixed/Other" {% if request.query_params.get('category') == 'Mixed/Other' %}selected{% endif %}>Mixte / autre</option>
         </select>
       </label>
-      <label>Compétition<input name="competition" placeholder="Facultatif"></label>
+      <label>Compétition<input name="competition" value="{{request.query_params.get('competition', target_competition or '')}}" placeholder="Facultatif"></label>
       <label>Date<input type="date" name="match_date"></label>
     </div>
     <datalist id="analysis-team-catalog">
@@ -31,11 +43,19 @@
     <small>Tu peux écrire n’importe quel nom d’équipe. Le catalogue AquaMetric sert uniquement de suggestion et ne bloque jamais l’analyse.</small>
     <span hidden>Search any club or national team</span>
 
+    <section class="scope-box" id="youtubeDirectDuration">
+      <h2>Analyse automatique des vidéos YouTube publiques</h2>
+      <p class="mode-note">Si le moteur vidéo est connecté au serveur, AquaMetric peut analyser une vidéo YouTube publique directement à partir de son lien, minute par minute, <strong>sans téléchargement ni partage d'écran</strong>. Les détections alimentent progressivement le rapport, avec des contrôles de qualité. Si le lien n'est pas accessible au moteur, la capture d'onglet reste une solution de secours.</p>
+      <label>Durée réelle de la vidéo YouTube en minutes (facultatif, indiquée sous la vidéo)
+        <input type="number" id="youtubeDurationMinutes" name="youtube_duration_minutes" min="0" max="240" step="0.1" placeholder="Ex. 82.5">
+      </label>
+      <small>Renseigner la durée lance automatiquement l'analyse directe si le moteur est configuré. Sinon, tu pourras l'indiquer dans le dossier du match. La durée n'est pas une garantie de couverture ou de résultats sportifs.</small>
+    </section>
     <h2 style="margin-top:22px">Choisis ton appareil</h2>
     <div class="device-choice" role="group" aria-label="Choix du mode d’analyse">
       <button type="button" id="desktopAnalysisMode" data-analysis-mode="desktop" aria-pressed="false">
         <strong>💻 Analyse sur ordinateur</strong>
-        <small>Colle le lien YouTube. AquaMetric ouvre le Studio puis analyse l’onglet vidéo partagé par le navigateur.</small>
+        <small>Choisis clairement entre un lien YouTube public et un fichier vidéo local. Le rapport se remplit à mesure que les séquences sont analysées.</small>
       </button>
       <button type="button" id="phoneAnalysisMode" data-analysis-mode="phone" aria-pressed="false">
         <strong>📱 Analyse sur téléphone</strong>
@@ -45,11 +65,27 @@
 
     <section class="analysis-mode" id="desktopModePanel" data-mode-panel="desktop">
       <h3>Analyse sur ordinateur</h3>
-      <p class="mode-note">Pour YouTube : colle le lien, puis AquaMetric te demandera uniquement de partager l’onglet du replay.</p>
+      <p class="mode-note">Pour YouTube public : colle le lien. Si le moteur IA est connecté et que tu indiques la durée, l'analyse démarre directement par intervalles ; sinon, le studio te proposera la capture d'onglet comme secours.</p>
       <span hidden>Analyser directement depuis l'URL · même minimum Ultimate Analyst</span>
-      <label>Lien vidéo
-        <input id="desktopVideoUrl" type="url" name="video_url" autocapitalize="none" spellcheck="false" placeholder="https://www.youtube.com/watch?v=..." inputmode="url">
+      <label for="desktopSource"><strong>Comment fournir le match ?</strong>
+        <select id="desktopSource">
+          <option value="link">Coller un lien YouTube</option>
+          <option value="file">Importer un fichier MP4, MOV ou WebM</option>
+        </select>
       </label>
+      <div id="desktopLinkPanel">
+        <label>Lien YouTube
+          <input id="desktopVideoUrl" type="url" name="video_url" value="{{ request.query_params.get('video_url', target_video_url or '') }}" autocapitalize="none" spellcheck="false" placeholder="https://www.youtube.com/watch?v=..." inputmode="url">
+        </label>
+        <div class="notice">YouTube public : renseigne la durée ci-dessus pour lancer l’analyse directe si le moteur IA est connecté. Sinon, utilise la capture depuis le navigateur.</div>
+      </div>
+      <div id="desktopFilePanel" hidden>
+        <label>Choisir la vidéo sur ton ordinateur
+          <input id="desktopVideoFile" name="video_file" type="file" disabled
+            accept=".mp4,.mov,.m4v,.webm,video/mp4,video/quicktime,video/webm">
+        </label>
+        <p class="mode-note">Fichier direct : {{max_upload_mb}} Mo maximum. Pour un match de plusieurs Go, utilise « Importer un match volumineux » ci-dessous. Après import, les actions IA démarrent automatiquement si le moteur est configuré.</p>
+      </div>
 
       <div class="scope-box">
         <h4 style="margin-top:0">La vidéo contient-elle plusieurs matchs ?</h4>
@@ -74,7 +110,8 @@
 
       <div class="notice"><b>Analyse depuis URL = minimum Ultimate Analyst.</b> Les métriques non prouvées restent « — » et ne sont jamais transformées en faux zéros.</div>
       <div class="actions compact">
-        <button class="btn intelligence-cta" type="submit" id="desktopAnalyzeSubmit" formaction="/analysis/url/create" formenctype="application/x-www-form-urlencoded">Analyser sur ordinateur</button>
+        <button class="btn intelligence-cta" type="submit" id="desktopAnalyzeSubmit" formaction="/analysis/url/create" formenctype="application/x-www-form-urlencoded">Analyser le lien YouTube</button>
+        <button class="btn intelligence-cta" type="submit" id="desktopFileAnalyzeSubmit" formaction="/matches" formenctype="multipart/form-data" hidden disabled>Importer et analyser le fichier</button>
       </div>
     </section>
 
@@ -82,8 +119,8 @@
       <h3>Analyse sur téléphone</h3>
       <label>Source sur téléphone<select id="phoneSource"><option value="link">Coller un lien vidéo</option><option value="file">Importer un fichier vidéo</option></select></label>
       <div id="phoneLinkPanel">
-        <label>Lien du match sur téléphone<input id="phoneVideoUrl" type="url" name="video_url" inputmode="url" autocapitalize="none" spellcheck="false" placeholder="https://www.youtube.com/watch?v=..." disabled></label>
-        <p>Le lien et le dossier sont enregistrés. Un lien seul ne donne pas accès aux images : la vidéo reste identifiée mais non analysée. Pour Vision/OCR, importe le fichier ou reprends la capture depuis un ordinateur compatible.</p>
+        <label>Lien du match sur téléphone<input id="phoneVideoUrl" type="url" name="video_url" value="{{ request.query_params.get('video_url', target_video_url or '') }}" inputmode="url" autocapitalize="none" spellcheck="false" placeholder="https://www.youtube.com/watch?v=..." disabled></label>
+        <p>Le lien et le dossier sont enregistrés. Pour un YouTube public, l'analyse automatique directe est lancée si le moteur IA et la durée sont disponibles ; sinon, aucun événement n'est inventé. Tu peux aussi importer le fichier ou utiliser le Studio sur ordinateur.</p>
         <button class="btn intelligence-cta" type="submit" id="phoneLinkSubmit" formaction="/analysis/url/create" formenctype="application/x-www-form-urlencoded">Enregistrer le lien et ouvrir le dossier</button>
       </div>
       <div id="phoneFilePanel" hidden>
@@ -97,8 +134,32 @@
       </div>
       </div>
     </section>
+
+    <section class="panel" id="largeVideoPanel" style="margin-top:20px;border:1px solid var(--border,#294754);border-radius:16px;padding:18px">
+      <span class="eyebrow">VIDÉO MP4 / MOV · PLUSIEURS GO</span>
+      <h2>Fichier volumineux — stockage cloud optionnel</h2>
+      <p>Jusqu'à <strong><span id="largeUploadLimit">5</span> Go</strong> via un stockage cloud privé. Le fichier est envoyé directement par morceaux de 16 Mo : pas de requête de 3 Go vers AquaMetric, reprise possible si la connexion coupe.</p>
+      <div id="largeUploadCloudControls">
+      <label>Choisir un fichier vidéo local (MP4, MOV, WebM, M4V, MKV)
+        <input type="file" id="largeUploadVideo" accept=".mp4,.mov,.webm,.m4v,.mkv,video/mp4,video/quicktime,video/webm">
+      </label>
+      <p id="largeUploadStatus" role="status" aria-live="polite">Vérification du stockage vidéo disponible…</p>
+      <progress id="largeUploadProgress" value="0" max="100" style="display:block;width:100%;height:19px;margin:12px 0"></progress>
+      <div class="actions compact">
+        <button type="button" class="btn intelligence-cta" id="largeUploadStart" disabled>Envoyer le gros fichier</button>
+        <button type="button" class="btn secondary" id="largeUploadCancel" hidden>Annuler l'envoi</button>
+      </div>
+      <small>Le stockage cloud et l'analyse vidéo sont deux étapes distinctes : une vidéo reçue n'est pas considérée comme analysée. L'import cloud doit être configuré par l'administrateur. Un stockage Render gratuit ne suffit pas à conserver de gros fichiers.</small>
+      </div>
+      <div id="largeUploadLocalFallback" class="notice" hidden>
+        <strong>Le stockage de plusieurs Go n'est pas disponible sur ce serveur.</strong>
+        <p>Tu peux toutefois importer un fichier vidéo classique jusqu’à {{max_upload_mb}} Mo, ou déposer les quart-temps séparément dans le rapport. L'absence de bucket ne bloque pas l'import local.</p>
+        <button class="btn primary" id="chooseRegularUpload" type="button">Utiliser l'import MP4 classique</button>
+      </div>
+    </section>
   </form>
 </div>
 <script defer src="/static/analysis-input-mobile.js"></script>
+<script defer src="/static/large-video-upload.js"></script>
 <!-- Default device selection: selectMode(mobileLike ? 'phone' : 'desktop') -->
 {% endblock %}

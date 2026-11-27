@@ -56,6 +56,16 @@ def _user(request: Request, db: Session):
 
 def _owned_match(match_id: int, request: Request, db: Session):
     user = _user(request, db)
+    if request.session.get("web_demo") and request.method == "POST":
+        # Guests can mark observed events and retrieve honest reports, not
+        # start CPU-heavy capture, research, inference or media regeneration.
+        blocked_paths = (
+            "/analysis/browser-capture/", "/analysis/start",
+            "/url-analysis/start", "/analysis/actions/start",
+            "/analysis/youtube/direct", "/analysis/evidence-pack",
+        )
+        if any(part in request.url.path for part in blocked_paths):
+            raise HTTPException(403,"Ce traitement automatique n'est pas disponible en invité. Utilise le marquage manuel.")
     match = db.get(Match, match_id)
     if not match or match.owner_id != user.id:
         raise HTTPException(status_code=404, detail="Match not found")

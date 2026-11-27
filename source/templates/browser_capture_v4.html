@@ -3,11 +3,21 @@
 <style>
 .capture-shell{max-width:1120px;margin:0 auto;display:grid;gap:18px}.capture-panel{border:1px solid var(--border,#294754);border-radius:22px;background:var(--panel,#0b202b);padding:20px}.capture-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.capture-status{padding:14px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);white-space:pre-wrap}.capture-warning{padding:12px 14px;border-left:3px solid #fb923c;background:rgba(251,146,60,.08);border-radius:0 12px 12px 0}.capture-good{padding:12px 14px;border-left:3px solid #4ade80;background:rgba(74,222,128,.08);border-radius:0 12px 12px 0}.capture-permission{padding:12px 14px;border-left:3px solid #38bdf8;background:rgba(56,189,248,.08);border-radius:0 12px 12px 0}.capture-time{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.capture-time input{width:130px;padding:9px 10px;border-radius:10px;border:1px solid rgba(255,255,255,.18);background:#06131b;color:inherit}.mode-choice{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:14px 0}.mode-btn{padding:14px;border:1px solid rgba(255,255,255,.16);border-radius:14px;background:rgba(255,255,255,.04);color:inherit;text-align:left;cursor:pointer}.mode-btn.active{outline:2px solid #38bdf8;background:rgba(56,189,248,.12)}.mode-btn:disabled{opacity:.45;cursor:not-allowed}.mode-btn b{display:block;font-size:17px}.progress-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.progress-card{padding:14px;border:1px solid rgba(255,255,255,.1);border-radius:14px;background:rgba(255,255,255,.03)}.progress-head{display:flex;justify-content:space-between;gap:12px;font-weight:800;margin-bottom:8px}.progress-track{height:12px;background:rgba(255,255,255,.08);border-radius:999px;overflow:hidden}.progress-fill{height:100%;width:0%;background:linear-gradient(90deg,#0ea5e9,#22c55e);transition:width .35s ease}.progress-meta{font-size:12px;opacity:.75;margin-top:7px}.studio-wrap{display:grid;gap:12px}.studio-player-grid{position:relative;aspect-ratio:16/9;background:#02070a;border-radius:18px;overflow:hidden;border:1px solid rgba(255,255,255,.12);display:grid;grid-template-columns:1fr;grid-template-rows:1fr}.studio-player-grid.turbo{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}.studio-tile{position:relative;min-width:0;min-height:0;background:#000;border:1px solid rgba(255,255,255,.08);overflow:hidden}.studio-tile iframe,.yt-host{width:100%;height:100%;border:0;display:block}.seg-label{position:absolute;left:8px;top:8px;z-index:3;background:rgba(0,0,0,.65);padding:4px 7px;border-radius:8px;font-size:11px}.capture-live-hud{display:none}.capture-shell.studio-live{max-width:none;margin:0}.capture-shell.studio-live>.capture-panel:not(.studio-panel){display:none}.capture-shell.studio-live .studio-panel{position:fixed;inset:0;z-index:9999;border:0;border-radius:0;padding:0;background:#000}.capture-shell.studio-live .studio-wrap{height:100%;display:block}.capture-shell.studio-live .studio-player-grid{position:absolute;inset:0;aspect-ratio:auto;border:0;border-radius:0}.capture-shell.studio-live .studio-info{display:none}.capture-shell.studio-live .capture-live-hud{display:block;position:fixed;z-index:10002;left:10px;right:10px;bottom:10px;padding:10px;border-radius:14px;background:rgba(4,13,18,.9);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.16)}.capture-shell.studio-live .capture-live-hud .progress-grid{grid-template-columns:1fr 1fr auto}.capture-shell.studio-live .capture-live-hud .progress-card{padding:8px 10px}#capturePreview,#captureCanvas{display:none}
 @media(max-width:820px){.mode-choice,.progress-grid{grid-template-columns:1fr}.capture-shell.studio-live .capture-live-hud .progress-grid{grid-template-columns:1fr}.capture-shell.studio-live .capture-live-hud{max-height:45vh;overflow:auto}.studio-player-grid.turbo{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}}
+.capture-quick-exit{display:flex;gap:9px;align-items:center;flex-wrap:wrap;padding:12px;background:rgba(5,29,43,.96);border:1px solid rgba(56,189,248,.4);border-radius:14px}
+.capture-quick-exit .btn{min-height:44px;text-align:center;white-space:normal}
+.capture-shell.studio-live .capture-quick-exit{position:fixed;display:flex;top:10px;left:10px;right:10px;z-index:10020;justify-content:flex-end;box-shadow:0 6px 25px #000a}
+@media(max-width:650px){.capture-shell.studio-live .capture-quick-exit{padding:6px;gap:5px}.capture-quick-exit .btn{padding:9px 10px;font-size:12px}}
 </style>
 <div class="capture-shell" id="captureShell">
+  <div class="capture-quick-exit" aria-label="Actions pour terminer le match" role="group">
+    <button type="button" class="btn primary" id="finishCaptureAnytime">Terminer et ouvrir mon rapport</button>
+    <a class="btn secondary" id="viewCaptureReport" href="/matches/{{match.id}}/analysis/result">Voir le rapport disponible</a>
+  </div>
   <section class="capture-panel">
     <span class="eyebrow">ANALYSE VIDÉO · VISION</span>
     <h1>Lecture + analyse en parallèle</h1>
+    <p>Si YouTube demande de confirmer que tu n'es pas un robot, tu peux <a class="btn secondary" href="/matches/{{match.id}}/analysis/result#annotation">ouvrir directement le poste de codage des actions</a> et annoter le replay sans enregistrer un écran de vérification.</p>
+    <div class="capture-warning" id="actionEngineReadiness" role="status"><b>Reconnaissance individuelle :</b> vérification de la connexion au moteur IA…</div>
     <p>Les numéros de bonnet et les identités ne sont plus préchargés depuis une liste manuelle. AquaMetric doit les déterminer à partir des images et conserver « indéterminé » quand la preuve visuelle n’est pas suffisante.</p>
     <div class="capture-permission" id="permissionState"><b>Vérification de l’autorisation navigateur…</b></div>
     <div class="capture-warning"><b>Rapport prioritaire :</b> une analyse Vision terminée reste disponible même si un enrichissement secondaire (séquences avancées, galerie) échoue ensuite.</div>
@@ -78,6 +88,13 @@
 <video id="capturePreview" autoplay muted playsinline></video><canvas id="captureCanvas"></canvas>
 <script>
 (() => {
+  const readiness = document.getElementById('actionEngineReadiness');
+  fetch('/health/video-actions', {cache:'no-store'})
+    .then(r => {if (!r.ok) throw Error('unavailable');return r.json()})
+    .then(result => {readiness.textContent = result.configured
+      ? 'Moteur de reconnaissance d’actions connecté : les détections restent à vérifier.'
+      : 'Moteur de reconnaissance d’actions non connecté : tirs, passes et statistiques individuelles ne seront pas inventés. Le poste d’annotation reste disponible.'})
+    .catch(() => {readiness.textContent = 'État du moteur IA inconnu : seules les observations vérifiables seront comptabilisées.'});
   const captureShell=document.getElementById('captureShell'),grid=document.getElementById('studioGrid');
   const tiles=[0,1,2,3].map(i=>document.getElementById(`tile${i}`)),labels=[0,1,2,3].map(i=>document.getElementById(`segLabel${i}`));
   const mode1=document.getElementById('mode1'),mode2=document.getElementById('mode2'),modeTurbo=document.getElementById('modeTurbo');
@@ -153,6 +170,19 @@
   });
   stopBtn.addEventListener('click',requestStop);stopLiveBtn.addEventListener('click',requestStop);sourceStartInput.addEventListener('change',()=>{sourceStart=Math.max(0,Number(sourceStartInput.value||0));if(mode==='turbo'&&sourceDuration>sourceStart+30)prepareTurbo();else prepareSingle()});
 
+  // This button must work BEFORE permission to record is granted and AFTER
+  // the capture enters the fullscreen studio. It delegates live recording
+  // finalization to the existing V12/V16 guarded finish lifecycle.
+  document.getElementById('finishCaptureAnytime').addEventListener('click', () => {
+    if(recorder&&recorder.state==='recording'){
+      if(typeof v12ForcedFinishReason!=='undefined') v12ForcedFinishReason='manual_stop';
+      requestStop();
+      document.getElementById('finishCaptureAnytime').disabled=true;
+      setStatus('Arrêt demandé · publication du rapport avec les preuves enregistrées…');
+    }else{
+      location.href='/matches/{{match.id}}/analysis/result?capture_not_started=1';
+    }
+  });
   function init(){
     if(!videoId){durationState.textContent='source YouTube non reconnue';startBtn.disabled=true;setPermission('Utilise l’import vidéo pour cette URL.',false);return}
     if(!window.isSecureContext||!window.MediaRecorder||!navigator.mediaDevices||!navigator.mediaDevices.getDisplayMedia){setPermission('Ce navigateur ne permet pas le partage d’onglet. Utilise un navigateur desktop compatible ou l’import vidéo.',false);startBtn.disabled=true;return}

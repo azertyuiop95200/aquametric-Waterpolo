@@ -6,6 +6,8 @@ jinja2>=3.1,<4
 python-multipart>=0.0.9,<1
 itsdangerous>=2.2,<3
 httpx>=0.27,<1
+authlib>=1.5,<2  # Google OpenID Connect code flow, ID token verification & CSRF state
+boto3>=1.35,<2  # S3-compatible R2 multipart uploads; no gigabyte body via Render
 pytest>=8,<10
 pydantic>=2.10,<3
 

@@ -1,1 +1,22 @@
-{% extends 'base.html' %}{% block content %}<div class="panel"><span class="eyebrow">EPHEMERAL GUEST MODE</span><h1>Try a match link</h1><p>Nothing is saved to your account. This demo does not fabricate automatic statistics.</p>{% if error %}<p class="error">{{error}}</p>{% endif %}<form method="post"><label>YouTube / supported URL<input type="url" name="video_url" placeholder="https://www.youtube.com/watch?v=..."></label><button class="btn">Open demo</button></form>{% if demo %}<div class="notice">{{ demo.message }}</div>{% if demo.embed %}<div class="video-wrap"><iframe src="{{demo.embed}}" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe></div>{% else %}<p>URL received, but no supported embed format was detected.</p>{% endif %}{% endif %}</div>{% endblock %}
+{% extends 'base.html' %}
+{% block content %}
+<section class="panel" style="max-width:980px;margin:auto">
+  <span class="eyebrow">AQUAMETRIC · ANALYSE ULTIMATE</span>
+  <h1>Essayer l’analyse Ultimate sans compte</h1>
+  <p>Un espace de démonstration privé à cette session : crée un match avec un lien YouTube public ou importe un petit fichier vidéo, puis ouvre le rapport, retrouve le replay et relève les actions sur la carte du bassin. Les événements non observés restent « non mesurés ».</p>
+  {% if guest_ultimate_enabled %}
+  <div class="actions" style="margin:20px 0">
+    <a class="btn intelligence-cta" id="guestUltimateLaunch" href="/guest/ultimate">Entrer dans Analyse Ultimate en invité</a>
+    <a class="btn secondary" href="/register">Créer un compte permanent</a>
+  </div>
+  <div class="notice">
+    <strong>Ce que permet le mode invité</strong>
+    <p>Un lien YouTube, un petit MP4/MOV/WebM, la lecture vidéo, l'annotation manuelle, les points sur le bassin et les rapports des observations enregistrées. Limite de 3 matchs et de 30 Mo par fichier pour protéger ce serveur de validation.</p>
+    <p><strong>Non inclus :</strong> stockage R2/S3 de plusieurs Go, reconnaissance IA payante, traitement automatique complet, conservation garantie des données. Les travaux invités peuvent disparaître après la fermeture de la session ou un redémarrage du service.</p>
+  </div>
+  {% else %}
+  <div class="notice">L’accès invité à Analyse Ultimate n’est pas activé sur ce serveur. Il reste disponible sur le service de validation, ou tu peux utiliser un compte personnel.</div>
+  <a class="btn" href="/register">Créer un compte</a>
+  {% endif %}
+</section>
+{% endblock %}

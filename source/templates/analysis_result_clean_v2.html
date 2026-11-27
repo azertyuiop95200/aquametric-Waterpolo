@@ -1,7 +1,12 @@
 {% extends "base.html" %}
 {% block content %}
 <style>
-.report-shell{max-width:1280px;margin:0 auto;display:grid;gap:18px}.hero-report{padding:24px;border:1px solid var(--border,#284654);border-radius:24px;background:linear-gradient(145deg,rgba(14,165,233,.08),rgba(34,197,94,.04))}.hero-top{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;flex-wrap:wrap}.match-title{font-size:clamp(28px,4vw,48px);margin:7px 0}.chips{display:flex;gap:8px;flex-wrap:wrap}.chip{padding:7px 10px;border-radius:999px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.11);font-size:13px}.report-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.report-card{padding:18px;border:1px solid var(--border,#284654);border-radius:18px;background:var(--panel,#0b202b)}.report-card h2{margin-top:0}.status-good{border-left:4px solid #22c55e}.status-warn{border-left:4px solid #f59e0b}.status-live{border-left:4px solid #38bdf8;background:rgba(56,189,248,.07)}.status-failed{border-left:4px solid #ef4444;background:rgba(239,68,68,.06)}.metric-table{width:100%;border-collapse:collapse}.metric-table th,.metric-table td{padding:11px 8px;border-bottom:1px solid rgba(255,255,255,.08);text-align:left}.metric-table th:nth-child(n+2),.metric-table td:nth-child(n+2){text-align:center}.metric-value{font-weight:900;font-size:18px}.unmeasured{opacity:.58;font-size:13px}.candidate{padding:11px 12px;border-radius:12px;background:rgba(255,255,255,.035);margin:8px 0}.candidate strong{display:block}.evidence-note{font-size:13px;opacity:.78;line-height:1.5}.periods{display:flex;gap:8px;flex-wrap:wrap}.period-pill{padding:9px 11px;border-radius:12px;background:rgba(56,189,248,.08);border:1px solid rgba(56,189,248,.18)}.video-frame{aspect-ratio:16/9;width:100%;border:0;border-radius:15px;background:#000}.actions{display:flex;gap:10px;flex-wrap:wrap}.event-list{display:grid;gap:8px}.event-row{display:grid;grid-template-columns:80px 1fr auto;gap:10px;align-items:start;padding:10px;border-bottom:1px solid rgba(255,255,255,.07)}.confidence{font-size:12px;opacity:.7}.section-wide{grid-column:1/-1}@media(max-width:820px){.report-grid{grid-template-columns:1fr}.section-wide{grid-column:auto}.event-row{grid-template-columns:65px 1fr}.event-row .confidence{grid-column:2}}
+.report-shell{max-width:1280px;margin:0 auto;display:grid;gap:18px}.hero-report{padding:24px;border:1px solid var(--border,#284654);border-radius:24px;background:linear-gradient(145deg,rgba(14,165,233,.08),rgba(34,197,94,.04))}.hero-top{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;flex-wrap:wrap}.match-title{font-size:clamp(28px,4vw,48px);margin:7px 0}.chips{display:flex;gap:8px;flex-wrap:wrap}.chip{padding:7px 10px;border-radius:999px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.11);font-size:13px}.report-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.report-card{padding:18px;border:1px solid var(--border,#284654);border-radius:18px;background:var(--panel,#0b202b)}.report-card h2{margin-top:0}.status-good{border-left:4px solid #22c55e}.status-warn{border-left:4px solid #f59e0b}.status-live{border-left:4px solid #38bdf8;background:rgba(56,189,248,.07)}.status-failed{border-left:4px solid #ef4444;background:rgba(239,68,68,.06)}.metric-table{width:100%;border-collapse:collapse}.metric-table th,.metric-table td{padding:11px 8px;border-bottom:1px solid rgba(255,255,255,.08);text-align:left}.metric-table th:nth-child(n+2),.metric-table td:nth-child(n+2){text-align:center}.metric-value{font-weight:900;font-size:18px}.unmeasured{opacity:.58;font-size:13px}.candidate{padding:11px 12px;border-radius:12px;background:rgba(255,255,255,.035);margin:8px 0}.candidate strong{display:block}.evidence-note{font-size:13px;opacity:.78;line-height:1.5}.periods{display:flex;gap:8px;flex-wrap:wrap}.period-pill{padding:9px 11px;border-radius:12px;background:rgba(56,189,248,.08);border:1px solid rgba(56,189,248,.18)}.video-frame{aspect-ratio:16/9;width:100%;border:0;border-radius:15px;background:#000}.actions{display:flex;gap:10px;flex-wrap:wrap}.event-list{display:grid;gap:8px}.event-row{display:grid;grid-template-columns:80px 1fr auto;gap:10px;align-items:start;padding:10px;border-bottom:1px solid rgba(255,255,255,.07)}.confidence{font-size:12px;opacity:.7}.section-wide{grid-column:1/-1}.segment-list{display:grid;gap:8px;margin:12px 0}.segment-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 10px;border:1px solid rgba(120,180,200,.25);border-radius:10px}.segment-row small{opacity:.75}.source-forms{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:16px}.source-forms form{padding:14px;border:1px solid rgba(120,180,200,.24);border-radius:12px}.source-forms label{display:block;margin:8px 0}.source-forms input,.source-forms select{width:100%}.map-filters{display:grid;grid-template-columns:repeat(5,minmax(120px,1fr));gap:9px;margin:13px 0}.map-filters label{font-size:13px}.map-filters select{width:100%}.map-layout{display:grid;grid-template-columns:minmax(0,1.8fr) minmax(230px,1fr);gap:16px}.map-figure svg{width:100%;max-height:530px;display:block}.map-legend{display:flex;gap:15px;flex-wrap:wrap;font-size:12px}.legend-goal{color:#f97316}.legend-saved{color:#38bdf8}.legend-miss{color:#d946ef}.map-evidence{margin-top:16px}.map-sidebar{padding:10px}.segment-review-player{max-width:900px;margin:14px 0}.segment-review-player iframe,.segment-review-player video{width:100%}@media(max-width:900px){.source-forms,.map-layout{grid-template-columns:1fr}.map-filters{grid-template-columns:repeat(2,1fr)}}@media(max-width:820px){.report-grid{grid-template-columns:1fr}.section-wide{grid-column:auto}.event-row{grid-template-columns:65px 1fr}.event-row .confidence{grid-column:2}}
+.match-action-dock{position:sticky;top:12px;z-index:180;display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:10px 12px;border-radius:14px;background:rgba(8,27,42,.96);border:1px solid rgba(56,189,248,.42);box-shadow:0 6px 24px #0005}
+.match-action-dock .btn{min-height:42px;display:inline-flex;align-items:center;justify-content:center;text-align:center}
+.match-action-dock-label{font-size:12px;font-weight:800;letter-spacing:.02em;opacity:.85;margin-right:auto}
+.report-shell [id]{scroll-margin-top:100px}
+@media(max-width:760px){.match-action-dock{position:fixed;bottom:0;top:auto;left:8px;right:8px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));padding:8px 8px calc(8px + env(safe-area-inset-bottom));margin:0}.match-action-dock-label{grid-column:1/-1}.match-action-dock .btn{padding:10px 8px;font-size:12px;min-height:44px}.report-shell{padding-bottom:150px}.report-shell [id]{scroll-margin-top:64px}}
 </style>
 <div class="report-shell">
   <section class="hero-report">
@@ -23,6 +28,226 @@
         <a class="btn" href="/analysis-library">Bibliothèque</a>
       </div>
     </div>
+  </section>
+
+  <nav class="match-action-dock" id="reportQuickActions" aria-label="Actions rapides pour analyser ce match">
+    <span class="match-action-dock-label">MON MATCH · ACTIONS RAPIDES</span>
+    <a id="quickTagMatch" class="btn primary" href="#annotation">Analyser / marquer</a>
+    <a id="quickShowStatistics" class="btn secondary" href="#liveAutomaticStats">Voir les statistiques</a>
+    <a id="quickAddPart" class="btn secondary" href="#sources">Ajouter Q2 / vidéo</a>
+    <a id="quickDownloadReport" class="btn secondary" href="/matches/{{match.id}}/analysis/report.html">Ouvrir le rapport</a>
+  </nav>
+
+  {% if match.video_source in ['upload', 'youtube', 'cloud'] %}
+  <section class="report-card section-wide {% if snapshot.video_actions.configured %}status-live{% else %}status-warn{% endif %}" id="matchAnalysisReadiness">
+    <h2>État réel du rapport de ce match</h2>
+    <p><strong>Source enregistrée :</strong>
+      {% if match.video_source == 'youtube' %}lien YouTube
+      {% elif match.video_source == 'cloud' %}fichier volumineux dans le stockage privé
+      {% else %}fichier vidéo local{% endif %}
+      · <strong>Traitement :</strong> {{match.status|replace('_',' ')}}.</p>
+    {% if not snapshot.video_actions.configured %}
+      <p><strong>Reconnaissance automatique des buts, tirs et actions indisponible sur ce serveur :</strong>
+      la clé du moteur d'analyse vidéo n'est pas configurée. La réception ou la lecture d'une vidéo ne produit donc pas de statistiques sportives à elle seule.
+      Les colonnes sans actions confirmées restent non mesurées.</p>
+      <p class="evidence-note">Tu peux toujours lire la vidéo, pointer les tirs sur le bassin, confirmer des actions observées et télécharger immédiatement le rapport des observations présentes.</p>
+    {% else %}
+      <p>Le moteur de détection des actions est configuré. Consulte la progression réelle et les statistiques provisoires dans le tableau ci-dessous ; une vidéo reçue n'est pas nécessairement une vidéo entièrement analysée.</p>
+    {% endif %}
+    <div class="actions">
+      <a class="btn primary" href="#liveAutomaticStats">Voir les statistiques et la progression</a>
+      <a class="btn secondary" href="#annotation">Lire la vidéo et relever les actions</a>
+      <a class="btn secondary" href="/matches/{{match.id}}/analysis/report.html">Télécharger le rapport disponible</a>
+      {% if match.video_source == 'youtube' %}<a class="btn secondary" href="/matches/{{match.id}}/analysis/browser-capture">Reprendre la capture YouTube</a>{% endif %}
+    </div>
+    {% if request.query_params.get('capture_not_started') %}
+      <p class="evidence-note">Le visionnage a été terminé sans capture vidéo enregistrée. Il est normal qu'aucune statistique de match ne soit apparue automatiquement.</p>
+    {% endif %}
+    {% if request.query_params.get('capture_interrupted') %}
+      <p class="evidence-note">La capture a été interrompue avant publication. Le dossier est conservé ; seules les observations vraiment enregistrées figurent dans le rapport.</p>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  {% if match.video_source == "cloud" %}
+  <section class="report-card status-live" id="cloudVideoReceived">
+    <h2>Vidéo volumineuse reçue sur le stockage privé</h2>
+    <p>Le fichier MP4/MOV a été assemblé et sa taille vérifiée auprès du stockage cloud. Aucun tir, but ou événement individuel n'a été mesuré automatiquement par le seul transfert.</p>
+    <p class="evidence-note">Le traitement IA des fichiers cloud n'est pas encore activé sur cet hébergement Render. Tu peux toutefois lire le fichier ci-dessous et enregistrer des actions réellement observées dans le poste d'annotation.</p>
+    <a class="btn secondary" href="#annotation">Ouvrir le poste de codage</a>
+  </section>
+  {% endif %}
+
+  {% if snapshot.source_facts %}
+  <section class="report-card status-warn" id="sourcedScore">
+    <h2>Résultat annoncé par la source — distinct des mesures vidéo</h2>
+    <p><strong style="font-size:25px">{{snapshot.source_facts.home_goals}} – {{snapshot.source_facts.away_goals}}</strong>
+       · {{snapshot.source_facts.home_team}} – {{snapshot.source_facts.away_team}}
+       · écart {{snapshot.source_facts.goal_difference_home}} buts</p>
+    <p class="evidence-note">Source : <a href="{{snapshot.source_facts.source_url}}" target="_blank" rel="noopener">{{snapshot.source_facts.score_source}}</a>
+      (« {{snapshot.source_facts.source_title}} »). Rencontre au calendrier fédéral : <a href="{{snapshot.source_facts.fixture_source}}" target="_blank" rel="noopener">FFN / extraNat</a>
+      · {{snapshot.source_facts.match_date}}. <b>Ces nombres sont annoncés dans le titre, pas mesurés à partir d'actions vidéo et ne remplissent jamais artificiellement les colonnes de tirs, joueuses ou exclusions.</b></p>
+  </section>
+  {% endif %}
+
+  {% if snapshot.capture_source_quality.get("status") in ["blocked", "static_unverified"] %}
+  <section class="report-card status-failed" id="captureQualityBlock" role="alert">
+    <h2>Source vidéo non exploitable pour les statistiques automatiques</h2>
+    <p>La capture reçue montre un écran presque immobile{% if snapshot.capture_source_quality.get("status") == "blocked" %} reconnu comme une demande de vérification du lecteur{% endif %}. Elle ne constitue pas une preuve de jeu de water-polo.</p>
+    <p><strong>Correction appliquée :</strong> les faux pics d'activité, périodes et lectures OCR sont retirés du rapport sportif. Aucune action individuelle n'est inventée.</p>
+    <p class="evidence-note">Contrôle : {{snapshot.capture_source_quality.frames_checked}} images comparées · variation moyenne {{snapshot.capture_source_quality.mean_frame_delta}} (sur 255). Pour produire une véritable analyse automatique, importer un MP4/MOV accessible ou utiliser la capture dans un navigateur où le match est réellement visible.</p>
+    <div class="actions"><a class="btn" href="/matches/new">Importer une vidéo</a><a class="btn secondary" href="#annotation">Annoter le replay visible</a></div>
+  </section>
+  {% endif %}
+
+  {% include "analysis_live_automatic_stats.html" %}
+
+  {% include "analysis_spatial_studio.html" %}
+
+  <section class="report-card section-wide" id="annotation">
+    <div class="hero-top">
+      <div><span class="eyebrow">POSTE D'ANALYSE · ACTIONS HORODATÉES</span><h2>Mesurer le match action par action</h2></div>
+      <span class="chip">{{review_metrics.verified_count}} action(s) confirmée(s)</span>
+    </div>
+    <p class="evidence-note">Comme dans les outils de marquage sportif : lis la vidéo, arrête-toi sur l'action, sélectionne l'équipe et éventuellement la joueuse, puis confirme l'événement. AquaMetric met à jour immédiatement les statistiques, les phases et les comparaisons. Aucune action n'est ajoutée automatiquement si la vidéo est bloquée.</p>
+    {% if video_segments %}
+      <label>Choisir la vidéo à analyser (les temps sont locaux à cette partie)
+        <select id="reviewSegmentSelect">
+        {% for part in video_segments %}<option value="{{loop.index0}}">Q{{part.period}} · {{part.label}} · Partie {{part.part_index}}</option>{% endfor %}
+        </select>
+      </label>
+      <div id="reviewSegmentPlayer" class="segment-review-player" aria-live="polite"></div>
+      <p class="evidence-note">Choisis d'abord la partie vidéo et la période. Le timestamp conservé avec l'action correspond exactement à cette vidéo, sans concaténation arbitraire des quatre quart-temps.</p>
+    {% elif match.video_source in ["upload","cloud"] and match.video_path %}
+      <video id="reviewLocalVideo" class="video-frame" controls preload="metadata" playsinline src="/matches/{{match.id}}/video">Lecture non prise en charge.</video>
+    {% elif source_embed %}
+      <iframe id="reviewVideo" class="video-frame" src="{{source_embed}}&rel=0" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen title="Replay du match"></iframe>
+    {% endif %}
+    <form id="reviewTagForm" action="/matches/{{match.id}}/events" method="post">
+      <input name="return_to" type="hidden" value="report">
+      <input id="reviewSegmentId" name="segment_id" type="hidden" value="">
+      <input id="coordX" name="coord_x" type="hidden" value="">
+      <input id="coordY" name="coord_y" type="hidden" value="">
+      <div class="formgrid">
+        <label>Quart-temps / période
+          <select id="reviewPeriod" name="period">
+          {% for q in range(1,9) %}<option value="{{q}}">Q{{q}}</option>{% endfor %}
+          </select>
+        </label>
+        <label>Instant de la vidéo (secondes)
+          <input type="number" id="reviewSecond" name="second" value="0" min="0" max="43200" step="0.1" required>
+          <small id="reviewTimeText">00:00 · modification possible</small>
+        </label>
+        <label>Équipe qui réalise l'action
+          <select name="perspective" id="reviewPerspective">
+            <option value="for">{{match.team.name}}</option>
+            <option value="against">{{match.opponent}}</option>
+          </select>
+        </label>
+        <label>Joueuse (facultatif, pour {{match.team.name}})
+          <select name="player_id" id="reviewPlayer">
+            <option value="">Non attribuée / adversaire</option>
+            {% for p in players %}
+            <option value="{{p.id}}">#{{p.cap_number or "—"}} · {{p.name}}</option>
+            {% endfor %}
+          </select>
+          <small><a href="/teams/{{match.team_id}}" target="_blank" rel="noopener">Compléter la liste des joueuses et numéros de bonnet</a></small>
+        </label>
+        <label>Contexte de l'action
+          <select name="phase_tag">
+            <option value="auto">Non déterminé</option>
+            <option value="even_attack">6 contre 6</option>
+            <option value="power_play">Supériorité 6 contre 5</option>
+            <option value="counterattack">Contre-attaque</option>
+            <option value="penalty_kill">Infériorité numérique</option>
+            <option value="centre_play">Jeu au centre</option>
+          </select>
+        </label>
+      </div>
+      <label>Observation complémentaire
+        <input name="note" maxlength="500" placeholder="Ex. tir depuis l'aile droite, ballon dévié par la gardienne">
+      </label>
+      <p class="evidence-note">Position du tir (facultative) : sélectionne un point sur la <a href="#spatialDashboard">carte du bassin</a> juste au-dessus. Sans point réellement observé, l'action reste enregistrée sans coordonnées et n'est pas affichée sur la heatmap.</p>
+      <label style="display:block;margin:12px 0"><input type="checkbox" name="observed" value="1" required> J'ai réellement observé cet événement dans la vidéo ou sur une feuille de match vérifiable.</label>
+      <div class="actions" style="gap:9px">
+        <button class="btn" type="submit" name="event_type" value="goal">But</button>
+        <button class="btn secondary" type="submit" name="event_type" value="shot_on_target">Tir arrêté / cadré</button>
+        <button class="btn secondary" type="submit" name="event_type" value="shot_off_target">Tir manqué</button>
+        <button class="btn secondary" type="submit" name="event_type" value="shot_blocked">Tir contré</button>
+        <button class="btn secondary" type="submit" name="event_type" value="save">Arrêt</button>
+        <button class="btn secondary" type="submit" name="event_type" value="turnover">Perte</button>
+        <button class="btn secondary" type="submit" name="event_type" value="recovery">Récupération</button>
+        <button class="btn secondary" type="submit" name="event_type" value="assist">Passe décisive</button>
+        <button class="btn secondary" type="submit" name="event_type" value="exclusion_earned">Exclusion obtenue</button>
+        <button class="btn secondary" type="submit" name="event_type" value="exclusion_committed">Exclusion commise</button>
+      </div>
+    </form>
+    <script>
+      (() => {
+        const second = document.getElementById('reviewSecond'), display = document.getElementById('reviewTimeText');
+        const perspective = document.getElementById('reviewPerspective'), player = document.getElementById('reviewPlayer');
+        const video = document.getElementById('reviewVideo');
+        const localVideo = document.getElementById('reviewLocalVideo');
+        if(localVideo) localVideo.addEventListener('timeupdate', () => {
+          if(document.activeElement!==second && Number.isFinite(localVideo.currentTime)){
+            second.value=Math.round(localVideo.currentTime*10)/10;updateTime();
+          }
+        });
+        function updateTime() { const n = Math.max(0,Number(second.value)||0); display.textContent = String(Math.floor(n/60)).padStart(2,'0')+':'+String(Math.floor(n%60)).padStart(2,'0')+' · timestamp de la vidéo'; }
+        second.addEventListener('input',updateTime); updateTime();
+        perspective.addEventListener('change', () => { if(perspective.value==='against') player.value=''; player.disabled=perspective.value==='against'; });
+        if(video){
+          window.addEventListener('message', ev=>{
+            if(!/^https:\/\/(?:www\.)?youtube(?:-nocookie)?\.com$/.test(ev.origin) || ev.source!==video.contentWindow) return;
+            let data=ev.data; if(typeof data==='string'){try{data=JSON.parse(data);}catch(e){return;}}
+            if(data && data.info && Number.isFinite(Number(data.info.currentTime)) && Number(data.info.currentTime)>0){
+              // Do not overwrite an intentional manual timestamp during an edit.
+              if(document.activeElement!==second){second.value=Math.round(Number(data.info.currentTime)*10)/10;updateTime();}
+            }
+          });
+          setInterval(()=>{try{video.contentWindow.postMessage(JSON.stringify({event:'listening',id:'aq-review'}),'*');}catch(e){}},1500);
+        }
+      })();
+    </script>
+  </section>
+
+  <section class="report-card section-wide" id="observedKPIs">
+    <h2>Tableau de bord · données réellement annotées</h2>
+    <p class="evidence-note">Statistiques <b>sur l'échantillon confirmé</b>, pas sur tout le match. Les buts annoncés dans le titre YouTube ne sont pas additionnés aux buts observés.</p>
+    <table class="metric-table">
+      <thead><tr><th>Mesure</th><th>{{match.team.name}}</th><th>{{match.opponent}}</th></tr></thead>
+      <tbody>
+        {% for title,key in [("Actions annotées","tagged_events"),("Buts annotés","tagged_goals"),("Tirs annotés","tagged_shots"),("Conversion des tirs annotés","shot_conversion_pct"),("Pertes / mauvaises passes","tagged_turnovers"),("Récupérations / interceptions","tagged_recoveries"),("Arrêts","tagged_saves"),("Exclusions obtenues","tagged_exclusions_earned"),("Exclusions concédées","tagged_exclusions_committed")] %}
+        <tr><td>{{title}}</td>
+          <td>{% if review_metrics.team.tagged_events or key == 'tagged_events' %}{{review_metrics.team[key] if review_metrics.team[key] is not none else '—'}}{% if key == 'shot_conversion_pct' and review_metrics.team[key] is not none %} %{% endif %}{% else %}—{% endif %}</td>
+          <td>{% if review_metrics.opponent.tagged_events or key == 'tagged_events' %}{{review_metrics.opponent[key] if review_metrics.opponent[key] is not none else '—'}}{% if key == 'shot_conversion_pct' and review_metrics.opponent[key] is not none %} %{% endif %}{% else %}—{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% if review_metrics.verified_count %}
+      <h3>Situations de jeu</h3>
+      <table class="metric-table"><thead><tr><th>Phase</th><th>{{match.team.name}}</th><th>{{match.opponent}}</th></tr></thead><tbody>
+      {% for key,phase in review_metrics.phases.items() %}
+        <tr><td>{{phase.label}}</td>
+        {% for side in ['for','against'] %}
+          {% set values=phase[side] %}<td>{{values.tagged_goals}} but(s) / {{values.tagged_shots}} tir(s){% if values.shot_conversion_pct is not none %} · {{values.shot_conversion_pct}} %{% endif %}</td>
+        {% endfor %}</tr>
+      {% endfor %}</tbody></table>
+      {% if review_metrics.players %}
+      <h3>Joueuses annotées · {{match.team.name}}</h3>
+      <table class="metric-table"><thead><tr><th>Joueuse</th><th>Buts</th><th>Tirs</th><th>% tirs</th><th>Passes décisives</th></tr></thead>
+        <tbody>{% for p in review_metrics.players %}<tr><td>{{p.name}}</td><td>{{p.tagged_goals}}</td><td>{{p.tagged_shots}}</td><td>{{p.shot_conversion_pct if p.shot_conversion_pct is not none else '—'}}</td><td>{{p.tagged_assists}}</td></tr>{% endfor %}</tbody></table>
+      {% endif %}
+      <h3>Actions vérifiées · accès direct à la preuve</h3>
+      {% for e in review_metrics.timeline %}
+        <div class="event-row"><b>{{"%02d:%02d"|format((e.second//60)|int,(e.second%60)|int)}}</b>
+        <div><strong>{{e.label}}</strong> · {{match.team.name if e.side == 'for' else match.opponent if e.side=='against' else 'Indéterminé'}}{% if e.player %} · {{e.player}}{% endif %}<small style="display:block">{{e.phase|replace('_',' ')}}</small></div>
+        {% if e.url %}<a href="{{e.url}}" target="_blank" rel="noopener">Voir sur la vidéo</a>{% endif %}</div>
+      {% endfor %}
+    {% else %}
+      <p class="evidence-note">Aucune action sportive enregistrée. Les valeurs seront calculées dès qu'un événement réellement observé aura été confirmé.</p>
+    {% endif %}
   </section>
 
   {% if match.status in ["browser_capture_running","browser_capture_finalizing"] %}
@@ -55,7 +280,7 @@
   {% if match.status == "source_link_saved" %}
   <section class="report-card status-warn" id="mobileLinkSaved"><h2>Lien enregistré dans ton dossier</h2>
     <p><strong>Vidéo identifiée mais non analysée.</strong> Aucun pixel n’a été reçu à partir de ce lien. Les statistiques, les identités et les conclusions tactiques ne peuvent pas être déduites de son seul enregistrement.</p>
-    <div class="actions"><a class="btn" href="/matches/{{match.id}}">Ouvrir le match et annoter</a><a class="btn secondary" href="/matches/{{match.id}}/analysis/browser-capture">Reprendre sur ordinateur</a><a class="btn secondary" href="/analysis/video-session-elite?match_id={{match.id}}">Préparer une séance vidéo</a></div>
+    <div class="actions"><a class="btn" href="/matches/{{match.id}}">Ouvrir le match et annoter</a>{% if match.video_source == "youtube" %}<a class="btn secondary" href="/matches/{{match.id}}/analysis/browser-capture">Reprendre sur ordinateur</a>{% else %}<a class="btn secondary" href="/matches/new">Importer un fichier vidéo analysable</a>{% endif %}<a class="btn secondary" href="/analysis/video-session-elite?match_id={{match.id}}">Préparer une séance vidéo</a></div>
     <p class="evidence-note">Conserve ton accès au compte pour retrouver ce dossier. Le mode invité et le stockage temporaire ne garantissent pas sa conservation après redémarrage.</p>
   </section>
   {% endif %}

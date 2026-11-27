@@ -1,0 +1,105 @@
+name: AquaMetric Real YouTube Tab Capture Probe
+
+on:
+  push:
+    branches: [fix/youtube-report-intake-2026-11]
+    paths:
+      - '.github/workflows/youtube-real-capture-probe.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  real-video-capture-probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Chromium
+        run: |
+          npm init -y >/dev/null
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Capture a short portion of the provided replay through a Chromium tab
+        env:
+          BASE: https://aquametric-youtube-validation.onrender.com
+        run: |
+          node - <<'NODE'
+          const {chromium}=require('playwright');
+          (async()=>{
+            const browser=await chromium.launch({headless:true,args:[
+              '--no-sandbox','--autoplay-policy=no-user-gesture-required',
+              '--enable-usermedia-screen-capturing',
+              '--auto-select-desktop-capture-source=AquaMetric',
+              '--auto-select-tab-capture-source-by-title=AquaMetric',
+              '--use-fake-ui-for-media-stream'
+            ]});
+            const page=await browser.newPage({viewport:{width:1280,height:800}});
+            const errors=[];
+            let captureSession='';
+            page.on('response',async response=>{
+              if(response.url().includes('/analysis/browser-capture/session') && response.request().method()==='POST'){
+                try { captureSession=(await response.json()).session_id||''; }catch(e){}
+              }
+            });
+            page.on('pageerror',err=>errors.push(String(err.message).slice(0,180)));
+            try {
+              let stagingVersion='';
+              for(let attempt=0;attempt<40;attempt++){
+                const response=await page.request.get(process.env.BASE+'/health',{timeout:20000}).catch(()=>null);
+                if(response?.ok()){
+                  stagingVersion=await response.text();
+                  if(stagingVersion.includes('9b1314b073806fa25ff0a1d30ad83108009a369b'))break;
+                }
+                await page.waitForTimeout(5000);
+              }
+              if(!stagingVersion.includes('9b1314b073806fa25ff0a1d30ad83108009a369b'))throw Error('Latest source-gated staging app not deployed');
+              await page.goto(process.env.BASE+'/demo-login',{waitUntil:'domcontentloaded',timeout:60000});
+              await page.locator('#desktopAnalyzeSubmit').click({timeout:20000});
+              await page.waitForURL(/\/matches\/\d+\/analysis\/browser-capture/,{timeout:30000});
+              const captureUrl=page.url();
+              console.log('CAPTURE_PAGE',captureUrl.replace(/\/matches\/\d+\//,'/matches/[id]/'));
+              await page.waitForTimeout(4500);
+              console.log('DURATION',await page.locator('#durationState').innerText());
+              await page.locator('#startCapture').click({timeout:15000});
+              await page.waitForTimeout(15000);
+              console.log('CAPTURE_STATUS_AFTER_15S',String(await page.locator('#captureStatus').innerText()).slice(0,280));
+              await page.screenshot({path:'real-capture-live-screen.png'});
+              console.log('CAPTURE_PERMISSION',String(await page.locator('#permissionState').innerText()).slice(0,280));
+              const canStop=await page.locator('#stopCaptureLive').isEnabled();
+              console.log('CAPTURE_STOP_ENABLED',canStop);
+              if(canStop){
+                await page.locator('#stopCaptureLive').click({timeout:15000});
+                await page.waitForTimeout(15000);
+                console.log('AFTER_STOP_URL',page.url().replace(/\/matches\/\d+\//,'/matches/[id]/'));
+                console.log('AFTER_STOP_STATUS',String(await page.locator('#captureStatus').innerText().catch(()=>'' )).slice(0,280));
+                const marked=await page.locator('#captureQualityBlock').count();
+                console.log('YOUTUBE_BOT_CAPTURE_DETECTED',Boolean(marked));
+                if(captureSession){
+                  const matchId=captureUrl.match(/\/matches\/(\d+)\//)?.[1];
+                  const progress=await page.request.get(process.env.BASE+'/matches/'+matchId+'/analysis/browser-capture/status?session_id='+captureSession);
+                  console.log('SOURCE_QUALITY_STATUS',JSON.stringify((await progress.json())?.progress?.capture_source_quality||{}));
+                }
+                console.log('REPORT_HAS_UNMEASURED',await page.locator('body').innerText().then(t=>t.includes('non mesuré')));
+                if(!marked)throw Error('The real YouTube bot page still appears as valid sports footage');
+              }
+              console.log('PAGE_ERRORS',JSON.stringify(errors.slice(-6)));
+            }catch(e){
+              console.log('CAPTURE_PROBE_ERROR',String(e.message).slice(0,500));
+              console.log('PAGE_ERRORS',JSON.stringify(errors.slice(-6)));
+              process.exitCode=1;
+            }finally{
+              await page.screenshot({path:'real-capture-probe.png',fullPage:false}).catch(()=>{});
+              await browser.close();
+            }
+          })().catch(e=>{console.error(e);process.exit(1)});
+          NODE
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: granville-marseille-short-capture-probe
+          path: real-capture-*.png
+          if-no-files-found: ignore

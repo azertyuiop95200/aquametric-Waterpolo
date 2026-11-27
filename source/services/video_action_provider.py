@@ -26,6 +26,31 @@ def provider_configuration() -> dict:
                         "L’administrateur doit connecter le moteur vidéo ; le score OCR seul ne mesure pas les actions.")}
 
 
+def request_gemini_interaction(body: dict, timeout: float) -> httpx.Response:
+    """One bounded retry for API versions that reject full nested JSON Schema.
+
+    Both responses still undergo the exact same local Pydantic validation.
+    Never treat a HTTP 400 caused by an unreadable video as a schema error.
+    """
+    with httpx.Client(timeout=httpx.Timeout(timeout,connect=min(10,timeout)),
+                      follow_redirects=False) as client:
+        response=client.post("https://generativelanguage.googleapis.com/v1beta/interactions",
+            headers={"x-goog-api-key":os.environ["GEMINI_API_KEY"]},json=body)
+        if response.status_code==400:
+            detail=(response.text or "")[:1400].lower()
+            if any(token in detail for token in (
+                "json schema", "json_schema", "response_format",
+                "schema validation","unsupported schema","invalid schema"
+            )):
+                smaller=dict(body)
+                # A strict local parser still validates enum, timestamps,
+                # confidences, and the entire structured answer after retry.
+                smaller["response_format"]={"type":"text","mime_type":"application/json"}
+                response=client.post("https://generativelanguage.googleapis.com/v1beta/interactions",
+                    headers={"x-goog-api-key":os.environ["GEMINI_API_KEY"]},json=smaller)
+        return response
+
+
 def analyze_video_segment(path: Path, *, team: str, opponent: str, timeout: float = 75) -> dict:
     config = provider_configuration()
     if not config["configured"]:
@@ -41,9 +66,7 @@ def analyze_video_segment(path: Path, *, team: str, opponent: str, timeout: floa
             "response_format": {"type": "text", "mime_type": "application/json",
                                 "schema": SegmentObservation.model_json_schema()}}
     try:
-        with httpx.Client(timeout=httpx.Timeout(timeout, connect=min(10, timeout)), follow_redirects=False) as client:
-            response = client.post("https://generativelanguage.googleapis.com/v1beta/interactions",
-                headers={"x-goog-api-key": os.environ["GEMINI_API_KEY"]}, json=body)
+        response = request_gemini_interaction(body, timeout)
         if response.status_code in {401, 403}:
             raise VideoActionError("credentials", "Le moteur vidéo refuse la clé ou les droits du serveur.")
         if response.status_code == 429:

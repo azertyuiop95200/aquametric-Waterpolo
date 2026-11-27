@@ -132,6 +132,7 @@ jobs:
             console.log('V12.2 mobile regression: scroll, 5 languages, visual tactics, teams, player dossiers and analysis history OK');
             await require('./source/tests/video_sessions_browser.cjs')(page, base, assert);
             await require('./source/tests/mobile_link_browser.cjs')(page, base, assert);
+            await require('./source/tests/analysis_buttons_browser.cjs')(page, base, assert);
             await browser.close();
           })().catch(e=>{console.error(e);process.exit(1);});
           JS

@@ -1,0 +1,184 @@
+{# Real coordinates only, no invented location or auto-derived xG. #}
+<section class="report-card section-wide" id="sources">
+  <div class="hero-top">
+    <div><span class="eyebrow">VIDÉOTHÈQUE DU MATCH</span><h2>Un match, plusieurs vidéos</h2></div>
+    <span class="chip">{{video_segments|length}} enregistrement(s)</span>
+  </div>
+  <p class="evidence-note">Une vidéo entière, quatre quart-temps séparés ou plusieurs extraits sont réunis dans le même dossier. Chaque action garde le numéro de période, la vidéo exacte et son temps local. Un fichier reçu n'est pas encore une action mesurée.</p>
+  {% if video_segments %}
+    <div class="segment-list">
+      {% for part in video_segments %}
+        <div class="segment-row">
+          <span class="chip">Q{{part.period}} · partie {{part.part_index}}</span>
+          <strong>{{part.label}}</strong>
+          <small>{{'Fichier cloud' if part.source_type=='cloud' else 'Fichier importé' if part.source_type=='upload' else 'YouTube' if part.source_type=='youtube' else 'Lien externe'}}</small>
+          {% if part.video_url %}<a href="{{part.video_url}}" rel="noopener" target="_blank">Ouvrir la source</a>{% endif %}
+          {% if part.play_url %}<a href="{{part.play_url}}" target="_blank">Lire le fichier</a>{% endif %}
+          {% if part.id is not none and part.source_type == 'youtube' %}
+          <form action="/matches/{{match.id}}/segments/{{part.id}}/youtube/direct" method="post" class="segment-direct-form">
+            <label>Durée du clip (minutes)
+              <input type="number" name="duration_minutes" min="0.1" max="240" step="0.1" required placeholder="Ex. 8">
+            </label>
+            <button class="btn secondary" type="submit" {% if not snapshot.video_actions.configured %}disabled{% endif %}>Analyser Q{{part.period}} par IA</button>
+          </form>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="evidence-note">Aucune vidéo encore associée à ce dossier. Ajoute le premier quart-temps pour commencer.</p>
+  {% endif %}
+  <div class="source-forms">
+    <form action="/matches/{{match.id}}/segments" method="post" enctype="multipart/form-data" id="addMatchPartForm">
+      <h3>Ajouter un quart-temps ou un extrait</h3>
+      <label>Quart-temps / période
+        <select name="period">{% for i in range(1,9) %}<option value="{{i}}">Q{{i}}</option>{% endfor %}</select>
+      </label>
+      <label>Nom de la partie<input name="label" placeholder="Ex. Q2 · seconde caméra" maxlength="100"></label>
+      <label>Lien YouTube / vidéo distante<input name="video_url" type="url" placeholder="https://www.youtube.com/watch?v=..."></label>
+      <label>Durée du clip YouTube (minutes, facultatif)
+        <input type="number" name="youtube_duration_minutes" min="0" max="240" step="0.1" placeholder="Ex. 8.0">
+      </label>
+      <p class="evidence-note">Si le moteur vidéo est connecté et que la durée est renseignée, cette partie YouTube publique sera analysée automatiquement dès son ajout.</p>
+      <label>Ou petit fichier (limite de l'import direct sur ce serveur)
+        <input name="video_file" type="file" accept=".mp4,.mov,.webm,.m4v,video/mp4,video/quicktime,video/webm">
+      </label>
+      <button class="btn secondary" type="submit">Ajouter cette partie au match</button>
+    </form>
+    <form id="segmentUploadForm" data-target-match-id="{{match.id}}">
+      <h3>Fichier vidéo volumineux (jusqu'à 5 Go)</h3>
+      <input type="hidden" name="team_name" value="{{match.team.name}}">
+      <input type="hidden" name="opponent" value="{{match.opponent}}">
+      <input type="hidden" name="category" value="{{match.team.category or 'Women'}}">
+      <input type="hidden" name="competition" value="{{match.competition}}">
+      <input type="hidden" name="match_date" value="{{match.match_date}}">
+      <label>Période
+        <select name="period">{% for i in range(1,9) %}<option value="{{i}}">Q{{i}}</option>{% endfor %}</select>
+      </label>
+      <label>Nom de la vidéo<input name="segment_label" placeholder="Q3 · film du match"></label>
+      <div id="largeUploadCloudControls">
+        <label>Fichier MP4 / MOV / WebM / MKV
+          <input id="largeUploadVideo" type="file" accept=".mp4,.mov,.webm,.m4v,.mkv,video/mp4,video/quicktime,video/webm">
+        </label>
+        <p class="evidence-note">Taille maximale prévue : <span id="largeUploadLimit">5</span> Go. L'envoi direct en morceaux nécessite un stockage cloud privé et une base durable.</p>
+        <progress id="largeUploadProgress" value="0" max="100" style="width:100%;height:14px"></progress>
+        <div class="actions"><button class="btn" type="button" id="largeUploadStart" disabled>Envoyer cette partie</button><button class="btn secondary" type="button" id="largeUploadCancel" hidden>Annuler</button></div>
+      </div>
+      <p id="largeUploadStatus" role="status">Vérification du stockage cloud…</p>
+      <div id="largeUploadLocalFallback" class="notice" hidden>
+        <strong>Sans bucket, l'import d'une petite vidéo reste disponible.</strong>
+        <p>Dépose les quart-temps un par un avec le formulaire juste à côté. Les fichiers sont associés au même match.</p>
+        <button class="btn primary" type="button" id="chooseRegularUpload">Ajouter un quart-temps classique</button>
+      </div>
+    </form>
+  </div>
+</section>
+
+<section class="report-card section-wide" id="spatialDashboard">
+  <div class="hero-top">
+    <div>
+      <span class="eyebrow">ANALYSE SPATIALE · POINTS VÉRIFIÉS</span>
+      <h2>Shot map et heatmap du bassin</h2>
+    </div>
+    <span class="chip" id="mapCount">{{spatial_stats.shots_mapped}} tir(s) localisé(s)</span>
+  </div>
+  <p class="evidence-note">La position correspond au <strong>point exact placé par l'analyste</strong>. Repère normalisé sur le demi-bassin offensif : X de gauche à droite (0–100), Y de la cage vers le milieu (0–100). Les positions sont comparables entre quart-temps, même si les équipes changent de côté. Aucune localisation ni xG n'est inventée.</p>
+  <div class="map-filters">
+    <label>Équipe
+      <select id="mapSide"><option value="all">Deux équipes</option><option value="for">{{match.team.name}}</option><option value="against">{{match.opponent}}</option></select>
+    </label>
+    <label>Événement
+      <select id="mapKind"><option value="shots">Tous les tirs</option><option value="goal">Buts</option><option value="shot_on_target">Tirs cadrés</option><option value="shot_off_target">Tirs manqués</option><option value="shot_blocked">Tirs contrés</option><option value="save">Arrêts</option><option value="all">Toutes les actions localisées</option></select>
+    </label>
+    <label>Période
+      <select id="mapPeriod"><option value="all">Toutes</option>{% for i in range(1,9) %}<option value="{{i}}">Q{{i}}</option>{% endfor %}</select>
+    </label>
+    <label>Joueuse
+      <select id="mapPlayer"><option value="all">Toutes</option>{% for p in players %}<option value="{{p.id}}">#{{p.cap_number or '—'}} · {{p.name}}</option>{% endfor %}</select>
+    </label>
+    <label>Affichage
+      <select id="mapMode"><option value="points">Points précis</option><option value="both">Points + densité</option><option value="heat">Densité seule</option></select>
+    </label>
+  </div>
+  <div class="map-layout">
+    <div class="map-figure">
+      <svg id="spatialPitch" viewBox="0 0 600 460" aria-label="Demi-bassin de water-polo. Cliquer pour enregistrer la position d'une action" role="img">
+        <defs>
+          <linearGradient id="poolWater" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="#0ea5e9"/><stop offset="0.5" stop-color="#67cdf1"/><stop offset="1" stop-color="#0f99d8"/></linearGradient>
+          <radialGradient id="shotDensity"><stop offset="0" stop-color="#ff3b0d" stop-opacity=".7"/><stop offset=".45" stop-color="#f7b33c" stop-opacity=".45"/><stop offset="1" stop-color="#f3df59" stop-opacity="0"/></radialGradient>
+        </defs>
+        <rect x="50" y="50" width="500" height="355" rx="2" fill="url(#poolWater)"/>
+        <rect x="50" y="50" width="500" height="355" fill="none" stroke="#e2f5fd" stroke-width="5"/>
+        <line x1="50" y1="115" x2="550" y2="115" stroke="#e1463d" stroke-width="4" stroke-dasharray="9 9"/>
+        <line x1="50" y1="190" x2="550" y2="190" stroke="#f1e65e" stroke-width="4" stroke-dasharray="9 9"/>
+        <line x1="50" y1="225" x2="550" y2="225" stroke="#7ac45e" stroke-width="4" stroke-dasharray="9 9"/>
+        <line x1="50" y1="405" x2="550" y2="405" stroke="#f8fbfc" stroke-width="4"/>
+        <path d="M 251 50 L 251 30 L 349 30 L 349 50" stroke="white" stroke-width="7" fill="none"/>
+        <text x="300" y="20" font-size="15" fill="currentColor" text-anchor="middle">CAGE ATTAQUÉE</text>
+        <text x="58" y="108" font-size="13" fill="#183047">2 m</text><text x="58" y="183" font-size="13" fill="#183047">5 m</text>
+        <text x="58" y="217" font-size="13" fill="#183047">6 m</text>
+        <text x="300" y="438" font-size="14" fill="currentColor" text-anchor="middle">MILIEU DU BASSIN · distance relative</text>
+        <g id="spatialGlows" pointer-events="none"></g>
+        <g id="spatialPoints" pointer-events="none"></g>
+        <circle id="spatialSelected" cx="50" cy="50" r="9" stroke="#0b1424" stroke-width="3" fill="none" visibility="hidden" pointer-events="none"/>
+        <rect x="50" y="50" width="500" height="355" fill="transparent" id="spatialClickSurface" style="cursor:crosshair"/>
+      </svg>
+      <div class="map-legend"><span class="legend-goal">● But</span><span class="legend-saved">● Tir cadré/arrêté</span><span class="legend-miss">● Tir manqué / contré</span></div>
+      <p class="evidence-note" id="spatialPointMessage">Clique sur le demi-bassin pour préparer le prochain point de tir. Le point ne sera enregistré qu'après confirmation de l'action dans le formulaire.</p>
+      <button type="button" id="spatialClear" class="btn secondary">Effacer le point choisi</button>
+    </div>
+    <div class="map-sidebar">
+      <h3>Couverture des données</h3>
+      <p><strong>{{spatial_stats.shots_mapped}} / {{spatial_stats.shots_reviewed}}</strong> tirs annotés avec une localisation exacte.</p>
+      <p><strong>{{spatial_stats.events_reviewed}}</strong> événement(s) confirmé(s), toutes catégories.</p>
+      <p><strong>{{spatial_stats.unlocated_shots}}</strong> tir(s) annoté(s) sans position — non affichés sur la carte.</p>
+      <p id="mapFilteredCount" class="evidence-note">Filtres en cours d'initialisation…</p>
+      <h3>Buts par période (observés)</h3>
+      <table class="metric-table">
+        <thead><tr><th>QT</th><th>{{match.team.name}}</th><th>{{match.opponent}}</th></tr></thead>
+        <tbody>{% for p in spatial_stats.periods %}<tr><td>Q{{p.period}}</td><td>{{p['for']}}</td><td>{{p.against}}</td></tr>{% endfor %}</tbody>
+      </table>
+      {% if not spatial_stats.periods %}<p class="evidence-note">Aucune action par période enregistrée. Ce n'est pas un score final 0–0.</p>{% endif %}
+      <p class="evidence-note">Ces buts sont les seuls buts explicitement confirmés dans le dossier, pas le score officiel complet du match.</p>
+    </div>
+  </div>
+  <h3>Efficacité par zone · sur les tirs localisés</h3>
+  <p class="evidence-note">Zones du demi-bassin offensif, 3 bandes de distance × gauche/centre/droite. Les zones vides restent « — ». Les cartes de densité sont des visualisations interpolées des points connus, pas des actions supplémentaires.</p>
+  <table class="metric-table">
+    <thead><tr><th>Zone</th><th>{{match.team.name}}</th><th>{{match.opponent}}</th></tr></thead>
+    <tbody>
+      {% for index in range(9) %}
+      {% set ours=spatial_stats.shot_zones['for'][index] %}
+      {% set theirs=spatial_stats.shot_zones['against'][index] %}
+      <tr><td>{{ours.zone}}</td><td>{% if ours.shots %}{{ours.goals}} / {{ours.shots}} ({{ours.conversion_pct}} %){% else %}—{% endif %}</td>
+        <td>{% if theirs.shots %}{{theirs.goals}} / {{theirs.shots}} ({{theirs.conversion_pct}} %){% else %}—{% endif %}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="map-evidence" id="spatialProofList"><p class="evidence-note">Les points cliquables et leurs preuves apparaissent ici après annotation.</p></div>
+</section>
+<section class="report-card section-wide" id="poloiqVision">
+  <div class="hero-top">
+    <div><span class="eyebrow">VISION ARTIFICIELLE · BASE D'ENTRAÎNEMENT</span>
+      <h2>PoloIQ · ballon, cage et joueuses</h2></div>
+    <span class="chip" id="poloiqState">Vérification du modèle…</span>
+  </div>
+  <p>Jeu de données <a href="https://universe.roboflow.com/ball-tracking-rrxno/poloiq" target="_blank" rel="noopener">PoloIQ de « ball tracking » sur Roboflow Universe</a> · 4 865 images sources · licence CC BY 4.0 · cinq classes : ballon, cage, gardienne rouge, joueuses foncées et blanches.</p>
+  <p class="evidence-note"><b>Attention :</b> le jeu de données public ne comporte pas de modèle préentraîné publié. Pour activer ce test, il faut entraîner un détecteur, le déployer et configurer ses identifiants sur le serveur. Les éventuelles boîtes visuelles ne prouvent ni un but, ni un tir, ni le numéro d'une joueuse. Le site ne les convertit pas en statistiques sportives sans revue.</p>
+  <div id="poloiqExplain" class="evidence-note" role="status" aria-live="polite">État de la reconnaissance en cours de vérification.</div>
+  <form id="poloiqFrameForm" data-match-id="{{match.id}}">
+    <label>Tester sur une image réellement issue du replay (JPG/PNG/WebP, 6 Mo maximum)
+      <input name="image" id="poloiqFrame" type="file" accept="image/jpeg,image/png,image/webp">
+    </label>
+    <button type="submit" id="poloiqTestBtn" class="btn secondary" disabled>Détecter les objets de cette image</button>
+  </form>
+  <div class="map-figure" style="max-width:800px;margin-top:12px">
+    <canvas id="poloiqPreview" style="width:100%;height:auto;max-height:480px;object-fit:contain" aria-label="Aperçu des objets détectés dans l'image choisie"></canvas>
+  </div>
+  <p class="evidence-note" id="poloiqResult">Aucun résultat visuel. Le rapport statistique reste séparé du test de détection.</p>
+</section>
+<script defer src="/static/poloiq-vision-preview.js"></script>
+<script type="application/json" id="spatialDataset">{{spatial_stats.points|tojson}}</script>
+<script type="application/json" id="videoSegmentsDataset">{{video_segments|tojson}}</script>
+<script defer src="/static/spatial-match-analysis.js"></script>
+<script defer src="/static/large-video-upload.js"></script>

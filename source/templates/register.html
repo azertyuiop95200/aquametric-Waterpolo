@@ -1,1 +1,21 @@
-{% extends 'base.html' %}{% block content %}<div class="panel narrow"><h1>Create account</h1>{% if error %}<p class="error">{{error}}</p>{% endif %}<form method="post"><label>Name<input name="name"></label><label>Email<input type="email" name="email" required></label><label>Password<input type="password" name="password" minlength="8" required></label><button class="btn">Create account</button></form><p><a href="/login">Already registered?</a></p></div>{% endblock %}
+{% extends 'base.html' %}
+{% block content %}
+<div class="panel narrow" style="max-width:480px;margin:auto">
+  <h1>Créer un compte AquaMetric</h1>
+  {% if error %}<p class="error">{{error}}</p>{% endif %}
+  {% if google_login_enabled %}
+    <a class="btn primary" id="googleRegisterAction" href="/auth/google?next=/matches/new">Continuer avec Google</a>
+    <p class="mode-note">Tu peux utiliser Google sans choisir un nouveau mot de passe AquaMetric.</p>
+  {% endif %}
+  <form method="post" action="/register">
+    <label>Nom<input name="name" autocomplete="name"></label>
+    <label>Email<input type="email" name="email" autocomplete="email" required></label>
+    <label>Mot de passe<input type="password" name="password" autocomplete="new-password" minlength="8" required></label>
+    <button class="btn" type="submit">Créer mon compte</button>
+  </form>
+  <div class="actions" style="margin-top:14px">
+    {% if guest_ultimate_enabled %}<a class="btn secondary" href="/guest/ultimate">Analyse Ultimate en invité</a>{% endif %}
+    <a class="btn secondary" href="/login">J’ai déjà un compte</a>
+  </div>
+</div>
+{% endblock %}

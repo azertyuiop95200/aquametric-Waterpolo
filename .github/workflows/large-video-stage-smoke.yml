@@ -1,0 +1,184 @@
+name: AquaMetric Analyze Staging E2E
+
+on:
+  push:
+    branches: [fix/youtube-report-intake-2026-11]
+    paths: ['.github/workflows/large-video-stage-smoke.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  analyze-ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    env:
+      BASE: https://aquametric-youtube-validation.onrender.com
+    steps:
+      - name: Wait for new version deployed to staging
+        run: |
+          set -euo pipefail
+          for n in $(seq 1 55); do
+            if curl -fsSL --max-time 30 "$BASE/static/analysis-input-mobile.js" -o analysis-input.js &&
+               grep -Fq "quickOpen('youtube')" analysis-input.js &&
+               curl -fsSL --max-time 30 "$BASE/guest" -o guest.html &&
+               grep -Fq 'id="guestUltimateLaunch"' guest.html &&
+               curl -fsSL --max-time 30 "$BASE/api/large-upload/capabilities" -o capabilities.json; then
+              echo "Updated staging UI is online"
+              exit 0
+            fi
+            echo "Waiting for Render deployment: $n"
+            sleep 10
+          done
+          exit 1
+      - name: Check authenticated YouTube/file import and live report
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          p=json.load(open('capabilities.json'))
+          assert p['max_gb']>=3
+          assert p['part_bytes']==16777216
+          assert isinstance(p['enabled'],bool)
+          if not p['enabled']:
+              assert p['reason']
+              print("LARGE_FILE_UPLOAD_SAFELY_DISABLED_UNTIL_STORAGE_READY")
+          PY
+          temp=$(mktemp -d)
+          trap 'rm -rf "$temp"' EXIT
+          email="aquametric-stage-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}@example.invalid"
+          curl -fsS --max-time 35 -c "$temp/cookies" -b "$temp/cookies" -D "$temp/signup.headers" \
+            --data-urlencode "email=$email" --data-urlencode 'password=Password123!' \
+            "$BASE/register" -o "$temp/signup.body"
+          grep -qE '^HTTP/[0-9.]+ 303' "$temp/signup.headers"
+          curl -fsSL --max-time 35 -c "$temp/cookies" -b "$temp/cookies" \
+            "$BASE/matches/new" -o "$temp/analyze.html"
+          for needle in 'id="analysisForm"' 'id="desktopSource"' 'id="desktopVideoFile"' \
+            'id="desktopFileAnalyzeSubmit"' 'id="desktopVideoUrl"' 'id="phoneVideoFile"' \
+            'id="largeUploadVideo"' 'id="youtubeDurationMinutes"' \
+            'value="file">Importer un fichier MP4' \
+            'id="quickYoutubeAnalysis"' 'id="quickFileAnalysis"' \
+            'id="quickReports"' 'id="largeUploadLocalFallback"'; do
+            grep -Fq "$needle" "$temp/analyze.html" || { echo "Missing Analyze form: $needle"; exit 1; }
+          done
+          curl -fsSL --max-time 35 "$BASE/static/live-auto-stats.js" -o "$temp/live.js"
+          curl -fsSL --max-time 35 "$BASE/static/large-video-upload.js" -o "$temp/large.js"
+          grep -Fq 'setTimeout(refresh,delay)' "$temp/live.js"
+          grep -Fq 'file.slice(first,last)' "$temp/large.js"
+          curl -fsS --max-time 35 -c "$temp/cookies" -b "$temp/cookies" -D "$temp/match.headers" \
+            --data-urlencode 'team_name=AquaMetric Staging Test' \
+            --data-urlencode 'opponent=Club Test' \
+            --data-urlencode 'category=Women' \
+            --data-urlencode 'video_url=https://www.youtube.com/watch?v=f_WzRHjybgU' \
+            --data-urlencode 'input_device=phone' --data-urlencode 'youtube_duration_minutes=0' \
+            "$BASE/analysis/url/create" -o "$temp/create.body"
+          grep -qE '^HTTP/[0-9.]+ 303' "$temp/match.headers"
+          location=$(grep -i '^location:' "$temp/match.headers" | tail -1 | tr -d '\r')
+          case "$location" in *"/matches/"*"/analysis/result"*) ;; *) echo "Match link not returned"; exit 1;; esac
+          mid=$(printf '%s' "$location" | sed -nE 's|.*[/]matches/([0-9]+)/analysis/result.*|\1|p')
+          test -n "$mid"
+          curl -fsSL --max-time 40 -c "$temp/cookies" -b "$temp/cookies" \
+            "$BASE/matches/$mid/analysis/result" -o "$temp/report.html"
+          for needle in 'id="liveAutomaticStats"' 'id="spatialDashboard"' 'id="spatialPitch"' \
+            'id="sources"' 'id="directYoutubeAnalysis"' 'id="reportQuickActions"' \
+            'id="quickTagMatch"' 'id="quickShowStatistics"' 'id="quickAddPart"' \
+            'id="quickDownloadReport"' 'id="largeUploadLocalFallback"'; do
+            grep -Fq "$needle" "$temp/report.html" || { echo "Missing report: $needle"; exit 1; }
+          done
+          curl -fsSL --max-time 35 -c "$temp/cookies" -b "$temp/cookies" \
+            "$BASE/matches/$mid/analysis/browser-capture" -o "$temp/capture.html"
+          for needle in 'id="finishCaptureAnytime"' 'id="viewCaptureReport"' \
+            'Terminer et ouvrir mon rapport' 'capture_not_started=1' \
+            "v12ForcedFinishReason='manual_stop'"; do
+            grep -Fq "$needle" "$temp/capture.html" || { echo "Missing stop/report action: $needle"; exit 1; }
+          done
+          echo 'STAGING_YOUTUBE_STOP_AND_REPORT_CONTROLS_OK'
+          curl -fsSL --max-time 35 -c "$temp/cookies" -b "$temp/cookies" \
+            "$BASE/matches/$mid/analysis/actions/live" -o "$temp/live.json"
+          python - "$temp/live.json" <<'PY'
+          import json,sys
+          stats=json.load(open(sys.argv[1]))
+          assert stats['counted_events']==0,stats
+          assert stats['scope']=='automatic_provisional_only'
+          assert 'sources' in stats and 'sides' in stats
+          print("STAGING_AUTHENTICATED_ANALYZE_AND_REPORT_PASS")
+          PY
+          # Provider state must be measured from the actual deployed server.
+          curl -fsSL --max-time 30 "$BASE/health/video-actions" -o "$temp/engine.json"
+          python - "$temp/engine.json" <<'PY'
+          import json,sys
+          p=json.load(open(sys.argv[1]))
+          assert p['ok'] is True
+          assert isinstance(p['configured'],bool)
+          assert 'availability_code' in p
+          print("LIVE_VIDEO_ENGINE_CONFIGURED="+str(p['configured']))
+          print("LIVE_VIDEO_ENGINE_STATE="+p['availability_code'])
+          PY
+          # Real small MP4 through the same desktop multipart endpoint. This is
+          # a generated blank test card, never presented as a real match.
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            python -m pip install -q 'imageio-ffmpeg>=0.6,<1'
+            ln -s "$(python -c 'import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())')" "$temp/ffmpeg"
+            export PATH="$temp:$PATH"
+          fi
+          if command -v ffmpeg >/dev/null 2>&1; then
+            ffmpeg -hide_banner -loglevel error -y \
+              -f lavfi -i color=c=blue:s=320x240:r=5 -t 1.2 \
+              -c:v libx264 -pix_fmt yuv420p "$temp/test.mp4"
+            curl -fsS --max-time 40 -c "$temp/cookies" -b "$temp/cookies" \
+              -D "$temp/file.headers" \
+              -F 'team_name=Test technique MP4' \
+              -F 'opponent=Image synthétique' -F 'category=Women' \
+              -F 'input_device=desktop' -F 'return_to_report=1' \
+              -F "video_file=@$temp/test.mp4;filename=q1.mp4;type=video/mp4" \
+              "$BASE/matches" -o "$temp/file.body"
+            grep -qE '^HTTP/[0-9.]+ 303' "$temp/file.headers"
+            filelocation=$(grep -i '^location:' "$temp/file.headers" | tail -1 | tr -d '\r')
+            case "$filelocation" in *"/analysis/result"*) ;; *) echo 'MP4 upload did not return to report'; exit 1;; esac
+            filemid=$(printf '%s' "$filelocation" | sed -nE 's|.*[/]matches/([0-9]+)(/analysis/result)?([?#].*)?$|\1|p')
+            test -n "$filemid"
+            curl -fsSL --max-time 40 -c "$temp/cookies" -b "$temp/cookies" \
+              "$BASE/matches/$filemid/analysis/result" -o "$temp/file-report.html"
+            grep -Fq 'id="liveAutomaticStats"' "$temp/file-report.html"
+            grep -Fq 'id="sources"' "$temp/file-report.html"
+            echo 'STAGING_SMALL_MP4_UPLOAD_AND_REPORT_PASS'
+          else
+            echo 'FFmpeg not installed on test runner; real MP4 upload covered by CI only'
+          fi
+          # Real guest Ultimate navigation without a password, scoped owner, and
+          # paid AI forbidden: tested directly on Render, not a local mock.
+          curl -fsSL --max-time 35 "$BASE/login" -o "$temp/login.html"
+          if grep -Fq 'id="googleLoginAction"' "$temp/login.html"; then
+            echo 'STAGING_GOOGLE_LOGIN_OAUTH_READY'
+          else
+            grep -Fq 'La connexion Google sera proposée' "$temp/login.html"
+            echo 'STAGING_GOOGLE_LOGIN_AWAITING_GOOGLE_CLIENT'
+          fi
+          curl -fsS --max-time 35 -c "$temp/guest.cookies" -b "$temp/guest.cookies" \
+            -D "$temp/guest.headers" "$BASE/guest/ultimate" -o "$temp/guest.body"
+          grep -qE '^HTTP/[0-9.]+ 303' "$temp/guest.headers"
+          curl -fsSL --max-time 40 -b "$temp/guest.cookies" \
+            "$BASE/matches/new" -o "$temp/guest-analyze.html"
+          grep -Fq 'id="quickFileAnalysis"' "$temp/guest-analyze.html"
+          curl -fsS --max-time 35 -b "$temp/guest.cookies" -c "$temp/guest.cookies" \
+            -D "$temp/guest-match.headers" \
+            --data-urlencode 'team_name=Guest Ultimate Check' \
+            --data-urlencode 'opponent=Visitor Rival' \
+            --data-urlencode 'input_device=phone' \
+            --data-urlencode 'video_url=https://www.youtube.com/watch?v=f_WzRHjybgU' \
+            "$BASE/analysis/url/create" -o "$temp/guest-match.body"
+          grep -qE '^HTTP/[0-9.]+ 303' "$temp/guest-match.headers"
+          glocation=$(grep -i '^location:' "$temp/guest-match.headers" | tail -1 | tr -d '\r')
+          gid=$(printf '%s' "$glocation" | sed -nE 's|.*[/]matches/([0-9]+)/analysis/result.*|\1|p')
+          test -n "$gid"
+          curl -fsSL --max-time 40 -b "$temp/guest.cookies" \
+            "$BASE/matches/$gid/analysis/result" -o "$temp/guest-report.html"
+          grep -Fq 'id="liveAutomaticStats"' "$temp/guest-report.html"
+          grep -Fq 'id="spatialDashboard"' "$temp/guest-report.html"
+          grep -Fq 'En invité' "$temp/guest-report.html"
+          code=$(curl -sS --max-time 30 -o "$temp/denied.json" -w '%{http_code}' \
+            -b "$temp/guest.cookies" -X POST \
+            -d 'duration_minutes=2' "$BASE/matches/$gid/analysis/youtube/direct")
+          test "$code" = 403
+          echo 'STAGING_GUEST_ULTIMATE_PRIVATE_REPORT_AND_PAID_AI_FORBIDDEN_OK'

@@ -41,7 +41,7 @@ def _create_match() -> int:
     return int(response.headers["location"].split("/matches/", 1)[1].split("/", 1)[0])
 
 
-def _jpeg() -> bytes:
+def _jpeg(wall_second: int = 0) -> bytes:
     frame = np.zeros((720, 1280, 3), dtype=np.uint8)
     boxes = ((0, 0, 640, 360), (640, 0, 1280, 360), (0, 360, 640, 720), (640, 360, 1280, 720))
     for idx, (x1, y1, x2, y2) in enumerate(boxes):
@@ -49,6 +49,11 @@ def _jpeg() -> bytes:
         frame[y1:y2, x1:x2] = (base, min(255, base + 45), min(255, base + 90))
         cv2.circle(frame, (x1 + 150 + idx * 20, y1 + 150), 45 + idx * 5, (255, 255, 255), -1)
         cv2.line(frame, (x1 + 50, y1 + 280), (x1 + 500, y1 + 80), (20, 20, 20), 8)
+        # A genuinely playable feed must change over time. Previously this
+        # regression test sent the exact same JPEG for nine timestamps.
+        shift = wall_second * 7
+        cv2.rectangle(frame, (x1 + 20 + shift, y1 + 60),
+                      (x1 + 300 + shift, y1 + 240), (210, 45, 10), -1)
     ok, encoded = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 84])
     assert ok
     return encoded.tobytes()
@@ -69,8 +74,8 @@ def test_v16_publishes_immediately_then_enriches_from_retained_live_frames(monke
     assert session.status_code == 200, session.text
     session_id = session.json()["session_id"]
 
-    frame = _jpeg()
     for wall_second in range(0, 33, 4):
+        frame = _jpeg(wall_second)
         response = client.post(
             f"/matches/{match_id}/analysis/browser-capture/frame",
             data={"session_id": session_id, "wall_second": str(wall_second)},
