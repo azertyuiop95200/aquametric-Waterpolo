@@ -34,3 +34,17 @@ class PossessionContextTests(unittest.TestCase):
         with self.assertRaises(ValueError):result(r)
     def test_legacy(self):
         r=fixture();r["possession_review_intervals"][0].pop("context_review");self.assertEqual(decisions(r,10)["decisions"],{})
+
+    def test_conflicting_endpoint_overrides_change(self):
+        r=fixture();r["possession_review_intervals"][0]["before_team"]="bleus"
+        r["possession_review_intervals"].append(dict(interval_id="P2",start_s=3,end_s=5,before_state="observed",before_team="bleus",after_state="apparent",after_team="blancs"))
+        d=result(r);self.assertEqual(d["status"],"endpoint_conflict");self.assertEqual(d["endpoint_conflict_ids"],["P2"])
+    def test_null_legacy_manifest(self):
+        r=fixture();r["possession_review_intervals"][0].pop("context_review");r["evidence_manifest"]=None
+        self.assertEqual(decisions(r,10)["decisions"],{})
+    def test_separate_ledger(self):
+        r=fixture();r["possession_context_fps"]=25;r["evidence_manifest"][0].update(sha256="a"*64,bytes=100)
+        r["possession_context_review_windows"]=[dict(id="W1",first_frame=25,last_frame=75,step_frames=5,view="full_frame",sample_count=11,sheets=[dict(path="preuves/a.jpg",sha256="a"*64,bytes=100)])]
+        self.assertEqual(decisions(r,10)["review_coverage"]["distinct_full_frame_samples"],11)
+        r["possession_context_review_windows"][0]["sheets"][0]["sha256"]="b"*64
+        with self.assertRaises(ValueError):decisions(r,10)
