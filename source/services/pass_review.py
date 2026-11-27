@@ -42,7 +42,7 @@ def validate_pass_review(reference, duration):
         for v in (lo,hi,c,k,arrival):check(v is None or frame(v,limit) and a<=v<=b,'Image hors fenêtre de preuve.')
         check((lo is None)==(hi is None) and (lo is None or lo<hi),'Bornes de libération incompatibles.')
         if state=='arrival_only':
-            check(arrival is not None and lo is None and team is None and outcome=='unknown' and r.get('direct_sequence') is not True and r.get('distinct_receiver') is not True,'Arrivée seule : départ, lanceuse et issue non établis.')
+            check(arrival is not None and lo is None and team is None and outcome=='unknown' and r.get('sender_role')=='unknown' and r.get('delivery')!='not_applicable' and r.get('direct_sequence') is not True and r.get('distinct_receiver') is not True,'Arrivée seule : départ, lanceuse et issue non établis.')
             anchor=arrival
         else:
             check(arrival is None,'Repère arrivée seule incompatible avec cet état.')
