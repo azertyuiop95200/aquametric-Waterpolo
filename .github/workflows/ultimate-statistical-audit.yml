@@ -17,7 +17,7 @@ jobs:
       - name: Compile edited Python modules
         run: python -m py_compile source/main.py source/services/elite_performance.py source/services/spatial_match_analysis.py source/services/analysis_product.py source/services/statistical_audit.py source/services/advanced_observed_metrics.py source/services/tracking_performance.py source/services/lineup_performance.py source/services/tactical_sequence_metrics.py
       - name: Install template test dependency
-        run: pip install jinja2 sqlalchemy 'opencv-python-headless==4.13.0.92' 'numpy==2.3.5'
+        run: pip install jinja2 sqlalchemy fastapi httpx 'opencv-python-headless==4.13.0.92' 'numpy==2.3.5'
       - name: Focused evidence audit tests
         env:
           PYTHONPATH: source
@@ -47,7 +47,7 @@ jobs:
         env:
           PYTHONPATH: source
         run: |
-          for suite in test_advanced_motion_release.py test_advanced_occupation_release.py; do
+          for suite in test_advanced_motion_release.py test_advanced_occupation_release.py test_collective_review_release.py; do
             python -m unittest discover -s source/tests -p "$suite" -v || exit 1
           done
       - name: Verify the report templates
@@ -58,7 +58,7 @@ jobs:
           python - <<'PY'
           from jinja2 import Environment, FileSystemLoader
           e=Environment(loader=FileSystemLoader('source/templates'))
-          for name in ('statistical_audit.html','advanced_observed_metrics.html','analysis_all_measurements.html','analysis_result_clean_v2.html','motion_performance.html','lineup_performance.html','tactical_sequence_metrics.html','vision.html','advanced_motion_rows.html'):
+          for name in ('statistical_audit.html','advanced_observed_metrics.html','analysis_all_measurements.html','analysis_result_clean_v2.html','motion_performance.html','lineup_performance.html','tactical_sequence_metrics.html','vision.html','advanced_motion_rows.html','collective_review_rows.html','spatial_decision_section.html','spatial_review.html','spatial_sandbox.html'):
               e.get_template(name)
               print(name, 'compiled')
           from types import SimpleNamespace
