@@ -597,6 +597,9 @@ def save_collective_review(
     roster_reviewed:bool=Form(False), evidence:str=Form(""),
     center:str=Form(""), marker:str=Form(""), keeper:str=Form(""),
     goal_width_m:str=Form(""), assumed_lateral_span_m:str=Form(""),
+    before_s:float=Form(0), after_s:float=Form(0), losing_side:str=Form(""),
+    unique_change_reviewed:bool=Form(False), continuous_play_reviewed:bool=Form(False),
+    field_players_only:bool=Form(False),
     db:Session=Depends(get_db),
 ):
     import json
@@ -606,7 +609,7 @@ def save_collective_review(
     if not _is_owned_upload(match):raise HTTPException(400,"Une vidéo locale calibrée est nécessaire.")
     if not _METRIC_SLOT.acquire(blocking=False):raise HTTPException(429,"Un calcul est déjà en cours.")
     try:
-        if len(binding)>12000 or action not in ("add","clear"):raise ValueError("Requête invalide.")
+        if len(binding)>12000 or action not in ("add","clear","add_recovery","clear_recovery"):raise ValueError("Requête invalide.")
         snap=analysis_snapshot(db,match);ctx=context(snap)
         if ctx is None or json.loads(binding)!=ctx:raise ValueError("Calibration ou identités modifiées. Actualiser le rapport.")
         auto=db.scalar(select(AutonomousAnalysis).where(AutonomousAnalysis.match_id==match.id).order_by(AutonomousAnalysis.id.desc()).limit(1))
@@ -617,11 +620,18 @@ def save_collective_review(
         if summary.get("identity_reviews",{})!=snap["automatic"]["summary"].get("identity_reviews",{}):raise ValueError("Identités modifiées.")
         if action=="clear":
             summary.pop("collective_reviews",None)
+        elif action=="clear_recovery":
+            summary.pop("recovery_reviews",None)
+        elif action=="add_recovery":
+            from services.recovery_review import append as append_recovery
+            raw=dict(binding=ctx,start_s=start_s,end_s=end_s,before_s=before_s,after_s=after_s,period=period,losing_side=losing_side,own_goal_x=goal_x,defenders=defenders,evidence=evidence,unique_change_reviewed=unique_change_reviewed,continuous_play_reviewed=continuous_play_reviewed,roster_reviewed=roster_reviewed,field_players_only=field_players_only)
+            summary["recovery_reviews"]=append_recovery(snap,raw)
         else:
             raw=dict(binding=ctx,start_s=start_s,end_s=end_s,period=period,attacking_side=attacking_side,attackers=attackers,defenders=defenders,carrier=carrier,goal_x=goal_x,control_reviewed=control_reviewed,roster_reviewed=roster_reviewed,evidence=evidence,center=center,marker=marker,keeper=keeper,goal_width_m=float(goal_width_m) if goal_width_m else None,assumed_lateral_span_m=float(assumed_lateral_span_m) if assumed_lateral_span_m else None)
             summary["collective_reviews"]=append(snap,raw)
         auto.summary_json=json.dumps(summary,ensure_ascii=False);db.commit()
-        return RedirectResponse(f"/matches/{match_id}/analysis/result#collectiveReview",status_code=303)
+        anchor="recoveryReview" if action in ("add_recovery","clear_recovery") else "collectiveReview"
+        return RedirectResponse(f"/matches/{match_id}/analysis/result#{anchor}",status_code=303)
     except (ValueError,TypeError,KeyError,AttributeError,OverflowError) as exc:
         raise HTTPException(422,str(exc) if isinstance(exc,ValueError) else "Revue collective invalide.") from None
     finally:
