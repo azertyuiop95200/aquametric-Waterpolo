@@ -1,0 +1,27 @@
+{# Include only with owner-scoped tactical_report prepared server-side. #}
+{% if tactical_report is defined and tactical_report %}
+{% set r=tactical_report %}
+<section class="advanced-tactical-report">
+<h2>Analyse tactique chronologique et cartographique</h2>
+<p>Période {{ r.period }} · source {{ r.source }} · {{ '%.1f'|format(r.start_s) }}–{{ '%.1f'|format(r.end_s) }} s vidéo. Couverture globale des actions non mesurée. Les résultats portent uniquement sur les preuves disponibles.</p>
+<h3>Chronologie des actions confirmées</h3>
+<div style="overflow-x:auto"><table class="metric-table"><thead><tr><th>Fenêtre vidéo (s)</th><th>Actions confirmées</th><th>Cumul confirmé</th></tr></thead><tbody>
+{% for w in r.timeline %}<tr><td>{{ '%.1f'|format(w.start_s) }}–{{ '%.1f'|format(w.end_s) }}</td><td>{% for k,n in w.confirmed_counts.items() %}{{ k }} : {{ n }}{% if not loop.last %} · {% endif %}{% else %}Aucune action confirmée dans les données{% endfor %}</td><td>{% for k,n in w.cumulative_confirmed_counts.items() %}{{ k }} : {{ n }}{% if not loop.last %} · {% endif %}{% else %}Non documenté{% endfor %}</td></tr>{% endfor %}
+</tbody></table></div>
+<h3>Cartes individuelles d'occupation</h3>
+{% for p in r.players %}<article><h4>{{ p.side }} · bonnet {{ p.cap_number }}</h4>
+{% if p.metrics is not none and p.map is not none and p.map.observed_s > 0 %}
+<svg role="img" aria-label="Occupation spatiale observée du bonnet {{ p.cap_number }}" viewBox="0 0 {{ r.length_m }} {{ r.width_m }}" style="width:100%;max-width:420px;display:block;background:#e8f3f8;border:1px solid #4893b0">
+{% for c in p.map.cells %}<rect x="{{ c.x }}" y="{{ c.y }}" width="{{ c.w }}" height="{{ c.h }}" fill="#1764aa" fill-opacity="{{ c.share }}"><title>{{ '%.3f'|format(c.seconds) }} s observées</title></rect>{% endfor %}
+<line x1="{{ r.length_m/2 }}" y1="0" x2="{{ r.length_m/2 }}" y2="{{ r.width_m }}" stroke="#4893b0" stroke-width=".06"/>
+</svg>
+<p>Temps observé {{ '%.2f'|format(p.map.observed_s) }} s · distance {{ '%.2f'|format(p.metrics.distance_m) }} m · sprints {{ p.metrics.sprint_count }} (seuil expérimental). Accélération : {{ '%.2f'|format(p.metrics.peak_speed_increase_mps2) if p.metrics.peak_speed_increase_mps2 is not none else 'Non mesurée' }} m/s². Décélération : {{ '%.2f'|format(p.metrics.peak_speed_decrease_mps2) if p.metrics.peak_speed_decrease_mps2 is not none else 'Non mesurée' }} m/s².</p>
+{% else %}<p>Trajectoire métrique exploitable indisponible.</p>{% endif %}</article>{% endfor %}
+<h3>Carte des tirs et des passes documentés en 3D</h3>
+<svg role="img" aria-label="Projections des actions documentées" viewBox="0 0 {{ r.length_m }} {{ r.width_m }}" style="width:100%;max-width:600px;display:block;background:#e8f3f8;border:1px solid #4893b0">
+{% for a in r.actions if a.spatial %}{% set s=a.spatial %}<line x1="{{ s.origin[0] }}" y1="{{ s.origin[1] }}" x2="{{ s.target[0] }}" y2="{{ s.target[1] }}" stroke="{{ '#b45309' if a.kind in ['goal','shot_on_target','shot_off_target','shot_blocked'] else '#1764aa' }}" stroke-width=".12"><title>Action {{ a.id }} · {{ a.second }} s</title></line><circle cx="{{ s.origin[0] }}" cy="{{ s.origin[1] }}" r=".18" fill="#334155"/>{% endfor %}
+</svg><p>Segments : projection des origines et destinations renseignées, pas trajectoire réelle du ballon. Bleu : passes ; orange : tirs.</p>
+<div style="overflow-x:auto"><table class="metric-table"><thead><tr><th>Action</th><th>Temps vidéo</th><th>Géométrie 3D</th><th>Marge simulée</th></tr></thead><tbody>{% for a in r.actions %}<tr><td>{{ a.kind }} #{{ a.id }}</td><td>{{ '%.2f'|format(a.second) }} s</td><td>{% if a.spatial %}{{ a.spatial.status }} · {{ a.spatial.alternative_count }} alternatives{% else %}Non documentée{% endif %}</td><td>{{ '%.2f'|format(a.spatial.clearance_m) ~ ' m' if a.spatial and a.spatial.clearance_m is not none else 'Non mesurée' }}</td></tr>{% endfor %}</tbody></table></div>
+<p>Reconstructions non raccordées : {{ r.spatial_excluded }}. Une marge géométrique ne constitue ni une probabilité de réussite ni un jugement tactique.</p>
+</section>
+{% endif %}
