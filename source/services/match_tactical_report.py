@@ -6,10 +6,12 @@ from copy import deepcopy
 from math import floor, ceil, hypot, isfinite
 try:
     from services.advanced_tracking import reviewed_motion
+    from services.occupancy_grid import occupancy
     from services.spatial_report_detail import map_scale, spatial_options, pass_network
 except ModuleNotFoundError as e:
     if e.name != 'services': raise
     from advanced_tracking import reviewed_motion
+    from occupancy_grid import occupancy
     from spatial_report_detail import map_scale, spatial_options, pass_network
 
 KINDS={'goal':'shot','shot_on_target':'shot','shot_off_target':'shot','shot_blocked':'shot',
@@ -24,28 +26,6 @@ def _xy(p, length, width):
     return isinstance(p,(list,tuple)) and len(p)>=2 and all(map(_num,p[:2])) and 0<=p[0]<=length and 0<=p[1]<=width
 
 
-def occupancy(segments, length, width, cell, start, end, gap=.26, speed=3.5):
-    """Split each accepted straight segment at grid boundaries; exact time allocation."""
-    cells=defaultdict(float); observed=0.; last=-1.
-    for seg in segments:
-        for a,b in zip(seg,seg[1:]):
-            t,u=a['second'],b['second']; p=(a['x_m'],a['y_m']); q=(b['x_m'],b['y_m'])
-            if not all(map(_num,(t,u))) or t<last or u<=t: raise ValueError('overlap or invalid time')
-            last=u; dt=u-t
-            if t<start or u>end or dt>gap or not _xy(p,length,width) or not _xy(q,length,width): continue
-            dx,dy=q[0]-p[0],q[1]-p[1]
-            if hypot(dx,dy)/dt>speed: continue
-            cuts={0.,1.}
-            for v,d,extent in ((p[0],dx,length),(p[1],dy,width)):
-                if d:
-                    cuts.update(f for k in range(1,ceil(extent/cell)) if 0<(f:=(k*cell-v)/d)<1)
-            cuts=sorted(cuts)
-            for a0,b0 in zip(cuts,cuts[1:]):
-                f=(a0+b0)/2; x=p[0]+dx*f; y=p[1]+dy*f
-                key=(min(ceil(length/cell)-1,floor(x/cell)),min(ceil(width/cell)-1,floor(y/cell)))
-                cells[key]+=dt*(b0-a0)
-            observed+=dt
-    return {'observed_s':observed,'cells':[{'x':i*cell,'y':j*cell,'w':min(cell,length-i*cell),'h':min(cell,width-j*cell),'seconds':v,'share':v/observed} for (i,j),v in sorted(cells.items())]}
 
 
 def adapt_metric(raw, *, source, period, reference_goal_x, lateral_sign):
