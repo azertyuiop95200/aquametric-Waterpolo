@@ -17,7 +17,7 @@ jobs:
       - name: Compile edited Python modules
         run: python -m py_compile source/main.py source/services/elite_performance.py source/services/spatial_match_analysis.py source/services/analysis_product.py source/services/statistical_audit.py source/services/advanced_observed_metrics.py source/services/tracking_performance.py source/services/lineup_performance.py source/services/tactical_sequence_metrics.py
       - name: Install template test dependency
-        run: pip install jinja2 sqlalchemy numpy opencv-python-headless
+        run: pip install jinja2 sqlalchemy 'opencv-python-headless==4.13.0.92' 'numpy==2.3.5'
       - name: Focused evidence audit tests
         env:
           PYTHONPATH: source
