@@ -307,3 +307,32 @@ def test_canonical_actions_preserves_conflict_and_prefers_eligible_observation()
     rows = canonical_actions([row("goal", 2, .4), row("shot_on_target", 2.01, .9)])
     assert len(rows) == 1 and rows[0]["counted"]
     assert rows[0]["event_type"] == "shot_on_target"
+
+
+def _possession_row(kind, second, segment=0, side="for", counted=True):
+    return dict(event_type=kind, second=second, segment_index=segment, side=side, counted=counted)
+
+
+def test_possession_isolates_segments_and_sorts_shots():
+    from services.video_action_report import bounded_possessions
+    row = _possession_row
+    result = bounded_possessions([row("goal", 7), row("possession_end", 8), row("shot_off_target", 4),
+        row("possession_start", 1), row("pass_complete", 3, 1), row("goal", 5, side="against"),
+        row("pass_complete", 6, counted=False)])
+    assert result["count"] == 1
+    assert result["intervals"][0] == dict(start_second=1, end_second=8, side="for", segment_index=0,
+        video_duration_seconds=7, passes=0, shots=2, goals=1, first_shot_after_seconds=3)
+
+
+def test_possession_ambiguous_starts_discarded_and_next_valid_interval_retained():
+    from services.video_action_report import bounded_possessions
+    row = _possession_row
+    result = bounded_possessions([row("possession_start", 1), row("possession_start", 3), row("possession_end", 5),
+        row("possession_start", 7), row("possession_end", 9)])
+    assert result["count"] == 1 and result["intervals"][0]["start_second"] == 7
+
+
+def test_possession_cross_segment_boundary_never_pairs():
+    from services.video_action_report import bounded_possessions
+    row = _possession_row
+    assert bounded_possessions([row("possession_start", 1), row("possession_end", 5, 1)])["count"] is None
