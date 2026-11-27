@@ -22,6 +22,7 @@
 {% for s in support.rows %}<tr><td>{{ s.id }}</td>{% for k in ['distance_m','goal_progress_m','carrier_distance_mean_m','nearest_defender_mean_m','separation_change_m','support_open_s','support_unknown_s'] %}<td>{{ '%.2f'|format(s[k]) if s[k] is not none else 'Non mesuré' }}</td>{% endfor %}</tr>{% else %}<tr><td colspan="8">Aucune receveuse renseignée.</td></tr>{% endfor %}
 </tbody></table><p>La variation de séparation est calculée uniquement sur les intervalles suivis ; elle peut être négative. Elle ne démontre pas une création d'espace causée par la joueuse.</p>
 {% include 'center_geometry_rows.html' %}
+{% include 'goalkeeper_geometry_rows.html' %}
 {% include 'spatial_dominance_rows.html' %}
 </article>{% else %}<p>Aucune sous-fenêtre de possession continue avec effectif et porteuse revus n'est raccordée.</p>{% endfor %}
 {% endif %}
