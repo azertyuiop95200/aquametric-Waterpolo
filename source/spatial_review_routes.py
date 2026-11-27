@@ -1,5 +1,7 @@
 """Private, event-linked 3D review routes. No pixels or tracks are fabricated."""
 import json
+from hashlib import sha256
+from math import isfinite
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -7,7 +9,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import Column, Integer, Text, ForeignKey, select
 from sqlalchemy.orm import Session
 from db import Base, get_db
-from models import Match, User, Event, SpatialReview, MatchVideoSegment
+from models import Match, User, Event, SpatialReview, MatchVideoSegment, EventPosition
 from services.event_evidence import verified_events
 from services.video import youtube_embed
 from services.spatial_replay import review
@@ -27,36 +29,64 @@ def owned(request,db,match_id):
 def has_segments(db, match):
     return db.scalar(select(MatchVideoSegment.id).where(MatchVideoSegment.match_id == match.id).limit(1)) is not None
 
+def event_sources(db, match):
+    """Bind verified actions to declared source metadata; no inference from period alone."""
+    segments={s.id:s for s in db.scalars(select(MatchVideoSegment).where(MatchVideoSegment.match_id==match.id)).all()}
+    positions={p.event_id:p for p in db.scalars(select(EventPosition).join(Event,Event.id==EventPosition.event_id).where(Event.match_id==match.id)).all()}
+    result={}
+    for e in verified_events(match.events):
+        if e.event_type not in KINDS: continue
+        p=positions.get(e.id)
+        seg=segments.get(p.segment_id) if p and p.segment_id is not None else None
+        if p and p.segment_id is not None and not seg: continue
+        if segments and not seg: continue  # ambiguous legacy event, never guess a segment
+        if seg and (p.provenance!="manual_verified" or p.period!=seg.period or p.segment_second is None): continue
+        second=p.segment_second if p and p.segment_second is not None else e.second
+        if not isinstance(second,(int,float)) or not isfinite(second) or not 0<=second<=86400: continue
+        if seg and seg.duration_seconds and second>seg.duration_seconds: continue
+        kind,path,url=(seg.source_type,seg.video_path,seg.video_url) if seg else (match.video_source,match.video_path,match.video_url)
+        embed=youtube_embed(url)
+        play=(f"/matches/{match.id}/segments/{seg.id}/video" if seg else f"/matches/{match.id}/video") if kind in {"upload","cloud"} and path else ""
+        if not play and not embed: continue
+        binding=sha256(json.dumps([match.id,e.id,e.event_type,e.second,seg.id if seg else None,seg.period if seg else (p.period if p else None),second,kind,path,url],ensure_ascii=False,separators=(",",":"),allow_nan=False).encode()).hexdigest()
+        result[e.id]={"id":e.id,"second":float(second),"kind":e.event_type,"player":e.player.name if e.player else None,
+            "segment_id":seg.id if seg else None,"period":seg.period if seg else (p.period if p else None),
+            "label":seg.label or f"Partie {seg.part_index}" if seg else "Vidéo principale",
+            "play_url":play,"embed":embed or "","binding":binding}
+    return result
+
 def eligible(db, match):
-    # This viewer currently uses the main recording only. Never reinterpret a segment-local time.
-    if has_segments(db, match):
-        return []
-    return sorted((e for e in verified_events(match.events) if e.event_type in KINDS),key=lambda e:(e.second,e.id))
+    ids=event_sources(db,match)
+    return sorted((e for e in verified_events(match.events) if e.id in ids),key=lambda e:(ids[e.id]["period"] or 99,ids[e.id]["segment_id"] or 0,ids[e.id]["second"],e.id))
 
 def saved_reviews(db,match):
-    valid={e.id for e in eligible(db,match)}
-    if not valid: return {}
+    sources=event_sources(db,match)
+    if not sources: return {}
     rows=db.scalars(select(SpatialReview).where(SpatialReview.match_id==match.id,SpatialReview.owner_id==match.owner_id)).all()
     result={}
     for row in rows:
-        if row.event_id in valid:
-            try: result[row.event_id]=json.loads(row.payload)
-            except ValueError: continue
+        source=sources.get(row.event_id)
+        if not source: continue
+        try:
+            payload=json.loads(row.payload)
+            if not isinstance(payload,dict) or payload.get("binding")!=source["binding"]: continue
+            result[row.event_id]=payload
+        except (ValueError,TypeError): continue
     return result
 
 @router.get("/matches/{match_id}/spatial",response_class=HTMLResponse)
 def spatial_page(match_id:int,request:Request,db:Session=Depends(get_db)):
     user,match=owned(request,db,match_id)
-    if has_segments(db,match): raise HTTPException(422,'Relecture 3D par segment non encore validée.')
-    events=[dict(id=e.id,second=e.second,kind=e.event_type,player=e.player.name if e.player else None) for e in eligible(db,match)]
+    sources=event_sources(db,match)
+    events=[sources[e.id] for e in eligible(db,match)]
     return templates.TemplateResponse(request,"spatial_review.html",dict(request=request,user=user,app_name="AquaMetric",
         match=match,events=events,reviews=saved_reviews(db,match),embed=youtube_embed(match.video_url)))
 
 @router.post("/matches/{match_id}/spatial/{event_id}")
 async def spatial_save(match_id:int,event_id:int,request:Request,db:Session=Depends(get_db)):
     user,match=owned(request,db,match_id)
-    event=next((e for e in eligible(db,match) if e.id==event_id),None)
-    if event is None: raise HTTPException(404,"Verified eligible event required")
+    source=event_sources(db,match).get(event_id)
+    if source is None: raise HTTPException(404,"Verified eligible event and source required")
     # Bound incoming payload even when the caller omits Content-Length.
     body=bytearray()
     async for chunk in request.stream():
@@ -64,11 +94,15 @@ async def spatial_save(match_id:int,event_id:int,request:Request,db:Session=Depe
         body.extend(chunk)
     try:
         data=json.loads(body)
+        if not isinstance(data,dict): raise ValueError('Observation invalide')
+        if data.get('source_binding')!=source['binding']: raise ValueError('Source modifiée ou non confirmée : recharger la scène.')
         from starlette.concurrency import run_in_threadpool
         result=await run_in_threadpool(review,data)
-        if not max(0,event.second-10)<=result["decision_second"]<=event.second:
-            raise ValueError("Decision must be at or within 10 seconds before the event")
-        payload=json.dumps(dict(observations=data,result=result),allow_nan=False)
+        second=source["second"]
+        if not max(0,second-10)<=result["decision_second"]<=second:
+            raise ValueError("Décision hors de la fenêtre vidéo locale précédant l'action.")
+        payload=json.dumps(dict(observations=data,result=result,binding=source["binding"],
+            video_source={k:source[k] for k in ("segment_id","period","second","label")}),allow_nan=False)
     except (ValueError,TypeError,KeyError,AttributeError,OverflowError) as exc:
         raise HTTPException(422,"Invalid spatial observation: "+str(exc)[:200]) from exc
     row=db.get(SpatialReview,event_id)
@@ -135,6 +169,8 @@ async def sandbox_search(match_id:int,event_id:int,request:Request,db:Session=De
 
 
 def report_snapshot(db,match):
-    if has_segments(db,match):
-        return {"status":"segment_unsupported","eligible_count":None,"reviews":{},"scope":"main_recording_only"}
-    return {"status":"available","eligible_count":len(eligible(db,match)), "reviews":saved_reviews(db,match),"scope":"manual_geometry_not_sport_probability"}
+    sources=event_sources(db,match)
+    total=sum(e.event_type in KINDS for e in verified_events(match.events))
+    return {"status":"available" if sources else "no_bound_actions","eligible_count":len(sources),
+            "unbound_count":total-len(sources),"reviews":saved_reviews(db,match),
+            "scope":"segment_local_manual_geometry_not_sport_probability"}
