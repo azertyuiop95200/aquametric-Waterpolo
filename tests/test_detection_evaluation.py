@@ -50,3 +50,38 @@ class DetectionEvaluationTests(unittest.TestCase):
     def test_duplicate_track_ids(self):
         a=[dict(point=[0,0],track_id=1),dict(point=[20,0],track_id=1)]
         with self.assertRaises(ValueError):endpoint_continuity({}, {}, a, [], 2)
+
+
+class PairedBenchmarkTests(unittest.TestCase):
+    def test_paired_scope(self):
+        from services.detection_evaluation import compare_frame_methods
+        rows=[dict(frame_key="a",completeness="complete",reference={"A":[0,0]},
+                   baseline=[[0,0],[20,20]],head_flow=[[0,0]]),
+              dict(frame_key="b",completeness="partial",reference={"B":[0,0]},
+                   baseline=[],head_flow=[[0,0],[30,30]]),
+              dict(frame_key="c",completeness="complete",reference={"C":[0,0]},
+                   baseline=None,head_flow=[[0,0]])]
+        r=compare_frame_methods(rows,2)
+        self.assertEqual(r["paired_frames"],2)
+        self.assertEqual(r["excluded"]["missing_output"],1)
+        self.assertEqual(r["methods"]["baseline"]["precision"],.5)
+        self.assertEqual(r["methods"]["head_flow"]["precision"],1)
+        self.assertEqual(r["methods"]["baseline"]["recall_reviewed"],.5)
+        self.assertEqual(r["methods"]["head_flow"]["recall_reviewed"],1)
+        self.assertAlmostEqual(r["methods"]["baseline"]["f1_complete"],2/3)
+    def test_no_reference(self):
+        from services.detection_evaluation import compare_frame_methods
+        r=compare_frame_methods([dict(frame_key="a",completeness="unknown")],2)
+        self.assertEqual(r["state"],"not_measured")
+        self.assertIsNone(r["methods"]["baseline"]["f1_complete"])
+    def test_duplicate_frame(self):
+        from services.detection_evaluation import compare_frame_methods
+        row=dict(frame_key="a",completeness="unknown")
+        with self.assertRaises(ValueError):compare_frame_methods([row,row],2)
+    def test_empty_detection_is_not_missing(self):
+        from services.detection_evaluation import compare_frame_methods
+        r=compare_frame_methods([dict(frame_key="a",completeness="complete",
+            reference={"A":[0,0]},baseline=[],head_flow=[])],2)
+        self.assertEqual(r["paired_frames"],1)
+        self.assertEqual(r["methods"]["baseline"]["recall_complete"],0)
+        self.assertEqual(r["methods"]["baseline"]["f1_complete"],0)
