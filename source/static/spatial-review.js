@@ -7,6 +7,7 @@ const canvas=$("canvas"), ctx=canvas.getContext("2d");
 const num=id=>Number($(id).value);
 const text=(tag,value,parent)=>{const el=document.createElement(tag);el.textContent=value;parent.append(el);return el};
 const fmt=(x,n=2)=>Number.isFinite(x)?x.toFixed(n):"non mesuré";
+const partLabel=p=>({body:"corps",left_arm:"bras gauche",right_arm:"bras droit",sphere_proxy:"volume approximatif"})[p]||"";
 function draw(){
  ctx.clearRect(0,0,canvas.width,canvas.height);
  if(!result){ctx.fillStyle="#c9e2ef";ctx.font="17px sans-serif";ctx.fillText("Aucune scène métrique disponible",30,45);return}
@@ -24,7 +25,12 @@ function draw(){
  for(const d of result.defenders){
  const p=d.position.map((v,i)=>v+d.velocity[i]*t);
  const circle=Array.from({length:37},(_,i)=>[p[0]+d.radius*Math.cos(i*Math.PI/18),p[1]+d.radius*Math.sin(i*Math.PI/18),p[2]]);
- line(circle,"#ff7777",1);line([[p[0],p[1],0],p],"#e88181",1);dot(p,"#e85a66",6,d.id);
+ if(!(d.reach_segments||[]).some(s=>s.part==="body"))line(circle,"#ff7777",1);
+ for(const s of d.reach_segments||[]){
+ const ends=[s.start_offset,s.end_offset].map(q=>q.map((v,i)=>v+p[i]));
+ ctx.lineCap="round";line(ends,"#ffad88",Math.max(1,2*s.radius*scale));ctx.lineCap="butt";
+ }
+ line([[p[0],p[1],0],p],"#e88181",1);dot(p,"#e85a66",6,d.id);
  }
  for(const o of result.options){
  const color=o.id===result.chosen?"#5bbcff":"#55e4a5";
@@ -49,7 +55,7 @@ function display(){
  text("p",status[o.status]||o.status,el);
  text("p","Marge de sécurité conservatrice : "+fmt(o.clearance_m)+" m · vol "+fmt(o.flight_s)+" s · vitesse initiale "+fmt(o.launch_speed_m_s)+" m/s · hauteur max. "+fmt(o.peak_height_m)+" m",el);
  if(o.kind==="shot")text("p",o.target_in_goal?"Cible située dans le cadre.":"Cible hors cadre ou trajectoire interrompue.",el);
- if(o.closest_defender)text("p","Défenseure la plus proche : "+o.closest_defender+" à "+fmt(o.closest_time_s)+" s (instant échantillonné).",el);
+ if(o.closest_defender)text("p","Défenseure la plus proche : "+o.closest_defender+(partLabel(o.closest_part)?" · "+partLabel(o.closest_part):"")+" à "+fmt(o.closest_time_s)+" s (instant échantillonné).",el);
  text("p",o.clearance_frequency===null?"Fréquence de dégagement non calculable.":"Fréquence de dégagement conditionnelle : "+fmt(100*o.clearance_frequency,1)+" % (intervalle Monte-Carlo : "+o.simulation_interval.map(v=>fmt(v*100,1)).join("–")+" %).",el);
  text("p","Probabilité de but / de passe réussie : non calibrée.",el);
  }
