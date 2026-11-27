@@ -427,6 +427,17 @@ def analysis_snapshot(db, match):
         snapshot["collective_review"] = build_collective_review(snapshot, local_source=match.video_source=="upload" and bool(match.video_path))
     except (ValueError, TypeError, KeyError, AttributeError, OverflowError):
         snapshot["collective_review"] = {"status":"invalid","context":None,"reports":[],"reason":"Séquences incohérentes : revue nécessaire."}
+    from services.recovery_review import build as build_recovery_review
+    try:
+        snapshot["recovery_review"] = build_recovery_review(snapshot, local_source=match.video_source=="upload" and bool(match.video_path))
+    except (ValueError,TypeError,KeyError,AttributeError,OverflowError):
+        snapshot["recovery_review"]={"status":"invalid","context":None,"reports":[],"reason":"Revues de repli incohérentes."}
+    from services.shot_context_review import build as build_shot_context, primary_events
+    try:
+        snapshot["primary_shot_events"] = primary_events(db,match,snapshot) if snapshot["advanced_motion"].get("status")=="experimental_partial" else []
+        snapshot["shot_context"] = build_shot_context(snapshot,local_source=match.video_source=="upload" and bool(match.video_path))
+    except (ValueError,TypeError,KeyError,AttributeError,OverflowError):
+        snapshot["shot_context"]={"status":"invalid","context":None,"rows":[],"reason":"Revues de tir incohérentes."}
     from services.recognition_quality import audit
     snapshot["recognition_quality"] = audit(snapshot["automatic"], snapshot["video_actions"])
     from services.statistical_audit import enrich_audit

@@ -1,0 +1,13 @@
+{% if snapshot.recovery_review is defined %}
+{% set review=snapshot.recovery_review %}
+<section class="report-card section-wide" id="recoveryReview">
+<h2>Transitions et repli défensif</h2>
+<p>Analyse après un changement de contrôle unique revu. Aucune estimation du délai de réaction, du temps de jeu ou du succès défensif.</p>
+{% if review.reason %}<p>{{ review.reason }}</p>{% endif %}
+{% for tactical_report in review.reports %}
+{% set t=tactical_report.transitions[0] %}
+<p>Période {{ tactical_report.period }} · équipe perdant le contrôle : {{ t.losing_side }} · contrôles opposés observés entre {{ t.before_s }} et {{ t.after_s }} s. Preuve revue : {{ t.evidence }}. Identifiant de revue, pas un événement sportif ajouté.</p>
+{% include 'defensive_recovery_rows.html' %}
+{% endfor %}
+</section>
+{% endif %}

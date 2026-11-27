@@ -21,6 +21,8 @@ jobs:
           python -m unittest discover -s tests -p test_advanced_motion_release.py -v
           python -m unittest discover -s tests -p test_advanced_occupation_release.py -v
           python -m unittest discover -s tests -p test_collective_review_release.py -v
+          python -m unittest discover -s tests -p test_recovery_review_release.py -v
+          python -m unittest discover -s tests -p test_shot_context_release.py -v
           python -m unittest discover -s tests -p test_identity_aggregation.py -v
           python -m unittest discover -s tests -p test_metric_field.py -v
           python -m unittest discover -s tests -p test_guest_full_policy.py -v
@@ -47,16 +49,28 @@ jobs:
               snapshot['collective_review'] = build_collective(snapshot, local_source=True)
               for name in ('collective_review_rows.html','collective_review_editor.html'):
                   env.get_template(name).render(snapshot=snapshot,match=SimpleNamespace(id=1,team=SimpleNamespace(name='A'),opponent='B'))
+          from services.recovery_review import build as build_recovery
+          from test_recovery_review_release import saved as saved_recovery
+          for snapshot in (saved_recovery(), {}):
+              snapshot['recovery_review'] = build_recovery(snapshot, local_source=True)
+              for name in ('recovery_review_rows.html','recovery_review_editor.html'):
+                  env.get_template(name).render(snapshot=snapshot,match=SimpleNamespace(id=1,team=SimpleNamespace(name='A'),opponent='B'))
+          from services.shot_context_review import build as build_shots
+          from test_shot_context_release import saved as saved_shots
+          for snapshot in (saved_shots(), {}):
+              snapshot['shot_context'] = build_shots(snapshot, local_source=True)
+              for name in ('shot_context_rows.html','shot_context_editor.html'):
+                  env.get_template(name).render(snapshot=snapshot,match=SimpleNamespace(id=1,team=SimpleNamespace(name='A'),opponent='B'))
           PY
 
-  live-release-two:
+  live-release-four:
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
-      - name: Verify live release two and isolated guest report
+      - name: Verify live release four and isolated guest report
         env:
           BASE: https://aquametric-ultimate-guest.onrender.com
-          EXPECTED: 24ce9aa21baaf34e3e3c743a4c4e42f7d04d5abd
+          EXPECTED: 6376bebc48a51c6b6a562c52bf9534593c9e95bd
         run: |
           set -euo pipefail
           tmp=$(mktemp -d)
@@ -79,6 +93,13 @@ jobs:
           curl -LfsS --max-time 60 -b "$tmp/cookies" "$BASE/matches/$id/analysis/report.html" -o "$tmp/export"
           grep -Fq 'id="advancedMotion"' "$tmp/export"
           grep -Fq 'Non mesuré : calibration exploitable et identité revue nécessaires.' "$tmp/export"
+          grep -Fq 'id="collectiveReview"' "$tmp/report"
+          grep -Fq 'id="collectiveReview"' "$tmp/export"
+          grep -Fq 'id="recoveryReview"' "$tmp/report"
+          grep -Fq 'id="recoveryReview"' "$tmp/export"
+          # The live uncalibrated URL dossier must reject a collective review.
+          code=$(curl -sS --max-time 30 -b "$tmp/cookies" -H "Origin: $BASE" --data-urlencode 'binding={}' --data-urlencode 'action=add' -o "$tmp/rejected" -w '%{http_code}' "$BASE/matches/$id/analysis/collective-review")
+          [[ "$code" == 400 || "$code" == 422 ]]
           # No session cookie is supplied: owner-scoped report must not leak.
           code=$(curl -sS --max-time 30 -o "$tmp/anonymous" -w '%{http_code}' "$BASE$loc")
           case "$code" in 301|302|303|307|308|401|403|404) ;; *) echo "Unexpected anonymous status $code"; exit 1;; esac

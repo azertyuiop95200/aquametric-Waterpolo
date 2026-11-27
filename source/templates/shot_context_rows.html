@@ -1,0 +1,27 @@
+{% if snapshot.shot_context is defined %}{% set r=snapshot.shot_context %}
+<section class="report-card section-wide" id="shotContext">
+<h2>Tirs et arrêts — contexte spatial</h2>
+<p>Origines cartographiées revues, reliées à une action confirmée dans la vidéo principale. Positions défensives interpolées uniquement sur les pistes admissibles à cet instant. Géométrie horizontale expérimentale, sans trajectoire de balle ni probabilité de but.</p>
+{% if r.reason %}<p>{{ r.reason }}</p>{% endif %}
+{% for a in r.rows %}
+<details open><summary>Action #{{ a.event.id }} · {{ a.event.identity }} · période {{ a.event.period }} · {{ '%.2f'|format(a.shot.second) }} s · {{ a.event.kind }}</summary>
+<p>Preuve : {{ a.evidence }}. Défenseures suivies : {{ a.defenders|length }}/{{ a.expected_defenders }}. {% if a.save %}Arrêt associé par revue : action #{{ a.save.id }}, {{ a.save.identity }}.{% else %}Aucun arrêt explicitement associé.{% endif %}</p>
+<svg role="img" aria-label="Configuration du tir et du but à l'échelle" viewBox="-1 -1 {{ r.length_m+2 }} {{ r.width_m+3 }}" preserveAspectRatio="xMidYMid meet" style="width:100%;max-width:600px;background:#e8f3f8;border:1px solid #4893b0">
+<rect x="0" y="0" width="{{ r.length_m }}" height="{{ r.width_m }}" fill="none" stroke="#4893b0" stroke-width="0.08"/>
+<path d="M{{ a.shot.origin[0] }} {{ a.shot.origin[1] }} L{{ a.goal_x }} {{ r.width_m/2-a.goal_width_m/2 }} L{{ a.goal_x }} {{ r.width_m/2+a.goal_width_m/2 }} Z" fill="#1764aa" fill-opacity="0.10" stroke="#1764aa" stroke-width="0.07"/>
+<line x1="{{ a.shot.origin[0] }}" y1="{{ a.shot.origin[1] }}" x2="{{ a.goal_x }}" y2="{{ r.width_m/2 }}" stroke="#64748b" stroke-width="0.08" stroke-dasharray="0.3 0.2"/>
+<line x1="{{ a.goal_x }}" y1="{{ r.width_m/2-a.goal_width_m/2 }}" x2="{{ a.goal_x }}" y2="{{ r.width_m/2+a.goal_width_m/2 }}" stroke="#164e63" stroke-width="0.15"/>
+{% if a.keeper and a.keeper.projected_interval_y_m %}<line x1="{{ a.goal_x }}" y1="{{ a.keeper.projected_interval_y_m[0] }}" x2="{{ a.goal_x }}" y2="{{ a.keeper.projected_interval_y_m[1] }}" stroke="#b91c1c" stroke-width="0.26"/>{% endif %}
+<circle cx="{{ a.shot.origin[0] }}" cy="{{ a.shot.origin[1] }}" r="0.28" fill="#1764aa"/>
+{% for i,v in a.defenders.items() %}<circle cx="{{ v[0] }}" cy="{{ v[1] }}" r="0.25" fill="{{ '#b91c1c' if i==a.keeper_id else '#64748b' }}"/><text x="{{ v[0] }}" y="{{ v[1]-0.45 }}" font-size="0.55" text-anchor="middle" fill="#164e63">{{ i }}</text>{% endfor %}
+<line x1="0" y1="{{ r.width_m+0.7 }}" x2="5" y2="{{ r.width_m+0.7 }}" stroke="#164e63" stroke-width="0.12"/><text x="2.5" y="{{ r.width_m+1.5 }}" font-size="0.65" text-anchor="middle" fill="#164e63">5 m</text></svg>
+<p>Bleu : origine cartographiée ; gris : défenseure ; rouge : gardienne et projection de l'envergure hypothétique si disponible. Pointillés : axe vers le centre du but, pas trajectoire réelle.</p>
+<table class="metric-table"><tbody>
+{% for label,v,unit in [('Distance au centre du but',a.distance_to_goal_m,'m'),('Angle horizontal entre poteaux',a.goal_angle_deg,'°'),('Distance à la défenseure visible la plus proche',a.nearest_visible_defender_m,'m'),('Écart minimum des joueuses de champ à l’axe central (effectif complet et gardienne identifiée)',a.centerline_field_gap_m,'m')] %}<tr><th>{{ label }}</th><td>{{ ('%.2f'|format(v) ~ ' ' ~ unit) if v is not none else 'Non mesuré' }}</td></tr>{% endfor %}
+{% if a.keeper %}{% for label,v,unit in [('Profondeur de la gardienne',a.keeper.keeper_depth_m,'m'),('Écart signé à l’axe central',a.keeper.alignment_error_m,'m'),('Largeur projetée par le modèle',a.keeper.projected_fraction*100 if a.keeper.projected_fraction is not none else none,'%')] %}<tr><th>{{ label }}</th><td>{{ ('%.2f'|format(v) ~ ' ' ~ unit) if v is not none else 'Non mesuré' }}</td></tr>{% endfor %}{% endif %}
+</tbody></table>
+<p>Envergure supposée : {{ a.assumed_lateral_span_m ~ ' m' if a.assumed_lateral_span_m is not none else 'non renseignée' }}. Aucun xG, temps de réaction ni résultat de trajectoire inféré.</p>
+</details>
+{% endfor %}
+{% if r.excluded_reviews is defined and r.excluded_reviews %}<p>{{ r.excluded_reviews }} revue(s) périmée(s) ou incohérente(s) exclue(s).</p>{% endif %}
+</section>{% endif %}
