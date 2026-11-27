@@ -109,6 +109,9 @@ jobs:
             assert(page.url()===original,'closing menu changed current page');
             await page.selectOption('#lang','fr'); await page.waitForTimeout(150);
             assert((await page.locator('[data-i18n="nav.dashboard"]').innerText()).trim()==='Tableau de bord','French nav translation failed');
+            await page.goto(base+'/dashboard',{waitUntil:'networkidle'});
+            assert(await page.locator('.coach-workspace a[href="/matches/new"]').count()>0,'dashboard analysis entry missing');
+            assert(await page.locator('.coach-workspace a[href="/scouting"],.coach-workspace a[href="/competitions"],.coach-workspace a[href="/simulation"],.coach-workspace a[href="/player-intelligence"],.coach-workspace a[href="/my-team"]').count()===0,'dashboard exposes legacy shortcuts');
             await page.goto(base+'/knowledge',{waitUntil:'networkidle'});
             assert(await page.locator('.tactic-board-card').count()>=8,'visual tactical boards are missing');
             assert(await page.locator('.source-row,.reference-row').count()===0,'knowledge page still exposes source ledger');
