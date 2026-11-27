@@ -7,7 +7,7 @@ import re
 
 TEAMS = {'blancs', 'bleus'}
 OUTCOMES = {'completed', 'intercepted', 'out_of_play', 'deflected_retained', 'unknown'}
-STATES = {'observed_pass', 'candidate', 'not_pass'}
+STATES = {'observed_pass', 'candidate', 'not_pass', 'arrival_only'}
 
 def check(ok, message):
     if not ok:
@@ -38,14 +38,21 @@ def validate_pass_review(reference, duration):
         a,b=r.get('window_start_frame'),r.get('window_end_frame')
         check(frame(a,limit) and frame(b,limit) and a<b,'Fenêtre de preuve invalide.')
         lo,hi,c,k=(r.get(x) for x in ('release_last_held_frame','release_first_free_frame','contact_frame','control_frame'))
-        for v in (lo,hi,c,k):check(v is None or frame(v,limit) and a<=v<=b,'Image hors fenêtre de preuve.')
+        arrival=r.get('arrival_first_frame')
+        for v in (lo,hi,c,k,arrival):check(v is None or frame(v,limit) and a<=v<=b,'Image hors fenêtre de preuve.')
         check((lo is None)==(hi is None) and (lo is None or lo<hi),'Bornes de libération incompatibles.')
-        check(c is None or hi is not None and c>=hi,'Contact avant libération.')
-        check(k is None or hi is not None and k>=hi and (c is None or k>=c),'Maîtrise avant libération/contact.')
+        if state=='arrival_only':
+            check(arrival is not None and lo is None and team is None and outcome=='unknown' and r.get('direct_sequence') is not True and r.get('distinct_receiver') is not True,'Arrivée seule : départ, lanceuse et issue non établis.')
+            anchor=arrival
+        else:
+            check(arrival is None,'Repère arrivée seule incompatible avec cet état.')
+            anchor=hi
+        check(c is None or anchor is not None and c>=anchor,'Contact avant libération/arrivée.')
+        check(k is None or anchor is not None and k>=anchor and (c is None or k>=c),'Maîtrise avant libération/arrivée/contact.')
         check((k is None)==(receiver is None),'Maîtrise et équipe de contrôle indissociables.')
         check(r.get('contact_state') in {'observed','apparent','unknown'} and ((c is None)==(r['contact_state']=='unknown')),'Contact et niveau de preuve incompatibles.')
         water=r.get('water_seen_frame')
-        check(water is None or frame(water,limit) and a<=water<=b,'Image de ballon à la surface invalide.')
+        check(water is None or frame(water,limit) and a<=water<=b and (state!='arrival_only' or water>=arrival),'Image de ballon à la surface invalide.')
         for f in ('distinct_receiver','direct_sequence','deflection_observed'):
             check(r.get(f) is None or type(r[f]) is bool,'Drapeau de preuve invalide.')
         check(r.get('delivery') in {'air','water','unknown','not_applicable'},'Mode de réception invalide.')
@@ -57,7 +64,7 @@ def validate_pass_review(reference, duration):
         if state=='observed_pass':
             check(team in TEAMS and lo is not None and r['delivery']!='not_applicable','Passe observée : départ et équipe requis.')
             releases.append((lo,hi,k if r.get('direct_sequence') is True else None,uid))
-        else:
+        elif state!='arrival_only':
             check(outcome=='unknown' and k is None,'Candidat ou contre-exemple : aucun résultat attribuable.')
         if state=='not_pass':check(lo is None and c is None and r['delivery']=='not_applicable','Contre-exemple incompatible avec un lancer observé.')
         if outcome=='completed':
@@ -110,7 +117,7 @@ def summarize_pass_review(reference,duration):
         d=dict(r)
         for field in ('accuracy','defensive_intervention','reception_quality'):
             d.setdefault(field,'unknown')
-        for f in ('window_start_frame','window_end_frame','release_last_held_frame','release_first_free_frame','contact_frame','control_frame','water_seen_frame'):
+        for f in ('window_start_frame','window_end_frame','release_last_held_frame','release_first_free_frame','contact_frame','control_frame','water_seen_frame','arrival_first_frame'):
             d[f.replace('_frame','_s')]=None if r.get(f) is None else round(r[f]/fps,6)
         if r.get('control_frame') is not None and r.get('direct_sequence') is True:
             d['release_to_control_evidence_s']=[round((r['control_frame']-r['release_first_free_frame'])/fps,6),round((r['control_frame']-r['release_last_held_frame'])/fps,6)]
@@ -130,6 +137,7 @@ def summarize_pass_review(reference,duration):
             d['shot_link_conflict_ids']=sorted(set(conflicts))
             if conflicts:d['shot_link_status']='opponent_control_observed'
         else:d['shot_link_conflict_ids']=[]
+        d['arrival_to_control_evidence_s']=round((r['control_frame']-r['arrival_first_frame'])/fps,6) if r['state']=='arrival_only' and r.get('control_frame') is not None else None
         d['key_pass_verified']=False
         d['assist_verified']=False
         output.append(d)
