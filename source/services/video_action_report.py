@@ -123,27 +123,35 @@ def summarize_actions(actions):
 
 
 def bounded_possessions(actions):
-    """Only pair observed boundaries inside the same continuous analysed clip."""
-    opened = {}
+    """Only pair unambiguous observed boundaries within one continuous clip."""
+    groups = defaultdict(list)
+    for action in actions:
+        if action["side"] != "unknown" and action.get("counted", True):
+            groups[(action["side"], action["segment_index"])].append(action)
     intervals = []
-    for action in sorted(actions, key=lambda a: a["second"]):
-        side = action["side"]
-        if side == "unknown":
-            continue
-        if action["event_type"] == "possession_start":
-            opened[side] = action
-        elif action["event_type"] == "possession_end":
-            start = opened.pop(side, None)
-            if start and start["segment_index"] == action["segment_index"] and start["second"] < action["second"]:
-                observed = [a for a in actions if a["side"] == side and start["second"] <= a["second"] <= action["second"]]
-                shots = [a for a in observed if a["event_type"] in {"goal", "shot_on_target", "shot_off_target", "shot_blocked"}]
-                intervals.append({"start_second": start["second"], "end_second": action["second"],
-                                  "video_duration_seconds": round(action["second"] - start["second"], 3),
-                                  "passes": sum(a["event_type"] in {"assist","key_pass","pass_complete","bad_pass"} for a in observed),
-                                  "shots": len(shots), "goals": sum(a["event_type"] == "goal" for a in shots),
-                                  "first_shot_after_seconds": round(shots[0]["second"] - start["second"], 3) if shots else None})
+    for (side, segment_index), rows in groups.items():
+        start = None
+        ambiguous = False
+        for action in sorted(rows, key=lambda a: a["second"]):
+            kind = action["event_type"]
+            if kind == "possession_start":
+                ambiguous = ambiguous or start is not None
+                start = action
+            elif kind == "possession_end":
+                if start and not ambiguous and start["second"] < action["second"]:
+                    observed = sorted((a for a in rows if start["second"] <= a["second"] <= action["second"]), key=lambda a: a["second"])
+                    shots = [a for a in observed if a["event_type"] in {"goal", "shot_on_target", "shot_off_target", "shot_blocked"}]
+                    intervals.append({"start_second": start["second"], "end_second": action["second"],
+                                      "side": side, "segment_index": segment_index,
+                                      "video_duration_seconds": round(action["second"] - start["second"], 3),
+                                      "passes": sum(a["event_type"] in {"assist", "key_pass", "pass_complete", "bad_pass"} for a in observed),
+                                      "shots": len(shots), "goals": sum(a["event_type"] == "goal" for a in shots),
+                                      "first_shot_after_seconds": round(shots[0]["second"] - start["second"], 3) if shots else None})
+                start = None
+                ambiguous = False
+    intervals.sort(key=lambda i: (i["start_second"], i["end_second"], i["side"], i["segment_index"]))
     return {"count": len(intervals) if intervals else None, "intervals": intervals,
-            "note": "Bornes de possession proposées par le modèle dans une même séquence continue. Durées en temps vidéo, pas en chrono de jeu ; aucune extrapolation aux possessions manquantes."}
+            "note": "Bornes de possession proposées par le modèle dans une même séquence continue. Débuts successifs sans fin intermédiaire exclus. Durées en temps vidéo, pas en chrono de jeu ; aucune extrapolation aux possessions manquantes."}
 
 
 def _group_summary(actions, key):
