@@ -1,0 +1,48 @@
+{% if p.pass_review %}
+{% set pr=p.pass_review %}
+<section class="report-card" id="reviewPassesQ{{ref.period}}">
+<h3>Passes — référence vidéo partielle</h3>
+<p>{{pr.note}}</p>
+{% if pr.review_coverage %}
+{% set c=pr.review_coverage %}
+<h4>Couverture de la revue des passes</h4>
+<p>{{c.note}}</p>
+<table><tbody>
+<tr><th>Fenêtres plein cadre / recadrées</th><td>{{c.full_frame_windows}} / {{c.crop_windows}}</td></tr>
+<tr><th>Plages plein cadre enregistrées (union)</th><td>{{c.registered_full_frame_span_s}} s ({{c.registered_full_frame_span_pct}} %)</td></tr>
+<tr><th>Images plein cadre distinctes</th><td>{{c.distinct_full_frame_samples}} / {{c.total_source_frames}} ({{c.full_frame_sample_pct}} %)</td></tr>
+<tr><th>Images recadrées distinctes</th><td>{{c.distinct_crop_samples}}</td></tr>
+<tr><th>Durée sans fenêtre plein cadre inscrite</th><td>{{c.remaining_unregistered_span_s}} s</td></tr>
+</tbody></table>
+<details><summary>Intervalles non inscrits au registre ({{c.gaps|length}})</summary>
+{% for g in c.gaps %}<p>{{g.start_s}}–{{g.end_s}} s ({{g.duration_s}} s ; fin exclue)</p>{% endfor %}
+</details>
+{% endif %}
+<table><thead><tr><th>Équipe</th><th>Passes recensées</th><th>Réussies</th><th>Issues inconnues</th><th>Interceptées</th><th>Sorties</th><th>Déviées conservées</th></tr></thead><tbody>
+{% for color,stats in pr.teams.items() %}<tr><td>{{color}}{% if color==p.home_color %} (notre équipe){% endif %}</td><td>{{stats.observed_attempts}}</td><td>{{stats.completed}}</td><td>{{stats.unknown_outcomes}}</td><td>{{stats.intercepted}}</td><td>{{stats.out_of_play}}</td><td>{{stats.deflected_retained}}</td></tr>{% endfor %}
+</tbody></table>
+<p>Ces nombres concernent exclusivement les annotations disponibles, pas le total du match. Candidats : {{pr.states.get('candidate',0)}} ; contre-exemples : {{pr.states.get('not_pass',0)}} ; arrivées seules (hors tentatives) : {{pr.states.get('arrival_only',0)}}.</p>
+<h4>Qualité des transmissions et couverture des issues</h4>
+<table><thead><tr><th>Équipe</th><th>Échecs confirmés</th><th>Issues non classées</th><th>Issues résolues / tentatives</th><th>Couverture des issues</th><th>Réussite sur issues résolues</th><th>Précision</th><th>Intervention défensive</th><th>Réception</th></tr></thead><tbody>
+{% set labels={'accurate':'Précise','inaccurate':'Imprécise','unknown':'Indéterminée','blocked':'Bloquée','deflected':'Déviée','none_observed':'Aucune observée','clean':'Propre','adjusted':'Avec correction','multiple_contacts':'Contacts multiples','failed':'Ratée'} %}
+{% for color,stats in pr.teams.items() %}{% if stats.resolved_completion_denominator is defined %}<tr><td>{{color}}</td><td>{{stats.confirmed_failed}}</td><td>{{stats.unclassified_completion}}</td><td>{{stats.resolved_completion_denominator}} / {{stats.observed_attempts}}</td><td>{% if stats.resolved_outcome_coverage_pct is defined and stats.resolved_outcome_coverage_pct is not none %}{{stats.resolved_outcome_coverage_pct}} %{% else %}—{% endif %}</td><td>{{stats.observed_resolved_completion_pct if stats.observed_resolved_completion_pct is not none else '—'}}{% if stats.observed_resolved_completion_pct is not none %} %{% endif %}</td>{% for field in ['accuracy_counts','defensive_intervention_counts','reception_quality_counts'] %}<td>{% for key,count in stats[field].items() %}{{labels.get(key,key)}} : {{count}}<br>{% endfor %}</td>{% endfor %}</tr>{% endif %}{% endfor %}
+</tbody></table>
+<p>Le taux porte uniquement sur les issues résolues, non sur toutes les passes du match. Les dimensions qualitatives ne s’additionnent pas.</p>
+{% if pr.retrospective_summary %}
+{% set retro=pr.retrospective_summary %}
+<h4>Décisions rétrospectives — analyse tactique</h4>
+<p>{{retro.note}}</p>
+<p>{{retro.reviewed_unknown_passes}} / {{retro.observed_unknown_passes}} passes à issue inconnue réexaminées ; {{retro.probable_retained}} conservation(s) probable(s), {{retro.probable_changed}} changement(s) probable(s), {{retro.probable_completed}} réception(s) partenaire probable(s) parmi ces conservations ; {{retro.without_tactical_decision}} sans décision tactique. Arrivées sans origine : {{retro.arrival_contexts}} contexte(s) réexaminé(s), hors tentatives.</p>
+{% endif %}
+<details><summary>Chronologie et preuves des transmissions</summary>
+<table><thead><tr><th>ID / équipe</th><th>Libération (s)</th><th>Contact / maîtrise (s)</th><th>État / issue</th><th>Contexte et observation</th></tr></thead><tbody>
+{% for a in pr.actions %}<tr><td>{{a.id}} · {{a.team or 'Indéterminée'}}</td><td>{% if a.release_first_free_s is not none %}{{a.release_last_held_s}}–{{a.release_first_free_s}}{% else %}Non observée{% endif %}</td><td>{% if a.arrival_first_s is not none %}Première image d’arrivée : {{a.arrival_first_s}} s<br>{% endif %}Contact : {{a.contact_s if a.contact_s is not none else '—'}} ({{a.contact_state}})<br>Maîtrise : {{a.control_s if a.control_s is not none else '—'}}{% if a.control_team %} ({{a.control_team}}){% endif %}<br>Surface : {{a.water_seen_s if a.water_seen_s is not none else '—'}}</td><td>{{ {'observed_pass':'Passe observée','candidate':'Candidate','not_pass':'Aucun départ observé','arrival_only':'Arrivée seule, origine inconnue'}.get(a.state,a.state) }}<br>{{ {'completed':'Réussie','unknown':'Issue inconnue','intercepted':'Interceptée','out_of_play':'Sortie','deflected_retained':'Déviée puis conservée'}.get(a.outcome,a.outcome) }}</td><td>{{a.observation}}{% if a.related_event_id %}<br>Événement lié : {{a.related_event_id}}{% if a.shot_link_status == 'temporal_only' %} (lien temporel uniquement ; continuité non validée, ni passe clé ni passe décisive confirmée){% elif a.shot_link_status == 'opponent_control_observed' %} (Contrôle adverse observé ; continuité contredite, aucune attribution)<br>Fenêtres contradictoires : {{a.shot_link_conflict_ids|join(', ')}}{% endif %}{% endif %}{% if a.related_interval_id %}<br>Fenêtre liée : {{a.related_interval_id}}{% endif %}{% if a.release_to_control_evidence_s %}<br>Libération → preuve de maîtrise : {{a.release_to_control_evidence_s[0]}}–{{a.release_to_control_evidence_s[1]}} s{% endif %}{% if a.arrival_to_control_evidence_s is not none %}<br>Arrivée visible → preuve de maîtrise : {{a.arrival_to_control_evidence_s}} s (pas un temps de vol){% endif %}{% if a.contact_to_control_evidence_s is defined and a.contact_to_control_evidence_s is not none %}<br>Contact observé → maîtrise : {{a.contact_to_control_evidence_s}} s (écart entre images, non durée physique exacte){% endif %}{% if a.retrospective_decision %}
+{% set d=a.retrospective_decision %}
+<br><strong>Déduction : {{ {'probable_retained':'Conservation probable','probable_changed':'Changement probable','later_control_only':'Maîtrise ultérieure seulement','continuity_not_supported':'Continuité non étayée'}.get(d.status,d.status) }}</strong>
+{% if d.pass_decision=='probable_completed' %} — réception partenaire probable{% endif %}
+<br>Suite observée : {{d.next_s}} s, {{d.control_team}}, {{d.next_kind}}{% if d.next_pass_id %} ({{d.next_pass_id}}){% endif %}.
+<br>{{d.reason}}<br>Alternative : {{d.alternative}}{% if d.conflict_ids %}<br>Contradictions : {{d.conflict_ids|join(', ')}}{% endif %}
+{% endif %}
+<br>Preuves du dossier privé : {{a.evidence|join(', ')}}</td></tr>{% endfor %}
+</tbody></table></details></section>
+{% endif %}

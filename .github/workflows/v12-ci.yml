@@ -2,7 +2,7 @@ name: AquaMetric V12.2 CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, feature/convergence-report-v3]
     paths:
       - 'source/**'
       - '.github/workflows/v12-ci.yml'
@@ -49,6 +49,8 @@ jobs:
           UPLOAD_DIR: /tmp/aquametric_v122_uploads
           EVIDENCE_DIR: /tmp/aquametric_v122_evidence
           SECRET_KEY: ci-only-secret-not-used-in-production
+          AUTO_REFRESH_OFFICIAL_DATA: '0'
+          AQUAMETRIC_FULL_REPORT_DIR: /tmp/aquametric-v3-app-report
         run: python -m pytest -q
 
       - name: Smoke test V12.2 main pages and Ultimate routes
@@ -77,6 +79,8 @@ jobs:
           assert '/coach-intelligence/{coach_id}' in paths
           assert '/profiles/players/{profile_id}' in paths
           assert '/security-status' in paths
+          if '/matches/{match_id}/spatial' in paths:
+              assert '/matches/{match_id}/review-reference' in paths
           assert '/docs' not in paths
           assert '/redoc' not in paths
           assert '/openapi.json' not in paths
@@ -84,3 +88,12 @@ jobs:
           assert release['product_version']=='12.2.0'
           assert release['analysis_engine']=='ultimate-analyst-v2.0'
           PY
+
+      - name: Publish V3 real-generator synthetic report
+        if: github.ref == 'refs/heads/feature/convergence-report-v3'
+        uses: actions/upload-artifact@v4
+        with:
+          name: v3-full-app-synthetic-report
+          path: /tmp/aquametric-v3-app-report/
+          if-no-files-found: error
+          retention-days: 7

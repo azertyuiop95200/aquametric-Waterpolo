@@ -387,12 +387,30 @@ def analysis_snapshot(db, match):
     snapshot["statistics"] = match_statistics(match)
     from services.elite_performance import elite_report
     snapshot["elite_performance"] = elite_report(snapshot["verified_events"])
+    from services.possession_evidence import report as possession_evidence_report
+    snapshot["possession_evidence"] = possession_evidence_report(snapshot["verified_events"])
+    from services.review_reference_import import summarize
+    snapshot["review_references"] = [dict(period=r.period,digest=r.digest,revision_count=len(r.revisions),report=summarize(json.loads(r.payload_json),r.home_color)) for r in match.review_references]
+
+    from services.statistical_audit import audit_rows
+    roster=[{"id":p.id,"name":p.name,"cap_number":p.cap_number} for p in match.team.players]
+    snapshot["statistical_audit"] = audit_rows(snapshot["verified_events"], roster=roster)
+    snapshot["statistical_audit"]["excluded_count"]=snapshot["statistics"]["excluded_unverified_events"]
+    from services.advanced_observed_metrics import advanced_report
+    snapshot["advanced_observed"] = advanced_report(snapshot["verified_events"],roster)
+    from services.lineup_performance import lineup_report, phase_context_report
+    snapshot["lineup_performance"] = lineup_report(snapshot["verified_events"],roster)
+    snapshot["phase_context"] = phase_context_report(snapshot["verified_events"])
+    from services.tactical_sequence_metrics import sequence_report
+    snapshot["tactical_sequences"] = sequence_report(snapshot["verified_events"])
     from services.video_action_report import action_report
     snapshot["video_actions"] = action_report(db, match)
     from services.identity_aggregation import build_identity_report
     summary = snapshot["automatic"].get("summary", {})
     snapshot["identity_analysis"] = build_identity_report(summary.get("metric_field_map", {}), snapshot["verified_events"], snapshot["video_actions"], [{"id":p.id,"name":p.name,"cap_number":p.cap_number} for p in match.team.players], summary.get("identity_reviews", {}))
     snapshot["identity_analysis"]["analysis_id"] = auto.id if auto else None
+    from services.tracking_performance import motion_report
+    snapshot["motion_performance"] = motion_report(summary.get("metric_field_map", {}),snapshot["identity_analysis"])
     from services.report_coverage import report_coverage
     snapshot["report_coverage"] = report_coverage(snapshot["verified_events"], snapshot["video_actions"], [{"id":p.id,"name":p.name,"cap_number":p.cap_number} for p in match.team.players])
     from services.defensive_systems import metric_diagnostics
@@ -422,6 +440,12 @@ def analysis_snapshot(db, match):
         snapshot["shot_context"]={"status":"invalid","context":None,"rows":[],"reason":"Revues de tir incohérentes."}
     from services.recognition_quality import audit
     snapshot["recognition_quality"] = audit(snapshot["automatic"], snapshot["video_actions"])
+    from services.statistical_audit import enrich_audit
+    enrich_audit(snapshot["statistical_audit"],snapshot["advanced_observed"],snapshot["identity_analysis"],snapshot["statistics"])
+    from services.statistical_audit import enrich_lineups
+    enrich_lineups(snapshot["statistical_audit"],snapshot["lineup_performance"],snapshot["phase_context"])
+    from services.statistical_audit import enrich_sequences
+    enrich_sequences(snapshot["statistical_audit"],snapshot["tactical_sequences"])
     # Basic counters over an empty event set are implementation zeros, not
     # measured match statistics. Apply the same contract to JSON/CSV and HTML.
     for side in ("team", "opponent"):
@@ -434,6 +458,8 @@ def analysis_snapshot(db, match):
         for side in ("team", "opponent"):
             row[side] = snapshot["ultimate"][side]["basic"].get(row["key"])
         row["delta"] = row["team"] - row["opponent"] if row["team"] is not None and row["opponent"] is not None else None
+    from spatial_review_routes import report_snapshot
+    snapshot['spatial_decision'] = report_snapshot(db, match)
     return snapshot
 
 
@@ -499,6 +525,9 @@ def _html_report(match, snapshot, export_media=None) -> str:
     ) or "<li>Aucun constat fort sans preuve suffisante.</li>"
     def measured(side, key):
         return side[key] if side.get("events") and side.get(key) is not None else "Non mesuré"
+    def measured_rate(side, key):
+        value = measured(side, key)
+        return f"{value} %" if value != "Non mesuré" else value
     diagnostics = snapshot.get("diagnostics", {})
     observation_rows = "".join(
         f"<tr><td>{float(row.get('second', 0)):.1f} s</td><td>{html.escape(str(row.get('raw_text', '')))}</td></tr>"
@@ -509,19 +538,20 @@ def _html_report(match, snapshot, export_media=None) -> str:
     env = Environment(loader=FileSystemLoader(Path(__file__).resolve().parents[1] / "templates"), autoescape=select_autoescape())
     statistics_html = env.get_template("analysis_all_measurements.html").render(snapshot=snapshot, match=match)
     media_html = env.get_template("analysis_export_media.html").render(export_media=export_media or [])
-    return f"""<!doctype html><html lang='fr'><meta charset='utf-8'><title>AquaMetric analysis</title>
-<style>body{{font-family:Arial,sans-serif;max-width:1000px;margin:40px auto;padding:0 24px;color:#15202b}}table{{border-collapse:collapse;width:100%}}td,th{{border:1px solid #ccd6dd;padding:8px;text-align:left}}small{{color:#657786}}</style>
+    return f"""<!doctype html><html lang='fr'><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'><title>AquaMetric · Rapport sportif</title>
+<style>body{{font-family:Arial,sans-serif;max-width:1000px;margin:32px auto;padding:0 20px;color:#152b37;line-height:1.55}}h2,h3{{color:#0b5365}}table{{border-collapse:collapse;width:100%}}td,th{{border:1px solid #d5e0e3;padding:8px;text-align:left;overflow-wrap:anywhere}}th{{background:#e8f1f3}}small,.muted{{color:#536777}}img,video,iframe{{max-width:100%}}.report-card{{min-width:0}}.report-status{{padding:12px;border-left:4px solid #bc8129;background:#fbf5e9}}@media print{{body{{margin:0;padding:0}}tr{{break-inside:avoid}}}}</style>
 <h1>{html.escape(match.team.name)} vs {html.escape(match.opponent)}</h1>
 <p>{html.escape(match.competition or '')} · {html.escape(match.match_date or '')}</p>
-<h2>État réel de l’analyse</h2><p>{html.escape(diagnostics.get('message', 'Couverture du match non établie.'))}</p>
-{ocr_html}
-<h2>Couverture Ultimate</h2><p><strong>{coverage['score']}% · {html.escape(coverage['readiness'])}</strong></p>
-<h2>KPIs vérifiés</h2><table><tr><th></th><th>{html.escape(match.team.name)}</th><th>{html.escape(match.opponent)}</th></tr>
+<p class='report-status'><strong>État réel de l’analyse :</strong> {html.escape(diagnostics.get('message', 'Couverture du match non établie.'))} Les mesures décrivent les actions confirmées, pas nécessairement le match entier.</p>
+<h2>Synthèse sportive · échantillon vérifié</h2><table><tr><th></th><th>{html.escape(match.team.name)}</th><th>{html.escape(match.opponent)}</th></tr>
 <tr><td>Buts</td><td>{measured(team, 'goals')}</td><td>{measured(opponent, 'goals')}</td></tr><tr><td>Tirs</td><td>{measured(team, 'shots')}</td><td>{measured(opponent, 'shots')}</td></tr>
-<tr><td>Passes réussies</td><td>{team['pass_completion_pct'] if team['pass_completion_pct'] is not None else '—'}%</td><td>{opponent['pass_completion_pct'] if opponent['pass_completion_pct'] is not None else '—'}%</td></tr>
+<tr><td>Passes réussies</td><td>{measured_rate(team, 'pass_completion_pct')}</td><td>{measured_rate(opponent, 'pass_completion_pct')}</td></tr>
 <tr><td>Pertes</td><td>{measured(team, 'turnovers')}</td><td>{measured(opponent, 'turnovers')}</td></tr></table>
 <h2>Constats coach fondés sur les données</h2><ul>{findings_html}</ul>
 {statistics_html}
+<h2>Annexe · preuves et limites</h2>
+{ocr_html}
+<p>État de préparation des données : {html.escape(str(coverage.get('readiness', 'Non établi')))}. Ce diagnostic ne mesure pas la précision sportive ni la couverture vidéo.</p>
 {media_html}
 <h2>Preuves</h2><p>{len(snapshot['verified_events'])} événements vérifiés · {len(snapshot['automatic']['candidates'])} candidats automatiques · {len(snapshot['artifacts'])} médias/références.</p>
 <p><small>Les candidats automatiques restent distincts des faits confirmés. Les extraits proviennent uniquement des pixels fournis par l'utilisateur.</small></p></html>"""
@@ -549,6 +579,11 @@ def build_analysis_zip(db, match, evidence_dir: Path) -> io.BytesIO:
                         and row.get("file_path") and (Path(evidence_dir) / Path(row["file_path"]).name).is_file()]
         archive.writestr(f"{root}/01_report/report.html", _html_report(match, snapshot, export_media))
         archive.writestr(f"{root}/01_report/analysis.json", json.dumps(snapshot, ensure_ascii=False, indent=2, default=str))
+        archive.writestr(f"{root}/03_events/possession_evidence.json", json.dumps(snapshot["possession_evidence"],ensure_ascii=False,indent=2))
+        for r in match.review_references:
+            archive.writestr(f"{root}/03_events/review_reference_Q{r.period}.json",r.payload_json)
+            for old in r.revisions:
+                archive.writestr(f"{root}/03_events/review_history/Q{r.period}_{old.id}_{old.digest}.json",old.payload_json)
         from services.measurement_report import flatten_measurements
         auto_report = snapshot["video_actions"]
         archive.writestr(f"{root}/03_events/automatic_video_actions.csv", _csv_text(
@@ -563,6 +598,15 @@ def build_analysis_zip(db, match, evidence_dir: Path) -> io.BytesIO:
                 for p in auto_report["players"] for row in flatten_measurements(p["report"])]))
         archive.writestr(f"{root}/04_sequences/action_coverage.json", json.dumps(
             {key: auto_report[key] for key in ("segments", "families", "coverage_percent", "physical")}, ensure_ascii=False, indent=2))
+        audit=snapshot["statistical_audit"]
+        audit_export=[dict(row, side=side, player_id=None) for side in ("team","opponent") for row in audit[side]]
+        audit_export.extend(dict(row, side=p["side"], player_id=p["player_id"]) for p in audit["players"] for row in p["metrics"])
+        archive.writestr(f"{root}/02_kpis/lineup_performance.json",json.dumps(snapshot["lineup_performance"],ensure_ascii=False,indent=2))
+        archive.writestr(f"{root}/02_kpis/tactical_sequences.json",json.dumps(snapshot["tactical_sequences"],ensure_ascii=False,indent=2))
+        archive.writestr(f"{root}/02_kpis/phase_context.json",json.dumps(snapshot["phase_context"],ensure_ascii=False,indent=2))
+        archive.writestr(f"{root}/02_kpis/motion_performance.json", json.dumps(snapshot["motion_performance"],ensure_ascii=False,indent=2))
+        archive.writestr(f"{root}/02_kpis/advanced_observed.json", json.dumps(snapshot["advanced_observed"],ensure_ascii=False,indent=2))
+        archive.writestr(f"{root}/02_kpis/statistical_audit.csv", _csv_text(["side","player_id","section","key","label","value","state","denominator","requirement","scope"], audit_export))
         archive.writestr(f"{root}/02_kpis/all_match_measurements.csv",
             _csv_text(["perspective", "metric", "value"], [
                 {"perspective": side, **row} for side in ("team", "opponent")

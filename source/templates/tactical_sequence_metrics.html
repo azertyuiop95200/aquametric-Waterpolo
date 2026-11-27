@@ -1,0 +1,14 @@
+<h3>Durées des séquences tactiques</h3>
+<p>{{snapshot.tactical_sequences.note}}</p>
+{% set labels={'power_play':'Supériorité','penalty_kill':'Infériorité','counterattack':'Contre-attaque','defensive_recovery':'Repli','timeout':'Temps mort'} %}
+{% for side,name in [('for',match.team.name),('against',match.opponent)] %}{% set d=snapshot.tactical_sequences.sides[side] %}
+<details><summary>{{name}} · {{d.sequences|length}} séquences appariées</summary>
+<div style="overflow-x:auto"><table class="metric-table"><thead><tr><th>Situation</th><th>Séquences</th><th>Durée totale effective (s)</th><th>Moyenne (s)</th><th>Issues classées</th><th>Réussite (%)</th></tr></thead><tbody>
+{% for r in d.metrics %}<tr><td>{{labels[r.kind]}}</td><td>{{r.count}}</td><td>{{r.total_seconds if r.total_seconds is not none else '—'}}</td><td>{{r.mean_seconds if r.mean_seconds is not none else '—'}}</td><td>{{r.classified_count}}</td><td>{{r.success_pct if r.success_pct is not none else '—'}}</td></tr>{% endfor %}
+</tbody></table></div>
+<p>{{d.unlinked}} borne(s) sans identifiant ou chrono · {{d.rejected|length}} séquence(s) rejetée(s). Pour le 5v6, la réussite signifie absence de but adverse.</p>
+{% if d.timeouts %}<h4>Possessions autour des temps morts</h4>
+<table class="metric-table"><thead><tr><th>Quart / chrono</th><th>Avant</th><th>Après</th><th>Écart (points de %)</th></tr></thead><tbody>
+{% for t in d.timeouts %}<tr><td>Q{{t.period}} / {{t.clock_s}} s</td><td>{{t.before.conversion_pct if t.before.conversion_pct is not none else '—'}} (n={{t.before.n}})</td><td>{{t.after.conversion_pct if t.after.conversion_pct is not none else '—'}} (n={{t.after.n}})</td><td>{{t.delta_pp if t.delta_pp is not none else '—'}}</td></tr>{% endfor %}
+</tbody></table><p>Deux possessions appariées de chaque côté sont nécessaires pour l'écart. Description uniquement : ni preuve d'effet du temps mort ni attribution au coach.</p>{% endif %}
+</details>{% endfor %}

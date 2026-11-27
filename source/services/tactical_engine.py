@@ -12,7 +12,7 @@ PHASE_START_EVENTS = {
     "defensive_recovery_start": "defensive_recovery",
 }
 
-SHOT_EVENTS = {"goal", "shot_on_target", "shot_off_target", "shot_blocked", "block"}
+from services.ultimate_analytics import SHOT_EVENTS
 LOSS_EVENTS = {"turnover", "bad_pass"}
 PASS_EVENTS = {"pass_complete", "assist"}
 
@@ -55,18 +55,18 @@ def analyze_match_tactics(match) -> dict:
     recoveries = counts_for["recovery"] + counts_for["interception"]
 
     headline = []
-    if attack_shots:
+    if attack_shots and not counts_for["shot_unknown"]:
         eff = _pct(attack_goals, attack_shots)
         headline.append({"label": "Tagged shot conversion", "value": f"{eff}%", "detail": f"{attack_goals} goals from {attack_shots} tagged shot outcomes"})
     if attack_losses:
         headline.append({"label": "Ball-security alerts", "value": str(attack_losses), "detail": "turnovers + bad passes in verified tags"})
     if recoveries:
         headline.append({"label": "Ball wins", "value": str(recoveries), "detail": "recoveries + interceptions"})
-    if opp_shots:
+    if opp_shots and not counts_against["shot_unknown"]:
         headline.append({"label": "Opponent tagged conversion", "value": f"{_pct(opp_goals, opp_shots)}%", "detail": "requires opponent-perspective tagging"})
 
     remarks = []
-    if attack_shots >= 5:
+    if attack_shots >= 5 and not counts_for["shot_unknown"]:
         eff = attack_goals / attack_shots
         if eff >= .45:
             remarks.append({"tone": "positive", "title": "Finishing efficiency is a current strength", "text": "Tagged shot outcomes show strong conversion. Preserve the shot-quality process; do not assume the result came only from shooting skill.", "evidence": f"{attack_goals}/{attack_shots} tagged outcomes ended in goals."})
@@ -246,7 +246,9 @@ def build_phase_sequences(events):
             "goals_for": for_counts["goal"],
             "goals_against": against_counts["goal"],
             "losses_for": sum(for_counts[x] for x in LOSS_EVENTS),
-            "blocks_for": for_counts["block"] + for_counts["shot_blocked"],
+            "blocks_for": for_counts["block"],
+            "shots_unknown_for": for_counts["shot_unknown"],
+            "shots_unknown_against": against_counts["shot_unknown"],
             "fast_recovery": for_counts["fast_recovery"],
             "late_recovery": for_counts["late_recovery"],
             "time_to_first_shot": round(first_shot.second - second, 1) if first_shot else None,

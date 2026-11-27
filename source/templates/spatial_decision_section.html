@@ -1,0 +1,6 @@
+{% if snapshot.spatial_decision is defined %}
+<section class="report-card" id="spatialDecision"><h3>Relecture des décisions en 3D</h3>
+{% if snapshot.spatial_decision.status == 'no_bound_actions' %}<p>Non mesuré : aucune action confirmée reliée à une source vidéo non ambiguë.</p>
+{% else %}{% if interactive_report|default(false) %}<p><a href="/matches/{{match.id}}/spatial">Ouvrir la relecture géométrique interactive</a></p>{% endif %}
+{% with spatial_reviews=snapshot.spatial_decision.reviews, spatial_eligible_count=snapshot.spatial_decision.eligible_count %}{% include 'spatial_report_rows.html' %}{% endwith %}
+{% endif %}<p>{{snapshot.spatial_decision.unbound_count|default(0)}} action(s) sans source vidéo certaine exclue(s) de la relecture 3D.</p><p>Les coordonnées saisies sont déclarées ; la simulation ne mesure ni xG ni probabilité de réussite sportive.</p></section>{% endif %}

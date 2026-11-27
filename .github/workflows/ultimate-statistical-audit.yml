@@ -1,0 +1,85 @@
+name: Ultimate statistical audit
+on:
+  push:
+    branches: [feature/ultimate-statistical-audit, feature/convergence-report-v3]
+  pull_request:
+    branches: [feature/elite-performance-2026]
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile edited Python modules
+        run: python -m py_compile source/main.py source/services/elite_performance.py source/services/spatial_match_analysis.py source/services/analysis_product.py source/services/statistical_audit.py source/services/advanced_observed_metrics.py source/services/tracking_performance.py source/services/lineup_performance.py source/services/tactical_sequence_metrics.py
+      - name: Install template test dependency
+        run: pip install jinja2 sqlalchemy fastapi httpx 'opencv-python-headless==4.13.0.92' 'numpy==2.3.5'
+      - name: Focused evidence audit tests
+        env:
+          PYTHONPATH: source
+          AQUAMETRIC_V3_FIXTURE_DIR: /tmp/aquametric-v3-fixture
+        run: python -m unittest discover -s tests -p "test_ultimate_statistical*.py" -v
+      - name: Possession evidence regression
+        env:
+          PYTHONPATH: source
+        run: python -m unittest discover -s tests -p "test_possession_evidence.py" -v
+      - name: Reference import, revisions and review regression
+        env:
+          PYTHONPATH: source
+        run: |
+          python -m py_compile source/models.py source/services/review_reference_import.py source/services/review_reference_revision.py
+          for suite in test_review_reference_import.py test_pass_review.py test_review_coverage.py test_retrospective_review.py test_possession_context.py; do
+            python -m unittest discover -s tests -p "$suite" -v || exit 1
+          done
+      - name: Experimental vision and calibration regression
+        env:
+          PYTHONPATH: source
+        run: |
+          python -m py_compile source/services/local_object_tracking.py source/services/head_flow_tracking.py source/services/local_clip_scan.py source/services/ball_motion_review.py source/services/calibration_validation.py source/services/detection_evaluation.py source/services/learned_head.py
+          for suite in test_local_object_tracking.py test_head_flow_tracking.py test_clip_tracking_mode.py test_ball_motion_review.py test_calibration_validation.py test_detection_evaluation.py test_learned_head.py; do
+            python -m unittest discover -s tests -p "$suite" -v || exit 1
+          done
+      - name: Advanced motion and occupancy release regression
+        env:
+          PYTHONPATH: source
+        run: |
+          for suite in test_advanced_motion_release.py test_advanced_occupation_release.py test_collective_review_release.py; do
+            python -m unittest discover -s source/tests -p "$suite" -v || exit 1
+          done
+      - name: Verify the report templates
+        env:
+          PYTHONPATH: source
+        run: |
+          pip install jinja2
+          python - <<'PY'
+          from jinja2 import Environment, FileSystemLoader
+          e=Environment(loader=FileSystemLoader('source/templates'))
+          for name in ('statistical_audit.html','advanced_observed_metrics.html','analysis_all_measurements.html','analysis_result_clean_v2.html','motion_performance.html','lineup_performance.html','tactical_sequence_metrics.html','vision.html','advanced_motion_rows.html','collective_review_rows.html','spatial_decision_section.html','spatial_review.html','spatial_sandbox.html'):
+              e.get_template(name)
+              print(name, 'compiled')
+          from types import SimpleNamespace
+          from services.lineup_performance import lineup_report, phase_context_report
+          from services.tactical_sequence_metrics import sequence_report
+          from services.statistical_audit import audit_rows
+          e=Environment(loader=FileSystemLoader('source/templates'))
+          roster=[{'id':1,'name':'Joueuse test'}]
+          snapshot={'lineup_performance':lineup_report([],roster),'phase_context':phase_context_report([]),
+                    'tactical_sequences':sequence_report([]),'statistical_audit':audit_rows([],roster)}
+          match=SimpleNamespace(team=SimpleNamespace(name='Equipe'),opponent='Adversaire')
+          for name in ('lineup_performance.html','tactical_sequence_metrics.html','statistical_audit.html'):
+              html=e.get_template(name).render(snapshot=snapshot,match=match)
+              assert len(html)>200 and 'Joueuse test' in html if name!='tactical_sequence_metrics.html' else len(html)>200
+              print(name,'rendered empty evidence sample')
+          PY
+
+      - name: Publish synthetic integrated report
+        uses: actions/upload-artifact@v4
+        with:
+          name: v3-synthetic-possession-report
+          path: /tmp/aquametric-v3-fixture/
+          if-no-files-found: error
+          retention-days: 7

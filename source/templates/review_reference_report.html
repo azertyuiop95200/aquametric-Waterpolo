@@ -1,0 +1,29 @@
+{% if snapshot.review_references is defined %}
+<section class="report-card section-wide" id="reviewReferences">
+<h2>Références vidéo importées — distinctes des statistiques confirmées</h2>
+{% for ref in snapshot.review_references %}
+{% set p=ref.report %}
+<h3>Q{{ref.period}} · {{ref.digest[:12]}}</h3>
+<p>{{ref.revision_count|default(0)}} ancienne(s) version(s) conservée(s) et exportée(s) dans le ZIP du match.</p>
+<p>{{p.note}}</p>
+{% if p.evidence_manifest %}<p>{{p.evidence_manifest.entries}} liens vers {{p.evidence_manifest.distinct_paths}} fichiers de preuves. {{p.evidence_manifest.note}}</p>{% endif %}<p>{{p.events|length}} événements · {{p.intervals|length}} fenêtres · {{p.duration_s}} s de vidéo · Notre équipe : {{p.home_color}}.</p>
+<details><summary>Événements de référence</summary><table><thead><tr><th>ID</th><th>Temps global</th><th>Partie / temps local</th><th>Équipe</th><th>Nature</th><th>État</th><th>Observation</th></tr></thead><tbody>
+{% for e in p.events %}<tr><td>{{e.id}}</td><td>{{e.time}}</td><td>{{e.location.file}} / {{e.location.local_s}} s</td><td>{{e.side}}</td><td>{{e.cause}}</td><td>{{e.state}}</td><td>{{e.observation}}</td></tr>{% endfor %}
+</tbody></table></details>
+<p>Au moins {{p.lower_bound_excluding_linked_shots}} changement(s) sur fenêtres disjointes hors tirs liés. {{p.referee_signals}} fenêtre(s) avec geste arbitral observé, {{p.confirmed_referee_decisions}} décision(s) déclarée(s) vérifiée(s) dans cette référence. Total exact non établi.</p>
+{% if p.endpoint_conflict_ids %}<p>Contrôles simultanés contradictoires : {{p.endpoint_conflict_ids|join(", ")}}. Fenêtres exclues de la borne minimale, à revoir.</p>{% endif %}
+<details><summary>Fenêtres de possession</summary><table><thead><tr><th>ID</th><th>Temps global</th><th>Avant → après</th><th>Constat</th><th>Cause / arbitrage</th><th>Observation</th></tr></thead><tbody>
+{% for e in p.intervals %}<tr><td>{{e.id}}</td><td>{{e.start}}–{{e.end}}</td><td>{{e.before}} → {{e.after}}</td><td>{{ {'opposite_endpoints':'Contrôles opposés','same_team_endpoints':'Même équipe aux bornes','probable_opposite_endpoints':'Changement probable','unresolved':'Indéterminé'}.get(e.status,e.status) }}</td><td>{{e.attributed_cause or "Cause non attribuée"}}{% if e.cause_candidate %}<br>Hypothèse : {{e.cause_candidate}}{% endif %}{% if e.referee_signal_observed %}<br>Geste observé{% endif %}{% if e.decision_verified %}<br>Décision déclarée vérifiée{% endif %}</td><td>{{e.observation}}</td></tr>{% endfor %}
+</tbody></table></details>
+{% if p.possession_context and p.possession_context.decisions %}
+<h3>Reconstruction contextuelle des possessions</h3>
+<p>{{p.possession_context.note}}</p>
+{% if p.possession_context.review_coverage %}<p>Revue contextuelle : {{p.possession_context.review_coverage.registered_full_frame_span_s}} s de plages inscrites, {{p.possession_context.review_coverage.distinct_full_frame_samples}} images plein cadre distinctes ; {{p.possession_context.review_coverage.distinct_crop_samples}} indices recadrés distincts. {{p.possession_context.review_coverage.note}}</p>{% endif %}
+<table><thead><tr><th>Fenêtre</th><th>Interprétation</th><th>Action suivante</th><th>Justification et alternative</th></tr></thead><tbody>
+{% for id,d in p.possession_context.decisions.items() %}<tr><td>{{id}}</td><td>{{ {'change_between_observed_controls':'Changement entre contrôles observés','probable_retained':'Conservation probable','probable_retained_initial_apparent':'Conservation plausible, départ apparent','retention_not_supported':'Conservation non étayée','later_control_only':'Contrôle ultérieur seul','endpoint_conflict':'Contrôles simultanés contradictoires'}.get(d.status,d.status) }}</td><td>{{d.next_s}} s · {{d.next_team}} · {{d.next_kind}}{% if d.next_event_id %} · {{d.next_event_id}}{% endif %}</td><td>{{d.reason}}<br>Alternative : {{d.alternative}}{% if d.endpoint_conflict_ids %}<br>Bornes contradictoires : {{d.endpoint_conflict_ids|join(', ')}}{% endif %}{% if d.conflict_ids %}<br>Contrôles opposés dans la fenêtre : {{d.conflict_ids|join(', ')}}{% endif %}<br>Preuves : {{d.evidence|join(', ')}}</td></tr>{% endfor %}
+</tbody></table>
+{% endif %}
+{% include "pass_review_report.html" %}
+{% else %}<p>Aucune référence vidéo importée.</p>{% endfor %}
+</section>
+{% endif %}

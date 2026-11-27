@@ -67,6 +67,32 @@ class Match(Base):
     team = relationship("Team")
     events = relationship("Event", back_populates="match", cascade="all, delete-orphan")
     media_artifacts = relationship("MediaArtifact", back_populates="match", cascade="all, delete-orphan")
+    review_references = relationship("MatchReviewReference", back_populates="match", cascade="all, delete-orphan")
+
+class MatchReviewReference(Base):
+    """Private, replaceable reference per period; never a verified Event."""
+    __tablename__ = "match_review_references"
+    from sqlalchemy import UniqueConstraint
+    __table_args__ = (UniqueConstraint("match_id", "period", name="uq_match_review_period"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    match_id: Mapped[int] = mapped_column(ForeignKey("matches.id"), index=True)
+    period: Mapped[int] = mapped_column(Integer)
+    digest: Mapped[str] = mapped_column(String(64))
+    home_color: Mapped[str] = mapped_column(String(12))
+    payload_json: Mapped[str] = mapped_column(Text)
+    match = relationship("Match", back_populates="review_references")
+    revisions = relationship("MatchReviewRevision", back_populates="reference", cascade="all, delete-orphan")
+
+class MatchReviewRevision(Base):
+    """Preserve prior reference payload before replacing the current revision."""
+    __tablename__ = "match_review_revisions"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    reference_id: Mapped[int] = mapped_column(ForeignKey("match_review_references.id"), index=True)
+    digest: Mapped[str] = mapped_column(String(64))
+    home_color: Mapped[str] = mapped_column(String(12))
+    payload_json: Mapped[str] = mapped_column(Text)
+    archived_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+    reference = relationship("MatchReviewReference", back_populates="revisions")
 
 class MatchVideoSegment(Base):
     """One real video belonging to a match (quarter, period, or other recording)."""
@@ -565,3 +591,12 @@ class CoachVideoSession(Base):
     items_json: Mapped[str] = mapped_column(Text, default="[]")
     revision: Mapped[int] = mapped_column(Integer, default=1)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+class SpatialReview(Base):
+    """Private event-linked geometric review; not an observed sport statistic."""
+    __tablename__ = "spatial_reviews_v1"
+    event_id: Mapped[int] = mapped_column(ForeignKey("events.id", ondelete="CASCADE"), primary_key=True)
+    owner_id: Mapped[int] = mapped_column(Integer, index=True)
+    match_id: Mapped[int] = mapped_column(Integer, index=True)
+    payload: Mapped[str] = mapped_column(Text)

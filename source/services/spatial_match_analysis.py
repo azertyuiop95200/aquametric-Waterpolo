@@ -11,7 +11,7 @@ from sqlalchemy import select
 from models import Event, EventPosition
 from services.video import timestamped_video_url
 
-SHOTS = {"goal", "shot_on_target", "shot_off_target", "shot_blocked"}
+SHOTS = {"goal", "shot_on_target", "shot_off_target", "shot_blocked", "shot_unknown"}
 MAP_EVENTS = SHOTS | {"save", "recovery", "interception", "turnover", "pass_complete"}
 
 
@@ -25,6 +25,7 @@ def spatial_match_dashboard(db, match, segments):
     by_period=defaultdict(lambda:{"for":0,"against":0,"shots_for":0,"shots_against":0})
     observed_shots=0
     confirmed_events=0
+    unknown_period_events=0
     for event in sorted(match.events, key=lambda e:(e.id or 0)):
         if (event.confidence or "").upper() not in {"CONFIRMED","VERIFIED"}:
             continue
@@ -34,15 +35,18 @@ def spatial_match_dashboard(db, match, segments):
         if side not in {"for","against"}:
             side="neutral"
         position=positions.get(event.id)
-        period=position.period if position and position.period else 1
+        from services.ultimate_analytics import note_tags
+        raw_period=position.period if position and position.period else note_tags(event).get("period")
+        period=int(raw_period) if str(raw_period) in {"1","2","3","4","5","6","7","8"} else None
+        if period is None: unknown_period_events+=1
         segment=indexes.get(position.segment_id) if position and position.segment_id else legacy
         second=round(float(position.segment_second if position and position.segment_second is not None
                            else event.second or 0),1)
         if event.event_type in SHOTS:
             observed_shots+=1
-            if side in {"for","against"}:
+            if side in {"for","against"} and period is not None:
                 by_period[period]["shots_"+side]+=1
-        if event.event_type=="goal" and side in {"for","against"}:
+        if event.event_type=="goal" and side in {"for","against"} and period is not None:
             by_period[period][side]+=1
         if not position or position.x_pct is None or position.y_pct is None:
             continue
@@ -63,7 +67,7 @@ def spatial_match_dashboard(db, match, segments):
             "phase":getattr(context,"phase_tag","auto"),
             "provenance":position.provenance,
         })
-    points.sort(key=lambda p:(p["period"],p["second"],p["event_id"]))
+    points.sort(key=lambda p:(p["period"] or 99,p["second"],p["event_id"]))
     mapped_shots=sum(p["event_type"] in SHOTS for p in points)
     cells={}
     for side in ("for","against"):
@@ -77,13 +81,13 @@ def spatial_match_dashboard(db, match, segments):
                     "zone":f"{'Proche' if row==0 else 'Médiane' if row==1 else 'Lointaine'} · {'gauche' if col==0 else 'centre' if col==1 else 'droite'}",
                     "x_index":col,"y_index":row,
                     "shots":len(area),"goals":goals,
-                    "conversion_pct":round(100*goals/len(area),1) if area else None,
+                    "conversion_pct":round(100*goals/len(area),1) if area and not any(p["event_type"]=="shot_unknown" for p in area) else None,
                 })
         cells[side]=zone_rows
     return {
         "points":points,"points_count":len(points),
         "shots_mapped":mapped_shots,"shots_reviewed":observed_shots,
-        "events_reviewed":confirmed_events,
+        "events_reviewed":confirmed_events,"unknown_period_events":unknown_period_events,
         "unlocated_shots":observed_shots-mapped_shots,
         "periods":[{"period":k,**v} for k,v in sorted(by_period.items())],
         "shot_zones":cells,

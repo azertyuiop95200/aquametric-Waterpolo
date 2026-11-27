@@ -28,6 +28,7 @@ from services.public_match_ratings import public_profile_evaluations
 from evidence_coverage_routes import router as evidence_coverage_router
 from tactical_media_routes import router as tactical_media_router, enrich_sequence_cards, build_tactical_study_pack
 from video_session_routes import router as video_session_router
+from spatial_review_routes import router as spatial_review_router
 from large_video_routes import router as large_video_router
 from match_video_segments_routes import router as match_video_segments_router
 from poloiq_vision_routes import router as poloiq_vision_router
@@ -328,6 +329,7 @@ def install_extensions(app):
     app.include_router(evidence_coverage_router)
     app.include_router(tactical_media_router)
     app.include_router(video_session_router)
+    app.include_router(spatial_review_router)
     app.include_router(large_video_router)
     app.include_router(match_video_segments_router)
     app.include_router(poloiq_vision_router)

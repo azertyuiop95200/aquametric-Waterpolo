@@ -194,7 +194,11 @@ def test_all_action_types_appear_in_report_with_separate_teams_caps_and_no_false
     save_run(db,match,actions,duration=55)
     report=action_report(db,match)
     assert report["team"]["event_counts"] == {kind:1 for kind in EVENT_LABELS}
-    assert report["team"]["basic"]["shots"] == 4 and report["opponent"]["basic"]["goals"] == 1
+    assert report["team"]["basic"]["shots"] == 5 and report["opponent"]["basic"]["goals"] == 1
+    # Five distinct attempts include one visible shot with unresolved outcome.
+    assert report["team"]["basic"]["shots_unknown_outcome"] == 1
+    assert report["team"]["basic"]["shot_accuracy_pct"] is None
+    assert report["team"]["basic"]["scoring_efficiency_pct"] is None
     assert report["unassigned"]["basic"]["saves"] == 1
     assert len(report["players"]) == 3
     assert all(metric["value"] is None for metric in report["physical"])

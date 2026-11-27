@@ -1,0 +1,25 @@
+{% set audit=snapshot.statistical_audit %}
+{% set sections={'score_tirs':'1 · Score et tirs','creation_passes':'2 · Création et passes','duels_defense':'3 · Défense et duels','discipline':'4 · Discipline','gardiennes':'5 · Gardiennes','possessions':'6 · Possessions et tactiques','gestion_match':'7 · Gestion et décision','physique_temps':'8 · Temps de jeu et physique'} %}
+{% set states={'confirmed_sample':'Échantillon confirmé','derived_sample':'Calcul sur échantillon','partial_measurement':'Mesure partielle','not_measured':'Non mesuré','requires_evidence_or_model':'Preuves / modèle requis'} %}
+<section class="report-card section-wide" id="statisticalAudit">
+<h2>Audit des statistiques · Ultimate</h2><p>{{audit.note}}</p>
+<p>{{audit.confirmed_count}} annotations confirmées · {{audit.excluded_count}} exclues de ce registre.</p>
+{% if audit.issues %}<h3>Points à contrôler avant interprétation</h3><ul>{% for issue in audit.issues %}<li>{{issue.detail}}{% if issue.count is not none %} ({{issue.count}}){% endif %}</li>{% endfor %}</ul>{% endif %}
+<p>Les taux sont limités aux actions et dénominateurs renseignés ; ils ne décrivent pas une couverture complète du match.</p>
+{% for section,label in sections.items() %}
+<details {% if loop.first %}open{% endif %}><summary>{{label}}</summary>
+<div style="overflow-x:auto"><table class="metric-table"><thead><tr><th>Indicateur</th><th>{{match.team.name}}</th><th>{{match.opponent}}</th><th>Conditions</th></tr></thead><tbody>
+{% for row in audit.team if row.section==section %}{% set other=(audit.opponent|selectattr('key','equalto',row.key)|first) %}
+<tr><td>{{row.label}}</td><td>{{row.value if row.value is not none else '—'}}<br><small>{{states[row.state]}}{% if row.denominator is not none %} · n={{row.denominator}}{% endif %}</small></td>
+<td>{{other.value if other.value is not none else '—'}}<br><small>{{states[other.state]}}{% if other.denominator is not none %} · n={{other.denominator}}{% endif %}</small></td><td>{{row.requirement}}</td></tr>
+{% endfor %}</tbody></table></div></details>
+{% endfor %}
+<h3>Registre individuel</h3>
+{% for player in audit.players %}<details><summary>{{player.name}} · {{'Équipe' if player.side=='for' else 'Adversaire'}}</summary><div style="overflow-x:auto"><table class="metric-table"><thead><tr><th>Indicateur</th><th>Valeur</th><th>État / n</th></tr></thead><tbody>
+{% for row in player.metrics if row.state!='requires_evidence_or_model' %}<tr><td>{{row.label}}</td><td>{{row.value if row.value is not none else '—'}}</td><td>{{states[row.state]}}{% if row.denominator is not none %} · n={{row.denominator}}{% endif %}</td></tr>{% endfor %}
+</tbody></table></div></details>{% else %}<p>Pas d'action attribuée à une joueuse.</p>{% endfor %}
+{% if snapshot.tactical_sequences is defined %}{% include "tactical_sequence_metrics.html" %}{% endif %}
+{% if snapshot.lineup_performance is defined %}{% include "lineup_performance.html" %}{% endif %}
+{% if snapshot.motion_performance is defined %}{% include "motion_performance.html" %}{% endif %}
+{% if snapshot.advanced_observed is defined %}{% include "advanced_observed_metrics.html" %}{% endif %}<details><summary>Référentiels et méthodologie</summary><ul>{% for key,url in audit.sources.items() %}<li><a href="{{url}}" rel="noopener">{{key}}</a></li>{% endfor %}</ul><p>Le registre est exporté dans le JSON du match et dans statistical_audit.csv du ZIP. Il ne substitue pas les mesures externes aux événements vidéo.</p></details>
+</section>

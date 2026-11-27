@@ -1,0 +1,40 @@
+name: Spatial decision 3D tests
+on:
+  push:
+    branches: [feature/spatial-decision-3d, feature/convergence-report-v3]
+    paths:
+      - 'source/spatial_decision_3d.py'
+      - 'source/spatial_review_routes.py'
+      - 'source/static/spatial-*.js'
+      - 'source/templates/spatial_*.html'
+      - 'source/services/spatial_*.py'
+      - 'tests/test_spatial_*.py'
+      - '.github/workflows/spatial-decision-3d.yml'
+  pull_request:
+    paths:
+      - 'source/spatial_decision_3d.py'
+      - 'source/spatial_review_routes.py'
+      - 'source/static/spatial-*.js'
+      - 'source/templates/spatial_*.html'
+      - 'source/services/spatial_*.py'
+      - 'tests/test_spatial_*.py'
+      - '.github/workflows/spatial-decision-3d.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  spatial:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run standalone spatial tests
+        env:
+          PYTHONPATH: source:.
+        run: python -m unittest discover -s tests -p 'test_spatial_*.py' -v
+      - name: Check browser script syntax
+        run: |
+          node --check source/static/spatial-sandbox.js
+          node --check source/static/spatial-review.js

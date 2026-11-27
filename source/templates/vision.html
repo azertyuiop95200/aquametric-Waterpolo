@@ -7,6 +7,34 @@
   {% if match.video_source == 'upload' %}<form method="post" action="/matches/{{match.id}}/vision/scan"><button class="btn">Run visual baseline scan</button></form>{% else %}<div class="notice"><b>Third-party source</b> — AquaMetric will not download this video. Upload an owned/local copy or later connect an authorized provider analysis path.</div>{% endif %}
 </section>
 
+<section class="panel">
+<h2>Détection locale et suivi — prototype</h2>
+<p>Analyse CPU de 75 images maximum, sans modèle externe. Les positions sont des candidats anonymes, pas des identités ni des événements validés. Le temps affiché est nominal ; aucune distance réelle n’est déduite.</p>
+<form method="post" action="/matches/{{match.id}}/vision/tracklets" target="_blank">
+<label>Indice de la première image <input type="number" name="start_frame" min="0" value="0" required></label>
+<label>Identifiant de segment (0 = vidéo principale) <input type="number" name="segment_id" min="0" value="0" required></label>
+<label>Moteur expérimental <select name="tracking_mode"><option value="baseline">Classique : têtes et candidats ballon</option><option value="head_flow">Hybride : têtes et flux optique seulement</option></select></label>
+<p class="muted">Les points de flux sont des hypothèses de position. Aucun de ces modes ne valide une identité ou une statistique individuelle.</p>
+<button class="btn secondary" type="submit">Analyser un extrait (JSON)</button>
+</form>
+<p class="muted">Disponible uniquement pour les fichiers locaux du match. Cette exploration ne modifie pas les statistiques.</p>
+</section>
+<section class="panel">
+<h2>Recherche assistée du ballon rapide</h2>
+<p>Deux centres de ballon revus manuellement, dans le même segment à 25 images/s. Le moteur compare trois images successives pour rechercher un candidat dans la zone prédite. Les coordonnées sont normalisées (0 à 1). Aucun événement ni résultat confirmé.</p>
+<form method="post" action="/matches/{{match.id}}/vision/ball-motion" target="_blank">
+<label>Segment (0 = vidéo principale) <input name="segment_id" type="number" min="0" value="0" required></label>
+<label>Image A <input name="seed_a" type="number" min="0" required></label>
+<label>X A <input name="ax" type="number" min="0" max="1" step="any" required></label>
+<label>Y A <input name="ay" type="number" min="0" max="1" step="any" required></label>
+<label>Image B <input name="seed_b" type="number" min="1" required></label>
+<label>X B <input name="bx" type="number" min="0" max="1" step="any" required></label>
+<label>Y B <input name="by" type="number" min="0" max="1" step="any" required></label>
+<label>Image recherchée (1 à 5 images après B) <input name="frame_index" type="number" min="2" required></label>
+<label><input name="reviewed" type="checkbox" value="true" required> J’ai revu les deux repères dans ce segment.</label>
+<button class="btn secondary" type="submit">Rechercher les candidats (JSON)</button>
+</form>
+</section>
 {% if analysis %}
 <div class="kpi-grid tactical-kpis">
   <article class="panel kpi-card"><span>Video type</span><b class="kpi-text">{{analysis.video_type|replace('_',' ')}}</b><small>{{analysis.confidence}} heuristic confidence</small></article>
