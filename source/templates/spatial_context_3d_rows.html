@@ -1,10 +1,17 @@
 {% if snapshot.spatial_3d is defined %}{% set r=snapshot.spatial_3d %}
 <section class="report-card section-wide" id="spatial3d"><h2>Simulation spatiale 3D — alternatives</h2>
-<p>Trajectoires balistiques hypothétiques issues du moteur partagé replay-3. Positions horizontales revues ; hauteurs, portée, immobilité et vitesse supposées. Aucun résultat de tir ou probabilité de réussite n'est déduit. La cible effectivement visée n'est pas renseignée.</p>
+<p>Trajectoires balistiques hypothétiques issues du moteur partagé replay-3. Positions horizontales revues ; hauteurs, portée et vitesse du ballon supposées. Le déplacement défensif est soit supposé nul, soit projeté à partir du suivi antérieur. Aucun résultat de tir ou probabilité de réussite n'est déduit. La cible effectivement visée n'est pas renseignée.</p>
 {% if r.reason %}<p>{{ r.reason }}</p>{% endif %}
 {% for a in r.rows %}
 <details open><summary>Tir #{{ a.event_id }} · Q{{ a.period }} · {{ '%.2f'|format(a.decision_second) }} s</summary>
 <p>Vitesse horizontale hypothétique {{ a.nominal_horizontal_speed_mps }} m/s · hauteur de départ {{ a.start[2] }} m · justification : {{ a.evidence }}. Écart-type hypothétique {{ a.sigma_m }} m ; {{ a.trials }} tirages par option si supérieur à zéro. Erreur réelle de calibration inconnue.</p>
+{% if a.motion_mode is defined and a.motion_mode=='predecision_velocity' %}
+<h3>Déplacements défensifs avant le tir</h3>
+<p>Vitesses horizontales moyennes estimées sur des pistes continues antérieures au tir ; projection constante, sans réaction adaptative. Les positions initiales restent les positions interpolées de la revue spatiale. Les receveuses sont supposées immobiles.</p>
+<table class="metric-table"><thead><tr><th>Défenseure</th><th>Vx (m/s)</th><th>Vy (m/s)</th><th>Durée observée (s)</th><th>Ancienneté de la dernière mesure (s)</th></tr></thead><tbody>
+{% for id,m in a.predecision_motion.items() %}<tr><td>{{ id }}</td><td>{{ '%.2f'|format(m.velocity[0]) }}</td><td>{{ '%.2f'|format(m.velocity[1]) }}</td><td>{{ '%.3f'|format(m.support_s) }}</td><td>{{ '%.3f'|format(m.age_s) }}</td></tr>{% endfor %}
+</tbody></table>
+{% else %}<p>Modèle défensif : centres immobiles, hors mouvements de bras hypothétiques.</p>{% endif %}
 {% set L=a.length_m %}{% set W=a.width_m %}
 <h3>Vue axonométrique des trajectoires</h3>
 {% macro px(x,y) %}{{ x+0.5*y }}{% endmacro %}

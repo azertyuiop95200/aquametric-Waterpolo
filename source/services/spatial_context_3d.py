@@ -7,6 +7,7 @@ from copy import deepcopy
 from .collective_review import num, context
 from .shot_context_review import point_at
 from .spatial_replay import review,number
+from .spatial_predecision_motion import estimate,in_bounds
 
 LIMIT=4
 TRIALS=32
@@ -32,12 +33,21 @@ def prepare(snapshot,raw):
     radius=number(raw.get('radius_m'),.15,1.8)
     speed=number(raw.get('horizontal_speed_mps'),2,30)
     sigma=number(raw.get('sigma_m'),0,2)
-    if raw.get('motion_mode')!='stationary_hypothesis':raise ValueError('Hypothèse de défense immobile requise.')
+    mode=raw.get('motion_mode')
+    if mode not in ('stationary_hypothesis','predecision_velocity'):raise ValueError('Choisir un modèle de déplacement défensif.')
     note=raw.get('evidence')
     if not isinstance(note,str) or not 3<=len(note.strip())<=300:raise ValueError('Justification des hypothèses requise.')
     # Positions x/y from existing reviewed context; vertical positions and radii supplied.
     # A stationary model does not assert that the athletes were stationary.
     defs=[dict(id=i,position=[*v,h],velocity=[0,0,0],radius=radius,confidence=1.) for i,v in sorted(a['defenders'].items())]
+    roster={f"{p['side']}:{p['cap_number']}":p for p in snapshot['advanced_motion']['players']}
+    motion={}
+    if mode=='predecision_velocity':
+        for d in defs:
+            m=estimate(roster[d['id']],t,L,W)
+            if m is None:raise ValueError('Suivi antérieur continu insuffisant pour '+d['id']+'. Choisir explicitement le modèle immobile ou revoir les pistes.')
+            d['velocity']=m['velocity']
+            motion[d['id']]=m
     poses=raw.get('reach_segments') or {}
     if not isinstance(poses,dict) or not set(poses)<=set(a['defenders']):raise ValueError('Postures hypothétiques invalides.')
     for d in defs:
@@ -57,7 +67,6 @@ def prepare(snapshot,raw):
     # Receivers must be explicitly selected and observed at the decision instant.
     receivers=raw.get('receivers') or []
     if not isinstance(receivers,list) or len(receivers)>3 or any(not isinstance(i,str) for i in receivers) or len(set(receivers))!=len(receivers):raise ValueError('Receveuses invalides.')
-    roster={f"{p['side']}:{p['cap_number']}":p for p in snapshot['advanced_motion']['players']}
     receiver_z=number(raw.get('receiver_height_m'),0,3) if receivers else None
     for i in receivers:
         if i not in ctx['ids'] or i==a['shot']['identity'] or not i.startswith(a['event']['side']+':') or i not in roster:raise ValueError('Receveuse revue de la même équipe requise.')
@@ -73,9 +82,19 @@ def prepare(snapshot,raw):
         delay=number(raw['reception_s'],0,1.5)
         budget=number(raw['budget_s'],.15,8) if raw.get('budget_s') is not None else None
         sequence=dict(reception_s=delay,budget_s=budget,receiver_velocities={v['id']:[0,0,0] for v in opts if v['kind']=='pass'})
+    # Coverage evaluates flight times up to 2 s. Two-leg cases can add the
+    # reception delay and another flight. Reject extrapolation beyond pool bounds.
+    if mode=='predecision_velocity':
+        horizon=2.
+        if sequence is not None:
+            passes=[v['duration_s'] for v in opts if v['kind']=='pass']
+            if passes:horizon=max(horizon,max(passes)+sequence['reception_s']+2.)
+        if any(not in_bounds(d['position'],d['velocity'],horizon,L,W) for d in defs):
+            raise ValueError('Projection défensive hors bassin dans l’horizon du modèle ; revoir la séquence ou choisir le modèle immobile.')
     result=review(data,trials=TRIALS,goal_map=dict(keeper_id=a['keeper_id'],speed=speed),sequence=sequence)
     signature=dict(event=a['event'],shot=a['shot'],goal_x=g,goal_width_m=a['goal_width_m'],defenders=a['defenders'],keeper_id=a['keeper_id'],receivers={i:point_at(roster[i],t,L,W) for i in receivers})
-    result.update(event_id=eid,period=a['event']['period'],scope='hypothetical_from_reviewed_planar_context',actual_target=None,reference_is_hypothetical=True,nominal_horizontal_speed_mps=speed,evidence=note.strip(),calibration_error_m=None)
+    if mode=='predecision_velocity':signature['predecision_motion']=motion
+    result.update(motion_mode=mode,predecision_motion=motion,event_id=eid,period=a['event']['period'],scope='hypothetical_from_reviewed_planar_context',actual_target=None,reference_is_hypothetical=True,nominal_horizontal_speed_mps=speed,evidence=note.strip(),calibration_error_m=None)
     # Store canonical JSON-compatible results; no repeated expensive evaluation on GET.
     import json
     return json.loads(json.dumps(signature,allow_nan=False)),json.loads(json.dumps(result,allow_nan=False))
@@ -107,6 +126,8 @@ def build(snapshot, *, local_source):
         receiver_ids=(r.get('signature') or {}).get('receivers',{})
         roster={f"{p['side']}:{p['cap_number']}":p for p in snapshot['advanced_motion']['players']}
         signature['receivers']={i:point_at(roster[i],a['shot']['second'],ctx['length_m'],ctx['width_m']) if i in roster else None for i in receiver_ids}
+        if v.get('motion_mode')=='predecision_velocity':
+            signature['predecision_motion']={i:estimate(roster[i],a['shot']['second'],ctx['length_m'],ctx['width_m']) if i in roster else None for i in a['defenders']}
         if r.get('signature')!=json.loads(json.dumps(signature)):continue
         out['rows'].append(v)
     if out['rows']:out.update(status='experimental_partial',reason='')

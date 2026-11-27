@@ -2,7 +2,7 @@
 {% set r=snapshot.spatial_3d %}{% set ctx=r.context %}
 <section class="report-card section-wide" id="spatial3dEditor">
 <h2>Simuler des alternatives de tir et de passe en 3D</h2>
-<p>À partir d'un tir contextualisé, avec défense complète et gardienne identifiée. But modélisé de 3 × 0,90 m. Les positions horizontales viennent du suivi revu ; hauteurs, rayons, vitesse et postures sont des hypothèses, pas des mesures. Défense et receveuses supposées immobiles hors mouvements de bras fournis.</p>
+<p>À partir d'un tir contextualisé, avec défense complète et gardienne identifiée. But modélisé de 3 × 0,90 m. Les positions horizontales viennent du suivi revu ; hauteurs, rayons, vitesse et postures sont des hypothèses, pas des mesures. La défense peut être modélisée immobile ou à vitesse horizontale constante estimée avant le tir ; les receveuses restent supposées immobiles.</p>
 {% if r.events %}
 <details><summary>Calculer une simulation hypothétique</summary>
 <form method="post" action="/matches/{{ match.id }}/analysis/collective-review">
@@ -11,6 +11,8 @@
 {% for label,name,lo,hi in [('Hauteur de départ du ballon (m)','release_height_m',0,3),('Hauteur du centre des obstacles (m)','defender_height_m',0,3),('Rayon des obstacles sphériques (m)','radius_m',0.15,1.8),('Vitesse horizontale nominale (m/s)','horizontal_speed_mps',2,30),('Écart-type hypothétique de position (m ; 0 = aucune simulation de perturbation)','sigma_m',0,2)] %}
 <label>{{ label }} <input name="{{ name }}" type="number" step="0.01" min="{{ lo }}" max="{{ hi }}" required></label>
 {% endfor %}
+<label>Modèle de déplacement défensif <select name="motion_mode" required><option value="stationary_hypothesis">Défense immobile (hypothèse)</option><option value="predecision_velocity">Vitesse avant le tir (projection constante)</option></select></label>
+<p>Le modèle dynamique nécessite au moins 0,30 s de suivi métrique continu par défenseure dans les 0,60 s précédant le tir, avec une dernière observation au plus 0,12 s avant celui-ci. Aucune vitesse n'est inventée en cas de lacune. La vitesse verticale reste nulle par hypothèse.</p>
 <details><summary>Alternatives de passe (trois maximum)</summary>
 <fieldset><legend>Receveuses de la même équipe, présentes et suivies à cet instant</legend>{% for i in ctx.ids %}<label><input type="checkbox" name="receivers" value="{{ i }}"> {{ i }}</label> {% endfor %}</fieldset>
 <label>Hauteur de réception supposée (m) <input name="receiver_height_m" type="number" step="0.01" min="0" max="3"></label>

@@ -609,6 +609,7 @@ def save_collective_review(
     sigma_m:float|None=Form(None), receiver_height_m:float|None=Form(None),
     receivers:list[str]=Form([]), hypotheses_reviewed:bool=Form(False),
     reach_json:str=Form(""), reception_s:str=Form(""), budget_s:str=Form(""),
+    motion_mode:str=Form("stationary_hypothesis"),
     db:Session=Depends(get_db),
 ):
     import json
@@ -638,7 +639,7 @@ def save_collective_review(
         elif action=="add_3d":
             from services.spatial_context_3d import append as append_3d
             if len(reach_json)>10000:raise ValueError("Postures trop volumineuses.")
-            raw=dict(binding=ctx,event_id=event_id,release_height_m=release_height_m,defender_height_m=defender_height_m,radius_m=radius_m,horizontal_speed_mps=horizontal_speed_mps,sigma_m=sigma_m,receiver_height_m=receiver_height_m,receivers=receivers,hypotheses_reviewed=hypotheses_reviewed,motion_mode="stationary_hypothesis",reach_segments=json.loads(reach_json) if reach_json else {},reception_s=float(reception_s) if reception_s else None,budget_s=float(budget_s) if budget_s else None,evidence=evidence)
+            raw=dict(binding=ctx,event_id=event_id,release_height_m=release_height_m,defender_height_m=defender_height_m,radius_m=radius_m,horizontal_speed_mps=horizontal_speed_mps,sigma_m=sigma_m,receiver_height_m=receiver_height_m,receivers=receivers,hypotheses_reviewed=hypotheses_reviewed,motion_mode=motion_mode,reach_segments=json.loads(reach_json) if reach_json else {},reception_s=float(reception_s) if reception_s else None,budget_s=float(budget_s) if budget_s else None,evidence=evidence)
             summary["spatial_3d_reviews"]=append_3d(snap,raw)
         elif action=="add_shot":
             from services.shot_context_review import append as append_shot
