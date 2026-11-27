@@ -65,8 +65,22 @@ function display(){
  }
  draw();
 }
+let mediaKey=null;
+function syncVideo(){
+ const video=$("video"),frame=$("yt"),note=$("source-note");
+ const key=active?.binding||null;
+ if(mediaKey===key)return;
+ mediaKey=key;
+ video.pause();video.removeAttribute("src");video.load();video.hidden=true;
+ frame.removeAttribute("src");frame.hidden=true;
+ note.textContent=active?((active.period?"Q"+active.period+" · ":"")+active.label+" · "+fmt(active.second,1)+" s (temps local)"):"Aucune source vérifiée.";
+ if(active?.play_url){video.hidden=false;video.src=active.play_url;video.load();}
+ else if(active?.embed){frame.hidden=false;frame.src=active.embed;}
+ $("seek").disabled=!active;
+}
 function load(){
  active=data.events.find(e=>String(e.id)===$("event")?.value)||null;
+ syncVideo();
  const saved=active&&reviews[active.id];
  result=saved?.result||null;
  if($("form")){
@@ -83,21 +97,23 @@ $("event")?.addEventListener("change",load);
 for(const id of ["rotate","tilt","time"])$(id).addEventListener("input",draw);
 $("seek").addEventListener("click",()=>{
  if(!active)return;const t=Math.max(0,active.second-3);
- if($("video")){$("video").currentTime=t;$("video").pause()}
- else if($("yt")&&data.embed){const u=new URL(data.embed);u.searchParams.set("start",String(Math.floor(t)));$("yt").src=u.href}
+ if(active.play_url){const video=$("video"),key=active.binding;
+ const seek=()=>{if(active?.binding!==key)return;video.currentTime=t;video.pause();};
+ if(video.readyState>=1)seek();else video.addEventListener("loadedmetadata",seek,{once:true});}
+ else if(active.embed){const u=new URL(active.embed);u.searchParams.set("start",String(Math.floor(t)));$("yt").src=u.href}
 });
 $("form")?.addEventListener("submit",async e=>{
- e.preventDefault();if(!active)return;const id=active.id;
+ e.preventDefault();if(!active)return;const id=active.id, binding=active.binding;
  const button=e.target.querySelector("button[type=submit]");button.disabled=true;
  try{
- const observation={source:"manual_video",decision_second:num("decision"),length_m:num("length"),width_m:num("width"),goal_x:$("goal").value==="zero"?0:num("length"),
+ const observation={source:"manual_video",source_binding:active.binding,decision_second:num("decision"),length_m:num("length"),width_m:num("width"),goal_x:$("goal").value==="zero"?0:num("length"),
  start:[num("x"),num("y"),num("z")],sigma_m:num("sigma"),defenders:JSON.parse($("def").value),options:JSON.parse($("opt").value),
  chosen:$("chosen").value,complete_defence:$("complete").checked};
  $("status").textContent="Calcul en cours…";
  const response=await fetch("/matches/"+data.match+"/spatial/"+id,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(observation)});
  const json=await response.json();if(!response.ok)throw Error(typeof json.detail==="string"?json.detail:"Calcul impossible");
  reviews[id]={observations:observation,result:json};
- if(active?.id===id){result=json;display();$("status").textContent="Relecture enregistrée."}
+ if(active?.id===id&&active.binding===binding){result=json;display();$("status").textContent="Relecture enregistrée."}
  }catch(err){$("status").textContent="Impossible de calculer : "+err.message}
  finally{button.disabled=false}
 });
