@@ -1,6 +1,7 @@
 """Read-only first release: reviewed motion in the original calibration frame."""
 from math import isfinite
 from .advanced_tracking import reviewed_motion
+from .occupancy_grid import occupancy, density, observed_timeline
 
 
 def build(snapshot):
@@ -45,4 +46,10 @@ def build(snapshot):
         rows=reviewed_motion({'tracks':tracks},{'players':people},sprint_mps=1.5,min_sprint_s=.35)
     except (ValueError,TypeError,KeyError,OverflowError):
         return out
+    for row in rows:
+        row['occupation']=None; row['movement_timeline']=None
+        if row['metrics'] and row['metrics']['observed_s']:
+            segments=row['segments']
+            row['occupation']=density(occupancy(segments,L,W,2.,0.,86400.))
+            row['movement_timeline']=observed_timeline(segments)
     return dict(out,status='experimental_partial' if any(r['metrics'] and r['metrics']['observed_s'] for r in rows) else 'unavailable',players=rows,length_m=L,width_m=W,analysis_id=identity['analysis_id'],sprint_mps=1.5,min_sprint_s=.35,coordinate_system='reference_goal_relative_shifted_lateral')
