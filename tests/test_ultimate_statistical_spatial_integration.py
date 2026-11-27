@@ -117,4 +117,31 @@ class SpatialIntegrationTests(unittest.TestCase):
             db.commit()
             self.assertEqual(event_sources(db,db.get(Match,1)),{})
 
+    def test_two_step_sandbox_preserves_private_observation(self):
+        from test_spatial_two_step import scene as sequence_scene
+        data=sequence_scene()
+        data["source_binding"]=self.observation()["source_binding"]
+        url="/matches/1/spatial/1"
+        self.assertEqual(self.client.post(url,json=data,headers=self.owner).status_code,200)
+        export="/matches/1/spatial.json"
+        before=self.client.get(export,headers=self.owner).json()
+        edits=dict(keeper_id="G",two_step=True,suggest=False,reception_s=.25)
+        self.assertEqual(self.client.post(url+"/sandbox",json=edits,headers=self.other).status_code,404)
+        response=self.client.post(url+"/sandbox",json=edits,headers=self.owner)
+        self.assertEqual(response.status_code,200,response.text)
+        self.assertEqual(response.headers["cache-control"],"private, no-store")
+        result=response.json()
+        self.assertEqual(result["mode"],"coach_hypothesis")
+        alternative=result["two_step"]["alternatives"][0]
+        self.assertEqual(alternative["joint_clearance_m"],min(alternative["pass_clearance_m"],alternative["shot_clearance_m"]))
+        self.assertIsNone(alternative["goal_probability"])
+        self.assertEqual(alternative["shot_release_s"],.75)
+        limited=self.client.post(url+"/sandbox",json=dict(edits,sequence_budget_s=.6),headers=self.owner)
+        self.assertEqual(limited.status_code,200)
+        self.assertEqual(limited.json()["two_step"]["alternatives"][0]["status"],"outside_bounds_or_budget")
+        self.assertEqual(self.client.get(export,headers=self.owner).json(),before)
+        with Session(self.engine) as db:
+            self.assertEqual(db.query(Event).count(),2)
+            self.assertEqual(report_snapshot(db,db.get(Match,1))["eligible_count"],1)
+
 if __name__=="__main__":unittest.main()
