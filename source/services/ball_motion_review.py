@@ -9,6 +9,7 @@ VERSION='assisted-ball-motion-v1'
 
 def propose(previous,current,following,*,frame_index,seeds):
     frames=(previous,current,following)
+    if not isinstance(current,np.ndarray):raise ValueError('Image centrale invalide.')
     if not all(isinstance(f,np.ndarray) and f.dtype==np.uint8 and f.ndim==3 and f.shape[2]==3 and f.shape==current.shape for f in frames):
         raise ValueError('Trois images BGR de même format requises.')
     h,w=current.shape[:2]; scale=h/720
@@ -38,3 +39,27 @@ def propose(previous,current,following,*,frame_index,seeds):
         out.append(dict(x=round(float(cx/w),6),y=round(float(cy/h),6),bbox=[round(left/w,6),round(top/h,6),round((left+bw)/w,6),round((top+bh)/h,6)],ranking_score=round(float(score),6),status='motion_candidate_not_verified'))
     out.sort(key=lambda d:-d['ranking_score'])
     return dict(base,status='candidates' if out else 'no_supported_candidate',candidates=out[:8])
+
+def scan_motion_clip(path,frame_index,seeds):
+    """Three exact source-local frames; 25 fps nominal domain only."""
+    if type(frame_index) is not int or frame_index<1:raise ValueError('Indice central invalide.')
+    c=cv2.VideoCapture(str(path))
+    try:
+        if not c.isOpened():raise ValueError('Vidéo locale illisible.')
+        fps=float(c.get(cv2.CAP_PROP_FPS))
+        total=int(c.get(cv2.CAP_PROP_FRAME_COUNT))
+        if not isfinite(fps) or abs(fps-25)>1e-6 or frame_index+1>=total:
+            raise ValueError('Prototype limité aux vidéos de 25 i/s avec deux images adjacentes.')
+        if not c.set(cv2.CAP_PROP_POS_FRAMES,frame_index-1):raise ValueError('Recherche vidéo impossible.')
+        frames=[]
+        for i in range(frame_index-1,frame_index+2):
+            ok,f=c.read()
+            if not ok or f is None or round(c.get(cv2.CAP_PROP_POS_FRAMES))!=i+1:
+                raise ValueError('Index de décodage non vérifiable.')
+            frames.append(f)
+        result=propose(*frames,frame_index=frame_index,seeds=seeds)
+        result.update(source_frame_count_reported=total,source_fps_reported=fps,
+                      nominal_second=frame_index/fps,pts_validated=False,
+                      seed_review_verified_by_server=False)
+        return result
+    finally:c.release()
