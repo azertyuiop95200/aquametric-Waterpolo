@@ -43,3 +43,6 @@ Ce document suit le développement, pas les données privées de match. Ne pas y
 - Code c5640d36758095f7c5f228b0e481d456e2c4a472 : contrôle adverse observé dans l'intervalle maîtrise–tir, identifiants des fenêtres exportés. CI 45945180270 terminée avec succès, avant ajout des tests ciblés.
 - Ajout de cinq tests synthétiques : contrôle observé, apparent, hors intervalle, borne du tir, rendu HTML. Le rapport affiche désormais la contradiction et les identifiants associés. Nouvelle CI à vérifier; aucune attribution positive ni validation vidéo supplémentaire.
 - Reprise : vérifier CI des cinq tests, puis audit des reprises attribuées et de la continuité. Ne pas fusionner ni redéployer avant validation et sauvegarde. Aucun fichier privé publié.
+
+## Révision 10 — bornes contradictoires
+- CI R9.1 45951242113 réussie. R10 : contrôles observés opposés au même instant dans la référence importée, conservation des annotations mais exclusion des fenêtres concernées de la borne minimale. Trois tests synthétiques ajoutés; rapport explicite. Comparaison exacte des secondes, sans tolérance arbitraire. CI R10 à vérifier. Aucun nouveau relevé vidéo, aucune fusion ni déploiement. Prochaine action : vérifier CI, étendre au registre manuel et examiner les reprises attribuées.
