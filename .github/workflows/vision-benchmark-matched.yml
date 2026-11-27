@@ -5,6 +5,12 @@ on:
     paths:
       - 'source/services/detection_evaluation.py'
       - 'tests/test_detection_evaluation.py'
+      - 'source/services/head_flow_tracking.py'
+      - 'source/services/local_clip_scan.py'
+      - 'source/services/local_object_tracking.py'
+      - 'tests/test_head_flow_tracking.py'
+      - 'tests/test_clip_tracking_mode.py'
+      - 'tests/test_local_object_tracking.py'
       - '.github/workflows/vision-benchmark-matched.yml'
   workflow_dispatch:
 permissions:
@@ -21,3 +27,19 @@ jobs:
         env:
           PYTHONPATH: source
         run: python -m unittest discover -s tests -p test_detection_evaluation.py -v
+      - name: Install pinned vision dependencies
+        run: pip install opencv-python-headless==4.13.0.92 numpy==2.3.5
+      - name: Run existing and supported flow regressions
+        env:
+          PYTHONPATH: source
+        run: |
+          python -m unittest discover -s tests -p test_head_flow_tracking.py -v
+          python -m unittest discover -s tests -p test_clip_tracking_mode.py -v
+          python -m unittest discover -s tests -p test_local_object_tracking.py -v
+      - name: Package exact public vision source for private offline audit
+        run: git archive --format=zip --output=/tmp/vision-audit-source.zip HEAD source/services/head_flow_tracking.py source/services/local_object_tracking.py source/services/local_clip_scan.py source/services/detection_evaluation.py tests/test_head_flow_tracking.py tests/test_clip_tracking_mode.py tests/test_local_object_tracking.py tests/test_detection_evaluation.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vision-audit-source
+          path: /tmp/vision-audit-source.zip
+          retention-days: 7
