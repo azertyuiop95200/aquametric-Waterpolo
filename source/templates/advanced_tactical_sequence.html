@@ -12,5 +12,6 @@
 <h3>Transitions documentées</h3>
 <div style="overflow-x:auto"><table class="metric-table"><thead><tr><th>Preuve</th><th>Fenêtre vidéo (s)</th><th>Progression signée (m)</th><th>Vitesse projetée (m/s)</th><th>Repli</th></tr></thead><tbody>{% for t in tactical_report.transitions %}<tr><td>#{{ t.id }}</td><td>{{ t.start_s }}–{{ t.end_s }}</td><td>{{ '%.2f'|format(t.progress_m) if t.progress_m is not none else 'Non mesurée' }}</td><td>{{ '%.2f'|format(t.mean_progress_mps) if t.mean_progress_mps is not none else 'Non mesurée' }}</td><td>Non mesuré</td></tr>{% else %}<tr><td colspan="5">Aucune transition métrique documentée.</td></tr>{% endfor %}</tbody></table></div>
 <p>La vitesse projetée entre deux bornes de preuve n'est pas la vitesse effective d'une contre-attaque.</p>
+{% include 'defensive_recovery_rows.html' %}
 {% endfor %}</section>
 {% endif %}
