@@ -531,6 +531,8 @@ def metric_calibration(match_id: int, request: Request, payload: dict, db: Sessi
     try:
         result=build_map(source,tracking,anchors,polygon,width,length,reference,shots)
         result["calibration_provenance"]="manual_reviewed_anchors"
+        from services.shot_context_review import source_key
+        result["source_key"]=source_key(match.video_path)
         if not result["aligned_frames"]:
             raise HTTPException(422,"Aucun raccord caméra accepté. Revoir les repères du décor.")
         # Preserve existing candidates and confirmed events; metric positions
