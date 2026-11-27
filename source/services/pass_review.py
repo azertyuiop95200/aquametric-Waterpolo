@@ -95,6 +95,10 @@ def summarize_pass_review(reference,duration):
         if r.get('control_frame') is not None and r.get('direct_sequence') is True:
             d['release_to_control_evidence_s']=[round((r['control_frame']-r['release_first_free_frame'])/fps,6),round((r['control_frame']-r['release_last_held_frame'])/fps,6)]
         else:d['release_to_control_evidence_s']=None
+        # Temporal association alone does not establish uninterrupted possession.
+        d['shot_link_status']='temporal_only' if r.get('event_relation')=='precedes_shot' else None
+        d['key_pass_verified']=False
+        d['assist_verified']=False
         output.append(d)
     for team in sorted(TEAMS):
         actions=[r for r in rows if r['state']=='observed_pass' and r['team']==team];counts=Counter(r['outcome'] for r in actions)
