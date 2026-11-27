@@ -17,7 +17,7 @@ jobs:
       - name: Compile edited Python modules
         run: python -m py_compile source/main.py source/services/elite_performance.py source/services/spatial_match_analysis.py source/services/analysis_product.py source/services/statistical_audit.py source/services/advanced_observed_metrics.py source/services/tracking_performance.py source/services/lineup_performance.py source/services/tactical_sequence_metrics.py
       - name: Install template test dependency
-        run: pip install jinja2
+        run: pip install jinja2 sqlalchemy
       - name: Focused evidence audit tests
         env:
           PYTHONPATH: source
@@ -27,6 +27,14 @@ jobs:
         env:
           PYTHONPATH: source
         run: python -m unittest discover -s tests -p "test_possession_evidence.py" -v
+      - name: Reference import, revisions and review regression
+        env:
+          PYTHONPATH: source
+        run: |
+          python -m py_compile source/models.py source/services/review_reference_import.py source/services/review_reference_revision.py
+          for suite in test_review_reference_import.py test_pass_review.py test_review_coverage.py test_retrospective_review.py test_possession_context.py; do
+            python -m unittest discover -s tests -p "$suite" -v || exit 1
+          done
       - name: Verify the report templates
         env:
           PYTHONPATH: source
