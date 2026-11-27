@@ -1,0 +1,24 @@
+{% if snapshot.shot_context is defined and snapshot.shot_context.context %}
+{% set r=snapshot.shot_context %}{% set ctx=r.context %}
+<section class="report-card section-wide" id="shotContextEditor"><h2>Relier un tir à son contexte spatial</h2>
+<p>Calibrer et cartographier le tir, revoir son identité, puis annoter l'action confirmée dans la vidéo principale. Les deux instants doivent correspondre à 0,25 s près. Les événements d'arrêt ne sont jamais déduits d'un tir cadré.</p>
+{% if r.shots and r.events %}
+<details><summary>Ajouter une revue de tir (12 maximum)</summary>
+<form method="post" action="/matches/{{ match.id }}/analysis/collective-review">
+<input type="hidden" name="binding" value='{{ ctx|tojson }}'>
+<label>Tir cartographié <select name="shot_index" required><option value="">Choisir</option>{% for s in r.shots %}<option value="{{ s.index }}">#{{ s.index }} · {{ s.identity }} · {{ s.second }} s</option>{% endfor %}</select></label>
+<label>Action confirmée <select name="event_id" required><option value="">Choisir</option>{% for e in r.events if e.kind!='save' %}<option value="{{ e.id }}">#{{ e.id }} · {{ e.kind }} · {{ e.identity }} · {{ e.second }} s</option>{% endfor %}</select></label>
+<label>Arrêt explicitement associé (facultatif) <select name="save_event_id"><option value="">Non renseigné</option>{% for e in r.events if e.kind=='save' %}<option value="{{ e.id }}">#{{ e.id }} · {{ e.identity }} · {{ e.second }} s</option>{% endfor %}</select></label>
+<label>But attaqué <select name="goal_x" required><option value="">Choisir</option><option value="0">Référence x = 0</option><option value="{{ ctx.length_m }}">Opposé x = {{ ctx.length_m }} m</option></select></label>
+<label>Largeur du but revue (m) <input name="goal_width_m" type="number" step="0.01" min="0.1" max="{{ ctx.width_m }}" required></label>
+<fieldset><legend>Effectif défensif complet revu</legend>{% for i in ctx.ids %}<label><input type="checkbox" name="defenders" value="{{ i }}"> {{ i }}</label> {% endfor %}</fieldset>
+<label>Gardienne revue (facultatif) <select name="keeper"><option value="">Non renseignée</option>{% for i in ctx.ids %}<option value="{{ i }}">{{ i }}</option>{% endfor %}</select></label>
+<label>Envergure latérale hypothétique (m, facultative) <input name="assumed_lateral_span_m" type="number" min="0.01" max="3" step="0.01"></label>
+<label>Preuves visuelles <textarea name="evidence" required minlength="3" maxlength="300"></textarea></label>
+<label><input name="shot_link_reviewed" type="checkbox" value="true" required> Même tir, vidéo, identité, instant et arrêt éventuel revus</label>
+<label><input name="roster_reviewed" type="checkbox" value="true" required> Effectif défensif complet et but attaqué revus</label>
+<button name="action" value="add_shot">Enregistrer le contexte du tir</button>
+</form></details>
+{% else %}<p>Un tir cartographié avec identité revue et une action confirmée avec position et identité revues sont nécessaires.</p>{% endif %}
+{% if r.rows or (r.excluded_reviews is defined and r.excluded_reviews) %}<details><summary>Réinitialiser les revues de tir</summary><form method="post" action="/matches/{{ match.id }}/analysis/collective-review"><input type="hidden" name="binding" value='{{ ctx|tojson }}'><button name="action" value="clear_shot">Effacer uniquement les revues de tir</button></form></details>{% endif %}
+</section>{% endif %}
