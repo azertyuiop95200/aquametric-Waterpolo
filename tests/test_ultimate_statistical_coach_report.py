@@ -101,4 +101,44 @@ class CoachReportIntegration(unittest.TestCase):
         self.assertIn("&lt;script&gt;",html)
         self.assertNotIn("<script>",html)
 
+    def test_motion_release_and_coach_report_share_snapshot(self):
+        from services.advanced_motion_report import build
+        _,s=render([])
+        track={"id":1,"segments":[[{"second":0,"x_m":1,"y_m":-2},
+            {"second":.2,"x_m":1.4,"y_m":-2},{"second":.4,"x_m":1.8,"y_m":-2}]]}
+        s["automatic"]={"summary":{"metric_field_map":{"status":"estimated","goal_relative":True,
+            "revision":"r","length_m":25,"width_m":20,"tracks":[track]},
+            "identity_reviews":{"tracks":{"1":{"provenance":"coach_review",
+                "side":"for","cap_number":4,"evidence":"synthetic review"}}}}}
+        s["identity_analysis"]={"analysis_id":3,"calibration_revision":"r",
+            "players":[{"side":"for","cap_number":4,"track_ids":[1]}]}
+        s["advanced_motion"]=build(s)
+        motion=s["advanced_motion"]
+        self.assertEqual(motion["status"],"experimental_partial")
+        self.assertAlmostEqual(motion["players"][0]["metrics"]["distance_m"],.8)
+        self.assertIsNone(motion["playing_seconds"])
+        self.assertTrue(all(x["value"] is None for x in s["statistical_audit"]["team"]))
+        match=SimpleNamespace(team=SimpleNamespace(name="Blanc"),opponent="Bleu")
+        html=ENV.get_template("analysis_all_measurements.html").render(snapshot=s,match=match)
+        self.assertEqual(html.count('id="advancedMotion"'),1)
+        self.assertIn("Distance observée",html)
+        self.assertIn("0.80 m",html)
+        self.assertIn("Trajectoire métrique",html)
+        self.assertIn("Le temps vidéo observé n'est pas le temps de jeu",html)
+        self.assertIn('id="possessionEvidence"',html)
+        s["identity_analysis"]["calibration_revision"]="stale"
+        s["advanced_motion"]=build(s)
+        self.assertEqual(s["advanced_motion"]["status"],"unavailable")
+        html=ENV.get_template("analysis_all_measurements.html").render(snapshot=s,match=match)
+        self.assertNotIn("0.80 m",html)
+        self.assertIn("Non mesuré : calibration exploitable et identité revue nécessaires.",html)
+
+    def test_motion_visible_without_statistics_snapshot(self):
+        from services.advanced_motion_report import build
+        match=SimpleNamespace(team=SimpleNamespace(name="Blanc"),opponent="Bleu")
+        html=ENV.get_template("analysis_all_measurements.html").render(
+            snapshot={"advanced_motion":build({})},match=match)
+        self.assertEqual(html.count('id="advancedMotion"'),1)
+        self.assertIn("Non mesuré",html)
+
 if __name__=="__main__":unittest.main()
