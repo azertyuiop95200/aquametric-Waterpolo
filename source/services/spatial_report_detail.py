@@ -1,6 +1,11 @@
 """Report-only geometry and verified pass links; no second 3D model."""
 from collections import Counter, defaultdict
 from math import hypot, isfinite
+try:
+    from services.occupancy_grid import density
+except ModuleNotFoundError as e:
+    if e.name != "services": raise
+    from occupancy_grid import density
 
 
 def number(v):
@@ -15,9 +20,7 @@ def map_scale(report):
         m=p.get('map')
         if m is None:
             continue
-        for c in m['cells']:
-            c['density_per_m2']=c['share']/(c['w']*c['h'])
-            c['opacity']=min(1., c['density_per_m2']/.25)
+        density(m)
         p['video_coverage']=m['observed_s']/(report['end_s']-report['start_s'])
     return {'unit':'fraction_of_observed_time_per_m2','legend_max':.25,'scale_bar_m':5.,'cell_m':report.get('cell_m',2.)}
 
