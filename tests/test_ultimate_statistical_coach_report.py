@@ -3,6 +3,9 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 import re
+import os
+import json
+from services.possession_evidence import report as possession_report, build_note
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from services.statistical_audit import audit_rows
 from services.advanced_observed_metrics import advanced_report
@@ -28,7 +31,8 @@ def render(rows):
                   reference=None,tactical=None,statistical_audit=audit,
                   advanced_observed=advanced_report(rows,roster),
                   lineup_performance=lineup_report(rows,roster),phase_context=phase_context_report(rows),
-                  tactical_sequences=sequence_report(rows),motion_performance=motion_report({},{}))
+                  tactical_sequences=sequence_report(rows),motion_performance=motion_report({},{}),
+                  possession_evidence=possession_report(rows))
     match=SimpleNamespace(team=SimpleNamespace(name="Blanc"),opponent="Bleu")
     return ENV.get_template("analysis_all_measurements.html").render(snapshot=snapshot,match=match),snapshot
 
@@ -57,5 +61,27 @@ class CoachReportIntegration(unittest.TestCase):
         self.assertIn("possession duration",html)
         self.assertIn("20",html)
         self.assertNotIn("performance_score",html)
+
+    def test_partial_review_does_not_create_complete_possession(self):
+        note=build_note(1,2,"for","against","observed","observed","unknown",
+                        False,False,False,False,"Contrôles visibles (fixture)",1,5)
+        row=event(2,"possession_transition",note)
+        row.update(perspective="neutral",player_id=None,player=None)
+        html,s=render([row])
+        p=s["possession_evidence"]
+        self.assertEqual(p["bounds"][0]["lower_bound"],1)
+        self.assertIsNone(p["exact_total_changes"])
+        self.assertIsNone(p["turnover_rate"])
+        self.assertEqual(s["advanced_observed"]["sides"]["for"]["possessions"],[])
+        self.assertIn("Contrôles opposés",html)
+        self.assertIn("au moins 1 changement",html)
+        self.assertIn("Non établie",html)
+        self.assertEqual(html.count('id="possessionEvidence"'),1)
+        out=os.getenv("AQUAMETRIC_V3_FIXTURE_DIR")
+        if out:
+            folder=Path(out)
+            folder.mkdir(parents=True,exist_ok=True)
+            (folder/"v3-synthetic.html").write_text('<!doctype html><html lang="fr"><meta charset="utf-8"><title>Rapport V3 synthétique</title><h1>Test synthétique — aucun match réel</h1>'+html+'</html>',encoding="utf-8")
+            (folder/"v3-synthetic.json").write_text(json.dumps({"fixture":True,"snapshot":s},ensure_ascii=False,indent=2,default=str),encoding="utf-8")
 
 if __name__=="__main__":unittest.main()
