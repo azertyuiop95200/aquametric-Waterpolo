@@ -1,0 +1,19 @@
+{
+  "module_version": "0.2.0",
+  "q1": {
+    "track_fragments": 53,
+    "identified_fragments": 14,
+    "same_identity_overlap_pairs": 0,
+    "pairs": [],
+    "replayed_uniqueness": false,
+    "reason": "Q1 export lacks per-track OCR support/share"
+  },
+  "synthetic": {
+    "duplicate_identity_pairs_before": 1,
+    "duplicate_identity_pairs_after": 0,
+    "rejected_tracks": 1,
+    "remaining_candidates": 1
+  },
+  "video_access": false,
+  "missing_file": "Q1_APERCU_720p.mp4"
+}
