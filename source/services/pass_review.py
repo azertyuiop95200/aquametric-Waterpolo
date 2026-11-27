@@ -29,7 +29,7 @@ def validate_pass_review(reference, duration):
     check(isinstance(rows,list) and len(rows)<=2000, 'Registre de passes invalide.')
     events={e['event_id']:e for e in reference.get('events',[])}
     intervals={e['interval_id']:e for e in reference.get('possession_review_intervals',[])}
-    ids=set(); releases=[]; same_action_ids=set()
+    ids=set(); releases=[]; same_action_ids=set(); shot_links=set()
     for r in rows:
         check(isinstance(r,dict), 'Action de passe invalide.')
         uid=r.get('id');state=r.get('state');outcome=r.get('outcome');team=r.get('team');receiver=r.get('control_team')
@@ -56,7 +56,7 @@ def validate_pass_review(reference, duration):
         check(isinstance(proof,list) and 1<=len(proof)<=12 and all(isinstance(x,str) and re.fullmatch(r'preuves/[A-Za-z0-9_.-]+\.jpg',x) for x in proof),'Référence preuve invalide.')
         if state=='observed_pass':
             check(team in TEAMS and lo is not None and r['delivery']!='not_applicable','Passe observée : départ et équipe requis.')
-            releases.append((lo,hi,uid))
+            releases.append((lo,hi,k if r.get('direct_sequence') is True else None,uid))
         else:
             check(outcome=='unknown' and k is None,'Candidat ou contre-exemple : aucun résultat attribuable.')
         if state=='not_pass':check(lo is None and c is None and r['delivery']=='not_applicable','Contre-exemple incompatible avec un lancer observé.')
@@ -69,14 +69,19 @@ def validate_pass_review(reference, duration):
         elif outcome=='out_of_play':check(k is None and r.get('direct_sequence') is True,'Sortie directe non démontrée.')
         ev=r.get('related_event_id');relation=r.get('event_relation');iv=r.get('related_interval_id')
         check((ev is None and relation is None) or ev in events and relation in {'same_action','precedes_shot'},'Lien événement invalide.')
-        if relation=='precedes_shot':check(outcome=='completed' and k/fps<=events[ev]['video_start_s'] and events[ev]['source_kind']=='shot' and events[ev]['team_before']==team,'Lien passe-tir incompatible.')
+        if relation=='precedes_shot':
+            check(ev not in shot_links,'Plusieurs passes directement liées au même tir.')
+            shot_links.add(ev)
+            check(outcome=='completed' and k/fps<=events[ev]['video_start_s'] and events[ev]['source_kind']=='shot' and events[ev]['team_before']==team,'Lien passe-tir incompatible.')
         if relation=='same_action':
             check(ev not in same_action_ids and lo is not None and events[ev]['team_before']==team and events[ev]['video_start_s']-0.25<=hi/fps<=events[ev]['video_end_s']+0.25,'Lien temporel action incompatible ou dupliqué.')
             same_action_ids.add(ev)
         if iv is not None:
             check(iv in intervals and a/fps<=intervals[iv]['end_s'] and b/fps>=intervals[iv]['start_s'],'Lien fenêtre de possession incompatible.')
     releases.sort()
-    for prev,cur in zip(releases,releases[1:]):check(prev[1]<cur[0],'Départs de passe chevauchants : doublon potentiel.')
+    for prev,cur in zip(releases,releases[1:]):
+        check(prev[1]<cur[0],'Départs de passe chevauchants : doublon potentiel.')
+        check(prev[2] is None or prev[2]<=cur[0],'Nouveau départ avant la maîtrise directe précédente.')
     return review
 
 def summarize_pass_review(reference,duration):
