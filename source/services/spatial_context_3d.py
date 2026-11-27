@@ -48,7 +48,7 @@ def prepare(snapshot,raw):
         if not .15<=duration<=2:return None
         return dict(id=i,kind=kind,target=target,duration_s=duration)
     opts=[]
-    for label,y in [('gauche',W/2-1.0),('centre',W/2),('droite',W/2+1.0)]:
+    for label,y in [('y-moins',W/2-1.0),('centre',W/2),('y-plus',W/2+1.0)]:
         for height_label,zz in [('bas',.2),('haut',.7)]:
             v=option(label+'-'+height_label,'shot',[g,y,zz])
             if v:opts.append(v)
@@ -63,11 +63,16 @@ def prepare(snapshot,raw):
         if p is None:raise ValueError('Receveuse non suivie à cet instant.')
         v=option('passe-'+i,'pass',[*p,receiver_z])
         if v:opts.append(v)
-    if not opts:raise ValueError('Aucune option dans la fenêtre de vol du modèle.')
+    if not any(o['kind']=='shot' for o in opts):raise ValueError('Aucun tir dans la fenêtre de vol du modèle.')
     # The engine requires a reference ID. It is not the observed actual destination.
     data=dict(source='manual_video',decision_second=t,length_m=L,width_m=W,goal_x=g,start=[*o,z],sigma_m=sigma,complete_defence=True,chosen=opts[0]['id'],defenders=defs,options=opts)
-    result=review(data,trials=TRIALS,goal_map=dict(keeper_id=a['keeper_id'],speed=speed))
-    signature=dict(event=a['event'],shot=a['shot'],goal_x=g,goal_width_m=a['goal_width_m'],defenders=a['defenders'],keeper_id=a['keeper_id'])
+    sequence=None
+    if raw.get('reception_s') is not None:
+        delay=number(raw['reception_s'],0,1.5)
+        budget=number(raw['budget_s'],.15,8) if raw.get('budget_s') is not None else None
+        sequence=dict(reception_s=delay,budget_s=budget,receiver_velocities={v['id']:[0,0,0] for v in opts if v['kind']=='pass'})
+    result=review(data,trials=TRIALS,goal_map=dict(keeper_id=a['keeper_id'],speed=speed),sequence=sequence)
+    signature=dict(event=a['event'],shot=a['shot'],goal_x=g,goal_width_m=a['goal_width_m'],defenders=a['defenders'],keeper_id=a['keeper_id'],receivers={i:point_at(roster[i],t,L,W) for i in receivers})
     result.update(event_id=eid,period=a['event']['period'],scope='hypothetical_from_reviewed_planar_context',actual_target=None,reference_is_hypothetical=True,nominal_horizontal_speed_mps=speed,evidence=note.strip(),calibration_error_m=None)
     # Store canonical JSON-compatible results; no repeated expensive evaluation on GET.
     import json
@@ -97,6 +102,9 @@ def build(snapshot, *, local_source):
         v=r.get('result',{});a=next((a for a in available_rows if a['event']['id']==v.get('event_id')),None)
         if a is None or v.get('model_version')!='replay-3':continue
         signature=dict(event=a['event'],shot=a['shot'],goal_x=a['goal_x'],goal_width_m=a['goal_width_m'],defenders=a['defenders'],keeper_id=a['keeper_id'])
+        receiver_ids=(r.get('signature') or {}).get('receivers',{})
+        roster={f"{p['side']}:{p['cap_number']}":p for p in snapshot['advanced_motion']['players']}
+        signature['receivers']={i:point_at(roster[i],a['shot']['second'],ctx['length_m'],ctx['width_m']) if i in roster else None for i in receiver_ids}
         if r.get('signature')!=json.loads(json.dumps(signature)):continue
         out['rows'].append(v)
     if out['rows']:out.update(status='experimental_partial',reason='')
