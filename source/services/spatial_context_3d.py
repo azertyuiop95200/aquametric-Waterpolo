@@ -1,13 +1,14 @@
 """Bridge reviewed shot context to the shared 3D engine.
 Every trajectory, height, speed, posture and counterfactual is a hypothesis.
-No future observation is used to infer a better decision.
+Dynamic defender velocity and initial position use forward raw observations only.
+Reviewed shot/receiver context remains retrospective, not an online decision model.
 """
 from math import hypot
 from copy import deepcopy
 from .collective_review import num, context
 from .shot_context_review import point_at
 from .spatial_replay import review,number
-from .spatial_predecision_motion import estimate,in_bounds
+from .spatial_predecision_motion import estimate_reviewed,in_bounds
 
 LIMIT=4
 TRIALS=32
@@ -44,9 +45,10 @@ def prepare(snapshot,raw):
     motion={}
     if mode=='predecision_velocity':
         for d in defs:
-            m=estimate(roster[d['id']],t,L,W)
-            if m is None:raise ValueError('Suivi antérieur continu insuffisant pour '+d['id']+'. Choisir explicitement le modèle immobile ou revoir les pistes.')
+            m=estimate_reviewed(snapshot,d['id'],t,L,W)
+            if m is None:raise ValueError('Piste brute chronologique ou calibration antérieure insuffisante pour '+d['id']+'. Choisir explicitement le modèle immobile ou revoir les pistes.')
             d['velocity']=m['velocity']
+            d['position']=[*m['position_xy'],h]
             motion[d['id']]=m
     poses=raw.get('reach_segments') or {}
     if not isinstance(poses,dict) or not set(poses)<=set(a['defenders']):raise ValueError('Postures hypothétiques invalides.')
@@ -127,7 +129,7 @@ def build(snapshot, *, local_source):
         roster={f"{p['side']}:{p['cap_number']}":p for p in snapshot['advanced_motion']['players']}
         signature['receivers']={i:point_at(roster[i],a['shot']['second'],ctx['length_m'],ctx['width_m']) if i in roster else None for i in receiver_ids}
         if v.get('motion_mode')=='predecision_velocity':
-            signature['predecision_motion']={i:estimate(roster[i],a['shot']['second'],ctx['length_m'],ctx['width_m']) if i in roster else None for i in a['defenders']}
+            signature['predecision_motion']={i:estimate_reviewed(snapshot,i,a['shot']['second'],ctx['length_m'],ctx['width_m']) for i in a['defenders']}
         if r.get('signature')!=json.loads(json.dumps(signature)):continue
         out['rows'].append(v)
     if out['rows']:out.update(status='experimental_partial',reason='')
