@@ -604,6 +604,11 @@ def save_collective_review(
     field_players_only:bool=Form(False),
     shot_index:int|None=Form(None), event_id:int|None=Form(None),
     save_event_id:str=Form(""), shot_link_reviewed:bool=Form(False),
+    release_height_m:float|None=Form(None), defender_height_m:float|None=Form(None),
+    radius_m:float|None=Form(None), horizontal_speed_mps:float|None=Form(None),
+    sigma_m:float|None=Form(None), receiver_height_m:float|None=Form(None),
+    receivers:list[str]=Form([]), hypotheses_reviewed:bool=Form(False),
+    reach_json:str=Form(""), reception_s:str=Form(""), budget_s:str=Form(""),
     db:Session=Depends(get_db),
 ):
     import json
@@ -613,7 +618,7 @@ def save_collective_review(
     if not _is_owned_upload(match):raise HTTPException(400,"Une vidéo locale calibrée est nécessaire.")
     if not _METRIC_SLOT.acquire(blocking=False):raise HTTPException(429,"Un calcul est déjà en cours.")
     try:
-        if len(binding)>12000 or action not in ("add","clear","add_recovery","clear_recovery","add_shot","clear_shot"):raise ValueError("Requête invalide.")
+        if len(binding)>12000 or action not in ("add","clear","add_recovery","clear_recovery","add_shot","clear_shot","add_3d","clear_3d"):raise ValueError("Requête invalide.")
         snap=analysis_snapshot(db,match);ctx=context(snap)
         if ctx is None or json.loads(binding)!=ctx:raise ValueError("Calibration ou identités modifiées. Actualiser le rapport.")
         auto=db.scalar(select(AutonomousAnalysis).where(AutonomousAnalysis.match_id==match.id).order_by(AutonomousAnalysis.id.desc()).limit(1))
@@ -628,6 +633,13 @@ def save_collective_review(
             summary.pop("recovery_reviews",None)
         elif action=="clear_shot":
             summary.pop("shot_context_reviews",None)
+        elif action=="clear_3d":
+            summary.pop("spatial_3d_reviews",None)
+        elif action=="add_3d":
+            from services.spatial_context_3d import append as append_3d
+            if len(reach_json)>10000:raise ValueError("Postures trop volumineuses.")
+            raw=dict(binding=ctx,event_id=event_id,release_height_m=release_height_m,defender_height_m=defender_height_m,radius_m=radius_m,horizontal_speed_mps=horizontal_speed_mps,sigma_m=sigma_m,receiver_height_m=receiver_height_m,receivers=receivers,hypotheses_reviewed=hypotheses_reviewed,motion_mode="stationary_hypothesis",reach_segments=json.loads(reach_json) if reach_json else {},reception_s=float(reception_s) if reception_s else None,budget_s=float(budget_s) if budget_s else None,evidence=evidence)
+            summary["spatial_3d_reviews"]=append_3d(snap,raw)
         elif action=="add_shot":
             from services.shot_context_review import append as append_shot
             raw=dict(binding=ctx,shot_index=shot_index,event_id=event_id,save_event_id=int(save_event_id) if save_event_id else None,goal_x=goal_x,goal_width_m=float(goal_width_m) if goal_width_m else None,defenders=defenders,keeper=keeper,assumed_lateral_span_m=float(assumed_lateral_span_m) if assumed_lateral_span_m else None,evidence=evidence,shot_link_reviewed=shot_link_reviewed,roster_reviewed=roster_reviewed)
@@ -640,7 +652,7 @@ def save_collective_review(
             raw=dict(binding=ctx,start_s=start_s,end_s=end_s,period=period,attacking_side=attacking_side,attackers=attackers,defenders=defenders,carrier=carrier,goal_x=goal_x,control_reviewed=control_reviewed,roster_reviewed=roster_reviewed,evidence=evidence,center=center,marker=marker,keeper=keeper,goal_width_m=float(goal_width_m) if goal_width_m else None,assumed_lateral_span_m=float(assumed_lateral_span_m) if assumed_lateral_span_m else None)
             summary["collective_reviews"]=append(snap,raw)
         auto.summary_json=json.dumps(summary,ensure_ascii=False);db.commit()
-        anchor="shotContext" if action in ("add_shot","clear_shot") else "recoveryReview" if action in ("add_recovery","clear_recovery") else "collectiveReview"
+        anchor="spatial3d" if action in ("add_3d","clear_3d") else "shotContext" if action in ("add_shot","clear_shot") else "recoveryReview" if action in ("add_recovery","clear_recovery") else "collectiveReview"
         return RedirectResponse(f"/matches/{match_id}/analysis/result#{anchor}",status_code=303)
     except (ValueError,TypeError,KeyError,AttributeError,OverflowError) as exc:
         raise HTTPException(422,str(exc) if isinstance(exc,ValueError) else "Revue collective invalide.") from None
