@@ -86,6 +86,8 @@ def test_full_reference_and_spatial_report():
             assert page.status_code==200,page.text
             assert 'id="reviewReferences"' in page.text
             assert 'id="spatialDecision"' in page.text
+            assert page.text.count('id="shotContext"')==1
+            assert page.text.count('id="recoveryReview"')==1
         archive=owner.get(base+"/analysis/export.zip")
         assert archive.status_code==200,archive.text
         snapshot,html=read_zip(archive)
@@ -95,6 +97,12 @@ def test_full_reference_and_spatial_report():
         assert str(event_id) in snapshot["spatial_decision"]["reviews"]
         assert "Non calibrée" in html
         assert "Révision synthétique" in html
+        assert snapshot["recovery_review"]["status"]=="unavailable"
+        assert snapshot["shot_context"]["status"]=="unavailable"
+        assert html.count('id="shotContext"')==1
+        assert html.count('id="recoveryReview"')==1
+        assert html.index('id="coach-tirs"')<html.index('id="shotContext"')<html.index('id="coach-passes"')
+        assert html.index('id="coach-phases"')<html.index('id="recoveryReview"')<html.index('id="coach-mouvement"')
         assert 'id="spatialDecision"' in html
         out=os.getenv("AQUAMETRIC_FULL_REPORT_DIR")
         if out:
