@@ -70,16 +70,21 @@ jobs:
               snapshot['spatial_3d'] = build_3d(snapshot, local_source=True)
               for name in ('spatial_context_3d_rows.html','spatial_context_3d_editor.html'):
                   env.get_template(name).render(snapshot=snapshot,match=SimpleNamespace(id=1,team=SimpleNamespace(name='A'),opponent='B'))
+          from test_spatial_predecision_motion import saved as saved_dynamic
+          snapshot=saved_dynamic()
+          snapshot['spatial_3d']=build_3d(snapshot, local_source=True)
+          html=env.get_template('spatial_context_3d_rows.html').render(snapshot=snapshot)
+          assert 'Déplacements défensifs avant le tir' in html
           PY
 
-  live-release-five:
+  live-release-six:
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
-      - name: Verify live release five and isolated guest report
+      - name: Verify live release six and isolated guest report
         env:
           BASE: https://aquametric-ultimate-guest.onrender.com
-          EXPECTED: 1f2a5bd8ef28b4c2d16eb19d7898da43ed2253ba
+          EXPECTED: d75f1dfc2a48eb6752fbd4aaf06e77207528af00
         run: |
           set -euo pipefail
           tmp=$(mktemp -d)
@@ -108,6 +113,8 @@ jobs:
           grep -Fq 'id="recoveryReview"' "$tmp/export"
           grep -Fq 'id="shotContext"' "$tmp/report"
           grep -Fq 'id="shotContext"' "$tmp/export"
+          grep -Fq 'id="spatial3d"' "$tmp/report"
+          grep -Fq 'id="spatial3d"' "$tmp/export"
           # The live uncalibrated URL dossier must reject a collective review.
           code=$(curl -sS --max-time 30 -b "$tmp/cookies" -H "Origin: $BASE" --data-urlencode 'binding={}' --data-urlencode 'action=add' -o "$tmp/rejected" -w '%{http_code}' "$BASE/matches/$id/analysis/collective-review")
           [[ "$code" == 400 || "$code" == 422 ]]
