@@ -1,6 +1,8 @@
 {% extends 'base.html' %}
 {% block content %}
 <style>
+/* Author button display rules must not override source selection visibility. */
+#analysisForm [hidden]{display:none!important}
 .device-choice{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:18px 0}.device-choice button{min-height:104px;text-align:left;padding:18px;border:1px solid var(--border,#294754);border-radius:18px;background:var(--panel,#0b202b);color:inherit;cursor:pointer}.device-choice button:hover,.device-choice button.active{border-color:#38bdf8;box-shadow:0 0 0 2px rgba(56,189,248,.14)}.device-choice strong{display:block;font-size:18px;margin-bottom:6px}.device-choice small{display:block;opacity:.78;line-height:1.4}.analysis-mode{display:none;margin-top:16px;padding:16px;border:1px solid rgba(255,255,255,.1);border-radius:16px;background:rgba(255,255,255,.025)}.analysis-mode.active{display:block}.mode-note{margin:0 0 12px;opacity:.82}.analysis-mode .actions{margin-top:12px}.scope-box{margin-top:14px;padding:14px;border:1px solid rgba(255,255,255,.1);border-radius:14px;background:rgba(255,255,255,.02)}.scope-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.scope-grid[hidden]{display:none}@media(max-width:700px){.device-choice,.scope-grid{grid-template-columns:1fr}.device-choice button{min-height:92px}}
 .analysis-quickstart{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:16px 0 22px}
 .analysis-quickstart button,.analysis-quickstart a{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:5px;min-height:84px;padding:14px;border-radius:14px;border:1px solid rgba(56,189,248,.34);background:rgba(56,189,248,.09);color:inherit;font:inherit;text-align:left;text-decoration:none;cursor:pointer}

@@ -9,7 +9,7 @@ on:
       - 'render.yaml'
       - '.github/workflows/v121-mobile-regression.yml'
   pull_request:
-    branches: [main]
+    branches: [main, 'fix/youtube-report-intake-2026-11']
     paths:
       - 'source/**'
       - 'Dockerfile'
@@ -89,7 +89,12 @@ jobs:
             const page = await browser.newPage({viewport:{width:390,height:844}, isMobile:true, hasTouch:true});
             const base='http://127.0.0.1:10000';
             await page.goto(base+'/demo-login',{waitUntil:'networkidle'});
-            await page.waitForURL('**/my-team');
+            await page.waitForURL(url => url.pathname === '/matches/new');
+            assert(await page.locator('#analysisForm').isVisible(),'analysis entry form missing after demo login');
+            assert(await page.locator('#quickYoutubeAnalysis').isVisible(),'YouTube quick entry missing');
+            assert(await page.locator('#quickFileAnalysis').isVisible(),'file quick entry missing');
+            await page.goto(base+'/my-team',{waitUntil:'networkidle'});
+            assert(new URL(page.url()).pathname === '/my-team','legacy team page is not accessible');
             const original=page.url();
             const toggle=page.locator('[data-menu-toggle]');
             assert(await toggle.isVisible(),'mobile menu button is not visible');

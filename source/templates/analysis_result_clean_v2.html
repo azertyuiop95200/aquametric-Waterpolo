@@ -277,10 +277,10 @@
   <section class="report-card status-warn"><h2>Traitement interrompu</h2><p>La dernière consolidation n’a pas terminé. Les données déjà enregistrées restent consultables ; tu peux relancer les extraits si la capture est encore disponible.</p></section>
   {% endif %}
 
-  {% if match.status == "source_link_saved" %}
+  {% if match.status in ["source_link_saved", "guest_link_saved"] %}
   <section class="report-card status-warn" id="mobileLinkSaved"><h2>Lien enregistré dans ton dossier</h2>
     <p><strong>Vidéo identifiée mais non analysée.</strong> Aucun pixel n’a été reçu à partir de ce lien. Les statistiques, les identités et les conclusions tactiques ne peuvent pas être déduites de son seul enregistrement.</p>
-    <div class="actions"><a class="btn" href="/matches/{{match.id}}">Ouvrir le match et annoter</a>{% if match.video_source == "youtube" %}<a class="btn secondary" href="/matches/{{match.id}}/analysis/browser-capture">Reprendre sur ordinateur</a>{% else %}<a class="btn secondary" href="/matches/new">Importer un fichier vidéo analysable</a>{% endif %}<a class="btn secondary" href="/analysis/video-session-elite?match_id={{match.id}}">Préparer une séance vidéo</a></div>
+    <div class="actions"><a class="btn" href="/matches/{{match.id}}">Ouvrir le match et annoter</a>{% if match.status == "guest_link_saved" %}<span class="evidence-note">Mode invité : annotation manuelle disponible, analyse IA payante désactivée.</span>{% elif match.video_source == "youtube" %}<a class="btn secondary" href="/matches/{{match.id}}/analysis/browser-capture">Reprendre sur ordinateur</a>{% else %}<a class="btn secondary" href="/matches/new">Importer un fichier vidéo analysable</a>{% endif %}<a class="btn secondary" href="/analysis/video-session-elite?match_id={{match.id}}">Préparer une séance vidéo</a></div>
     <p class="evidence-note">Conserve ton accès au compte pour retrouver ce dossier. Le mode invité et le stockage temporaire ne garantissent pas sa conservation après redémarrage.</p>
   </section>
   {% endif %}

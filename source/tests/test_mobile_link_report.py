@@ -63,3 +63,29 @@ def test_unverified_events_are_not_reported_as_confirmed():
     export = client.get(f'/matches/{match_id}/analysis/report.html')
     assert '<script>bad()</script>' not in export.text
     assert '&lt;script&gt;' in export.text
+
+
+def test_guest_phone_link_status_and_export(monkeypatch):
+    import main
+    monkeypatch.setattr(main, "WEB_DEMO_MODE", True)
+    client = TestClient(app)
+    assert client.get("/demo-login", follow_redirects=False).status_code == 303
+    response = create(client)
+    assert response.status_code == 303
+    target = response.headers["location"]
+    match_id = int(target.split("/")[2])
+    with SessionLocal() as db:
+        match = db.get(Match, match_id)
+        assert match.status == "guest_link_saved"
+        assert not match.events
+    for _ in range(2):
+        page = client.get(target)
+        assert page.status_code == 200
+        assert 'id="mobileLinkSaved"' in page.text
+        assert "Vidéo identifiée mais non analysée" in page.text
+        assert "Mode invité : annotation manuelle disponible" in page.text
+    export = client.get(f"/matches/{match_id}/analysis/report.html")
+    assert export.status_code == 200
+    assert "Non mesuré" in export.text
+    assert "Vidéo identifiée mais non analysée" in export.text
+    assert registered().get(f"/matches/{match_id}/analysis/report.html").status_code == 404
