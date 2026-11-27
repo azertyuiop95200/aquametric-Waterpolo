@@ -3,7 +3,8 @@ Every trajectory, height, speed, posture and counterfactual is a hypothesis.
 No future observation is used to infer a better decision.
 """
 from math import hypot
-from .collective_review import num
+from copy import deepcopy
+from .collective_review import num, context
 from .shot_context_review import point_at
 from .spatial_replay import review,number
 
@@ -14,6 +15,7 @@ TRIALS=32
 def available(snapshot):
     s=snapshot.get('shot_context') or {}
     ctx=s.get('context')
+    if ctx is None or ctx!=context(snapshot):return None,[]
     rows=[r for r in s.get('rows',[]) if r.get('complete_geometry') is True and r.get('keeper_id') in r.get('defenders',{}) and num(r.get('goal_width_m')) and abs(r['goal_width_m']-3)<1e-6]
     return ctx,rows
 
@@ -86,7 +88,7 @@ def append(snapshot,raw):
     rows=list(old.get('rows',[])) if old.get('binding')==ctx else []
     rows=[r for r in rows if r.get('result',{}).get('event_id')!=result['event_id']]
     if len(rows)>=LIMIT:raise ValueError('Quatre simulations maximum.')
-    return dict(binding=ctx,rows=rows+[dict(signature=signature,result=result)])
+    return dict(binding=deepcopy(ctx),rows=rows+[dict(signature=signature,result=result)])
 
 
 def build(snapshot, *, local_source):
