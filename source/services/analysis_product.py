@@ -387,12 +387,25 @@ def analysis_snapshot(db, match):
     snapshot["statistics"] = match_statistics(match)
     from services.elite_performance import elite_report
     snapshot["elite_performance"] = elite_report(snapshot["verified_events"])
+    from services.statistical_audit import audit_rows
+    roster=[{"id":p.id,"name":p.name,"cap_number":p.cap_number} for p in match.team.players]
+    snapshot["statistical_audit"] = audit_rows(snapshot["verified_events"], roster=roster)
+    snapshot["statistical_audit"]["excluded_count"]=snapshot["statistics"]["excluded_unverified_events"]
+    from services.advanced_observed_metrics import advanced_report
+    snapshot["advanced_observed"] = advanced_report(snapshot["verified_events"],roster)
+    from services.lineup_performance import lineup_report, phase_context_report
+    snapshot["lineup_performance"] = lineup_report(snapshot["verified_events"],roster)
+    snapshot["phase_context"] = phase_context_report(snapshot["verified_events"])
+    from services.tactical_sequence_metrics import sequence_report
+    snapshot["tactical_sequences"] = sequence_report(snapshot["verified_events"])
     from services.video_action_report import action_report
     snapshot["video_actions"] = action_report(db, match)
     from services.identity_aggregation import build_identity_report
     summary = snapshot["automatic"].get("summary", {})
     snapshot["identity_analysis"] = build_identity_report(summary.get("metric_field_map", {}), snapshot["verified_events"], snapshot["video_actions"], [{"id":p.id,"name":p.name,"cap_number":p.cap_number} for p in match.team.players], summary.get("identity_reviews", {}))
     snapshot["identity_analysis"]["analysis_id"] = auto.id if auto else None
+    from services.tracking_performance import motion_report
+    snapshot["motion_performance"] = motion_report(summary.get("metric_field_map", {}),snapshot["identity_analysis"])
     from services.report_coverage import report_coverage
     snapshot["report_coverage"] = report_coverage(snapshot["verified_events"], snapshot["video_actions"], [{"id":p.id,"name":p.name,"cap_number":p.cap_number} for p in match.team.players])
     from services.defensive_systems import metric_diagnostics
@@ -427,6 +440,12 @@ def analysis_snapshot(db, match):
         snapshot["spatial_3d"]={"status":"invalid","context":None,"rows":[],"reason":"Simulation 3D incohérente."}
     from services.recognition_quality import audit
     snapshot["recognition_quality"] = audit(snapshot["automatic"], snapshot["video_actions"])
+    from services.statistical_audit import enrich_audit
+    enrich_audit(snapshot["statistical_audit"],snapshot["advanced_observed"],snapshot["identity_analysis"],snapshot["statistics"])
+    from services.statistical_audit import enrich_lineups
+    enrich_lineups(snapshot["statistical_audit"],snapshot["lineup_performance"],snapshot["phase_context"])
+    from services.statistical_audit import enrich_sequences
+    enrich_sequences(snapshot["statistical_audit"],snapshot["tactical_sequences"])
     # Basic counters over an empty event set are implementation zeros, not
     # measured match statistics. Apply the same contract to JSON/CSV and HTML.
     for side in ("team", "opponent"):
@@ -568,6 +587,15 @@ def build_analysis_zip(db, match, evidence_dir: Path) -> io.BytesIO:
                 for p in auto_report["players"] for row in flatten_measurements(p["report"])]))
         archive.writestr(f"{root}/04_sequences/action_coverage.json", json.dumps(
             {key: auto_report[key] for key in ("segments", "families", "coverage_percent", "physical")}, ensure_ascii=False, indent=2))
+        audit=snapshot["statistical_audit"]
+        audit_export=[dict(row, side=side, player_id=None) for side in ("team","opponent") for row in audit[side]]
+        audit_export.extend(dict(row, side=p["side"], player_id=p["player_id"]) for p in audit["players"] for row in p["metrics"])
+        archive.writestr(f"{root}/02_kpis/lineup_performance.json",json.dumps(snapshot["lineup_performance"],ensure_ascii=False,indent=2))
+        archive.writestr(f"{root}/02_kpis/tactical_sequences.json",json.dumps(snapshot["tactical_sequences"],ensure_ascii=False,indent=2))
+        archive.writestr(f"{root}/02_kpis/phase_context.json",json.dumps(snapshot["phase_context"],ensure_ascii=False,indent=2))
+        archive.writestr(f"{root}/02_kpis/motion_performance.json", json.dumps(snapshot["motion_performance"],ensure_ascii=False,indent=2))
+        archive.writestr(f"{root}/02_kpis/advanced_observed.json", json.dumps(snapshot["advanced_observed"],ensure_ascii=False,indent=2))
+        archive.writestr(f"{root}/02_kpis/statistical_audit.csv", _csv_text(["side","player_id","section","key","label","value","state","denominator","requirement","scope"], audit_export))
         archive.writestr(f"{root}/02_kpis/all_match_measurements.csv",
             _csv_text(["perspective", "metric", "value"], [
                 {"perspective": side, **row} for side in ("team", "opponent")

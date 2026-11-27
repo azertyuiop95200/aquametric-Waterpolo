@@ -1,0 +1,16 @@
+<h3>Compositions, présence et différentiel de buts</h3>
+{% set l=snapshot.lineup_performance %}
+<p>{{l.note}}</p>
+<table class="metric-table"><thead><tr><th>Quart</th><th>Présences complètes déclarées</th><th>Buts complets déclarés (deux équipes)</th><th>État</th></tr></thead><tbody>
+{% for q in l.quarters %}<tr><td>Q{{q.period}}</td><td>{{'Oui' if q.lineup_claim else 'Non'}}</td><td>{{'Oui' if q.goal_claim else 'Non'}}</td><td>{{q.reason}}</td></tr>{% endfor %}
+</tbody></table>
+<details open><summary>Impact individuel sur les quarts admissibles</summary>
+<div style="overflow-x:auto"><table class="metric-table"><thead><tr><th>Joueuse</th><th>Temps apparié (s)</th><th>Temps évalué +/− (s)</th><th>Buts pour</th><th>Buts contre</th><th>+/−</th><th>+/− par 8 min</th></tr></thead><tbody>
+{% for p in l.players %}<tr><td>{{p.name}}</td><td>{{p.playing_seconds if p.playing_seconds is not none else '—'}}</td><td>{{p.goal_evaluated_seconds}}</td><td>{{p.goals_for if p.goals_for is not none else '—'}}</td><td>{{p.goals_against if p.goals_against is not none else '—'}}</td><td>{{p.plus_minus if p.plus_minus is not none else '—'}}</td><td>{{p.plus_minus_per_8min if p.plus_minus_per_8min is not none else '—'}}</td></tr>{% endfor %}</tbody></table></div></details>
+<details><summary>Compositions collectives observées</summary>
+{% if l.lineups %}<div style="overflow-x:auto"><table class="metric-table"><thead><tr><th>Composition</th><th>Durée (s)</th><th>Pour</th><th>Contre</th><th>+/−</th><th>+/− par 8 min</th><th>Quarts</th></tr></thead><tbody>
+{% for r in l.lineups %}<tr><td>{{r.names|join(', ')}}</td><td>{{r.seconds}}</td><td>{{r.goals_for}}</td><td>{{r.goals_against}}</td><td>{{r.plus_minus}}</td><td>{{r.plus_minus_per_8min}}</td><td>{{r.periods|join(', ')}}</td></tr>{% endfor %}</tbody></table></div>{% else %}<p>Aucun quart admissible. Aucun classement artificiel.</p>{% endif %}</details>
+{% if snapshot.phase_context is defined %}<h3>Possessions selon leur phase initiale</h3><p>{{snapshot.phase_context.note}}</p>
+{% set labels={'even_attack':'6v6','power_play':'Supériorité','counterattack':'Contre-attaque','centre_play':'Pointe','penalty':'Penalty','auto':'Non déterminée'} %}
+{% for side,name in [('for',match.team.name),('against',match.opponent)] %}<details><summary>{{name}}</summary><table class="metric-table"><thead><tr><th>Phase initiale</th><th>Possessions appariées</th><th>Buts</th><th>Conversion (%)</th><th>Durée moyenne (s)</th></tr></thead><tbody>
+{% for p in snapshot.phase_context.sides[side].phases %}<tr><td>{{labels[p.phase]}}</td><td>{{p.possessions}}</td><td>{{p.goals if p.goals is not none else '—'}}</td><td>{{p.conversion_pct if p.conversion_pct is not none else '—'}}</td><td>{{p.mean_seconds if p.mean_seconds is not none else '—'}}</td></tr>{% endfor %}</tbody></table></details>{% endfor %}{% endif %}

@@ -67,8 +67,8 @@ EVENT_TYPES = (
     "block", "interception", "recovery", "save", "bad_pass", "turnover", "foul",
     "exclusion", "exclusion_earned", "exclusion_committed", "penalty_earned", "penalty_committed",
     "whistle", "power_play_start", "penalty_kill_start", "counterattack_start",
-    "defensive_recovery_start", "fast_recovery", "late_recovery",
-    "foul_earned", "offensive_foul", "unforced_error", "goal_against", "possession_end", "power_play_end", "penalty_kill_end", "shot_clock_expired", "player_in", "player_out", "distance_sample", "swim_off_won", "swim_off_lost", "timeout_start", "timeout_end", "period_start", "period_end", "sprint"
+    "defensive_recovery_start", "counterattack_end", "defensive_recovery_end", "fast_recovery", "late_recovery",
+    "foul_earned", "offensive_foul", "unforced_error", "goal_against", "possession_start", "possession_end", "power_play_end", "penalty_kill_end", "shot_clock_expired", "player_in", "player_out", "distance_sample", "swim_off_won", "swim_off_lost", "timeout_start", "timeout_end", "period_start", "period_end", "sprint"
 )
 PHASE_TAGS = ("auto", "even_attack", "even_defence", "power_play", "penalty_kill", "counterattack", "defensive_recovery", "centre_play", "restart", "penalty")
 PERSPECTIVES = ("for", "against", "neutral")
@@ -745,7 +745,7 @@ def create_evidence(
         raise HTTPException(400, detail="Unsupported evidence type.")
     if analysis_type not in {"action", "tactic", "technique", "referee", "transition"}:
         raise HTTPException(400, detail="Unsupported analysis category.")
-    if second < 0 or second > 12 * 60 * 60:
+    if not __import__("math").isfinite(second) or second < 0 or second > 12 * 60 * 60:
         raise HTTPException(400, detail="Evidence time is outside the supported range.")
     linked_event = None
     if event_id:
@@ -909,6 +909,18 @@ def add_event(
     game_clock_s: str = Form(""),
     outcome: str = Form(""),
     distance_m: str = Form(""),
+    possession_id: str = Form(""),
+    action_id: str = Form(""),
+    receiver_id: str = Form(""),
+    passes_complete: str = Form(""),
+    tsap_category: str = Form(""),
+    tsap_coverage: str = Form(""),
+    metric_type: str = Form(""),
+    metric_value: str = Form(""),
+    metric_calibrated: str = Form(""),
+    sequence_id: str = Form(""),
+    lineups_complete: str = Form(""),
+    goals_complete: str = Form(""),
     db: Session = Depends(get_db),
 ):
     user = require_user(request, db)
@@ -955,6 +967,8 @@ def add_event(
 
     if perspective not in PERSPECTIVES:
         perspective = "neutral"
+    if return_to=="report" and pid is not None and perspective!="for":
+        raise HTTPException(400,detail="Cette joueuse appartient à votre équipe.")
     if phase_tag not in PHASE_TAGS:
         phase_tag = "auto"
     # Structured optional evidence fields. Video time is not playing time.
@@ -968,7 +982,7 @@ def add_event(
             evidence_tags.append(f"game_clock_s={clock_value}")
         if outcome:
             allowed = set(END_LABELS) if event_type == "possession_end" else {"goal", "no_goal"}
-            if event_type in {"possession_end", "power_play_end", "penalty_kill_end"}:
+            if event_type in {"possession_end", "power_play_end", "penalty_kill_end", "counterattack_end"}:
                 if outcome not in allowed:
                     raise HTTPException(400, detail="Issue incompatible avec cette action.")
                 evidence_tags.append(f"outcome={outcome}")
@@ -977,7 +991,40 @@ def add_event(
             if distance is None:
                 raise HTTPException(400, detail="Distance mesurée invalide.")
             evidence_tags.append(f"distance_m={distance}")
-        note = f"{note[:340]} {' '.join(evidence_tags)}"
+        for key,value in (("possession",possession_id),("action_id",action_id),("sequence",sequence_id)):
+            if value.strip():
+                if not re.fullmatch(r"[A-Za-z0-9_-]{1,32}",value.strip()):
+                    raise HTTPException(400, detail="Identifiant invalide.")
+                evidence_tags.append(f"{key}={value.strip().lower()}")
+        if receiver_id:
+            receiver = db.get(Player,int(receiver_id)) if receiver_id.isdecimal() else None
+            if perspective!="for" or pid is None or not receiver or receiver.team_id!=match.team_id or receiver.id==pid or event_type not in {"pass_complete","assist","key_pass"} or not action_id.strip():
+                raise HTTPException(400,detail="Destinataire ou identifiant de passe invalide.")
+            evidence_tags.append(f"receiver_id={receiver.id}")
+        if passes_complete=="yes" and event_type=="possession_end":
+            evidence_tags.append("passes_complete=yes")
+        if tsap_category:
+            if tsap_category not in {"rb","cb","nb","lb","ob","ss"} or pid is None or not action_id.strip():
+                raise HTTPException(400,detail="TSAP : joueuse, catégorie et identifiant d'action requis.")
+            evidence_tags.append(f"tsap={tsap_category}")
+        if tsap_coverage=="complete" and tsap_category:
+            evidence_tags.append("tsap_coverage=complete")
+        if metric_type or metric_value:
+            from services.advanced_observed_metrics import METRIC_SPEC
+            spec=METRIC_SPEC.get(metric_type)
+            if not spec or event_type not in spec[0] or metric_calibrated!="yes":
+                raise HTTPException(400,detail="Mesure incompatible ou calibration non confirmée.")
+            val=number(metric_value,spec[2])
+            if val is None or val<spec[1]:
+                raise HTTPException(400,detail="Valeur physique invalide.")
+            evidence_tags.extend([f"{metric_type}={val}","measurement=calibrated"])
+        if lineups_complete=="yes" or goals_complete=="yes":
+            if event_type!="period_end" or number(game_clock_s,480)!=0 or perspective not in {"for","against"} or (lineups_complete=="yes" and perspective!="for"):
+                raise HTTPException(400,detail="Couverture : fin de quart à 0 s, équipe correcte requise.")
+            if lineups_complete=="yes": evidence_tags.append("lineups_complete=yes")
+            if goals_complete=="yes": evidence_tags.append("goals_complete=yes")
+        suffix=" ".join(evidence_tags)
+        note = f"{note[:max(0,499-len(suffix))]} {suffix}"
     event = Event(
         match_id=match.id,
         player_id=pid,

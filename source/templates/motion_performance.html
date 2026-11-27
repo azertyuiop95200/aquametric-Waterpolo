@@ -1,0 +1,22 @@
+<h3>Cartographie métrique et déplacements observés</h3>
+<p>Les durées suivantes sont des secondes vidéo suivies, et non des minutes de jeu officielles. Les intervalles manquants ne sont pas extrapolés, les chevauchements ne sont comptés qu'une fois et les pistes incompatibles sont écartées.</p>
+{% for p in snapshot.motion_performance.players %}
+<details><summary>{{p.name}} · bonnet {{p.cap_number}} · {{'Équipe' if p.side=='for' else 'Adversaire'}}</summary>
+<table class="metric-table"><tbody>
+<tr><th>Temps suivi (s)</th><td>{{p.observed_seconds}}</td></tr>
+<tr><th>Distance 2D (m)</th><td>{{p.distance_m if p.distance_m is not none else '—'}}</td></tr>
+<tr><th>Vitesse moyenne 2D (m/s)</th><td>{{p.average_speed_mps if p.average_speed_mps is not none else '—'}}</td></tr>
+<tr><th>90e percentile (m/s)</th><td>{{p.speed_p90_mps if p.speed_p90_mps is not none else '—'}}</td></tr>
+<tr><th>Pic échantillonné (m/s)</th><td>{{p.peak_sample_speed_mps if p.peak_sample_speed_mps is not none else '—'}}</td></tr>
+<tr><th>Chevauchement / conflit (s)</th><td>{{p.overlap_seconds}} / {{p.conflict_seconds}}</td></tr>
+</tbody></table>
+{% if p.occupancy %}
+{% set xmin=p.occupancy|map(attribute='x_index')|min %}{% set xmax=p.occupancy|map(attribute='x_index')|max %}
+{% set ymin=p.occupancy|map(attribute='y_index')|min %}{% set ymax=p.occupancy|map(attribute='y_index')|max %}
+{% set peak=p.occupancy|map(attribute='seconds')|max %}
+<svg viewBox="{{xmin*25}} {{ymin*25}} {{(xmax-xmin+1)*25}} {{(ymax-ymin+1)*25}}" style="width:100%;max-width:480px;max-height:300px;background:#d5e7ee;border:1px solid #6492ac" role="img" aria-label="Occupation spatiale observée, repère calibré">
+{% for cell in p.occupancy %}<rect x="{{cell.x_index*25}}" y="{{cell.y_index*25}}" width="25" height="25" fill="#087da8" fill-opacity="{{0.12+0.88*cell.seconds/peak if peak else 0.12}}" stroke="#fff" stroke-width=".5"><title>{{cell.seconds}} s · {{cell.share_pct}} %</title></rect>{% endfor %}
+</svg>
+<p>Cellules de {{p.cell_m}} m × {{p.cell_m}} m dans le repère calibré. Intensité relative au maximum individuel ; ce n'est pas une carte du bassin entier. {{p.note}}</p>
+{% else %}<p>Aucun intervalle métrique exploitable.</p>{% endif %}
+</details>{% else %}<p>Aucune piste attribuée et calibrée disponible.</p>{% endfor %}
