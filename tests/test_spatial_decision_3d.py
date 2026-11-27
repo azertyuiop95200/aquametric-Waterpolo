@@ -44,4 +44,26 @@ class SpatialTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             Track("d",(0,0,0),reach_segments=(part,part))
 
+    def test_timed_arm_closes_lane_before_ball_arrival(self):
+        from source.spatial_decision_3d import ReachSegment
+        def arm(reaction):
+            return ReachSegment("left_arm",(0,0,0),(0,0,.4),.12,
+                                (0,0,0),(0,-1.3,0),reaction,.1)
+        def run(reaction):
+            d=Track("d",(2.5,1.3,1),radius=.3,reach_segments=(arm(reaction),))
+            return assess((0,0,1),(5,0,1),.3,[d],1,steps=80)
+        early,late=run(0),run(.4)
+        self.assertEqual(early["status"],"potential_obstruction")
+        self.assertEqual(early["closest_part"],"left_arm")
+        self.assertEqual(late["status"],"clear_in_model")
+        self.assertEqual(arm(0).offsets_at(.2)[1],(0,-1.3,0))
+        self.assertEqual(arm(.4).offsets_at(.1)[1],(0,0,.4))
+
+    def test_timed_reach_rejects_partial_pose_and_invalid_duration(self):
+        from source.spatial_decision_3d import ReachSegment
+        with self.assertRaises(ValueError):
+            ReachSegment("left_arm",(0,0,0),(0,0,.4),.12,target_end_offset=(0,-1,0))
+        with self.assertRaises(ValueError):
+            ReachSegment("left_arm",(0,0,0),(0,0,.4),.12,motion_s=0)
+
 if __name__=="__main__": unittest.main()
