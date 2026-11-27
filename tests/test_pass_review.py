@@ -125,3 +125,9 @@ class PassReviewTests(unittest.TestCase):
     def test_duplicate_direct_shot_link(self):
         with self.assertRaises(ValueError):
             read(self.two_passes(related_event_id="G1",event_relation="precedes_shot"))
+
+    def test_temporal_link_not_assist(self):
+        a=self.validate()["actions"][0]
+        self.assertEqual(a["shot_link_status"],"temporal_only")
+        self.assertFalse(a["key_pass_verified"])
+        self.assertFalse(a["assist_verified"])
