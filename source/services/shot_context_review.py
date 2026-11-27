@@ -1,5 +1,6 @@
 """Reviewed event-linked planar shot context, not a reconstruction of ball flight."""
 from math import hypot, atan2, degrees
+from hashlib import sha256
 from .collective_review import context, num
 from .possession_geometry import segment_distance
 from .goalkeeper_geometry import snapshot as keeper_snapshot
@@ -9,11 +10,17 @@ LIMIT=12
 TIME_TOL=.25
 
 
+def source_key(path):
+    return sha256(str(path).encode('utf-8')).hexdigest()
+
+
 def primary_events(db,match,snapshot):
     """Only explicit primary-video positions; no cross-clip timestamp guessing."""
     from sqlalchemy import select
     from models import Event, EventPosition, MatchVideoSegment
     if match.video_source!='upload' or not match.video_path:return []
+    raw=((snapshot.get('automatic') or {}).get('summary') or {}).get('metric_field_map') or {}
+    if raw.get('source_key')!=source_key(match.video_path):return []
     primary=list(db.scalars(select(MatchVideoSegment).where(MatchVideoSegment.match_id==match.id,MatchVideoSegment.source_type=='upload',MatchVideoSegment.video_path==match.video_path)).all())
     if len(primary)>1:return []
     segment=primary[0].id if primary else None
@@ -24,6 +31,7 @@ def primary_events(db,match,snapshot):
     for e in snapshot.get('verified_events',[]):
         p=pos.get(e['id']); a=ids.get(e['id'],{}); side=e.get('perspective')
         if not p or e.get('event_type') not in SHOTS|{'save'} or side not in ('for','against') or type(p.period) is not int or not 1<=p.period<=8 or not num(p.segment_second) or p.segment_second<0:continue
+        if primary and p.period!=primary[0].period:continue
         if a.get('provenance') not in ('coach_review','confirmed_roster') or a.get('side')!=side or type(a.get('cap_number')) is not int:continue
         rows.append(dict(id=e['id'],kind=e['event_type'],second=p.segment_second,period=p.period,side=side,identity=f"{side}:{a['cap_number']}"))
     return rows
