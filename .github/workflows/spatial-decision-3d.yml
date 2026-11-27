@@ -4,12 +4,18 @@ on:
     branches: [feature/spatial-decision-3d, feature/convergence-report-v3]
     paths:
       - 'source/spatial_decision_3d.py'
+      - 'source/spatial_review_routes.py'
+      - 'source/static/spatial-*.js'
+      - 'source/templates/spatial_*.html'
       - 'source/services/spatial_*.py'
       - 'tests/test_spatial_*.py'
       - '.github/workflows/spatial-decision-3d.yml'
   pull_request:
     paths:
       - 'source/spatial_decision_3d.py'
+      - 'source/spatial_review_routes.py'
+      - 'source/static/spatial-*.js'
+      - 'source/templates/spatial_*.html'
       - 'source/services/spatial_*.py'
       - 'tests/test_spatial_*.py'
       - '.github/workflows/spatial-decision-3d.yml'
