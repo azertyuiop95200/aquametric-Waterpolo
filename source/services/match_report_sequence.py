@@ -4,10 +4,12 @@ from math import hypot
 try:
     from services.advanced_tracking import motion, transition
     from services.match_tactical_report import build_report, _num
+    from services.possession_geometry import analyze_window
 except ModuleNotFoundError as e:
     if e.name != 'services': raise
     from advanced_tracking import motion, transition
     from match_tactical_report import build_report, _num
+    from possession_geometry import analyze_window
 
 
 def _clip(segments, start, end):
@@ -32,7 +34,7 @@ def build_match_sequence(inputs):
     ordered=sorted(inputs,key=lambda x:(x['source'],x['period'],x['start']))
     reports=[]; previous={}; cumulative=defaultdict(Counter); event_ids=set()
     for raw in ordered:
-        args=dict(raw); transitions=args.pop('transition_records',[])
+        args=dict(raw); transitions=args.pop('transition_records',[]); windows=args.pop('possession_windows',[])
         key=(args['source'],args['period']); start,end=args['start'],args['end']
         if key in previous and start<previous[key]: raise ValueError('overlapping report windows')
         previous[key]=end
@@ -60,5 +62,11 @@ def build_match_sequence(inputs):
             if record.get('metric_endpoints_reviewed') is not True: continue
             value=transition(evidence,record['ball_start'],record['ball_end'],record['attack_axis'])
             report['transitions'].append({'id':ident,'start_s':a,'end_s':b,**value})
+        report['possession_geometry']=[]; last=start; ids=set()
+        for w in sorted(windows,key=lambda w:w['start_s']):
+            if not isinstance(w.get('id'),str) or not w['id'] or w['id'] in ids or w['start_s']<last:
+                raise ValueError('duplicate or overlapping possession subwindows')
+            report['possession_geometry'].append(analyze_window(report,w))
+            last=w['end_s']; ids.add(w['id'])
         reports.append(report)
     return {'scope':'source_period_reports_not_full_match_totals','reports':reports,'global_totals':None,'game_duration_s':None}
