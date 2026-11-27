@@ -107,13 +107,22 @@ def summarize(p,home_color):
             observation=e["observation"],prior_shot=e["linked_prior_shot"],
             referee_signal_observed=e.get("referee_signal_observed",False),decision_verified=e["decision_verified"],
             cause_candidate=e.get("cause_candidate"),attributed_cause=result["attributed_cause"]))
+    # Opposite observed controls at the same instant cannot both be true.
+    endpoints={}
+    for e in r["possession_review_intervals"]:
+        for edge,key in (("before","start_s"),("after","end_s")):
+            if e[edge+"_state"]=="observed":
+                endpoints.setdefault(e[key],{}).setdefault(e[edge+"_team"],set()).add(e["interval_id"])
+    conflicts=sorted({uid for teams in endpoints.values() if len(teams)>1 for ids in teams.values() for uid in ids})
+    for e in iv:
+        e["endpoint_conflict"]=e["id"] in conflicts
     chosen=[]; last=-1
     for e in sorted(iv,key=lambda e:e["end"]):
-        if e["status"]=="opposite_endpoints" and not e["prior_shot"] and e["start"]>=last:
+        if e["status"]=="opposite_endpoints" and not e["prior_shot"] and not e["endpoint_conflict"] and e["start"]>=last:
             chosen.append(e["id"]);last=e["end"]
     return dict(events=ev,intervals=iv,counts=dict(Counter(e["state"] for e in ev)),
                 interval_statuses=dict(Counter(e["status"] for e in iv)), lower_bound_excluding_linked_shots=len(chosen),
-                bound_interval_ids=chosen, referee_signals=sum(e["referee_signal_observed"] for e in iv),
+                bound_interval_ids=chosen, endpoint_conflict_ids=conflicts, referee_signals=sum(e["referee_signal_observed"] for e in iv),
                 confirmed_referee_decisions=sum(e["decision_verified"] for e in iv), exact_total_changes=None,
                 duration_s=t["duration_s"],home_color=home_color,coverage_complete=False,
                 pass_review=summarize_pass_review(r,t["duration_s"]),
