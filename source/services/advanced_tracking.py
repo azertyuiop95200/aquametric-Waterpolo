@@ -1,6 +1,13 @@
 """Experimental metrics on reviewed metric track segments, never image pixels."""
 from math import hypot, atan2, degrees, isfinite
 from numbers import Real
+try:
+    from services.tracklet_union import merge_tracklets
+    from services.directional_effort import directional_effort
+except ModuleNotFoundError as e:
+    if e.name != "services": raise
+    from tracklet_union import merge_tracklets
+    from directional_effort import directional_effort
 
 
 def num(x):
@@ -63,10 +70,14 @@ def reviewed_motion(metric,identity,**config):
     for p in identity.get('players',[]):
         ids=list(dict.fromkeys(map(str,p.get('track_ids',[]))))
         row=dict(side=p['side'],cap_number=p['cap_number'],track_ids=ids)
-        if len(ids)!=1 or ids[0] not in tracks or ids[0] in duplicates or owners[ids[0]]!=1:
-            row.update(status='unavailable_ambiguous_tracks',metrics=None)
+        if not ids or any(k not in tracks or k in duplicates or owners[k]!=1 for k in ids):
+            row.update(status='unavailable_ambiguous_tracks',metrics=None,segments=[],track_quality=None)
         else:
-            row.update(status='experimental_proxy',metrics=motion(tracks[ids[0]].get('segments',[]),**config))
+            union=merge_tracklets([tracks[k] for k in ids],max_gap_s=config.get('max_gap_s',.26),max_speed_mps=config.get('max_speed_mps',3.5))
+            segments=union.pop('segments')
+            metrics=motion(segments,**config)
+            metrics['directional_effort']=directional_effort(segments,sprint_mps=config['sprint_mps'],min_sprint_s=config['min_sprint_s'],max_gap_s=config.get('max_gap_s',.26),max_speed_mps=config.get('max_speed_mps',3.5))
+            row.update(status='experimental_proxy',metrics=metrics,segments=segments,track_quality=union)
         rows.append(row)
     return rows
 
