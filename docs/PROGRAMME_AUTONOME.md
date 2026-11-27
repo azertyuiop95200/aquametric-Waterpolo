@@ -46,3 +46,8 @@ Ce document suit le développement, pas les données privées de match. Ne pas y
 
 ## Révision 10 — bornes contradictoires
 - CI R9.1 45951242113 réussie. R10 : contrôles observés opposés au même instant dans la référence importée, conservation des annotations mais exclusion des fenêtres concernées de la borne minimale. Trois tests synthétiques ajoutés; rapport explicite. Comparaison exacte des secondes, sans tolérance arbitraire. CI R10 à vérifier. Aucun nouveau relevé vidéo, aucune fusion ni déploiement. Prochaine action : vérifier CI, étendre au registre manuel et examiner les reprises attribuées.
+
+## R11 — qualité des passes
+- Commit 380cdd6a : dimensions indépendantes accuracy, defensive_intervention, reception_quality; anciennes annotations inconnues par défaut. Échecs confirmés et taux sur issues résolues uniquement; déviations conservées non classées en réussite/échec sans preuve de réception cible. CI et tests ciblés à vérifier.
+- Exigence utilisateur : relever toutes les passes, y compris circulation sans tir, gardiennes, transitions et reprises; distinguer précision, blocage, réception, responsabilité et finalité décisive. Couverture exhaustive à démontrer par fenêtres revues sans lacunes, pas par extrapolation. Aucun nouveau relevé vidéo dans ce cycle.
+- Reprise : tests des nouvelles dimensions, interface HTML, preuve positive passe-tir, couverture Q1 puis match entier. Ne pas déployer.
