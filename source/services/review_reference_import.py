@@ -5,6 +5,7 @@ from collections import Counter
 from services.possession_evidence import validate, CAUSES
 from services.pass_review import validate_pass_review, summarize_pass_review
 from services.evidence_manifest import validate_manifest
+from services.possession_context import decisions as possession_context
 
 MAX_BYTES=512*1024
 MAX_ROWS=2000
@@ -78,6 +79,7 @@ def load(raw):
     require(len(periods)==1,"Une référence doit correspondre à une seule période.")
     validate_pass_review(r,dur)
     validate_manifest(r)
+    possession_context(r,dur)
     try: canonical=json.dumps(p,sort_keys=True,ensure_ascii=True,separators=(",",":"),allow_nan=False)
     except (ValueError,RecursionError) as e: raise ValueError("JSON invalide.") from e
     return p,canonical,hashlib.sha256(canonical.encode()).hexdigest(),next(iter(periods))
@@ -127,4 +129,5 @@ def summarize(p,home_color):
                 duration_s=t["duration_s"],home_color=home_color,coverage_complete=False,
                 pass_review=summarize_pass_review(r,t["duration_s"]),
                 evidence_manifest=validate_manifest(r),
+                possession_context=possession_context(r,t['duration_s']),
                 verified_match_event_count=0,note="Référence importée, non fusionnée aux événements du match. Temps locaux relatifs au premier échantillon de chaque partie; alignement au lecteur à vérifier.")
