@@ -591,3 +591,12 @@ class CoachVideoSession(Base):
     items_json: Mapped[str] = mapped_column(Text, default="[]")
     revision: Mapped[int] = mapped_column(Integer, default=1)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+class SpatialReview(Base):
+    """Private event-linked geometric review; not an observed sport statistic."""
+    __tablename__ = "spatial_reviews_v1"
+    event_id: Mapped[int] = mapped_column(ForeignKey("events.id", ondelete="CASCADE"), primary_key=True)
+    owner_id: Mapped[int] = mapped_column(Integer, index=True)
+    match_id: Mapped[int] = mapped_column(Integer, index=True)
+    payload: Mapped[str] = mapped_column(Text)

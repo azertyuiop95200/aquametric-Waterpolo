@@ -37,6 +37,7 @@
 {% include 'advanced_motion_rows.html' %}
 {% elif anchor=='coach-tactique' %}
 {% include 'collective_review_rows.html' %}
+{% include 'spatial_decision_section.html' %}
 {% if snapshot.tactical_sequences is defined %}{% include 'tactical_sequence_metrics.html' %}{% endif %}
 {% if snapshot.tactical %}<details><summary>Analyse tactique et limites de couverture</summary>{{render(snapshot.tactical,labels)}}</details>{% endif %}
 {% elif anchor=='coach-passes' and snapshot.advanced_observed is defined %}

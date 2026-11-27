@@ -447,6 +447,8 @@ def analysis_snapshot(db, match):
         for side in ("team", "opponent"):
             row[side] = snapshot["ultimate"][side]["basic"].get(row["key"])
         row["delta"] = row["team"] - row["opponent"] if row["team"] is not None and row["opponent"] is not None else None
+    from spatial_review_routes import report_snapshot
+    snapshot['spatial_decision'] = report_snapshot(db, match)
     return snapshot
 
 
