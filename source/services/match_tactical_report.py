@@ -87,7 +87,7 @@ def build_report(*, source, period, start, end, length, width, metric, identity,
     players=reviewed_motion(metric,identity,sprint_mps=sprint_mps,min_sprint_s=min_sprint_s)
     for p in players:
         if p['metrics'] is not None:
-            p['map']=occupancy(tracks[p['track_ids'][0]]['segments'],length,width,cell_m,start,end)
+            p['map']=occupancy(p['segments'],length,width,cell_m,start,end)
         else: p['map']=None
     rows=[]; seen=set(); excluded=0
     for e in events:
