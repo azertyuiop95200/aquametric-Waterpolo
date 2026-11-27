@@ -1,0 +1,15 @@
+{% set c=p.center_geometry %}
+<h4>Jeu de pointe — placement et marquage revus</h4>
+{% if c is not none %}
+<p>Pointe {{ c.center }} ; défenseure désignée {{ c.marker }}. Temps commun {{ '%.2f'|format(c.observed_s) }} s vidéo. Zone descriptive de {{ c.zone_depth_m }} m de profondeur et {{ c.zone_half_width_m*2 }} m de largeur, centrée sur le but attaqué : ce n'est pas une zone réglementaire.</p>
+{% if c.snapshot %}{% set L=tactical_report.length_m %}{% set W=tactical_report.width_m %}{% set v=c.snapshot %}
+<svg role="img" aria-label="Placement pointe et défenseure" viewBox="-1 -1 {{ L+2 }} {{ W+3 }}" preserveAspectRatio="xMidYMid meet" style="width:100%;max-width:600px;background:#e8f3f8;border:1px solid #4893b0">
+<rect x="0" y="0" width="{{ L }}" height="{{ W }}" fill="none" stroke="#4893b0" stroke-width="0.08"/><rect x="{{ 0 if p.goal_x==0 else L-c.zone_depth_m }}" y="{{ W/2-c.zone_half_width_m }}" width="{{ c.zone_depth_m }}" height="{{ 2*c.zone_half_width_m }}" fill="#1764aa" fill-opacity="0.12" stroke="#1764aa" stroke-width="0.08" stroke-dasharray="0.3 0.2"/>
+<line x1="{{ v.center[0] }}" y1="{{ v.center[1] }}" x2="{{ v.marker[0] }}" y2="{{ v.marker[1] }}" stroke="#64748b" stroke-width="0.09"/>
+<circle cx="{{ v.center[0] }}" cy="{{ v.center[1] }}" r="{{ c.radius_m }}" fill="none" stroke="#1764aa" stroke-width="0.06" stroke-dasharray="0.3 0.2"/>
+<circle cx="{{ v.center[0] }}" cy="{{ v.center[1] }}" r="0.25" fill="#1764aa"/><circle cx="{{ v.marker[0] }}" cy="{{ v.marker[1] }}" r="0.25" fill="#b91c1c"/>
+<line x1="0" y1="{{ W+0.7 }}" x2="5" y2="{{ W+0.7 }}" stroke="#164e63" stroke-width="0.12"/><text x="2.5" y="{{ W+1.5 }}" font-size="0.65" text-anchor="middle" fill="#164e63">5 m</text></svg>
+<p>Configuration interpolée à {{ '%.3f'|format(v.second) }} s. Bleu : pointe ; rouge : défenseure ; cercle : rayon de proximité {{ c.radius_m }} m.</p>{% endif %}
+<table class="metric-table"><tbody>{% for label,key,unit in [('Occupation zone centrale','zone_s','s'),('Proximité de la défenseure','marker_proximity_s','s'),('Défenseure côté but','marker_goal_side_s','s'),('Distance moyenne défenseure','marker_mean_distance_m','m'),('Proximité borne basse','proximity_lower_s','s'),('Proximité borne haute','proximity_upper_s','s')] %}<tr><th>{{ label }}</th><td>{{ ('%.2f'|format(c[key]) ~ ' ' ~ unit) if c[key] is not none else 'Non mesuré' }}</td></tr>{% endfor %}</tbody></table>
+<p>Les bornes de proximité dépendent de la borne d'erreur fournie ({{ c.position_error_bound_m ~ ' m' if c.position_error_bound_m is not none else 'inconnue' }}). La proximité et la position côté but ne prouvent ni contact ni duel gagné. Les autres mesures restent nominales.</p>
+{% else %}<p>Rôles de pointe et de défenseure non renseignés par une revue.</p>{% endif %}

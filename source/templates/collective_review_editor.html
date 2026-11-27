@@ -1,0 +1,35 @@
+{% if snapshot.collective_review is defined and snapshot.collective_review.context %}
+{% set review=snapshot.collective_review %}{% set ctx=review.context %}
+<section class="report-card section-wide" id="collectiveReviewEditor">
+<h2>Revoir une séquence collective</h2>
+<p>Sélectionner jusqu'à quatre séquences non chevauchantes de 15 s maximum sur la vidéo locale calibrée. La porteuse, les effectifs et le sens d'attaque doivent rester constants pendant chaque séquence. Les numéros ci-dessous sont les identités déjà revues, pas les postes tactiques.</p>
+<details><summary>Ajouter une séquence revue</summary>
+<form method="post" action="/matches/{{ match.id }}/analysis/collective-review">
+<input type="hidden" name="binding" value='{{ ctx|tojson }}'>
+<label>Début vidéo (s) <input name="start_s" type="number" min="0" max="28800" step="0.001" required></label>
+<label>Fin vidéo (s) <input name="end_s" type="number" min="0" max="28800" step="0.001" required></label>
+<label>Période revue <input name="period" type="number" min="1" max="8" value="1" required></label>
+<label>Équipe attaquante <select name="attacking_side"><option value="for">{{ match.team.name }}</option><option value="against">{{ match.opponent }}</option></select></label>
+<label>But attaqué dans le repère calibré <select name="goal_x"><option value="">Choisir</option><option value="0">But de référence (x = 0)</option><option value="{{ ctx.length_m }}">But opposé (x = {{ ctx.length_m }} m)</option></select></label>
+<fieldset><legend>Effectif attaquant complet</legend>{% for i in ctx.ids %}<label><input type="checkbox" name="attackers" value="{{ i }}"> {{ i }}</label> {% endfor %}</fieldset>
+<fieldset><legend>Effectif défendant complet</legend>{% for i in ctx.ids %}<label><input type="checkbox" name="defenders" value="{{ i }}"> {{ i }}</label> {% endfor %}</fieldset>
+<label>Porteuse constante <select name="carrier" required><option value="">Choisir</option>{% for i in ctx.ids %}<option value="{{ i }}">{{ i }}</option>{% endfor %}</select></label>
+<details><summary>Rôles facultatifs</summary>
+{% for label,name in [('Pointe','center'),('Défenseure de pointe','marker'),('Gardienne défendant le but','keeper')] %}
+<label>{{ label }} <select name="{{ name }}"><option value="">Non renseigné</option>{% for i in ctx.ids %}<option value="{{ i }}">{{ i }}</option>{% endfor %}</select></label>
+{% endfor %}
+<label>Largeur du but revue (m, requise si gardienne) <input name="goal_width_m" type="number" min="0.1" max="{{ ctx.width_m }}" step="0.01"></label>
+<label>Envergure latérale hypothétique (m, facultative) <input name="assumed_lateral_span_m" type="number" min="0.01" max="3" step="0.01"></label>
+</details>
+<label>Preuve visuelle <textarea name="evidence" required minlength="3" maxlength="300"></textarea></label>
+<label><input name="control_reviewed" type="checkbox" value="true" required> Contrôle continu et porteuse constante revus</label>
+<label><input name="roster_reviewed" type="checkbox" value="true" required> Effectifs actifs complets et sens d'attaque revus</label>
+<button type="submit" name="action" value="add">Enregistrer et calculer la séquence</button>
+</form>
+</details>
+{% if review.reports or review.status=='invalid' %}
+<details><summary>Réinitialiser les séquences collectives</summary><p>Cette action efface seulement les revues collectives, sans toucher à la vidéo, aux identités ni aux événements.</p>
+<form method="post" action="/matches/{{ match.id }}/analysis/collective-review"><input type="hidden" name="binding" value='{{ ctx|tojson }}'><button type="submit" name="action" value="clear">Effacer les séquences collectives</button></form></details>
+{% endif %}
+</section>
+{% endif %}

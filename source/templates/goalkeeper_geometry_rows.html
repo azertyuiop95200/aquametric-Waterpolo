@@ -1,0 +1,20 @@
+{% set k=p.keeper_geometry %}
+<h4>Gardienne — placement et projection horizontale</h4>
+{% if k is not none %}
+<p>Gardienne {{ k.keeper }} ; porteuse {{ k.carrier }}. Suivi commun {{ '%.2f'|format(k.observed_s) }} s vidéo. Les centres des joueuses sont des positions de référence, non des points de lâcher de balle.</p>
+{% if k.snapshot %}{% set v=k.snapshot %}{% set L=tactical_report.length_m %}{% set W=tactical_report.width_m %}
+<svg role="img" aria-label="Placement de la gardienne par rapport aux poteaux" viewBox="-1 -1 {{ L+2 }} {{ W+3 }}" preserveAspectRatio="xMidYMid meet" style="width:100%;max-width:600px;background:#e8f3f8;border:1px solid #4893b0">
+<rect x="0" y="0" width="{{ L }}" height="{{ W }}" fill="none" stroke="#4893b0" stroke-width="0.08"/>
+<path d="M{{ v.carrier[0] }} {{ v.carrier[1] }} L{{ p.goal_x }} {{ W/2-k.goal_width_m/2 }} L{{ p.goal_x }} {{ W/2+k.goal_width_m/2 }} Z" fill="#1764aa" fill-opacity="0.10" stroke="#1764aa" stroke-width="0.07"/>
+<line x1="{{ v.carrier[0] }}" y1="{{ v.carrier[1] }}" x2="{{ p.goal_x }}" y2="{{ W/2 }}" stroke="#64748b" stroke-width="0.09" stroke-dasharray="0.3 0.2"/>
+<line x1="{{ p.goal_x }}" y1="{{ W/2-k.goal_width_m/2 }}" x2="{{ p.goal_x }}" y2="{{ W/2+k.goal_width_m/2 }}" stroke="#164e63" stroke-width="0.15"/>
+{% if v.projected_interval_y_m %}<line x1="{{ p.goal_x }}" y1="{{ v.projected_interval_y_m[0] }}" x2="{{ p.goal_x }}" y2="{{ v.projected_interval_y_m[1] }}" stroke="#b91c1c" stroke-width="0.26"/>{% endif %}
+<circle cx="{{ v.carrier[0] }}" cy="{{ v.carrier[1] }}" r="0.25" fill="#1764aa"/><circle cx="{{ v.keeper[0] }}" cy="{{ v.keeper[1] }}" r="0.25" fill="#b91c1c"/>
+{% if k.assumed_lateral_span_m is not none %}<line x1="{{ v.keeper[0] }}" y1="{{ v.keeper[1]-k.assumed_lateral_span_m/2 }}" x2="{{ v.keeper[0] }}" y2="{{ v.keeper[1]+k.assumed_lateral_span_m/2 }}" stroke="#b91c1c" stroke-width="0.12"/>{% endif %}
+<line x1="0" y1="{{ W+0.7 }}" x2="5" y2="{{ W+0.7 }}" stroke="#164e63" stroke-width="0.12"/><text x="2.5" y="{{ W+1.5 }}" font-size="0.65" fill="#164e63" text-anchor="middle">5 m</text></svg>
+<p>Configuration interpolée à {{ '%.3f'|format(v.second) }} s. Bleu : porteuse ; rouge : gardienne et projection de l'envergure supposée sur la ligne de but, si calculable. Pointillés : axe vers le centre du but.</p>{% endif %}
+<table class="metric-table"><thead><tr><th>Mesure</th><th>Moyenne</th><th>Support vidéo (s)</th></tr></thead><tbody>
+{% for label,key,unit in [('Profondeur devant le but','keeper_depth_m','m'),('Décalage latéral signé','keeper_lateral_offset_m','m'),('Distance porteuse–centre du but','carrier_distance_to_goal_m','m'),('Angle horizontal entre poteaux','goal_angle_deg','°'),('Écart absolu à l’axe central','alignment_abs_error_m','m'),('Largeur du but projetée par le modèle','projected_fraction','%')] %}<tr><td>{{ label }}</td><td>{{ ('%.2f'|format(k.means[key]* (100 if unit=='%' else 1)) ~ ' ' ~ unit) if k.means[key] is not none else 'Non mesurée' }}</td><td>{{ '%.2f'|format(k.supports_s[key]) }}</td></tr>{% endfor %}</tbody></table>
+<p>Déplacement latéral : {{ '%.2f'|format(k.lateral_distance_m) ~ ' m' if k.lateral_distance_m is not none else 'Non mesuré' }} ; longitudinal : {{ '%.2f'|format(k.depth_distance_m) ~ ' m' if k.depth_distance_m is not none else 'Non mesuré' }}.</p>
+<p>Largeur du but renseignée : {{ k.goal_width_m }} m ; envergure latérale hypothétique : {{ k.assumed_lateral_span_m ~ ' m' if k.assumed_lateral_span_m is not none else 'non renseignée' }}. Projection statique 2D sans hauteur, bras, vitesse du ballon ni autres défenseures. Ni probabilité d'arrêt ni temps de réaction. Erreur de position non quantifiée.</p>
+{% else %}<p>Rôle de gardienne ou largeur du but non renseignés par une revue.</p>{% endif %}

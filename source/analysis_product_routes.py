@@ -586,3 +586,43 @@ def save_identity_review(match_id:int,request:Request,payload:dict,db:Session=De
     except ValueError as exc:
         raise HTTPException(422,str(exc)) from None
     finally:_METRIC_SLOT.release()
+
+
+@router.post("/matches/{match_id}/analysis/collective-review")
+def save_collective_review(
+    match_id:int, request:Request, binding:str=Form(...), action:str=Form("add"),
+    start_s:float=Form(0), end_s:float=Form(0), period:int=Form(1),
+    attacking_side:str=Form("for"), attackers:list[str]=Form([]), defenders:list[str]=Form([]),
+    carrier:str=Form(""), goal_x:float=Form(0), control_reviewed:bool=Form(False),
+    roster_reviewed:bool=Form(False), evidence:str=Form(""),
+    center:str=Form(""), marker:str=Form(""), keeper:str=Form(""),
+    goal_width_m:str=Form(""), assumed_lateral_span_m:str=Form(""),
+    db:Session=Depends(get_db),
+):
+    import json
+    from models import AutonomousAnalysis
+    from services.collective_review import append,context
+    _,match=_owned_match(match_id,request,db)
+    if not _is_owned_upload(match):raise HTTPException(400,"Une vidéo locale calibrée est nécessaire.")
+    if not _METRIC_SLOT.acquire(blocking=False):raise HTTPException(429,"Un calcul est déjà en cours.")
+    try:
+        if len(binding)>12000 or action not in ("add","clear"):raise ValueError("Requête invalide.")
+        snap=analysis_snapshot(db,match);ctx=context(snap)
+        if ctx is None or json.loads(binding)!=ctx:raise ValueError("Calibration ou identités modifiées. Actualiser le rapport.")
+        auto=db.scalar(select(AutonomousAnalysis).where(AutonomousAnalysis.match_id==match.id).order_by(AutonomousAnalysis.id.desc()).limit(1))
+        if not auto or auto.id!=ctx["analysis_id"]:raise ValueError("Analyse périmée.")
+        db.refresh(auto)
+        summary=json.loads(auto.summary_json or "{}")
+        if summary.get("metric_field_map",{}).get("revision")!=ctx["revision"]:raise ValueError("Calibration périmée.")
+        if summary.get("identity_reviews",{})!=snap["automatic"]["summary"].get("identity_reviews",{}):raise ValueError("Identités modifiées.")
+        if action=="clear":
+            summary.pop("collective_reviews",None)
+        else:
+            raw=dict(binding=ctx,start_s=start_s,end_s=end_s,period=period,attacking_side=attacking_side,attackers=attackers,defenders=defenders,carrier=carrier,goal_x=goal_x,control_reviewed=control_reviewed,roster_reviewed=roster_reviewed,evidence=evidence,center=center,marker=marker,keeper=keeper,goal_width_m=float(goal_width_m) if goal_width_m else None,assumed_lateral_span_m=float(assumed_lateral_span_m) if assumed_lateral_span_m else None)
+            summary["collective_reviews"]=append(snap,raw)
+        auto.summary_json=json.dumps(summary,ensure_ascii=False);db.commit()
+        return RedirectResponse(f"/matches/{match_id}/analysis/result#collectiveReview",status_code=303)
+    except (ValueError,TypeError,KeyError,AttributeError,OverflowError) as exc:
+        raise HTTPException(422,str(exc) if isinstance(exc,ValueError) else "Revue collective invalide.") from None
+    finally:
+        _METRIC_SLOT.release()

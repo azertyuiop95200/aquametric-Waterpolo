@@ -1,0 +1,28 @@
+{% if tactical_report.possession_geometry is defined %}
+<h3>Organisation collective et couloirs de passe par possession</h3>
+<p>Configurations et identités revues ; géométrie horizontale expérimentale. Le contrôle continu du ballon doit être établi en amont. Les durées portent sur les intervalles où toutes les joueuses du groupe sont suivies, et non sur le temps de jeu.</p>
+{% for p in tactical_report.possession_geometry %}<article><h4>{{ p.id }} · {{ p.attacking_side }} · {{ '%.2f'|format(p.start_s) }}–{{ '%.2f'|format(p.end_s) }} s vidéo</h4>
+<p>Couverture commune : {{ '%.1f'|format(p.coverage*100) }} % ({{ '%.2f'|format(p.observed_s) }} s). Rayon de couloir : {{ p.lane_radius_m }} m ; proximité : {{ p.proximity_m }} m. Incertitude de position non quantifiée.</p>
+{% if p.snapshot %}{% set snap=p.snapshot %}{% set L=tactical_report.length_m %}{% set W=tactical_report.width_m %}
+<svg role="img" aria-label="Configuration du bassin et couloirs de passe" viewBox="-1 -1 {{ L+2 }} {{ W+3 }}" preserveAspectRatio="xMidYMid meet" style="width:100%;max-width:600px;background:#e8f3f8;border:1px solid #4893b0">
+<rect x="0" y="0" width="{{ L }}" height="{{ W }}" fill="none" stroke="#4893b0" stroke-width="0.07"/><line x1="{{ L/2 }}" y1="0" x2="{{ L/2 }}" y2="{{ W }}" stroke="#4893b0" stroke-width="0.06"/>
+{% for i,state in snap.lanes.items() %}<line x1="{{ snap.positions[p.carrier][0] }}" y1="{{ snap.positions[p.carrier][1] }}" x2="{{ snap.positions[i][0] }}" y2="{{ snap.positions[i][1] }}" stroke="{{ '#16803c' if state=='clear_2d' else '#b91c1c' if state=='obstructed_2d' else '#64748b' }}" stroke-width="0.12" {% if state=='indeterminate' %}stroke-dasharray="0.3 0.2"{% endif %}><title>{{ i }} · {{ state }}</title></line>{% endfor %}
+{% for i,v in snap.positions.items() %}<circle cx="{{ v[0] }}" cy="{{ v[1] }}" r="0.27" fill="{{ '#1764aa' if i in p.attackers else '#b91c1c' }}"/><text x="{{ v[0] }}" y="{{ v[1]-0.45 }}" font-size="0.55" text-anchor="middle" fill="#164e63">{{ i }}</text>{% endfor %}
+<circle cx="{{ snap.positions[p.carrier][0] }}" cy="{{ snap.positions[p.carrier][1] }}" r="0.42" fill="none" stroke="#a16207" stroke-width="0.13"/>
+<line x1="0" y1="{{ W+0.7 }}" x2="5" y2="{{ W+0.7 }}" stroke="#164e63" stroke-width="0.12"/><text x="2.5" y="{{ W+1.5 }}" font-size="0.65" text-anchor="middle" fill="#164e63">5 m</text>
+</svg><p>Configuration interpolée à {{ '%.3f'|format(snap.second) }} s. Bleu : attaque ; rouge : défense ; anneau : porteuse. Couloirs : vert dégagé, rouge obstrué, gris indéterminé selon le modèle 2D ; ce ne sont pas des passes réalisées.</p>
+{% else %}<p>Aucune configuration complète mesurable.</p>{% endif %}
+<table class="metric-table"><thead><tr><th>Groupe</th><th>Largeur moyenne (m)</th><th>Profondeur moyenne (m)</th><th>Dispersion RMS (m)</th></tr></thead><tbody>{% for s,m in p.shape.items() %}<tr><td>{{ s }}</td>{% for k in ['width_m','depth_m','rms_radius_m'] %}<td>{{ '%.2f'|format(m[k]) if m[k] is not none else 'Non mesurée' }}</td>{% endfor %}</tr>{% endfor %}</tbody></table>
+<table class="metric-table"><thead><tr><th>Receveuse potentielle</th><th>Dégagé (s)</th><th>Obstrué (s)</th><th>Indéterminé (s)</th><th>Part dégagée</th></tr></thead><tbody>{% for l in p.lanes %}<tr><td>{{ l.receiver }}</td>{% for k in ['clear_s','obstructed_s','indeterminate_s'] %}<td>{{ '%.2f'|format(l[k]) if l[k] is not none else 'Non mesurée' }}</td>{% endfor %}<td>{{ '%.1f'|format(l.clear_fraction*100) ~ ' %' if l.clear_fraction is not none else 'Non mesurée' }}</td></tr>{% else %}<tr><td colspan="5">Aucune receveuse renseignée.</td></tr>{% endfor %}</tbody></table>
+<table class="metric-table"><thead><tr><th>Attaquante</th><th>Proximité collective (s)</th><th>Double proximité (s)</th></tr></thead><tbody>{% for l in p.pressure %}<tr><td>{{ l.id }}</td><td>{{ '%.2f'|format(l.proximity_s) if l.proximity_s is not none else 'Non mesurée' }}</td><td>{{ '%.2f'|format(l.double_proximity_s) if l.double_proximity_s is not none else 'Non mesurée' }}</td></tr>{% endfor %}</tbody></table>
+{% set support=p.offball_support %}
+<h4>Déplacements et disponibilité sans ballon</h4>
+<p>Temps commun : {{ '%.2f'|format(support.observed_s) }} s. Soutien géométrique : couloir dégagé, distance à la porteuse ≤ {{ support.support_radius_m }} m et séparation de toute défenseure ≥ {{ support.separation_m }} m. Seuils expérimentaux, erreur de position non quantifiée. Aucun appel ni intention déduit.</p>
+<table class="metric-table"><thead><tr><th>Joueuse</th><th>Distance (m)</th><th>Progression vers but (m)</th><th>Distance moyenne porteuse (m)</th><th>Distance moyenne défenseure la plus proche (m)</th><th>Variation cumulée de séparation (m)</th><th>Soutien disponible (s)</th><th>Indéterminé (s)</th></tr></thead><tbody>
+{% for s in support.rows %}<tr><td>{{ s.id }}</td>{% for k in ['distance_m','goal_progress_m','carrier_distance_mean_m','nearest_defender_mean_m','separation_change_m','support_open_s','support_unknown_s'] %}<td>{{ '%.2f'|format(s[k]) if s[k] is not none else 'Non mesuré' }}</td>{% endfor %}</tr>{% else %}<tr><td colspan="8">Aucune receveuse renseignée.</td></tr>{% endfor %}
+</tbody></table><p>La variation de séparation est calculée uniquement sur les intervalles suivis ; elle peut être négative. Elle ne démontre pas une création d'espace causée par la joueuse.</p>
+{% include 'center_geometry_rows.html' %}
+{% include 'goalkeeper_geometry_rows.html' %}
+{% include 'spatial_dominance_rows.html' %}
+</article>{% else %}<p>Aucune sous-fenêtre de possession continue avec effectif et porteuse revus n'est raccordée.</p>{% endfor %}
+{% endif %}
