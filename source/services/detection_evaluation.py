@@ -59,3 +59,54 @@ def endpoint_continuity(start_ref,end_ref,start_predictions,end_predictions,tole
     counts={s:sum(r['status']==s for r in rows) for s in ('missing_endpoint','same_track_id','different_track_id','contradictory_endpoint_link')}
     both=len(rows)-counts['missing_endpoint']
     return dict(shared_reference_ids=len(rows),both_endpoints_matched=both,**counts,endpoint_retention=counts['same_track_id']/both if both else None,rows=rows,note='Concordance des identifiants aux deux bornes uniquement, pas une validation des identités intermédiaires.')
+
+
+def compare_frame_methods(frames, tolerance_px):
+    """Paired head-point benchmark on identical independently reviewed frames.
+
+    Frame keys must identify source and frame externally. Missing output is
+    not an empty detection. Partial annotations contribute recall only.
+    No track identity or sporting statistic is inferred.
+    """
+    totals = {m: dict(matched=0, marked=0, complete_matched=0,
+                      complete_marked=0, complete_predictions=0)
+              for m in ("baseline", "head_flow")}
+    seen = set()
+    paired = complete = partial = 0
+    excluded = {"missing_output": 0, "unknown_reference": 0}
+    for frame in frames:
+        key = frame["frame_key"]
+        if not isinstance(key, str) or not key or key in seen:
+            raise ValueError("Duplicate or invalid frame key")
+        seen.add(key)
+        coverage = frame["completeness"]
+        if coverage not in ("complete", "partial", "unknown"):
+            raise ValueError("Invalid reference coverage")
+        if coverage == "unknown":
+            excluded["unknown_reference"] += 1
+            continue
+        if any(frame.get(m) is None for m in totals):
+            excluded["missing_output"] += 1
+            continue
+        paired += 1
+        complete += coverage == "complete"
+        partial += coverage == "partial"
+        for m, t in totals.items():
+            result = evaluate_points(frame["reference"], frame[m], tolerance_px,
+                                     completeness=coverage)
+            t["matched"] += result["matched"]
+            t["marked"] += result["marked"]
+            if coverage == "complete":
+                t["complete_matched"] += result["matched"]
+                t["complete_marked"] += result["marked"]
+                t["complete_predictions"] += result["predictions"]
+    for t in totals.values():
+        n, p, a = t["complete_matched"], t["complete_predictions"], t["complete_marked"]
+        t["precision"] = n/p if p else None
+        t["recall_complete"] = n/a if a else None
+        t["recall_reviewed"] = t["matched"]/t["marked"] if t["marked"] else None
+        t["f1_complete"] = 2*n/(p+a) if p+a else None
+    return dict(version="paired-head-v1", paired_frames=paired,
+                complete_frames=complete, partial_frames=partial,
+                excluded=excluded, methods=totals, tolerance_px=tolerance_px,
+                state="reviewed_sample" if paired else "not_measured")
