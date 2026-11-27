@@ -40,6 +40,10 @@ function projection(){
  inverse(q,z){const u=(q[0]-380)/k,v=((q[1]-235)/k+z*Math.cos(b))/Math.sin(b);return [L/2+u*Math.cos(a)+v*Math.sin(a),W/2-u*Math.sin(a)+v*Math.cos(a),z]}};
 }
 const partLabel=p=>({body:"corps",left_arm:"bras gauche",right_arm:"bras droit",sphere_proxy:"volume approximatif"})[p]||"";
+function reachEndpoints(s,d,t){
+ const u=s.target_start_offset&&s.target_end_offset?Math.max(0,Math.min(1,(t+(d.reach_elapsed_s||0)-(s.reaction_s||0))/(s.motion_s||.3))):0;
+ return [s.start_offset,s.end_offset].map((p,j)=>p.map((v,i)=>v+u*((j?s.target_end_offset:s.target_start_offset)?.[i]??v)-u*v));
+}
 function draw(){
  const {project}=projection();ctx.clearRect(0,0,760,470);
  function line(ps,color,width=1,fill=null,dashed=false){ctx.beginPath();ps.forEach((p,i)=>{const q=project(p);i?ctx.lineTo(...q):ctx.moveTo(...q)});ctx.setLineDash(dashed?[5,4]:[]);if(fill){ctx.closePath();ctx.fillStyle=fill;ctx.fill()}ctx.strokeStyle=color;ctx.lineWidth=width;ctx.stroke();ctx.setLineDash([])}
@@ -52,7 +56,7 @@ function draw(){
  old.forEach(p=>dot(p,"#c0d3de",5,null,true));
  if(result&&resultInput===JSON.stringify(edit)){
   const t=num("playtime");
-  for(const d of result.defenders){const p=d.position.map((x,i)=>x+d.velocity[i]*t);dot(p,"#ff727c",4,null,true);for(const s of d.reach_segments||[]){ctx.lineCap="round";line([s.start_offset,s.end_offset].map(q=>q.map((v,i)=>v+p[i])),"#ffad88",Math.max(1,2*s.radius*390/Math.hypot(L,W)));ctx.lineCap="butt"}}
+  for(const d of result.defenders){const p=d.position.map((x,i)=>x+d.velocity[i]*t);dot(p,"#ff727c",4,null,true);for(const s of d.reach_segments||[]){ctx.lineCap="round";line(reachEndpoints(s,d,t).map(q=>q.map((v,i)=>v+p[i])),"#ffad88",Math.max(1,2*s.radius*390/Math.hypot(L,W)));ctx.lineCap="butt"}}
   for(const o of result.options){const color=o.id===base.chosen?"#5bbcff":o.generated?"#73e9a7":"#61ddff";line(o.path.map(p=>p.xyz_m),color,2,null,true);const i=Math.min(o.path.length-1,Math.round(t/o.flight_s*(o.path.length-1)));if(t<=o.flight_s)dot(o.path[i].xyz_m,color,3,null)}
  }
  for(const e of entities()){
