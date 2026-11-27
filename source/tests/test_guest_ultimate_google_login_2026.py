@@ -124,6 +124,8 @@ def test_guest_ultimate_without_password_isolated_with_real_report(monkeypatch):
         report=visitor.get(f"/matches/{mid}/analysis/result")
         assert report.status_code==200
         assert 'id="liveAutomaticStats"' in report.text
+        assert 'id="mobileLinkSaved"' in report.text
+        assert "Vidéo identifiée mais non analysée" in report.text
         assert 'id="spatialDashboard"' in report.text
         assert 'id="quickTagMatch"' in report.text
         assert 'En invité' in report.text
