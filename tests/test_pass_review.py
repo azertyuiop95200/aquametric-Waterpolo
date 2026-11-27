@@ -160,3 +160,31 @@ class PassReviewTests(unittest.TestCase):
         h=env.get_template("review_reference_report.html").render(snapshot={"review_references":[dict(period=1,digest="a"*64,report=s)]})
         self.assertIn("Contrôle adverse observé",h)
         self.assertIn("Fenêtres contradictoires : P1",h)
+
+    def test_quality_independent_of_success(self):
+        p=self.validate(accuracy="inaccurate",reception_quality="adjusted")
+        s=p["teams"]["bleus"]
+        self.assertEqual(s["completed"],1)
+        self.assertEqual(s["accuracy_counts"]["inaccurate"],1)
+        self.assertEqual(s["reception_quality_counts"]["adjusted"],1)
+        self.assertEqual(s["observed_resolved_completion_pct"],100)
+        self.assertIsNone(s["match_completion_pct"])
+    def test_clean_requires_first_contact_control(self):
+        self.reject(reception_quality="clean")
+        self.assertEqual(self.validate(reception_quality="clean",control_frame=30)["actions"][0]["reception_quality"],"clean")
+    def test_legacy_quality_unknown(self):
+        self.assertEqual(self.validate()["teams"]["bleus"]["accuracy_counts"],{"unknown":1})
+    def test_unknown_not_failure(self):
+        p=self.validate(outcome="unknown",contact_frame=None,contact_state="unknown",control_frame=None,control_team=None,related_event_id=None,event_relation=None)
+        s=p["teams"]["bleus"]
+        self.assertEqual(s["confirmed_failed"],0)
+        self.assertEqual(s["unclassified_completion"],1)
+        self.assertIsNone(s["observed_resolved_completion_pct"])
+    def test_deflection_not_automatically_failed(self):
+        s=self.validate(outcome="deflected_retained",deflection_observed=True,defensive_intervention="deflected",related_event_id=None,event_relation=None)["teams"]["bleus"]
+        self.assertEqual(s["confirmed_failed"],0)
+        self.assertEqual(s["unclassified_completion"],1)
+    def test_invalid_quality(self):
+        self.reject(accuracy="perfect")
+        self.reject(defensive_intervention="deflected")
+        self.reject(reception_quality="failed")
