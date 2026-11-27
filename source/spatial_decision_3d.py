@@ -26,6 +26,10 @@ class ReachSegment:
     start_offset: Vec
     end_offset: Vec
     radius: float
+    target_start_offset: Vec | None = None
+    target_end_offset: Vec | None = None
+    reaction_s: float = 0.
+    motion_s: float = .3
     def __post_init__(self):
         if self.part not in ("body","left_arm","right_arm"):
             raise ValueError("Invalid reach part")
@@ -33,6 +37,24 @@ class ReachSegment:
             raise ValueError("Invalid reach geometry")
         if not .03 <= self.radius <= .8 or max(norm(self.start_offset),norm(self.end_offset))>2:
             raise ValueError("Reach outside model bounds")
+        if not isfinite(self.reaction_s) or not 0 <= self.reaction_s <= 3 or not isfinite(self.motion_s) or not .05 <= self.motion_s <= 2:
+            raise ValueError("Invalid reach timing")
+        if (self.target_start_offset is None) != (self.target_end_offset is None):
+            raise ValueError("Supply both target endpoints")
+        for p in (self.target_start_offset,self.target_end_offset):
+            if p is not None and (len(p)!=3 or not all(isfinite(x) for x in p) or norm(p)>2):
+                raise ValueError("Invalid target reach")
+    def offsets_at(self,t):
+        if self.target_start_offset is None:
+            return self.start_offset,self.end_offset
+        u=max(0.,min(1.,(t-self.reaction_s)/self.motion_s))
+        return tuple(tuple(a+(b-a)*u for a,b in zip(p,q)) for p,q in (
+            (self.start_offset,self.target_start_offset),(self.end_offset,self.target_end_offset)))
+    def speed_bound(self):
+        if self.target_start_offset is None:
+            return 0.
+        return max(norm(sub(self.target_start_offset,self.start_offset)),
+                   norm(sub(self.target_end_offset,self.end_offset)))/self.motion_s
 
 @dataclass(frozen=True)
 class Track:
@@ -42,11 +64,14 @@ class Track:
     radius: float = .65
     confidence: float = 1.
     reach_segments: tuple[ReachSegment,...] = ()
+    reach_elapsed_s: float = 0.
     def __post_init__(self):
         if not all(isfinite(x) for x in (*self.position,*self.velocity,self.radius,self.confidence)):
             raise ValueError("nonfinite track")
         if self.radius < 0 or not 0 <= self.confidence <= 1:
             raise ValueError("invalid track")
+        if not isfinite(self.reach_elapsed_s) or not 0 <= self.reach_elapsed_s <= 3:
+            raise ValueError("Invalid reach elapsed time")
         if len(self.reach_segments)>3 or len({s.part for s in self.reach_segments})!=len(self.reach_segments):
             raise ValueError("Duplicate or excessive reach parts")
 
@@ -78,7 +103,7 @@ def assess(start: Vec,end: Vec,duration: float,defenders: Optional[list[Track]],
             "launch_elevation_deg":degrees(atan2(velocity[2],norm((velocity[0],velocity[1],0)))),
             "peak_height_m":max(p[2] for _,p in path),"path":[{"t_s":t,"xyz_m":p} for t,p in path],
             "clearance_m":None,"closest_defender":None,"closest_time_s":None,"closest_part":None,
-            "confidence":observation_confidence,"status":"unknown","model":"ballistic_constant_velocity_v2"}
+            "confidence":observation_confidence,"status":"unknown","model":"ballistic_moving_reach_v3"}
     if defenders is None or not defenders or observation_confidence==0:
         return result
     # Conservative discretization allowance using bound on relative speed.
@@ -91,9 +116,11 @@ def assess(start: Vec,end: Vec,duration: float,defenders: Optional[list[Track]],
             if not any(s.part=="body" for s in d.reach_segments):
                 candidates.append((norm(sub(p,q))-d.radius-allowance,d.id,t,"sphere_proxy"))
             for s in d.reach_segments:
-                a=tuple(q[i]+s.start_offset[i] for i in range(3))
-                b=tuple(q[i]+s.end_offset[i] for i in range(3))
-                candidates.append((segment_distance(p,a,b)-s.radius-allowance,d.id,t,s.part))
+                first,last=s.offsets_at(t+d.reach_elapsed_s)
+                a=tuple(q[i]+first[i] for i in range(3))
+                b=tuple(q[i]+last[i] for i in range(3))
+                motion_allowance=s.speed_bound()*duration/(2*steps)
+                candidates.append((segment_distance(p,a,b)-s.radius-allowance-motion_allowance,d.id,t,s.part))
     c,who,t,part=min(candidates)
     result.update(clearance_m=c,closest_defender=who,closest_time_s=t,closest_part=part,
                   confidence=min(observation_confidence,*(d.confidence for d in defenders)),
