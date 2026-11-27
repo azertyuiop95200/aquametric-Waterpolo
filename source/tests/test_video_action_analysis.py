@@ -307,3 +307,19 @@ def test_canonical_actions_preserves_conflict_and_prefers_eligible_observation()
     rows = canonical_actions([row("goal", 2, .4), row("shot_on_target", 2.01, .9)])
     assert len(rows) == 1 and rows[0]["counted"]
     assert rows[0]["event_type"] == "shot_on_target"
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+def test_exact_duplicate_retains_strongest_observation(reverse):
+    weak = {**action(second=3), "confidence": .40}
+    strong = {**action(second=3), "confidence": .92,
+              "evidence": "Fixture synthétique : observation plus précise du tir."}
+    rows = [weak, strong]
+    if reverse:
+        rows.reverse()
+    plan, _ = segment_plan(30)
+    observed = normalize_observations(payload(rows), plan[0])
+    assert observed["ignored"]["duplicates"] == 1
+    assert len(observed["actions"]) == 1
+    assert observed["actions"][0]["confidence"] == .92
+    assert observed["actions"][0]["evidence"] == strong["evidence"]

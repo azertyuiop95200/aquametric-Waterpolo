@@ -94,8 +94,14 @@ def normalize_observations(payload: dict, segment: dict) -> dict:
         # Literal duplicates are safely removed; close-in-time shots or passes
         # from different players must not be collapsed into one event.
         signature = (event["second"], event["event_type"], event["side"], event["cap_number"])
-        if any((e["second"], e["event_type"], e["side"], e["cap_number"]) == signature for e in events):
+        duplicate_index = next((i for i, e in enumerate(events)
+                                if (e["second"], e["event_type"], e["side"], e["cap_number"]) == signature), None)
+        if duplicate_index is not None:
             ignored["duplicates"] += 1
+            # Keep the strongest observation intact; do not combine evidence
+            # or infer identity from multiple uncertain observations.
+            if event["confidence"] > events[duplicate_index]["confidence"]:
+                events[duplicate_index] = event
             continue
         events.append(event)
     payload["actions"] = sorted(events, key=lambda e: e["second"])
