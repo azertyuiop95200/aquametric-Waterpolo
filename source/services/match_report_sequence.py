@@ -46,7 +46,7 @@ def build_match_sequence(inputs):
             for p in report['players']:
                 m=None
                 if p['metrics'] is not None:
-                    clipped=list(_clip(tracks[p['track_ids'][0]]['segments'],w['start_s'],w['end_s']))
+                    clipped=list(_clip(p['segments'],w['start_s'],w['end_s']))
                     # No sprint/acceleration across bucket cuts; full-window values stay in player report.
                     result=motion(clipped,sprint_mps=args['sprint_mps'],min_sprint_s=args['min_sprint_s'])
                     m={k:result[k] for k in ('observed_s','distance_m','mean_speed_mps')}
