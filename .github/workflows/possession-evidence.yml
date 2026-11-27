@@ -11,6 +11,7 @@ on:
       - 'tests/test_possession_context.py'
       - 'tests/test_local_object_tracking.py'
       - 'tests/test_head_flow_tracking.py'
+      - 'tests/test_clip_tracking_mode.py'
       - 'tests/test_ball_motion_review.py'
       - 'tests/test_detection_evaluation.py'
       - 'tests/test_calibration_validation.py'
@@ -34,6 +35,7 @@ jobs:
       - run: PYTHONPATH=source python -m unittest discover -s tests -p test_possession_context.py -v
       - run: PYTHONPATH=source python -m unittest discover -s tests -p test_local_object_tracking.py -v
       - run: PYTHONPATH=source python -m unittest discover -s tests -p test_head_flow_tracking.py -v
+      - run: PYTHONPATH=source python -m unittest discover -s tests -p test_clip_tracking_mode.py -v
       - run: PYTHONPATH=source python -m unittest discover -s tests -p test_ball_motion_review.py -v
       - run: PYTHONPATH=source python -m unittest discover -s tests -p test_detection_evaluation.py -v
       - run: PYTHONPATH=source python -m unittest discover -s source/tests -p test_metric_field.py -v

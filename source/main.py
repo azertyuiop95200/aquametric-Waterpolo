@@ -678,7 +678,8 @@ def run_vision_scan(match_id: int, request: Request, db: Session = Depends(get_d
 
 @app.post("/matches/{match_id}/vision/tracklets")
 def local_tracklet_scan(match_id: int, request: Request, start_frame: int = Form(0),
-                        segment_id: int = Form(0), db: Session = Depends(get_db)):
+                        segment_id: int = Form(0), tracking_mode: str = Form("baseline"),
+                        db: Session = Depends(get_db)):
     from models import MatchVideoSegment
     from services.local_clip_scan import scan_clip
     user = require_user(request, db)
@@ -698,7 +699,7 @@ def local_tracklet_scan(match_id: int, request: Request, start_frame: int = Form
     if not source.is_file():
         raise HTTPException(404, detail="Vidéo locale indisponible.")
     try:
-        result = scan_clip(source, start_frame)
+        result = scan_clip(source, start_frame, tracking_mode=tracking_mode)
     except ValueError as exc:
         raise HTTPException(422, detail=str(exc)) from None
     result.update(match_id=match.id, segment_id=segment_id or None)

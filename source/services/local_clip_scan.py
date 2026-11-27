@@ -2,8 +2,13 @@
 from math import isfinite
 import cv2
 from services.local_object_tracking import scan
+from services.head_flow_tracking import scan_head_flow
 
-def scan_clip(path,start_frame=0,frame_count=75):
+MODES={'baseline':scan,'head_flow':scan_head_flow}
+
+def scan_clip(path,start_frame=0,frame_count=75,*,tracking_mode='baseline'):
+    if not isinstance(tracking_mode,str) or tracking_mode not in MODES:
+        raise ValueError('Mode de suivi inconnu.')
     if type(start_frame) is not int or start_frame<0 or type(frame_count) is not int or not 1<=frame_count<=75:
         raise ValueError("Fenêtre de 1 à 75 images requise.")
     c=cv2.VideoCapture(str(path))
@@ -27,11 +32,16 @@ def scan_clip(path,start_frame=0,frame_count=75):
                 if not ok or f is None or round(c.get(cv2.CAP_PROP_POS_FRAMES))!=i+1:
                     raise ValueError("Index d’image non vérifiable.")
                 yield i/fps,f
-        result=scan(frames())
-        for row,i in zip(result["frames"],range(start_frame,end,stride)):
+        result=MODES[tracking_mode](frames())
+        indices=list(range(start_frame,end,stride))
+        if len(result['frames'])!=len(indices):raise ValueError('Nombre d’images traitées incohérent.')
+        for row,i in zip(result["frames"],indices):
+            if abs(row['second']-i/fps)>1e-5:raise ValueError('Temps d’image incohérent.')
             row["source_frame_index"]=i
+        # All tracks remain experimental: this endpoint must never assert metric or roster validity.
         result.update(source_fps_reported=fps,source_frame_count_reported=total,first_frame=start_frame,
                       end_frame_exclusive=end,sample_stride=stride,time_basis="nominal_frame_index_divided_by_reported_fps",
-                      pts_validated=False)
+                      pts_validated=False,tracking_mode=tracking_mode,object_scope='heads_only' if tracking_mode=='head_flow' else 'heads_and_ball_candidates',
+                      statistical_use_allowed=False,identity_verified=False,metrics_validated=False)
         return result
     finally:c.release()

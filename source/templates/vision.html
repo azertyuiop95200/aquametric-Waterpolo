@@ -13,6 +13,8 @@
 <form method="post" action="/matches/{{match.id}}/vision/tracklets" target="_blank">
 <label>Indice de la première image <input type="number" name="start_frame" min="0" value="0" required></label>
 <label>Identifiant de segment (0 = vidéo principale) <input type="number" name="segment_id" min="0" value="0" required></label>
+<label>Moteur expérimental <select name="tracking_mode"><option value="baseline">Classique : têtes et candidats ballon</option><option value="head_flow">Hybride : têtes et flux optique seulement</option></select></label>
+<p class="muted">Les points de flux sont des hypothèses de position. Aucun de ces modes ne valide une identité ou une statistique individuelle.</p>
 <button class="btn secondary" type="submit">Analyser un extrait (JSON)</button>
 </form>
 <p class="muted">Disponible uniquement pour les fichiers locaux du match. Cette exploration ne modifie pas les statistiques.</p>
