@@ -50,9 +50,12 @@ def search_scenarios(baseline, edits):
             c["defenders"]=deepcopy(defenders)
             for d in c["defenders"]:d["position"][1]+=side*.5
         add("Bloc adverse "+("gauche" if side<0 else "droite"),"Sensibilité à une réaction adverse imposée",block)
-    out=[]; rejected=[]
+    out=[]; rejected=[]; windows=[]
     for name,description,c in candidates:
-        try:r=sandbox(baseline,c,trials=16)
+        timing=name=="Référence coach" or name.startswith("Temporiser ")
+        evaluated=deepcopy(c)
+        if not timing: evaluated.pop("keeper_id",None)
+        try:r=sandbox(baseline,evaluated,trials=16)
         except (ValueError,TypeError,KeyError) as exc:
             rejected.append({"name":name,"reason":str(exc)[:150]});continue
         # A shot outside goal or truncated observed trajectory cannot win a search.
@@ -63,10 +66,16 @@ def search_scenarios(baseline, edits):
             if not xs:return None
             o=max(xs,key=lambda o:(o["clearance_frequency"],o["clearance_m"]))
             return {k:o[k] for k in ("id","kind","clearance_frequency","clearance_m","simulation_interval","flight_s")}
+        if timing and r.get("goal_coverage"):
+            gmap=r["goal_coverage"]
+            windows.append(dict(delay_s=r["delay_s"],keeper=gmap["keeper"],defence=gmap["defence"],
+                                best_shot=best(shots),best_pass=best(passes)))
         out.append({"name":name,"description":description,"edits":c,"best_shot":best(shots),"best_pass":best(passes),
                     "reaction_sensitivity":name.startswith("Bloc adverse")})
-    return {"mode":"coach_hypothesis_search","trials_per_option":16,"scenarios":out,"rejected":rejected,
+    windows.sort(key=lambda w:w["delay_s"])
+    return {"timing_samples":windows,"mode":"coach_hypothesis_search","trials_per_option":16,"scenarios":out,"rejected":rejected,
             "limitations":["Exploratory frequencies; refine a chosen scenario before comparison",
                            "No prediction of goals or pass completion",
+                           "Timing samples compare discrete release delays, not continuous optimal windows; no possession clock or pass-then-shot outcome modeled",
                            "Instant repositioning is a hypothetical initial configuration, not a feasible movement plan",
                            "Collective movement affects receiver proxies, not verified player identities"]}
