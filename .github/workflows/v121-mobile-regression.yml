@@ -9,7 +9,7 @@ on:
       - 'render.yaml'
       - '.github/workflows/v121-mobile-regression.yml'
   pull_request:
-    branches: [main]
+    branches: [main, fix/youtube-report-intake-2026-11]
     paths:
       - 'source/**'
       - 'Dockerfile'
@@ -89,7 +89,8 @@ jobs:
             const page = await browser.newPage({viewport:{width:390,height:844}, isMobile:true, hasTouch:true});
             const base='http://127.0.0.1:10000';
             await page.goto(base+'/demo-login',{waitUntil:'networkidle'});
-            await page.waitForURL('**/my-team');
+            assert(new URL(page.url()).pathname === '/matches/new', 'demo login must open match analysis: '+page.url());
+            assert(await page.locator('#quickYoutubeAnalysis').count()===1,'match analysis entry is missing');
             const original=page.url();
             const toggle=page.locator('[data-menu-toggle]');
             assert(await toggle.isVisible(),'mobile menu button is not visible');
@@ -97,7 +98,9 @@ jobs:
             assert(await page.locator('#sidebar').evaluate(el=>el.classList.contains('open')),'sidebar did not open');
             const nav=page.locator('#sidebar .side-nav');
             const dims=await nav.evaluate(el=>({scrollHeight:el.scrollHeight,clientHeight:el.clientHeight,overflow:getComputedStyle(el).overflowY,touch:getComputedStyle(el).touchAction}));
-            assert(dims.scrollHeight>dims.clientHeight,'sidebar navigation is not vertically scrollable');
+            const navPaths=await nav.locator('a').evaluateAll(links=>links.map(a=>a.getAttribute('href')));
+            assert(JSON.stringify(navPaths)===JSON.stringify(['/dashboard','/matches/new','/matches','/knowledge','/analysis-history','/analysis-library']),'sidebar must contain only analysis sections');
+            assert(dims.scrollHeight>=dims.clientHeight,'sidebar dimensions invalid');
             assert(['auto','scroll'].includes(dims.overflow),'sidebar overflow-y is not scrollable');
             assert(dims.touch!=='none','sidebar touch scrolling is disabled');
             assert(await page.locator('[data-lang-choice]').count()===5,'five-language dock is missing');
@@ -106,6 +109,9 @@ jobs:
             assert(page.url()===original,'closing menu changed current page');
             await page.selectOption('#lang','fr'); await page.waitForTimeout(150);
             assert((await page.locator('[data-i18n="nav.dashboard"]').innerText()).trim()==='Tableau de bord','French nav translation failed');
+            await page.goto(base+'/dashboard',{waitUntil:'networkidle'});
+            assert(await page.locator('.coach-workspace a[href="/matches/new"]').count()>0,'dashboard analysis entry missing');
+            assert(await page.locator('.coach-workspace a[href="/scouting"],.coach-workspace a[href="/competitions"],.coach-workspace a[href="/simulation"],.coach-workspace a[href="/player-intelligence"],.coach-workspace a[href="/my-team"]').count()===0,'dashboard exposes legacy shortcuts');
             await page.goto(base+'/knowledge',{waitUntil:'networkidle'});
             assert(await page.locator('.tactic-board-card').count()>=8,'visual tactical boards are missing');
             assert(await page.locator('.source-row,.reference-row').count()===0,'knowledge page still exposes source ledger');
