@@ -15,6 +15,13 @@
 <details><summary>Fenêtres de possession</summary><table><thead><tr><th>ID</th><th>Temps global</th><th>Avant → après</th><th>Constat</th><th>Cause / arbitrage</th><th>Observation</th></tr></thead><tbody>
 {% for e in p.intervals %}<tr><td>{{e.id}}</td><td>{{e.start}}–{{e.end}}</td><td>{{e.before}} → {{e.after}}</td><td>{{ {'opposite_endpoints':'Contrôles opposés','same_team_endpoints':'Même équipe aux bornes','probable_opposite_endpoints':'Changement probable','unresolved':'Indéterminé'}.get(e.status,e.status) }}</td><td>{{e.attributed_cause or "Cause non attribuée"}}{% if e.cause_candidate %}<br>Hypothèse : {{e.cause_candidate}}{% endif %}{% if e.referee_signal_observed %}<br>Geste observé{% endif %}{% if e.decision_verified %}<br>Décision déclarée vérifiée{% endif %}</td><td>{{e.observation}}</td></tr>{% endfor %}
 </tbody></table></details>
+{% if p.possession_context and p.possession_context.decisions %}
+<h3>Reconstruction contextuelle des possessions</h3>
+<p>{{p.possession_context.note}}</p>
+<table><thead><tr><th>Fenêtre</th><th>Interprétation</th><th>Action suivante</th><th>Justification et alternative</th></tr></thead><tbody>
+{% for id,d in p.possession_context.decisions.items() %}<tr><td>{{id}}</td><td>{{ {'change_between_observed_controls':'Changement entre contrôles observés','probable_retained':'Conservation probable','probable_retained_initial_apparent':'Conservation plausible, départ apparent','retention_not_supported':'Conservation non étayée','later_control_only':'Contrôle ultérieur seul'}.get(d.status,d.status) }}</td><td>{{d.next_s}} s · {{d.next_team}} · {{d.next_kind}}{% if d.next_event_id %} · {{d.next_event_id}}{% endif %}</td><td>{{d.reason}}<br>Alternative : {{d.alternative}}{% if d.conflict_ids %}<br>Contrôles opposés dans la fenêtre : {{d.conflict_ids|join(', ')}}{% endif %}<br>Preuves : {{d.evidence|join(', ')}}</td></tr>{% endfor %}
+</tbody></table>
+{% endif %}
 {% include "pass_review_report.html" %}
 {% else %}<p>Aucune référence vidéo importée.</p>{% endfor %}
 </section>
