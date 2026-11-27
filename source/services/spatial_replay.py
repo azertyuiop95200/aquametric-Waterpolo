@@ -48,10 +48,13 @@ def review(data, trials=160):
         segments=tuple(ReachSegment(label(s["part"]),
             xyz(s["start_offset"],((-2,2),)*3),
             xyz(s["end_offset"],((-2,2),)*3),
-            number(s["radius"],.03,.8)) for s in parts)
+            number(s["radius"],.03,.8),
+            xyz(s["target_start_offset"],((-2,2),)*3) if s.get("target_start_offset") is not None else None,
+            xyz(s["target_end_offset"],((-2,2),)*3) if s.get("target_end_offset") is not None else None,
+            number(s.get("reaction_s",0),0,3),number(s.get("motion_s",.3),.05,2)) for s in parts)
         tracks.append(Track(label(d["id"]),xyz(d["position"],bounds),
                      xyz(d["velocity"],((-3,3),(-3,3),(-3,3))),
-                     number(d["radius"],.15,1.8),number(d["confidence"],0,1),segments))
+                     number(d["radius"],.15,1.8),number(d["confidence"],0,1),segments,number(d.get("reach_elapsed_s",0),0,3)))
     if len({d.id for d in tracks})!=len(tracks):
         raise ValueError("Duplicate defender")
     if not isinstance(data.get("chosen"),str):
@@ -80,7 +83,7 @@ def review(data, trials=160):
         count=0
         if complete and sigma>0:
             for a,b,c in draws:
-                shifted=[Track(d.id,shift(d.position,n),d.velocity,d.radius,d.confidence,d.reach_segments) for d,n in zip(tracks,b)]
+                shifted=[Track(d.id,shift(d.position,n),d.velocity,d.radius,d.confidence,d.reach_segments,d.reach_elapsed_s) for d,n in zip(tracks,b)]
                 rr=assess(shift(start,a),shift(end,c),duration,shifted,1,steps=24)
                 count+=rr["status"]=="clear_in_model"
         freq=count/trials if complete and sigma>0 else None
@@ -99,12 +102,12 @@ def review(data, trials=160):
     ids=[o["id"] for o in output]
     if len(set(ids))!=len(ids) or data["chosen"] not in ids:
         raise ValueError("Chosen action missing or duplicate option")
-    return dict(model_version="replay-2",source=data["source"],start=start,
-                defenders=[dict(id=d.id,position=d.position,velocity=d.velocity,radius=d.radius,confidence=d.confidence,reach_segments=[dict(part=s.part,start_offset=s.start_offset,end_offset=s.end_offset,radius=s.radius) for s in d.reach_segments]) for d in tracks],
+    return dict(model_version="replay-3",source=data["source"],start=start,
+                defenders=[dict(id=d.id,position=d.position,velocity=d.velocity,radius=d.radius,confidence=d.confidence,reach_elapsed_s=d.reach_elapsed_s,reach_segments=[dict(part=s.part,start_offset=s.start_offset,end_offset=s.end_offset,radius=s.radius,target_start_offset=s.target_start_offset,target_end_offset=s.target_end_offset,reaction_s=s.reaction_s,motion_s=s.motion_s) for s in d.reach_segments]) for d in tracks],
                 length_m=length,width_m=width,goal_x=goal_x,chosen=data["chosen"],options=output,
                 goal_angles=goal_angles(start,goal_x,width/2) if abs(start[0]-goal_x)>1e-8 else None,
                 sigma_m=sigma,trials=trials,complete_defence=complete,decision_second=decision_second,
                 limitations=["Conditional geometric clearance, not scoring or completion probability",
-                "Constant defender velocity; supplied body/arm capsules retain fixed orientation during flight; missing parts are not reconstructed",
+                "Constant defender velocity; optional supplied reach poses interpolate linearly after reaction delay, then hold; not an anatomical or measured reaction model",
                 "Spherical proxy retained when no body capsule is supplied; clearance is conditional on modeled geometry, not anatomical coverage",
                 "Manual or supplied positions are not automatically reconstructed from pixels"])
