@@ -676,6 +676,36 @@ def run_vision_scan(match_id: int, request: Request, db: Session = Depends(get_d
     return RedirectResponse(f"/matches/{match_id}/vision", status_code=303)
 
 
+@app.post("/matches/{match_id}/vision/tracklets")
+def local_tracklet_scan(match_id: int, request: Request, start_frame: int = Form(0),
+                        segment_id: int = Form(0), db: Session = Depends(get_db)):
+    from models import MatchVideoSegment
+    from services.local_clip_scan import scan_clip
+    user = require_user(request, db)
+    match = db.get(Match, match_id)
+    if not match or match.owner_id != user.id:
+        raise HTTPException(404)
+    if segment_id:
+        segment = db.get(MatchVideoSegment, segment_id)
+        if not segment or segment.match_id != match.id:
+            raise HTTPException(404)
+        kind, path = segment.source_type, segment.video_path
+    else:
+        kind, path = match.video_source, match.video_path
+    if kind != "upload" or not path:
+        raise HTTPException(422, detail="Une vidéo locale téléversée est requise.")
+    source = UPLOAD_DIR / Path(path).name
+    if not source.is_file():
+        raise HTTPException(404, detail="Vidéo locale indisponible.")
+    try:
+        result = scan_clip(source, start_frame)
+    except ValueError as exc:
+        raise HTTPException(422, detail=str(exc)) from None
+    result.update(match_id=match.id, segment_id=segment_id or None)
+    from fastapi.responses import JSONResponse
+    return JSONResponse(result, headers={"Cache-Control": "private, no-store"})
+
+
 @app.get("/matches/{match_id}/vision/contact-sheet")
 def vision_contact_sheet(match_id: int, request: Request, db: Session = Depends(get_db)):
     user = require_user(request, db)
