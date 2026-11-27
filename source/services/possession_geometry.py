@@ -3,9 +3,11 @@ from bisect import bisect_right
 from math import hypot, isfinite, sqrt
 try:
     from services.tactical_trajectories import _interval, _exposure
+    from services.spatial_dominance import SpaceAccumulator
 except ModuleNotFoundError as e:
     if e.name != 'services': raise
     from tactical_trajectories import _interval, _exposure
+    from spatial_dominance import SpaceAccumulator
 
 
 def number(v): return type(v) in (int,float) and isfinite(v)
@@ -44,6 +46,7 @@ def analyze_window(report, window, *, lane_radius_m=.65, proximity_m=1.5, max_st
     if not A or not D or any(not isinstance(i,str) or not i.startswith(side+':') for i in A) or any(not isinstance(i,str) or not i.startswith(other+':') for i in D) or len(set(A+D))!=len(A+D) or carrier not in A:
         raise ValueError('invalid fixed roster/carrier')
     if window.get('goal_x') not in (0,report['length_m']): raise ValueError('attack direction required')
+    space=SpaceAccumulator(report['length_m'],report['width_m'],A,D,position_error_m=window.get('position_error_bound_m'))
     rows={}; duplicates=set()
     for p in report['players']:
         k=f"{p['side']}:{p['cap_number']}"
@@ -78,6 +81,7 @@ def analyze_window(report, window, *, lane_radius_m=.65, proximity_m=1.5, max_st
     for t,u in zip(cuts,cuts[1:]):
         edges={i:edge(i,t,u) for i in A+D}
         if any(v is None for v in edges.values()): continue
+        space.add(edges,t,u)
         dt=u-t; observed+=dt; mid={i:mean(*v) for i,v in edges.items()}
         for s,ids in (('attack',A),('defence',D)):
             for k,v in shape([mid[i] for i in ids]).items(): totals[s][k]+=dt*v
@@ -101,4 +105,5 @@ def analyze_window(report, window, *, lane_radius_m=.65, proximity_m=1.5, max_st
             'pressure':[{'id':i,'proximity_s':value(v[0]),'double_proximity_s':value(v[1])} for i,v in pressure.items()],
             'lanes':[{'receiver':i,'clear_s':value(v[0]),'obstructed_s':value(v[1]),'indeterminate_s':value(v[2]),'clear_fraction':v[0]/observed if observed else None} for i,v in lanes.items()],
             'snapshot':snapshots[0] if snapshots else None,'lane_radius_m':lane_radius_m,'proximity_m':proximity_m,
-            'status':'experimental_planar_proxy','game_duration_s':None,'position_error_m':None}
+            'status':'experimental_planar_proxy','game_duration_s':None,'position_error_m':None,
+            'spatial_dominance':space.result()}
