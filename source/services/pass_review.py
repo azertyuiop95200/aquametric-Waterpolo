@@ -4,6 +4,7 @@ A completed transfer is not a possession change. No player or full-match rate is
 from collections import Counter
 from math import isfinite
 from services.review_coverage import coverage
+from services.retrospective_review import retrospective, retrospective_summary
 import re
 
 TEAMS = {'blancs', 'bleus'}
@@ -109,12 +110,14 @@ def validate_pass_review(reference, duration):
         check(prev[1]<cur[0],'Départs de passe chevauchants : doublon potentiel.')
         check(prev[2] is None or prev[2]<=cur[0],'Nouveau départ avant la maîtrise directe précédente.')
     coverage(review,duration)
+    retrospective(reference,fps,rows)
     return review
 
 def summarize_pass_review(reference,duration):
     review=validate_pass_review(reference,duration)
     if review is None:return None
     fps=review['fps']; rows=review['actions']; output=[]; teams={}
+    decisions=retrospective(reference,fps,rows)
     for r in rows:
         d=dict(r)
         for field in ('accuracy','defensive_intervention','reception_quality'):
@@ -142,6 +145,7 @@ def summarize_pass_review(reference,duration):
         d['arrival_to_control_evidence_s']=round((r['control_frame']-r['arrival_first_frame'])/fps,6) if r['state']=='arrival_only' and r.get('control_frame') is not None else None
         # Only observed contact and direct control support a reception delay.
         d['contact_to_control_evidence_s']=round((r['control_frame']-r['contact_frame'])/fps,6) if r['state']=='observed_pass' and r['outcome']=='completed' and r.get('contact_state')=='observed' and r.get('contact_frame') is not None else None
+        d['retrospective_decision']=decisions.get(r['id'])
         d['key_pass_verified']=False
         d['assist_verified']=False
         output.append(d)
@@ -157,4 +161,4 @@ def summarize_pass_review(reference,duration):
         summary['resolved_outcome_coverage_pct']=round(100*n/len(actions),2) if actions else None
         for field in ('accuracy','defensive_intervention','reception_quality'):
             summary[field+'_counts']=dict(Counter(r.get(field,'unknown') for r in actions))
-    return dict(actions=output,teams=teams,states=dict(Counter(r['state'] for r in rows)),fps=fps,coverage_complete=False,review_coverage=coverage(review,duration),note='Revue partielle. Durée jusqu’à une image de maîtrise, non temps de vol exact. Aucun taux global ni attribution individuelle.')
+    return dict(actions=output,teams=teams,states=dict(Counter(r['state'] for r in rows)),fps=fps,coverage_complete=False,review_coverage=coverage(review,duration),retrospective_summary=retrospective_summary(rows,decisions),note='Revue partielle. Durée jusqu’à une image de maîtrise, non temps de vol exact. Aucun taux global ni attribution individuelle.')
