@@ -67,6 +67,24 @@ def validate_pass_review(reference, duration):
         elif outcome=='deflected_retained':
             check(receiver==team and k is not None and r.get('direct_sequence') is True and r.get('deflection_observed') is True,'Conservation après déviation non démontrée.')
         elif outcome=='out_of_play':check(k is None and r.get('direct_sequence') is True,'Sortie directe non démontrée.')
+        # Optional independent quality dimensions; legacy rows remain unknown.
+        for field, allowed in (
+            ('accuracy', {'accurate','inaccurate','unknown'}),
+            ('defensive_intervention', {'blocked','deflected','none_observed','unknown'}),
+            ('reception_quality', {'clean','adjusted','multiple_contacts','failed','unknown'}),
+        ):
+            value=r.get(field,'unknown')
+            check(isinstance(value,str) and value in allowed,'Qualité de passe invalide.')
+            check(state=='observed_pass' or value=='unknown','Qualité sans passe observée.')
+        quality=r.get('reception_quality','unknown')
+        if quality in {'clean','adjusted','multiple_contacts'}:
+            check(outcome=='completed' and c is not None and r['contact_state']=='observed','Réception non démontrée.')
+        if quality=='clean':
+            check(c==k,'Maîtrise au premier contact non démontrée.')
+        if quality=='failed':
+            check(outcome in {'intercepted','out_of_play'} and c is not None and r['contact_state']=='observed','Échec de réception non démontré.')
+        if r.get('defensive_intervention')=='deflected':
+            check(r.get('deflection_observed') is True,'Déviation non démontrée.')
         ev=r.get('related_event_id');relation=r.get('event_relation');iv=r.get('related_interval_id')
         check((ev is None and relation is None) or ev in events and relation in {'same_action','precedes_shot'},'Lien événement invalide.')
         if relation=='precedes_shot':
@@ -90,6 +108,8 @@ def summarize_pass_review(reference,duration):
     fps=review['fps']; rows=review['actions']; output=[]; teams={}
     for r in rows:
         d=dict(r)
+        for field in ('accuracy','defensive_intervention','reception_quality'):
+            d.setdefault(field,'unknown')
         for f in ('window_start_frame','window_end_frame','release_last_held_frame','release_first_free_frame','contact_frame','control_frame','water_seen_frame'):
             d[f.replace('_frame','_s')]=None if r.get(f) is None else round(r[f]/fps,6)
         if r.get('control_frame') is not None and r.get('direct_sequence') is True:
@@ -116,4 +136,12 @@ def summarize_pass_review(reference,duration):
     for team in sorted(TEAMS):
         actions=[r for r in rows if r['state']=='observed_pass' and r['team']==team];counts=Counter(r['outcome'] for r in actions)
         teams[team]=dict(observed_attempts=len(actions),completed=counts['completed'],unknown_outcomes=counts['unknown'],intercepted=counts['intercepted'],out_of_play=counts['out_of_play'],deflected_retained=counts['deflected_retained'],match_completion_pct=None,match_turnover_count=None)
+        summary=teams[team]
+        summary['confirmed_failed']=counts['intercepted']+counts['out_of_play']
+        summary['unclassified_completion']=counts['unknown']+counts['deflected_retained']
+        summary['resolved_completion_denominator']=counts['completed']+summary['confirmed_failed']
+        n=summary['resolved_completion_denominator']
+        summary['observed_resolved_completion_pct']=round(100*counts['completed']/n,2) if n else None
+        for field in ('accuracy','defensive_intervention','reception_quality'):
+            summary[field+'_counts']=dict(Counter(r.get(field,'unknown') for r in actions))
     return dict(actions=output,teams=teams,states=dict(Counter(r['state'] for r in rows)),fps=fps,coverage_complete=False,note='Revue partielle. Durée jusqu’à une image de maîtrise, non temps de vol exact. Aucun taux global ni attribution individuelle.')
