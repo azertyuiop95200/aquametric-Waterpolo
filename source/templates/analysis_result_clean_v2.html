@@ -25,6 +25,7 @@
     </div>
   </section>
 
+  <section class="report-card"><span class="eyebrow">INTELLIGENCE DÉCISIONNELLE</span><h2>Relecture 3D des tirs et passes</h2><p>{{spatial_eligible_count|default(0)}} actions vérifiées éligibles · {{spatial_reviews|default({})|length}} relectures enregistrées. Les alternatives non observées restent des simulations.</p><div class="actions"><a class="btn" href="/matches/{{match.id}}/spatial">Comparer les décisions en 3D</a><a class="btn secondary" href="/matches/{{match.id}}/spatial.json">Export des relectures</a></div>{% include "spatial_report_rows.html" %}</section>
   {% if match.status in ["browser_capture_running","browser_capture_finalizing"] %}
   <section class="report-card status-live" id="finalizationLiveState">
     <h2>Rapport en cours de publication</h2>
