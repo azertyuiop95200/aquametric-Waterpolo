@@ -8,6 +8,10 @@ const num=id=>Number($(id).value);
 const text=(tag,value,parent)=>{const el=document.createElement(tag);el.textContent=value;parent.append(el);return el};
 const fmt=(x,n=2)=>Number.isFinite(x)?x.toFixed(n):"non mesuré";
 const partLabel=p=>({body:"corps",left_arm:"bras gauche",right_arm:"bras droit",sphere_proxy:"volume approximatif"})[p]||"";
+function reachEndpoints(s,d,t){
+ const u=s.target_start_offset&&s.target_end_offset?Math.max(0,Math.min(1,(t+(d.reach_elapsed_s||0)-(s.reaction_s||0))/(s.motion_s||.3))):0;
+ return [s.start_offset,s.end_offset].map((p,j)=>p.map((v,i)=>v+u*((j?s.target_end_offset:s.target_start_offset)?.[i]??v)-u*v));
+}
 function draw(){
  ctx.clearRect(0,0,canvas.width,canvas.height);
  if(!result){ctx.fillStyle="#c9e2ef";ctx.font="17px sans-serif";ctx.fillText("Aucune scène métrique disponible",30,45);return}
@@ -27,7 +31,7 @@ function draw(){
  const circle=Array.from({length:37},(_,i)=>[p[0]+d.radius*Math.cos(i*Math.PI/18),p[1]+d.radius*Math.sin(i*Math.PI/18),p[2]]);
  if(!(d.reach_segments||[]).some(s=>s.part==="body"))line(circle,"#ff7777",1);
  for(const s of d.reach_segments||[]){
- const ends=[s.start_offset,s.end_offset].map(q=>q.map((v,i)=>v+p[i]));
+ const ends=reachEndpoints(s,d,t).map(q=>q.map((v,i)=>v+p[i]));
  ctx.lineCap="round";line(ends,"#ffad88",Math.max(1,2*s.radius*scale));ctx.lineCap="butt";
  }
  line([[p[0],p[1],0],p],"#e88181",1);dot(p,"#e85a66",6,d.id);
