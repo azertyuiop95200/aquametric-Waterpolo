@@ -293,3 +293,17 @@ def test_report_exports_player_page_actual_clip_and_account_isolation(tmp_path,m
         assert client.get(clip_url).status_code == 404
         assert client.get(f"/matches/{mid}/analysis/actions/status").status_code == 404
         assert client.post(f"/matches/{mid}/analysis/actions/start").status_code == 404
+
+
+def test_canonical_actions_preserves_conflict_and_prefers_eligible_observation():
+    from services.video_action_report import canonical_actions
+    def row(kind, second, confidence):
+        return dict(event_type=kind, second=second, side="for", cap_number=4,
+                    segment_index=0, confidence=confidence, counted=confidence >= .65)
+    rows = canonical_actions([row("goal", 1, .95), row("shot_off_target", 1.01, .9),
+                              row("shot_off_target", 1.02, .99)])
+    assert len(rows) == 3
+    assert all(not r["counted"] and r.get("conflict") for r in rows)
+    rows = canonical_actions([row("goal", 2, .4), row("shot_on_target", 2.01, .9)])
+    assert len(rows) == 1 and rows[0]["counted"]
+    assert rows[0]["event_type"] == "shot_on_target"
