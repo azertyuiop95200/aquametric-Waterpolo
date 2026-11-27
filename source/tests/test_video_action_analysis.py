@@ -323,3 +323,57 @@ def test_exact_duplicate_retains_strongest_observation(reverse):
     assert len(observed["actions"]) == 1
     assert observed["actions"][0]["confidence"] == .92
     assert observed["actions"][0]["evidence"] == strong["evidence"]
+
+
+def _boundary_row(second, kind="goal", segment=0, cap=4, side="for", **tags):
+    return dict(second=second, event_type=kind, segment_index=segment, cap_number=cap,
+                side=side, confidence=.92, counted=True, **tags)
+
+
+def test_cross_segment_close_releases_are_reviewable_not_silently_merged():
+    from services.video_action_report import canonical_actions
+    source = [_boundary_row(59.8, "shot_on_target"), _boundary_row(60.2, segment=1)]
+    rows = canonical_actions(source)
+    assert len(rows) == 2
+    assert all(not row["counted"] and row["dedup_status"] == "review_required" for row in rows)
+    assert all(row["counted"] and "conflict" not in row for row in source)
+
+
+def test_observed_recovery_separates_close_shots():
+    from services.video_action_report import canonical_actions
+    source = [_boundary_row(59.8, "shot_blocked"), _boundary_row(60., "recovery", segment=1),
+              _boundary_row(60.2, segment=1)]
+    rows = canonical_actions(source)
+    assert len(rows) == 3 and all(row["counted"] for row in rows)
+
+
+def test_known_period_difference_separates_actions():
+    from services.video_action_report import canonical_actions
+    rows = canonical_actions([_boundary_row(59.9, period=1), _boundary_row(60.1, segment=1, period=2)])
+    assert len(rows) == 2 and all(row["counted"] for row in rows)
+
+
+def test_conflicting_zones_and_unknown_identity_preserve_observations():
+    from services.video_action_report import canonical_actions
+    for source in ([_boundary_row(3, zone="centre"), _boundary_row(3.1, zone="wing_left")],
+                   [_boundary_row(3, cap=None), _boundary_row(3.1, cap=None)]):
+        rows = canonical_actions(source)
+        assert len(rows) == 2 and all(not row["counted"] for row in rows)
+
+
+def test_dense_events_do_not_hide_duplicate_and_chain_not_collapsed():
+    from services.video_action_report import canonical_actions
+    source = [_boundary_row(3, "shot_on_target"), _boundary_row(3.1)]
+    source += [_boundary_row(3.05, "touch", cap=i) for i in range(1, 13)]
+    rows = canonical_actions(source)
+    shots = [r for r in rows if r["event_type"] in {"goal", "shot_on_target"}]
+    assert len(shots) == 1 and shots[0]["event_type"] == "goal"
+    assert shots[0]["merged_observation_count"] == 2
+    rows = canonical_actions([_boundary_row(3), _boundary_row(3.1), _boundary_row(3.2)])
+    assert len(rows) == 3 and all(not r["counted"] for r in rows)
+
+
+def test_same_cap_different_teams_never_merge():
+    from services.video_action_report import canonical_actions
+    rows = canonical_actions([_boundary_row(3), _boundary_row(3, side="against")])
+    assert len(rows) == 2 and all(r["counted"] for r in rows)
