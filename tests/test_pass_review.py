@@ -108,3 +108,20 @@ class PassReviewTests(unittest.TestCase):
     def test_manifest_duplicate(self):
         p=self.manifest();p["reference"]["evidence_manifest"].append(copy.deepcopy(p["reference"]["evidence_manifest"][0]))
         with self.assertRaises(ValueError):read(p)
+
+    def two_passes(self, **kw):
+        p=sample()
+        rows=p["reference"]["pass_review"]["actions"]
+        rows.append(dict(rows[0],id="PA2",release_last_held_frame=33,
+            release_first_free_frame=34,contact_frame=35,control_frame=36,
+            related_event_id=None,event_relation=None))
+        rows[1].update(kw)
+        return p
+    def test_sequential_direct_passes(self):
+        self.assertEqual(summarize(read(self.two_passes())[0],"bleus")["pass_review"]["teams"]["bleus"]["completed"],2)
+    def test_release_before_previous_control(self):
+        with self.assertRaises(ValueError):
+            read(self.two_passes(release_last_held_frame=28,release_first_free_frame=29))
+    def test_duplicate_direct_shot_link(self):
+        with self.assertRaises(ValueError):
+            read(self.two_passes(related_event_id="G1",event_relation="precedes_shot"))
