@@ -5,11 +5,13 @@ try:
     from services.advanced_tracking import motion, transition
     from services.match_tactical_report import build_report, _num
     from services.possession_geometry import analyze_window
+    from services.defensive_recovery import analyze_recovery
 except ModuleNotFoundError as e:
     if e.name != 'services': raise
     from advanced_tracking import motion, transition
     from match_tactical_report import build_report, _num
     from possession_geometry import analyze_window
+    from defensive_recovery import analyze_recovery
 
 
 def _clip(segments, start, end):
@@ -61,7 +63,10 @@ def build_match_sequence(inputs):
             seen.add(ident)
             if record.get('metric_endpoints_reviewed') is not True: continue
             value=transition(evidence,record['ball_start'],record['ball_end'],record['attack_axis'])
-            report['transitions'].append({'id':ident,'start_s':a,'end_s':b,**value})
+            recovery=None
+            if record.get('recovery_review') is not None:
+                recovery=analyze_recovery(report,evidence,record['recovery_review'])
+            report['transitions'].append({'id':ident,'start_s':a,'end_s':b,**value,'recovery':recovery})
         report['possession_geometry']=[]; last=start; ids=set()
         for w in sorted(windows,key=lambda w:w['start_s']):
             if not isinstance(w.get('id'),str) or not w['id'] or w['id'] in ids or w['start_s']<last:
