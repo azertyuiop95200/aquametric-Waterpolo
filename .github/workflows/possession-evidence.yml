@@ -10,6 +10,7 @@ on:
       - 'tests/test_retrospective_review.py'
       - 'tests/test_possession_context.py'
       - 'tests/test_local_object_tracking.py'
+      - 'tests/test_ball_motion_review.py'
       - 'tests/test_calibration_validation.py'
       - 'source/tests/test_metric_field.py'
       - '.github/workflows/possession-evidence.yml'
@@ -22,7 +23,7 @@ jobs:
         with:
           python-version: '3.11'
       - run: pip install jinja2 sqlalchemy opencv-python-headless numpy
-      - run: python -m py_compile source/main.py source/services/analysis_product.py source/services/possession_evidence.py source/services/review_reference_import.py source/services/pass_review.py source/services/review_coverage.py source/services/retrospective_review.py source/services/possession_context.py source/services/local_object_tracking.py source/services/local_clip_scan.py source/services/evidence_manifest.py source/services/review_reference_revision.py source/models.py
+      - run: python -m py_compile source/main.py source/services/analysis_product.py source/services/possession_evidence.py source/services/review_reference_import.py source/services/pass_review.py source/services/review_coverage.py source/services/retrospective_review.py source/services/possession_context.py source/services/local_object_tracking.py source/services/local_clip_scan.py source/services/ball_motion_review.py source/services/evidence_manifest.py source/services/review_reference_revision.py source/models.py
       - run: PYTHONPATH=source python -m unittest discover -s tests -p test_possession_evidence.py -v
       - run: PYTHONPATH=source python -m unittest discover -s tests -p test_review_reference_import.py -v
       - run: PYTHONPATH=source python -m unittest discover -s tests -p test_pass_review.py -v
@@ -30,6 +31,7 @@ jobs:
       - run: PYTHONPATH=source python -m unittest discover -s tests -p test_retrospective_review.py -v
       - run: PYTHONPATH=source python -m unittest discover -s tests -p test_possession_context.py -v
       - run: PYTHONPATH=source python -m unittest discover -s tests -p test_local_object_tracking.py -v
+      - run: PYTHONPATH=source python -m unittest discover -s tests -p test_ball_motion_review.py -v
       - run: PYTHONPATH=source python -m unittest discover -s source/tests -p test_metric_field.py -v
       - run: PYTHONPATH=source python -m unittest discover -s tests -p test_calibration_validation.py -v
       - run: |
