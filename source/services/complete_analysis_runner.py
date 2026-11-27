@@ -99,6 +99,20 @@ def run_complete_analysis(db, match, upload_dir: Path, evidence_dir: Path, *, in
     refined = _refine_score_change_focus(db, result.get("vision"), result.get("autonomy"))
     if refined:
         result.setdefault("summary", {})["score_change_timestamps_refined"] = refined
+    # Local detector outputs must reach the same native evidence store and export.
+    from services.local_scan_batch import run as run_local_scan_batch
+    try:
+        local_scan = run_local_scan_batch(db, match, source_path)
+    except (OSError, ValueError):
+        local_scan = {"status": "unavailable", "statistical_use_allowed": False,
+                      "reason": "local_source_or_scan_unavailable"}
+    result["local_scan_batch"] = local_scan
+    if result.get("autonomy"):
+        summary = json.loads(result["autonomy"].summary_json or "{}")
+        summary["local_scan_batch"] = local_scan
+        result["autonomy"].summary_json = json.dumps(summary, ensure_ascii=False)
+        result.setdefault("summary", {})["local_scan_batch"] = local_scan
+        db.commit()
     from services.video_action_runner import run_video_actions
     result["video_actions"] = run_video_actions(db, match, source_path)
     build_exact_evidence_pack(

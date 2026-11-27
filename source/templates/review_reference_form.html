@@ -2,7 +2,7 @@
 <p>Import séparé des statistiques confirmées. Choisir le fichier produit par le référentiel d'analyse et la couleur de notre équipe. Le rapprochement des vidéos reste déclaré, non vérifié par le serveur.</p>
 <form action="/matches/{{match.id}}/review-reference" method="post" enctype="multipart/form-data">
 <label>Fichier de référence<input type="file" name="reference_file" accept=".json,application/json" required></label>
-<label>Couleur de {{match.team.name}}<select name="home_color" required><option value="">Choisir</option><option value="blancs">Blancs</option><option value="bleus">Bleus</option></select></label>
+<label>Couleur de {{match.team.name}}<select name="home_color" required><option value="">Choisir</option><option value="blancs">Blancs</option><option value="bleus">Bleus</option><option value="unknown">Non déterminée</option></select></label>
 <label><input type="checkbox" name="same_match" value="1" required> Je confirme que le fichier correspond au match ouvert.</label>
 {% if snapshot is defined and snapshot.review_references %}
 <label>Révision à remplacer (facultatif)<select name="expected_digest"><option value="">Nouvelle référence / import identique</option>{% for r in snapshot.review_references %}<option value="{{r.digest}}">Q{{r.period}} · {{r.digest[:12]}}</option>{% endfor %}</select></label>

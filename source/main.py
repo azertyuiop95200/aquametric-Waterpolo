@@ -1174,7 +1174,7 @@ def import_match_review_reference(match_id: int, request: Request,
     match = db.get(Match, match_id)
     if not match or match.owner_id != user.id:
         raise HTTPException(404)
-    if same_match != "1" or home_color not in COLORS:
+    if same_match != "1" or home_color not in COLORS | {"unknown"}:
         raise HTTPException(400, detail="Confirmer le match et la couleur de notre équipe.")
     try:
         p, canonical, digest, period = load(reference_file.file.read(MAX_BYTES+1))

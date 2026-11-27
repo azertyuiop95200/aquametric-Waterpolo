@@ -54,12 +54,27 @@ def read_scan(row):
 def report(db,match):
     segments={s.id:s for s in db.scalars(select(MatchVideoSegment).where(MatchVideoSegment.match_id==match.id))}
     rows=[];stale=0
+    checked=[]; latest={}
     for row in db.scalars(select(VisionScanEvidence).where(VisionScanEvidence.match_id==match.id).order_by(VisionScanEvidence.id)):
         segment=segments.get(row.segment_id)
         if (row.segment_id is not None and segment is None) or row.source_binding!=source_binding(match,segment):
             stale+=1;continue
         try:
-            r=read_scan(row)["result"]
+            payload=read_scan(row)
+            r=payload["result"]
+            sha=r.get("source_sha256_at_execution")
+            if isinstance(sha,str) and len(sha)==64 and all(c in "0123456789abcdef" for c in sha):
+                latest[row.source_binding]=(sha,payload["source_file_size"],payload["source_file_mtime_ns"])
+            checked.append((row,segment,payload))
+        except (ValueError,TypeError,KeyError,AttributeError):stale+=1
+    for row,segment,payload in checked:
+        try:
+            r=payload["result"]
+            sha=r.get("source_sha256_at_execution")
+            current=latest.get(row.source_binding)
+            if current and ((sha is not None and sha!=current[0]) or
+                (sha is None and (payload["source_file_size"],payload["source_file_mtime_ns"])!=current[1:])):
+                stale+=1;continue
             frames=r.get("frames",[])
             rows.append({"id":row.id,"segment_id":row.segment_id,"period":segment.period if segment else None,
                 "kind":row.kind,"engine":r.get("engine"),"mode":r.get("tracking_mode"),
@@ -68,10 +83,10 @@ def report(db,match):
                 "sampled_frames":len(frames) if row.kind=="tracklets" else None,
                 "tracklets":r.get("tracklets_total"),"tracklets_at_least_3":r.get("tracklets_at_least_3"),
                 "ball_candidates":len(r.get("candidates",[])) if row.kind=="ball_motion" else None,
-                "digest":row.digest})
+                "digest":row.digest,"source_sha256_at_execution":sha,"provenance":r.get("provenance","local_scan")})
         except (ValueError,TypeError,KeyError,AttributeError):stale+=1
     return {"status":"experimental_partial" if rows else "unavailable","rows":rows,"stale_count":stale,
-        "scope":"per_window_not_unique_athletes","source_binding":"metadata_only_not_video_hash",
+        "scope":"per_window_not_unique_athletes","source_binding":"metadata_and_last_recorded_hash_not_live_verification",
         "identity_verified":False,"metrics_validated":False,"statistical_use_allowed":False}
 
 

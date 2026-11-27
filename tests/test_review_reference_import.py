@@ -16,6 +16,10 @@ class ReviewImportTests(unittest.TestCase):
         self.assertEqual(s["events"][0]["side"],"Notre équipe")
         self.assertEqual(s["intervals"][0]["status"],"opposite_endpoints")
     def test_color_mapping(self):self.assertEqual(summarize(fixture(),"blancs")["events"][0]["side"],"Adversaire")
+    def test_unassigned_club(self):
+        s=summarize(fixture(),"unknown")
+        self.assertEqual(s["events"][0]["side"],"Bonnets bleus (club non attribué)")
+        self.assertEqual(s["verified_match_event_count"],0)
     def test_hash_stable(self):
         p=fixture();self.assertEqual(read(p)[2],load(json.dumps(p,indent=2).encode())[2])
     def test_cross_segment(self):

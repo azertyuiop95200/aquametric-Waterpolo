@@ -91,9 +91,12 @@ def locate(timeline,second):
     return None
 
 def summarize(p,home_color):
-    require(home_color in COLORS,"Couleur de notre équipe non choisie.")
+    require(home_color in COLORS | {"unknown"},"Couleur de notre équipe non choisie.")
     t=p["timeline"];r=p["reference"]
-    def side(c): return "Notre équipe" if c==home_color else "Adversaire" if c in COLORS else "Indéterminée"
+    def side(c):
+        if home_color == "unknown":
+            return {"blancs":"Bonnets blancs (club non attribué)","bleus":"Bonnets bleus (club non attribué)"}.get(c,"Indéterminée")
+        return "Notre équipe" if c==home_color else "Adversaire" if c in COLORS else "Indéterminée"
     ev=[]
     for e in r["events"]:
         ev.append(dict(id=e["event_id"],time=e["video_end_s"],start=e["video_start_s"],side=side(e.get("team_before")),
