@@ -110,3 +110,89 @@ def compare_frame_methods(frames, tolerance_px):
                 complete_frames=complete, partial_frames=partial,
                 excluded=excluded, methods=totals, tolerance_px=tolerance_px,
                 state="reviewed_sample" if paired else "not_measured")
+
+
+def compare_scan_windows(baseline, head_flow, references, tolerance_px, *, width, height):
+    """Compare persisted vision-scan-v1 windows; references use exact local frame indices.
+
+    The binding is metadata only, not a byte hash. A reviewer must independently
+    establish that the referenced images really belong to this source. Coordinates
+    are normalized by the scanner and converted to supplied original pixels here.
+    """
+    import hashlib
+    import json
+    from collections import Counter
+
+    if type(width) is not int or type(height) is not int or not (128<=width<=3840 and 128<=height<=2160):
+        raise ValueError("Invalid reviewed image dimensions")
+    if type(tolerance_px) not in (int,float) or not isfinite(tolerance_px) or tolerance_px<=0:
+        raise ValueError("Invalid tolerance")
+    def unpack(record,mode):
+        if record.get("schema")!="vision-scan-v1" or record.get("kind")!="tracklets":
+            raise ValueError("Unsupported scan evidence")
+        payload={k:v for k,v in record.items() if k not in ("id","digest","segment_id")}
+        raw=json.dumps(payload,sort_keys=True,ensure_ascii=False,separators=(",",":"),allow_nan=False)
+        if hashlib.sha256(raw.encode()).hexdigest()!=record.get("digest"):
+            raise ValueError("Scan digest mismatch")
+        r=record["result"]
+        if r.get("tracking_mode")!=mode or r.get("coordinate_system")!="image_normalized":
+            raise ValueError("Incompatible scan mode or coordinates")
+        if r.get("object_scope")!=("heads_only" if mode=="head_flow" else "heads_and_ball_candidates"):
+            raise ValueError("Incompatible object scope")
+        if any(r.get(k) is True for k in ("identity_verified","metrics_validated","statistical_use_allowed")):
+            raise ValueError("Unexpected promotion")
+        if r.get("time_basis")!="nominal_frame_index_divided_by_reported_fps":
+            raise ValueError("Unsupported time basis")
+        fps=r["source_fps_reported"]; first=r["first_frame"]; end=r["end_frame_exclusive"]; stride=r["sample_stride"]
+        if type(fps) not in (int,float) or not isfinite(fps) or not 10<=fps<=60:
+            raise ValueError("Invalid fps")
+        if any(type(x) is not int for x in (first,end,stride)) or not 0<=first<end<=r["source_frame_count_reported"] or not 1<=end-first<=75 or stride<1:
+            raise ValueError("Invalid scan window")
+        expected=list(range(first,end,stride))
+        if [row.get("source_frame_index") for row in r["frames"]]!=expected:
+            raise ValueError("Missing or duplicated scan frames")
+        points={}
+        for row in r["frames"]:
+            index=row["source_frame_index"]
+            if type(row.get("second")) not in (int,float) or not isfinite(row["second"]) or abs(row["second"]-index/fps)>1e-5:
+                raise ValueError("Inconsistent nominal timestamp")
+            detector=[]; propagated=[]
+            for d in row["detections"]:
+                if d.get("kind")!="head":continue
+                x,y=_point([d["x"],d["y"]])
+                if not 0<=x<=1 or not 0<=y<=1:raise ValueError("Outside normalized image")
+                source=d.get("point_source","detector" if mode=="baseline" else None)
+                if source=="detector":detector.append([x*width,y*height])
+                elif source=="optical_flow" and mode=="head_flow":propagated.append([x*width,y*height])
+                else:raise ValueError("Unknown point provenance")
+            points[index]=(detector,propagated)
+        return r,points
+    a,ap=unpack(baseline,"baseline");b,bp=unpack(head_flow,"head_flow")
+    for k in ("source_binding","source_file_size","source_file_mtime_ns","segment_id"):
+        if baseline.get(k)!=head_flow.get(k):raise ValueError("Different source bindings")
+    for k in ("source_fps_reported","source_frame_count_reported","first_frame","end_frame_exclusive","sample_stride"):
+        if a[k]!=b[k]:raise ValueError("Different scan windows")
+    if not baseline.get("source_binding"):raise ValueError("Missing source binding")
+    ref_by_index={}
+    for ref in references:
+        if ref.get("source_binding")!=baseline["source_binding"] or ref.get("image_width")!=width or ref.get("image_height")!=height:
+            raise ValueError("Reference source or dimensions mismatch")
+        i=ref["source_frame_index"]
+        if type(i) is not int or i<0 or i in ref_by_index:raise ValueError("Duplicate or invalid reference frame")
+        ref_by_index[i]=ref
+    paired=[]; detector_only=[]; counts=Counter()
+    for i,(base,_) in ap.items():
+        det,flow=bp[i]
+        counts.update(baseline_heads=len(base),head_flow_detector_heads=len(det),head_flow_propagated_heads=len(flow))
+        ref=ref_by_index.get(i)
+        if ref is None:continue
+        row=dict(frame_key=str(i),completeness=ref["completeness"],reference=ref["reference"],baseline=base)
+        paired.append(dict(row,head_flow=det+flow))
+        detector_only.append(dict(row,head_flow=det))
+    return dict(version="persisted-head-paired-v1",sampled_frames=len(ap),
+                reference_frames_in_window=len(paired),reference_frames_outside_window=len(set(ref_by_index)-set(ap)),
+                candidate_counts={k:counts[k] for k in ("baseline_heads","head_flow_detector_heads","head_flow_propagated_heads")},
+                all_candidates=compare_frame_methods(paired,tolerance_px),
+                detector_only=compare_frame_methods(detector_only,tolerance_px),
+                source_binding_state="metadata_only",pts_validated=False,statistical_use_allowed=False,
+                note="Frame indices and dimensions are supplied or reported; independent source alignment still required. Propagated points are not independent detections.")
