@@ -97,6 +97,19 @@ def summarize_pass_review(reference,duration):
         else:d['release_to_control_evidence_s']=None
         # Temporal association alone does not establish uninterrupted possession.
         d['shot_link_status']='temporal_only' if r.get('event_relation')=='precedes_shot' else None
+        # A proven opponent control inside the gap contradicts continuity.
+        if d['shot_link_status']=='temporal_only':
+            start=r['control_frame']/fps
+            end=next(e['video_start_s'] for e in reference['events'] if e['event_id']==r['related_event_id'])
+            opponent=next(t for t in TEAMS if t!=r['team'])
+            conflicts=[]
+            for iv in reference.get('possession_review_intervals',[]):
+                for edge, time_key in (('before','start_s'),('after','end_s')):
+                    if iv.get(edge+'_state')=='observed' and iv.get(edge+'_team')==opponent and start<=iv[time_key]<=end:
+                        conflicts.append(iv['interval_id'])
+            d['shot_link_conflict_ids']=sorted(set(conflicts))
+            if conflicts:d['shot_link_status']='opponent_control_observed'
+        else:d['shot_link_conflict_ids']=[]
         d['key_pass_verified']=False
         d['assist_verified']=False
         output.append(d)
