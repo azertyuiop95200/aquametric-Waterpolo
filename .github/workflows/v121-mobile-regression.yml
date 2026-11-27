@@ -97,7 +97,13 @@ jobs:
             assert(await page.locator('#sidebar').evaluate(el=>el.classList.contains('open')),'sidebar did not open');
             const nav=page.locator('#sidebar .side-nav');
             const dims=await nav.evaluate(el=>({scrollHeight:el.scrollHeight,clientHeight:el.clientHeight,overflow:getComputedStyle(el).overflowY,touch:getComputedStyle(el).touchAction}));
-            assert(dims.scrollHeight>dims.clientHeight,'sidebar navigation is not vertically scrollable');
+            assert(dims.clientHeight>0,'sidebar navigation has no visible height');
+            assert(await nav.locator('a').count()===6,'analysis-first menu must have six destinations');
+            for(const link of await nav.locator('a').all()){
+              await link.scrollIntoViewIfNeeded();
+              assert(await link.isVisible(),'navigation link is not visible');
+              assert(await link.evaluate(el=>{const r=el.getBoundingClientRect(), n=el.closest('.side-nav').getBoundingClientRect();return r.top>=Math.max(0,n.top)-2&&r.bottom<=Math.min(innerHeight,n.bottom)+2;}),'navigation link is clipped or unreachable');
+            }
             assert(['auto','scroll'].includes(dims.overflow),'sidebar overflow-y is not scrollable');
             assert(dims.touch!=='none','sidebar touch scrolling is disabled');
             assert(await page.locator('[data-lang-choice]').count()===5,'five-language dock is missing');
@@ -105,7 +111,7 @@ jobs:
             assert(!(await page.locator('#sidebar').evaluate(el=>el.classList.contains('open'))),'sidebar did not close outside');
             assert(page.url()===original,'closing menu changed current page');
             await page.selectOption('#lang','fr'); await page.waitForTimeout(150);
-            assert((await page.locator('[data-i18n="nav.dashboard"]').innerText()).trim()==='Tableau de bord','French nav translation failed');
+            assert((await page.locator('[data-i18n="analysis_nav.home"]').innerText()).trim()==='Accueil','French nav translation failed');
             await page.goto(base+'/knowledge',{waitUntil:'networkidle'});
             assert(await page.locator('.tactic-board-card').count()>=8,'visual tactical boards are missing');
             assert(await page.locator('.source-row,.reference-row').count()===0,'knowledge page still exposes source ledger');
