@@ -54,6 +54,7 @@ def search_scenarios(baseline, edits):
     for name,description,c in candidates:
         timing=name=="Référence coach" or name.startswith("Temporiser ")
         evaluated=deepcopy(c)
+        evaluated.pop("two_step",None)
         if not timing: evaluated.pop("keeper_id",None)
         try:r=sandbox(baseline,evaluated,trials=16)
         except (ValueError,TypeError,KeyError) as exc:

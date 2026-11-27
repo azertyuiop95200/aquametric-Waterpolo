@@ -5,7 +5,7 @@ const data=JSON.parse($("data").textContent), base=data.baseline.observations, r
 const clone=x=>JSON.parse(JSON.stringify(x)), L=base.length_m,W=base.width_m;
 const canvas=$("canvas"),ctx=canvas.getContext("2d");
 const initial=()=>({start:clone(base.start),carrier_velocity:[0,0,0],carrier_acceleration:[0,0,0],defenders:base.defenders.map(d=>({...clone(d),acceleration:[0,0,0]})),
- options:base.options.map(o=>({...clone(o),receiver_velocity:[0,0,0]})),delay_s:0,ball_speed_m_s:12,keeper_id:"",suggest:true});
+ options:base.options.map(o=>({...clone(o),receiver_velocity:[0,0,0]})),delay_s:0,ball_speed_m_s:12,keeper_id:"",two_step:false,reception_s:.25,sequence_budget_s:null,suggest:true});
 const snapshots={A:null,B:null};
 let edit=initial(), result=null, resultInput=null, history=[], selected="carrier", drag=null, timer=null, revision=0, busy=false, pending=false, refineNext=false, animation=0;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v)), fmt=(v,n=2)=>Number.isFinite(v)?v.toFixed(n):"—";
@@ -25,7 +25,7 @@ function sync(){
  ["ax","ay","az"].forEach((id,i)=>{$(id).disabled=!e.a;$(id).value=e.a?fmt(e.a[i]):""});
  $("radius").disabled=!e.defender;$("radius").value=e.defender?fmt(e.defender.radius):"";
  $("flight").disabled=!e.option;$("flight").value=e.option?e.option.duration_s:"";
- $("delay").value=edit.delay_s;$("delay-value").value=fmt(edit.delay_s,1)+" s";$("speed").value=edit.ball_speed_m_s;$("suggest").checked=edit.suggest;$("keeper").value=edit.keeper_id||"";
+ $("delay").value=edit.delay_s;$("delay-value").value=fmt(edit.delay_s,1)+" s";$("speed").value=edit.ball_speed_m_s;$("suggest").checked=edit.suggest;$("keeper").value=edit.keeper_id||"";$("two-step").checked=!!edit.two_step;$("reception").value=edit.reception_s??.25;$("budget").value=edit.sequence_budget_s??"";
 }
 function remember(){history.push(clone(edit));if(history.length>40)history.shift();$("undo").disabled=false}
 function limit(e,p){
@@ -82,8 +82,15 @@ function showGoalMap(map){
   }}
  }
 }
+function showSequence(seq){
+ const root=$("sequence-rows");root.replaceChildren();
+ if(!seq){$("sequence-summary").textContent="Activez la comparaison et sélectionnez une gardienne.";return}
+ $("sequence-summary").textContent=seq.direct_best?"Meilleure cible de tir direct échantillonnée : marge "+fmt(seq.direct_best.defence_clearance_m)+" m · vol "+fmt(seq.direct_best.flight_s)+" s.":"Tir direct non évaluable.";
+ const labels={unknown:"Non évalué",clear_in_model:"Dégagé dans le modèle",potential_obstruction:"Obstruction possible",no_evaluable_shot:"Tir non évaluable",outside_bounds_or_budget:"Hors limites ou délai",defender_projection_outside_bounds:"Projection défensive hors bassin"};
+ for(const o of seq.alternatives){const tr=add(root,"tr","");for(const v of [o.pass_id,fmt(o.pass_clearance_m),fmt(o.shot_clearance_m),fmt(o.joint_clearance_m),fmt(o.total_duration_s),fmt(o.direct_clearance_delta_m),labels[o.status]||o.status])add(tr,"td",v);}
+}
 function display(){
- $("rows").replaceChildren();showGoalMap(result&&resultInput===JSON.stringify(edit)?result.goal_coverage:null);
+ $("rows").replaceChildren();showGoalMap(result&&resultInput===JSON.stringify(edit)?result.goal_coverage:null);showSequence(result&&resultInput===JSON.stringify(edit)?result.two_step:null);
  if(!result||resultInput!==JSON.stringify(edit)){$("summary").textContent="Scène modifiée : résultats en attente de recalcul.";return}
  const options=[...result.options].sort((a,b)=>(b.clearance_m??-Infinity)-(a.clearance_m??-Infinity));
  $("summary").textContent=result.trials+" simulations / option · "+result.proposed_ids.length+" solutions générées · "+(result.complete_defence?"couverture défensive déclarée complète":"couverture défensive insuffisante");
@@ -113,7 +120,10 @@ async function calculate(){
  finally{busy=false;if(pending){clearTimeout(timer);timer=setTimeout(calculate,100)}}
 }
 for(const d of base.defenders){const o=add($("keeper"),"option",d.id);o.value=d.id}
-$("keeper").addEventListener("change",()=>{remember();edit.keeper_id=$("keeper").value;changed()});
+$("keeper").addEventListener("change",()=>{remember();edit.keeper_id=$("keeper").value;if(!edit.keeper_id)edit.two_step=false;sync();changed()});
+$("two-step").addEventListener("change",()=>{if(!$("keeper").value){$("two-step").checked=false;$("status").textContent="Sélectionnez une gardienne.";return}remember();edit.two_step=$("two-step").checked;changed()});
+$("reception").addEventListener("change",()=>{if(!Number.isFinite(num("reception"))){sync();return}remember();edit.reception_s=clamp(num("reception"),0,1.5);sync();changed()});
+$("budget").addEventListener("change",()=>{if($("budget").value!==""&&!Number.isFinite(num("budget"))){sync();return}remember();edit.sequence_budget_s=$("budget").value===""?null:clamp(num("budget"),.15,8);sync();changed()});
 const select=$("entity");for(const e of entities()){const o=add(select,"option",e.label);o.value=e.key}
 select.addEventListener("change",()=>{selected=select.value;sync();draw()});
 for(const id of ["x","y","z","vx","vy","vz","ax","ay","az","flight","radius"])$(id).addEventListener("change",()=>{

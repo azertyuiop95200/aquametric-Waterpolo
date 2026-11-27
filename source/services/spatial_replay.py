@@ -20,7 +20,7 @@ def label(value):
         raise ValueError("Invalid label")
     return value.strip()
 
-def review(data, trials=160, *, goal_map=None):
+def review(data, trials=160, *, goal_map=None, sequence=None):
     if not isinstance(data,dict):
         raise ValueError("Expected object")
     if data.get("source") not in ("manual_video","calibrated_tracking"):
@@ -119,4 +119,13 @@ def review(data, trials=160, *, goal_map=None):
             raise ValueError("Select an explicitly supplied goalkeeper")
         result["goal_coverage"]=goal_coverage(start,goal_x,width,tracks,keeper_id,complete,
             number(goal_map["speed"],2,30))
+    if sequence is not None:
+        from services.spatial_two_step import two_step_attack
+        if goal_map is None:
+            raise ValueError("Select a goalkeeper for two-step analysis")
+        budget=sequence.get("budget_s")
+        result["two_step"]=two_step_attack(start,goal_x,length,width,tracks,keeper_id,complete,
+            number(goal_map["speed"],2,30),output,number(sequence["reception_s"],0,1.5),
+            {key:xyz(value,((-3,3),)*3) for key,value in sequence["receiver_velocities"].items()},
+            number(budget,.15,8) if budget is not None else None)
     return result
