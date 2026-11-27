@@ -3,6 +3,7 @@ A completed transfer is not a possession change. No player or full-match rate is
 """
 from collections import Counter
 from math import isfinite
+from services.review_coverage import coverage
 import re
 
 TEAMS = {'blancs', 'bleus'}
@@ -107,6 +108,7 @@ def validate_pass_review(reference, duration):
     for prev,cur in zip(releases,releases[1:]):
         check(prev[1]<cur[0],'Départs de passe chevauchants : doublon potentiel.')
         check(prev[2] is None or prev[2]<=cur[0],'Nouveau départ avant la maîtrise directe précédente.')
+    coverage(review,duration)
     return review
 
 def summarize_pass_review(reference,duration):
@@ -155,4 +157,4 @@ def summarize_pass_review(reference,duration):
         summary['resolved_outcome_coverage_pct']=round(100*n/len(actions),2) if actions else None
         for field in ('accuracy','defensive_intervention','reception_quality'):
             summary[field+'_counts']=dict(Counter(r.get(field,'unknown') for r in actions))
-    return dict(actions=output,teams=teams,states=dict(Counter(r['state'] for r in rows)),fps=fps,coverage_complete=False,note='Revue partielle. Durée jusqu’à une image de maîtrise, non temps de vol exact. Aucun taux global ni attribution individuelle.')
+    return dict(actions=output,teams=teams,states=dict(Counter(r['state'] for r in rows)),fps=fps,coverage_complete=False,review_coverage=coverage(review,duration),note='Revue partielle. Durée jusqu’à une image de maîtrise, non temps de vol exact. Aucun taux global ni attribution individuelle.')
