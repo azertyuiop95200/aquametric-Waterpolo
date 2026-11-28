@@ -19,7 +19,7 @@
 {% else %}<p>Non mesuré : aucune fenêtre de suivi R7 enregistrée.</p>{% endif %}
 {% for r in v.rows if r.fragment_link_review is defined and r.fragment_link_review is not none %}
 <details><summary>Scan #{{r.id}} — {{r.fragment_link_review.links|length}} raccordements candidats de fragments</summary>
-<p>Raccordements proposés par flux optique réciproque, sans interpolation, ni attribution automatique à une joueuse. À revoir visuellement ; ils ne changent pas les trajectoires métriques.</p>
+<p>Raccordements proposés par flux optique réciproque, sans interpolation, ni attribution automatique à une joueuse. À revoir visuellement ; seuls les liens explicitement revus dans une fenêtre métrique peuvent regrouper les fragments, sans mesurer leurs lacunes.</p>
 {% if r.fragment_link_review.links %}
 <table class="metric-table"><thead><tr><th>Piste précédente</th><th>Piste suivante</th><th>Temps vidéo nominal (s)</th><th>Échantillons manquants</th><th>Écarts optiques aller / retour (px)</th></tr></thead><tbody>
 {% for e in r.fragment_link_review.links %}<tr><td>{{e.from_track_id}}</td><td>{{e.to_track_id}}</td><td>{{e.from_second}} → {{e.to_second}}</td><td>{{e.missing_samples}}</td><td>{{e.forward_error_px}} / {{e.reverse_error_px}}</td></tr>{% endfor %}
@@ -49,8 +49,9 @@
 </tbody></table></details>
 {% endif %}
 <table class="metric-table"><thead><tr><th>Joueuse</th><th>Piste</th><th>Points projetés</th><th>Durée observée (s)</th><th>Distance estimée (m)</th><th>Vitesse moyenne estimée (m/s)</th><th>Temps de jeu</th></tr></thead><tbody>
-{% for p in m.players %}<tr><td>{{p.identity.side}} · bonnet {{p.identity.cap_number}}</td><td>{{p.track_id}}</td><td>{{p.projected_points}}/{{p.requested_points}}</td><td>{{'%.3f'|format(p.metrics.observed_s)}}</td><td>{{'%.2f'|format(p.metrics.distance_m) if p.metrics.distance_m is not none else 'Non mesuré'}}</td><td>{{'%.2f'|format(p.metrics.mean_speed_mps) if p.metrics.mean_speed_mps is not none else 'Non mesuré'}}</td><td>Non mesuré</td></tr>{% endfor %}
+{% for p in m.players %}<tr><td>{{p.identity.side}} · bonnet {{p.identity.cap_number}}</td><td>{{p.fragment_track_ids|join(' → ') if p.fragment_track_ids is defined else p.track_id}}{% if p.fragment_count is defined and p.fragment_count>1 %}<small> · raccordements revus, lacunes exclues</small>{% endif %}</td><td>{{p.projected_points}}/{{p.requested_points}}</td><td>{{'%.3f'|format(p.metrics.observed_s)}}</td><td>{{'%.2f'|format(p.metrics.distance_m) if p.metrics.distance_m is not none else 'Non mesuré'}}</td><td>{{'%.2f'|format(p.metrics.mean_speed_mps) if p.metrics.mean_speed_mps is not none else 'Non mesuré'}}</td><td>Non mesuré</td></tr>{% endfor %}
 </tbody></table>
+{% for p in m.players if p.link_evidence is defined and p.link_evidence %}<p>Justification du regroupement {{p.identity.side}} · bonnet {{p.identity.cap_number}} : {{p.link_evidence}}</p>{% endfor %}
 {% for p in m.players if p.occupation is not none %}
 <figure><figcaption>Occupation observée — {{p.identity.side}} · bonnet {{p.identity.cap_number}} (fenêtre uniquement)</figcaption>
 <svg viewBox="0 0 {{m.length_m}} {{m.width_m}}" role="img" aria-label="Carte métrique de la fenêtre revue" style="width:100%;max-width:480px;background:#dcecf4;border:1px solid #54778a">
