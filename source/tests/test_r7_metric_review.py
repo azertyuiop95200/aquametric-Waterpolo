@@ -48,6 +48,8 @@ class R7MetricTests(unittest.TestCase):
             r=save_scan(db,m,None,'tracklets',self.scan,self.path)
             self.id=r.id;self.raw['scan_digest']=r.digest
         self.qa.app.add_api_route('/matches/{match_id}/analysis/r7-metric/{scan_id}',routes.r7_metric,methods=['POST'])
+        self.qa.app.add_api_route('/matches/{match_id}/analysis/r7-metric-form',routes.r7_metric_form,methods=['POST'])
+        self.qa.app.add_api_route('/matches/{match_id}/analysis/r7-evidence/{scan_id}',routes.r7_evidence,methods=['GET'])
         self.url=f'/matches/10/analysis/r7-metric/{self.id}'
     def test_exact_source_and_review(self):
         result=analyze(self.path,self.scan,self.raw,self.roster)
@@ -81,3 +83,20 @@ class R7MetricTests(unittest.TestCase):
         self.path.write_bytes(b'different video')
         self.assertEqual(self.client.post(self.url,json=self.raw).status_code,422)
         self.assertEqual(len(self.qa.snapshot()['vision_scan_evidence']['rows']),1)
+
+    def test_form_and_private_evidence(self):
+        evidence=f'/matches/10/analysis/r7-evidence/{self.id}'
+        r=self.client.get(evidence)
+        self.assertEqual(r.status_code,200);self.assertEqual(r.headers.get('cache-control'),'private, no-store')
+        self.assertEqual(r.json()['digest'],self.raw['scan_digest'])
+        data=dict(scan_ref=f"{self.id}:{self.raw['scan_digest']}",period=1,reference_frame=0,length_m=25,width_m=20,
+            anchors_json=json.dumps(self.raw['anchors']),polygon_json=json.dumps(self.raw['polygon']),tracks_json=json.dumps(self.raw['tracks']),
+            all_points_reviewed='true',calibration_reviewed='true',nominal_time_acknowledged='true')
+        url='/matches/10/analysis/r7-metric-form'
+        r=self.client.post(url,data=data,follow_redirects=False)
+        self.assertEqual(r.status_code,303,r.text)
+        self.assertIn('#visionR7',r.headers['location'])
+        self.assertIn('Preuve du scan',self.client.get(self.qa.report).text)
+        self.client.get('/__qa_session/2')
+        self.assertEqual(self.client.get(evidence).status_code,404)
+        self.assertEqual(self.client.post(url,data=data).status_code,404)
