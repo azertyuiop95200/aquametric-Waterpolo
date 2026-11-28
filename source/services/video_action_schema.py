@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-VERSION = "video-actions-v2-pass-control"
+VERSION = "video-actions-v3-lineups"
 
 EVENT_LABELS = {
     "goal": "But", "shot_on_target": "Tir cadré arrêté", "shot_off_target": "Tir non cadré",
@@ -69,6 +69,7 @@ class ActionObservation(ObservationModel):
     decision: Literal["good", "poor", "neutral", "unknown"] = "unknown"
     possession_outcome: Literal["goal","save","off_target","post","blocked","bad_pass","steal","offensive_foul","shot_clock","handling","period_end","unknown"] = "unknown"
     game_clock_seconds: float | None = Field(default=None, ge=0, le=480)
+    game_clock_evidence: str = Field(default="",max_length=400)
     shot_clock_seconds: float | None = Field(default=None, ge=0, le=30)
     is_replay: bool = False
 
@@ -111,6 +112,35 @@ class BallControlObservation(ObservationModel):
         return self
 
 
+class LineupObservation(ObservationModel):
+    start_second: float = Field(ge=0)
+    end_second: float = Field(gt=0)
+    side: Literal["for","against"]
+    period: int = Field(ge=1,le=4)
+    clock_start: float = Field(gt=0,le=480)
+    clock_end: float = Field(ge=0,le=480)
+    in_play: list[int] = Field(min_length=1,max_length=7)
+    excluded: list[int] = Field(default_factory=list,max_length=30)
+    complete_lineup: bool = False
+    confidence: float = Field(ge=0,le=1)
+    clock_evidence: str = Field(default="",max_length=400)
+    lineup_evidence: str = Field(default="",max_length=700)
+    team_evidence: str = Field(default="",max_length=400)
+    is_replay: bool = False
+
+    @model_validator(mode="after")
+    def check_lineup(self):
+        if self.end_second <= self.start_second or self.clock_end >= self.clock_start:
+            raise ValueError("Invalid lineup interval")
+        if any(not 1<=n<=30 for n in self.in_play+self.excluded) or len(set(self.in_play+self.excluded))!=len(self.in_play+self.excluded):
+            raise ValueError("Invalid or conflicting cap numbers")
+        if self.clock_start-self.clock_end > self.end_second-self.start_second+1:
+            raise ValueError("Game clock exceeds elapsed video time")
+        if not (self.clock_evidence.strip() and self.lineup_evidence.strip() and self.team_evidence.strip()):
+            self.complete_lineup = False
+        return self
+
+
 class Observability(ObservationModel):
     family: Family
     status: Literal["visible", "limited", "not_visible"]
@@ -121,6 +151,7 @@ class SegmentObservation(ObservationModel):
     scene: Literal["water_polo", "mixed", "not_water_polo", "unreadable"]
     actions: list[ActionObservation] = Field(max_length=240)
     ball_control: list[BallControlObservation] = Field(default_factory=list, max_length=240)
+    lineups: list[LineupObservation] = Field(default_factory=list,max_length=120)
     observability: list[Observability] = Field(max_length=10)
     summary: str = Field(max_length=1400)
 
@@ -156,6 +187,7 @@ Pour possession_end, renseigne possession_outcome seulement si la cause est visi
 
 Pour la synthèse tactique, distingue press individuel, aide latérale 1–2 / 4–5, zone M (aide sur pointe et splits périphériques), zone 2–3–4, trappe et changement press-zone. Les postes 1–6 ne sont pas les numéros de bonnet. Évalue plusieurs secondes avant le tir, les appariements, l’aide sur pointe et les déplacements. Si le champ ne montre pas toutes les joueuses, ne nomme que le mécanisme local visible. Vérifie l'issue du tir après le lâcher, y compris ballon dans le filet, déviation par la gardienne, retour du ballon en jeu et reprise. Ne déduis pas l'issue uniquement du score.
 Pour une passe réussie, receiver_cap_number exige une receveuse distincte de la même équipe, numéro réellement lisible et contrôle observé, documentés dans receiver_evidence ; sinon null. pass_method vaut dry (sans contact avec eau), wet (via eau), hand_off (remise directe) ou unknown. ball_control contient uniquement des intervalles continus de maîtrise visible, avec start_second/end_second locaux au clip, preuve, équipe et identité si lisibles, confidence et is_replay. Ne prolonge pas un contrôle masqué ni ne déduis une possession d’une simple proximité du ballon. Si aucun intervalle certain, ball_control=[]. Les durées sont vidéo et non chrono de jeu.
+Pour le chronomètre général de chaque action, renseigne game_clock_evidence avec la lecture visible et le contexte de période ; sinon le lien à une composition n’est pas établi. Pour lineups, renseigne des intervalles vidéo continus avec période, chronomètre général décroissant clock_start/clock_end réellement lus, tous les bonnets distincts en jeu de cette équipe y compris la gardienne, et exclusions explicitement observées. complete_lineup=true uniquement si toute la composition et sa continuité sont établies, pas sur un cadrage partiel ni à partir d’une absence de joueuse. Ne déduis aucun retour après une durée réglementaire supposée. Ne comble pas les lacunes ou les changements masqués ; si aucun intervalle fiable, lineups=[]. Ces observations ne sont pas un temps de jeu complet. Les bornes de quatre périodes et huit minutes sont des limites du schéma, pas une règle universelle imposée au match.
 Rends la visibilité et ses limites pour chacune des familles: {', '.join(FAMILIES)}.
 Une absence de détection n'est pas la preuve d'un zéro. Ni distance métrique, vitesse,
 temps de jeu complet, fatigue, note globale, ni total extrapolé: le modèle ne les mesure
