@@ -99,6 +99,8 @@ def run_complete_analysis(db, match, upload_dir: Path, evidence_dir: Path, *, in
     refined = _refine_score_change_focus(db, result.get("vision"), result.get("autonomy"))
     if refined:
         result.setdefault("summary", {})["score_change_timestamps_refined"] = refined
+    from services.local_scan_batch import attach as attach_local_scan_batch
+    attach_local_scan_batch(db, match, source_path, result)
     from services.video_action_runner import run_video_actions
     result["video_actions"] = run_video_actions(db, match, source_path)
     build_exact_evidence_pack(

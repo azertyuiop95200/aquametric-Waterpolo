@@ -429,6 +429,8 @@ def analysis_snapshot(db, match):
     snapshot["recognition_quality"] = audit(snapshot["automatic"], snapshot["video_actions"])
     from services.vision_scan_evidence import report as vision_scan_report
     snapshot["vision_scan_evidence"] = vision_scan_report(db, match)
+    from services.local_scan_batch import snapshot_summary
+    snapshot["local_scan_batch"] = snapshot_summary(match, summary, snapshot["vision_scan_evidence"])
     from services.possession_window_review import read_report as possession_window_report
     try:
         snapshot["possession_evidence"] = possession_window_report(db, match, auto)
@@ -458,9 +460,8 @@ def run_product_analysis(db, match, upload_dir: Path, evidence_dir: Path, *, inc
             visual_samples=180, ocr_samples=48,
         )
         build_exact_evidence_pack(db, match, upload_dir, evidence_dir)
-        # Bounded initial scan, not whole-match coverage. Never promotes candidates.
-        from services.r7_initial_scan import initial_scan
-        initial_scan(db, match, source_path)
+        from services.local_scan_batch import attach as attach_local_scan_batch
+        attach_local_scan_batch(db, match, source_path, result)
         return result
 
     if match.video_url:
