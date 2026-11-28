@@ -26,6 +26,11 @@
 <label><input name="all_points_reviewed" type="checkbox" value="true" required> Toutes les positions et les identités sélectionnées sont revues</label>
 <label><input name="calibration_reviewed" type="checkbox" value="true" required> Les dimensions, les repères et le décor sont revus</label>
 <label><input name="nominal_time_acknowledged" type="checkbox" value="true" required> J'accepte une estimation par cadence nominale (pas un temps de jeu vérifié)</label>
+<details><summary>Calibration dynamique — références supplémentaires (optionnel)</summary>
+<p>Ajouter une ou deux images déjà échantillonnées dans ce même scan, avec cinq repères dans le même ordre et un masque du décor fixe. Même but physique, mêmes axes et dimensions. En mode multiple, les projections doivent être soutenues par au moins deux références et concordantes à 0,75 m ; ce seuil expérimental n'est pas une précision mesurée. Maximum 30 images de positions.</p>
+<label>Références supplémentaires (JSON) <textarea name="additional_references_json" maxlength="12000" placeholder='[{"reference_frame":2,"anchors":[[x,y],...],"polygon":[[x,y],...]}]'></textarea></label>
+<label><input name="same_goal_and_side_reviewed" type="checkbox" value="true"> Même but physique et même côté de bassin pour toutes les références</label>
+</details>
 <button type="submit">Calculer la fenêtre revue</button>
 </form>
 {% endif %}
