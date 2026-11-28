@@ -1,5 +1,7 @@
 """Bounded local clip scanner, source frame indices, not PTS certification."""
 from math import isfinite
+from pathlib import Path
+import hashlib
 import cv2
 from services.local_object_tracking import scan
 from services.head_flow_tracking import scan_head_flow
@@ -11,6 +13,10 @@ def scan_clip(path,start_frame=0,frame_count=75,*,tracking_mode='baseline'):
         raise ValueError('Mode de suivi inconnu.')
     if type(start_frame) is not int or start_frame<0 or type(frame_count) is not int or not 1<=frame_count<=75:
         raise ValueError("Fenêtre de 1 à 75 images requise.")
+    path=Path(path)
+    stat=path.stat()
+    if stat.st_size>1200*1024*1024:raise ValueError('Fichier trop volumineux pour ce scan local.')
+    with path.open('rb') as f:sha=hashlib.file_digest(f,'sha256').hexdigest()
     c=cv2.VideoCapture(str(path))
     try:
         if not c.isOpened():raise ValueError("Vidéo locale illisible.")
@@ -43,5 +49,8 @@ def scan_clip(path,start_frame=0,frame_count=75,*,tracking_mode='baseline'):
                       end_frame_exclusive=end,sample_stride=stride,time_basis="nominal_frame_index_divided_by_reported_fps",
                       pts_validated=False,tracking_mode=tracking_mode,object_scope='heads_only' if tracking_mode=='head_flow' else 'heads_and_ball_candidates',
                       statistical_use_allowed=False,identity_verified=False,metrics_validated=False)
+        end_stat=path.stat()
+        if (stat.st_size,stat.st_mtime_ns)!=(end_stat.st_size,end_stat.st_mtime_ns):raise ValueError('Source modifiée pendant le scan.')
+        result.update(source_sha256_at_creation=sha,source_file_size=stat.st_size,source_file_mtime_ns=stat.st_mtime_ns)
         return result
     finally:c.release()
