@@ -67,6 +67,10 @@ def analyze(path,scan,raw,roster):
     L,W=raw.get('length_m'),raw.get('width_m')
     if not number(L) or not number(W):raise ValueError('Dimensions invalides.')
     cal=calibrate(raw.get('anchors'),W,L)
+    multi=raw.get('additional_references') is not None
+    frame_ids=sorted({p['frame'] for t in tracks for p in t['points']})
+    if multi and len(frame_ids)>30:raise ValueError('Calibration multiple limitée à 30 images échantillonnées.')
+    reference_meta=[];projection_quality=[];cuts={f['source_frame_index'] for f in scan['frames'] if f.get('scene_reset') is True}
     c=cv2.VideoCapture(str(path))
     try:
         if not c.isOpened() or abs(float(c.get(cv2.CAP_PROP_FPS))-fps)>1e-5:raise ValueError('Cadence modifiée.')
@@ -75,32 +79,44 @@ def analyze(path,scan,raw,roster):
             ok,f=c.read()
             if not ok or f is None or round(c.get(cv2.CAP_PROP_POS_FRAMES))!=i+1:raise ValueError('Image non vérifiable.')
             return cv2.resize(f,(960,540))
-        aligner=CameraAligner(frame(ref),raw.get('polygon'))
+        if multi:
+            from services.r7_multireference import references,consensus
+            aligner,reference_meta=references(raw,scan,frame,L,W)
+        else:aligner=CameraAligner(frame(ref),raw.get('polygon'))
         cache={}
-        for i in sorted({p['frame'] for t in tracks for p in t['points']}):
+        for i in frame_ids:
             cache[i]=aligner.align(frame(i))
         players=[]
         for t in tracks:
-            pts=[]
+            pts=[];requested=len(t['points']);last_frame=None
             for p in t['points']:
+                if last_frame is not None and any(last_frame<cut<=p['frame'] for cut in cuts):pts.append(None)
+                last_frame=p['frame']
                 a=cache[p['frame']]
-                xy=project(cal,*aligner.point(a[0],p['x'],p['y'])) if a is not None else None
+                if multi:
+                    q=consensus(aligner,a,p['x'],p['y'])
+                    xy=(q['x_m'],q['y_m']) if q is not None else None
+                    projection_quality.append(dict(track_id=t['track_id'],frame=p['frame'],support=q['support'] if q else 0,spread_m=q['spread_m'] if q else None,accepted=q is not None))
+                else:xy=project(cal,*aligner.point(a[0],p['x'],p['y'])) if a is not None else None
                 if xy is None or not 0<=xy[0]<=L or not -W/2<=xy[1]<=W/2:pts.append(None)
                 else:pts.append(dict(second=p['second'],x_m=xy[0],y_m=xy[1]+W/2))
             measured=measure(pts);segments=measured['segments']
             m=motion(segments,sprint_mps=1.5,min_sprint_s=.35)
             occ=density(occupancy(segments,L,W,2.,0.,86400.)) if m['observed_s'] else None
-            players.append(dict(track_id=t['track_id'],identity=t['identity'],requested_points=len(pts),
+            players.append(dict(track_id=t['track_id'],identity=t['identity'],requested_points=requested,
                 projected_points=sum(p is not None for p in pts),metrics=m,segments=segments,occupation=occ,
                 playing_seconds=None))
     finally:c.release()
     end=path.stat()
     if (stat.st_size,stat.st_mtime_ns)!=(end.st_size,end.st_mtime_ns):raise ValueError('Source modifiée pendant la revue.')
     if not any(p['metrics']['observed_s']>0 for p in players):raise ValueError('Aucune trajectoire métrique continue exploitable.')
-    return dict(engine='r7-reviewed-metric-v1',status='experimental_partial',period=period,reference_frame=ref,
+    return dict(engine='r7-reviewed-metric-multiref-v1' if multi else 'r7-reviewed-metric-v1',
+        calibration_mode='multi_reference_consensus' if multi else 'single_reference',reference_details=reference_meta,
+        projection_quality=projection_quality,consensus_tolerance_m=.75 if multi else None,
+        independent_metric_accuracy_validated=False,status='experimental_partial',period=period,reference_frame=ref,
         source_sha256_at_creation=sha,source_file_size=stat.st_size,source_file_mtime_ns=stat.st_mtime_ns,
         length_m=L,width_m=W,anchors=raw['anchors'],polygon=raw['polygon'],players=players,
-        requested_frames=len(cache),aligned_frames=sum(a is not None for a in cache.values()),
+        requested_frames=len(cache),aligned_frames=sum((len(a)>=2 if multi else a is not None) for a in cache.values()),
         time_basis='nominal_frame_index_divided_by_reported_fps',pts_validated=False,
         identity_verified=False,metrics_validated=False,statistical_use_allowed=False,
         scope='reviewed_window_not_match_total',note='Projection estimative, positions de tête revues, cadence nominale ; pas de temps de jeu, ni total de match. Ne pas additionner les fenêtres.')
