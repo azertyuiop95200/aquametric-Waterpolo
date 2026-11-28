@@ -4,11 +4,11 @@ from __future__ import annotations
 from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-VERSION = "video-actions-v1"
+VERSION = "video-actions-v2-pass-control"
 
 EVENT_LABELS = {
     "goal": "But", "shot_on_target": "Tir cadré arrêté", "shot_off_target": "Tir non cadré",
-    "shot_blocked": "Tir bloqué", "shot_unknown": "Tir visible, issue indéterminée", "pass_complete": "Passe réussie", "bad_pass": "Passe manquée",
+    "shot_blocked": "Tir bloqué", "shot_unknown": "Tir visible, issue indéterminée", "pass_complete": "Passe réussie", "bad_pass": "Passe manquée", "pass_unknown": "Passe tentée, issue non résolue",
     "assist": "Passe décisive", "key_pass": "Passe clé", "action_created": "Action créée",
     "touch": "Ballon touché", "centre_touch": "Ballon touché au centre", "save": "Arrêt",
     "goalkeeper_restart": "Relance du gardien", "turnover": "Perte de balle",
@@ -60,6 +60,9 @@ class ActionObservation(ObservationModel):
     hand: Literal["left", "right", "unknown"] = "unknown"
     shot_type: Literal["direct", "lob", "skip", "backhand", "redirect", "penalty", "unknown"] = "unknown"
     pass_type: Literal["perimeter", "centre_entry", "cross", "through", "back", "long", "restart", "unknown"] = "unknown"
+    receiver_cap_number: int | None = Field(default=None, ge=1, le=30)
+    receiver_evidence: str = Field(default="", max_length=400)
+    pass_method: Literal["dry","wet","hand_off","unknown"] = "unknown"
     cause: Literal["bad_pass", "centre_entry", "counterattack", "offensive_foul", "shot_clock",
                    "steal", "handling", "decision", "technical", "pressure", "unknown"] = "unknown"
     pressure: Literal["low", "medium", "high", "unknown"] = "unknown"
@@ -79,6 +82,32 @@ class ActionObservation(ObservationModel):
             self.cap_number = None
         if not self.cap_colour_evidence.strip():
             self.cap_colour = "unknown"
+        if not self.receiver_evidence.strip() or self.side == "unknown" or self.event_type not in {"pass_complete","assist","key_pass"} or self.receiver_cap_number == self.cap_number:
+            self.receiver_cap_number = None
+        if self.event_type not in {"pass_complete","assist","key_pass","bad_pass","pass_unknown"}:
+            self.pass_method = "unknown"
+        return self
+
+
+class BallControlObservation(ObservationModel):
+    start_second: float = Field(ge=0)
+    end_second: float = Field(gt=0)
+    side: Side
+    cap_number: int | None = Field(default=None, ge=1, le=30)
+    confidence: float = Field(ge=0, le=1)
+    evidence: str = Field(min_length=12, max_length=700)
+    identity_evidence: str = Field(default="", max_length=400)
+    team_evidence: str = Field(default="", max_length=400)
+    is_replay: bool = False
+
+    @model_validator(mode="after")
+    def check_interval(self):
+        if self.end_second <= self.start_second:
+            raise ValueError("Invalid control interval")
+        if not self.team_evidence.strip():
+            self.side = "unknown"
+        if self.side == "unknown" or not self.identity_evidence.strip():
+            self.cap_number = None
         return self
 
 
@@ -91,6 +120,7 @@ class Observability(ObservationModel):
 class SegmentObservation(ObservationModel):
     scene: Literal["water_polo", "mixed", "not_water_polo", "unreadable"]
     actions: list[ActionObservation] = Field(max_length=240)
+    ball_control: list[BallControlObservation] = Field(default_factory=list, max_length=240)
     observability: list[Observability] = Field(max_length=10)
     summary: str = Field(max_length=1400)
 
@@ -104,7 +134,7 @@ Types autorisés: {', '.join(EVENT_LABELS)}.
 
 Règles de comptage: un but est UNE action goal, pas aussi shot_on_target. Une passe est
 UN type parmi assist (passe immédiatement décisive visible), key_pass, pass_complete ou
-bad_pass; ne double pas une même passe. Une passe ratée n'est pas aussi turnover.
+bad_pass ou pass_unknown (lâcher observé, issue inconnue) ; ne double pas une même passe. Une passe ratée n'est pas aussi turnover.
 Une touche au centre est centre_touch, pas aussi touch. Une relance est une action
 goalkeeper_restart; si son issue est visible, ajoute séparément la passe correspondante.
 Un tir et l'arrêt adverse sont deux actions distinctes. Ne déduis pas un but d'un mouvement
@@ -125,6 +155,7 @@ possession exige observation du changement de possession, pas le début/fin de l
 Pour possession_end, renseigne possession_outcome seulement si la cause est visible : but, arrêt, tir hors cadre, poteau, contre, mauvaise passe, interception, faute offensive, expiration, erreur technique ou fin de période. Un rebond récupéré par l’attaque ne termine pas automatiquement la possession. Un simple coup de sifflet ne prouve pas une exclusion : cherche le geste arbitral et la sortie/zone de rentrée. Une exclusion et un penalty ne sont pas la même sanction. Ne déduis pas la supériorité du nombre de personnes visibles dans un cadrage incomplet. Le référentiel senior récent est 4 × 8 min, possession 28 s, reset/exclusion 18 s dans les cas prévus, mais ne force pas ces valeurs sur un match ancien ou une compétition différente. game_clock_seconds et shot_clock_seconds uniquement si les affichages respectifs sont lisibles au timestamp ; ne les intervertis pas. Une passe décisive exige la séquence complète jusqu’au but. Pour chaque passe recherche le lâcher, le trajet de balle et la réception ou interception. Attribue le tir à la joueuse qui lâche le ballon vers la cage, distingue tir cadré arrêté, non cadré, contré et but; si le lâcher vers la cage est certain mais l’issue est masquée, utilise shot_unknown. Ne le classe ni cadré ni non cadré. Si le geste lui-même est incertain, ne crée pas de tir. Pour l’équipe attaquante, exige la maîtrise du ballon et la direction du but attaqué, sans supposer que le bonnet clair appartient au club à domicile. Les bonnets rouges peuvent correspondre à une gardienne; le numéro doit être lisible, jamais déduit d’une piste de tracking. Le nombre de joueuses visibles n’est pas le nombre de joueuses autorisées dans le bassin. Distingue temps vidéo, chrono général et chrono de possession. Si une action est masquée, ne la complète pas par supposition.
 
 Pour la synthèse tactique, distingue press individuel, aide latérale 1–2 / 4–5, zone M (aide sur pointe et splits périphériques), zone 2–3–4, trappe et changement press-zone. Les postes 1–6 ne sont pas les numéros de bonnet. Évalue plusieurs secondes avant le tir, les appariements, l’aide sur pointe et les déplacements. Si le champ ne montre pas toutes les joueuses, ne nomme que le mécanisme local visible. Vérifie l'issue du tir après le lâcher, y compris ballon dans le filet, déviation par la gardienne, retour du ballon en jeu et reprise. Ne déduis pas l'issue uniquement du score.
+Pour une passe réussie, receiver_cap_number exige une receveuse distincte de la même équipe, numéro réellement lisible et contrôle observé, documentés dans receiver_evidence ; sinon null. pass_method vaut dry (sans contact avec eau), wet (via eau), hand_off (remise directe) ou unknown. ball_control contient uniquement des intervalles continus de maîtrise visible, avec start_second/end_second locaux au clip, preuve, équipe et identité si lisibles, confidence et is_replay. Ne prolonge pas un contrôle masqué ni ne déduis une possession d’une simple proximité du ballon. Si aucun intervalle certain, ball_control=[]. Les durées sont vidéo et non chrono de jeu.
 Rends la visibilité et ses limites pour chacune des familles: {', '.join(FAMILIES)}.
 Une absence de détection n'est pas la preuve d'un zéro. Ni distance métrique, vitesse,
 temps de jeu complet, fatigue, note globale, ni total extrapolé: le modèle ne les mesure
