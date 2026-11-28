@@ -1,6 +1,20 @@
 # AquaMetric — tableau de suivi du rapport final
 Mise à jour initiale : 28 novembre 2026. Ce tableau est un état vérifié à date, pas une télémétrie en direct. Le responsable intégration & événements le met à jour à chaque cycle à partir des preuves des spécialistes. [Mandat commun](DELIVERY_REPORT_FIRST.md) · [Convergence](CONVERGENCE.md) · [Feuille de route](ROADMAP.md).
 
+## Avancement vers 100 % — référentiel v1
+[Consulter les 50 critères détaillés et les preuves](OBJECTIFS_100.md). Chaque jalon vaut 10 points pour son agent, seulement après validation intégrale. Pondérations égales par agent ; avancement global = jalons vérifiés / 50. Ce score mesure les livrables, pas la précision sportive, le temps restant ni le taux de statistiques renseignées.
+
+| Agent | Jalon validé | Progression | Prochain jalon prioritaire |
+|---|---|---:|---|
+| Intégration & événements | I01, I02 | 20 % | I03 — convergence des producteurs V3 et lot 8 |
+| Vision & calibration | V01, V02 | 20 % | V03/V04 — PTS Q1, benchmark indépendant |
+| Statistiques & restitution | S01 à S04 | 40 % | S05 — inventaire complet producteur/rendu/export |
+| Parcours & UX | U01, U02 | 20 % | U03 — import vidéo réel et plusieurs segments |
+| Validation indépendante | Q01, Q02 | 20 % | Q03 — smoke HTTP sur lot8 exact |
+| **Global** | **12/50** | **24 %** | **38 jalons restent à valider** |
+
+État initial établi le 28/11/2026 sur les preuves liées dans OBJECTIFS_100.md. U01 est validé sur branche uniquement. U02 utilise une fixture URL, pas un vrai traitement vidéo. Les 146 tests et le pilote de tracking ne certifient pas un rapport sportif complet. L'intégrateur met à jour les IDs, scores, preuves et blocages à chaque cycle ; une régression peut réduire le score. Les spécialistes transmettent leurs résultats dans leurs propres journaux. Conserver les critères et poids fixes.
+
 ## Livraison
 - [Site Ultimate](https://aquametric-ultimate-guest.onrender.com) : lot 8, SHA `c6ee727786928332176a0e6d75a7e09a7932248a`, Render live (27/11, 23:09:46 heure de Paris).
 - [CI lot 8](https://github.com/azertyuiop95200/aquametric-Waterpolo/actions/runs/46074577789) : 146 tests précédemment vérifiés, dont 2 parcours HTTP sur fixture synthétique. Pas une validation sportive réelle.
