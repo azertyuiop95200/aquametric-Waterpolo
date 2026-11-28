@@ -9,6 +9,7 @@ from services.metric_field import calibrate,CameraAligner,project,measure
 from services.advanced_tracking import motion
 from services.occupancy_grid import occupancy,density
 from services.identity_aggregation import review_identity
+from services.r7_reviewed_fragments import fragment_ids
 
 def number(v):return type(v) in (float,int) and isfinite(v)
 
@@ -37,25 +38,28 @@ def select_tracks(scan,raw,roster):
     seen=set();people=set();out=[]
     for item in selected:
         k=item.get('track_id')
-        if type(k) is not int or str(k) not in by_id or k in seen:raise ValueError('Piste inconnue ou dupliquée.')
-        seen.add(k);ident=review_identity(item)
+        ids=fragment_ids(item,scan,by_id,fps)
+        if any(i in seen for i in ids):raise ValueError('Fragment attribué plusieurs fois.')
+        seen.update(ids);ident=review_identity(item)
         cap=ident['cap_number'];side=ident['side']
         if cap is None or (side=='for' and roster.count(cap)!=1):raise ValueError('Bonnet non attribuable à la feuille.')
         if (side,cap) in people:raise ValueError('Une piste par identité et fenêtre.')
-        people.add((side,cap));tr=by_id[str(k)]
-        if tr.get('kind')!='head':raise ValueError('Piste de tête requise.')
+        people.add((side,cap))
         points=[];last=-1
-        for p in tr.get('points',[]):
-            t,x,y=(p.get(n) for n in ('second','x','y'))
-            if not all(map(number,(t,x,y))) or not 0<=x<=1 or not 0<=y<=1:raise ValueError('Point invalide.')
-            i=round(t*fps)
-            f=by_index.get(i)
-            if i<=last or f is None or abs(t-i/fps)>1e-5:raise ValueError('Point hors fenêtre ou temps non croissant.')
-            matches=[d for d in f.get('detections',[]) if d.get('track_id')==k and d.get('kind')=='head' and d.get('x')==x and d.get('y')==y]
-            if len(matches)!=1:raise ValueError('Point sans observation correspondante.')
-            points.append(dict(frame=i,second=i/fps,x=x,y=y));last=i
-        if len(points)<5:raise ValueError('Au moins cinq positions revues par piste.')
-        out.append(dict(track_id=k,identity=ident,points=points))
+        for fid in ids:
+            tr=by_id[str(fid)]
+            if tr.get('kind')!='head':raise ValueError('Piste de tête requise.')
+            if len(tr.get('points',[]))<5:raise ValueError('Au moins cinq positions revues par fragment.')
+            for p in tr.get('points',[]):
+                t,x,y=(p.get(n) for n in ('second','x','y'))
+                if not all(map(number,(t,x,y))) or not 0<=x<=1 or not 0<=y<=1:raise ValueError('Point invalide.')
+                i=round(t*fps)
+                f=by_index.get(i)
+                if i<=last or f is None or abs(t-i/fps)>1e-5:raise ValueError('Point hors fenêtre ou temps non croissant.')
+                matches=[d for d in f.get('detections',[]) if d.get('track_id')==fid and d.get('kind')=='head' and d.get('x')==x and d.get('y')==y]
+                if len(matches)!=1:raise ValueError('Point sans observation correspondante.')
+                points.append(dict(frame=i,second=i/fps,x=x,y=y,fragment_id=fid));last=i
+        out.append(dict(track_id=k,fragment_track_ids=ids,identity=ident,points=points,link_evidence=item.get('link_evidence','').strip() if len(ids)>1 else None))
     return fps,period,ref,out
 
 def analyze(path,scan,raw,roster):
@@ -88,22 +92,24 @@ def analyze(path,scan,raw,roster):
             cache[i]=aligner.align(frame(i))
         players=[]
         for t in tracks:
-            pts=[];requested=len(t['points']);last_frame=None
+            pts=[];requested=len(t['points']);last_frame=None;last_fragment=None
             for p in t['points']:
-                if last_frame is not None and any(last_frame<cut<=p['frame'] for cut in cuts):pts.append(None)
+                if last_frame is not None and (last_fragment!=p['fragment_id'] or any(last_frame<cut<=p['frame'] for cut in cuts)):pts.append(None)
+                last_fragment=p['fragment_id']
                 last_frame=p['frame']
                 a=cache[p['frame']]
                 if multi:
                     q=consensus(aligner,a,p['x'],p['y'])
                     xy=(q['x_m'],q['y_m']) if q is not None else None
-                    projection_quality.append(dict(track_id=t['track_id'],frame=p['frame'],support=q['support'] if q else 0,spread_m=q['spread_m'] if q else None,accepted=q is not None))
+                    projection_quality.append(dict(track_id=p['fragment_id'],frame=p['frame'],support=q['support'] if q else 0,spread_m=q['spread_m'] if q else None,accepted=q is not None))
                 else:xy=project(cal,*aligner.point(a[0],p['x'],p['y'])) if a is not None else None
                 if xy is None or not 0<=xy[0]<=L or not -W/2<=xy[1]<=W/2:pts.append(None)
                 else:pts.append(dict(second=p['second'],x_m=xy[0],y_m=xy[1]+W/2))
             measured=measure(pts);segments=measured['segments']
             m=motion(segments,sprint_mps=1.5,min_sprint_s=.35)
             occ=density(occupancy(segments,L,W,2.,0.,86400.)) if m['observed_s'] else None
-            players.append(dict(track_id=t['track_id'],identity=t['identity'],requested_points=requested,
+            players.append(dict(track_id=t['track_id'],fragment_track_ids=t['fragment_track_ids'],link_evidence=t['link_evidence'],
+                fragment_count=len(t['fragment_track_ids']),identity=t['identity'],requested_points=requested,
                 projected_points=sum(p is not None for p in pts),metrics=m,segments=segments,occupation=occ,
                 playing_seconds=None))
     finally:c.release()
