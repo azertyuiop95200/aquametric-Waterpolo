@@ -1,0 +1,18 @@
+{% if snapshot.video_actions is defined and snapshot.video_actions.lineup_exposure is defined %}
+{% set l=snapshot.video_actions.lineup_exposure %}
+{% set perf=snapshot.video_actions.lineup_performance %}
+<section class="report-card section-wide" id="lineupExposure">
+<h2>Temps de jeu observé, rotations et situations numériques</h2>
+<p>Estimations candidates issues des compositions complètes observées et du chronomètre général. Temps de jeu partiel, jamais durée de présence vidéo. Aucune durée de banc ni exclusion déduite d'une absence à l'image. Le nombre de joueuses inclut les gardiennes. Les taux décrivent uniquement les actions détectées associées à ces intervalles.</p>
+{% if l.teams['for'].observed_game_seconds is none and l.teams['against'].observed_game_seconds is none %}<p>Non mesuré : aucune composition complète associée au chronomètre général.</p>{% endif %}
+{% for side,label in [('for','Notre équipe'),('against','Adversaire')] %}
+{% set t=l.teams[side] %}<h3>{{label}}</h3>
+<p>Chrono couvert : {{t.observed_game_seconds if t.observed_game_seconds is not none else 'Non mesuré'}} s ; conflits de composition : {{t.conflict_game_seconds}} s.</p>
+{% if t.players %}<table class="metric-table"><thead><tr><th>Bonnet</th><th>Temps de jeu partiel (s)</th><th>Exclusions observées (s)</th></tr></thead><tbody>{% for r in t.players %}<tr><td>{{r.cap}}</td><td>{{r.playing_seconds if r.playing_seconds is not none else 'Non mesuré'}}</td><td>{{r.excluded_seconds if r.excluded_seconds is not none else 'Non mesuré'}}</td></tr>{% endfor %}</tbody></table>
+<h4>Compositions observées</h4><table class="metric-table"><thead><tr><th>Bonnets en jeu</th><th>Temps de jeu observé (s)</th></tr></thead><tbody>{% for r in t.compositions %}<tr><td>{{r.caps|join(', ')}}</td><td>{{r.seconds}}</td></tr>{% endfor %}</tbody></table>{% endif %}
+{% if perf.teams[side].players %}<details><summary>Actions candidates associées aux compositions</summary><table class="metric-table"><thead><tr><th>Bonnet</th><th>Chrono observé (s)</th><th>Tirs détectés</th><th>Passes tentées</th><th>Réceptions</th><th>Buts / min observée</th><th>Différentiel de buts observé</th></tr></thead><tbody>{% for r in perf.teams[side].players %}<tr><td>{{r.cap}}</td><td>{{r.seconds}}</td><td>{{r.shots}}</td><td>{{r.passes_attempted}}</td><td>{{r.passes_received}}</td><td>{{r.goals_per_min if r.goals_per_min is not none else 'Non mesuré'}}</td><td>{{r.observed_goal_diff if r.observed_goal_diff is not none else 'Non mesuré'}}</td></tr>{% endfor %}</tbody></table></details>{% endif %}
+{% endfor %}
+{% if l.numerical_states %}<h3>Situations numériques simultanément observées</h3><table class="metric-table"><thead><tr><th>Notre équipe</th><th>Adversaire</th><th>Chrono commun (s)</th></tr></thead><tbody>{% for r in l.numerical_states %}<tr><td>{{r.for_players}}</td><td>{{r.against_players}}</td><td>{{r.seconds}}</td></tr>{% endfor %}</tbody></table>{% endif %}
+<p>Compositions rejetées : {{l.rejected_intervals}}. Périodes et durée réglementaire plafonnées par le contrat technique ; pas de couverture totale revendiquée.</p>
+</section>
+{% endif %}
