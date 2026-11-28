@@ -98,6 +98,11 @@ def normalize_observations(payload: dict, segment: dict) -> dict:
             ignored["duplicates"] += 1
             continue
         events.append(event)
+    from services.ball_control import normalize_control_intervals
+    try:
+        payload["ball_control"] = normalize_control_intervals(payload.get("ball_control", []), segment, payload["scene"])
+    except ValueError as exc:
+        raise VideoActionError("invalid_control_interval", "Intervalle de contrôle hors séquence ou incohérent.") from exc
     payload["actions"] = sorted(events, key=lambda e: e["second"])
     payload["ignored"] = ignored
     return payload
