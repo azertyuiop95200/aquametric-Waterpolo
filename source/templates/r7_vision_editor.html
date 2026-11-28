@@ -22,6 +22,7 @@
 <p>Coordonnées image normalisées de 0 à 1. Repères dans l'ordre : deux poteaux (y négatif puis positif dans le repère du bassin), coin côté positif, repères latéraux 2 m et 6 m. Polygone du décor fixe pour compenser la caméra ; ne pas inclure les joueuses ni l'eau mobile.</p>
 <label>Cinq repères (JSON) <textarea name="anchors_json" required placeholder="[[x,y],[x,y],[x,y],[x,y],[x,y]]"></textarea></label>
 <label>Polygone décor (JSON) <textarea name="polygon_json" required placeholder="[[x,y],[x,y],[x,y],...]"></textarea></label>
+<p>Pour regrouper des fragments déjà proposés par le mode R7 avec raccordements, ajouter à une identité les champs <code>fragment_track_ids</code> (liste ordonnée commençant par track_id), <code>links_reviewed: true</code> et <code>link_evidence</code> (justification visuelle). Maximum quatre fragments de cinq positions au moins. Les intervalles entre fragments restent non mesurés.</p>
 <label>Pistes revues (JSON) <textarea name="tracks_json" required placeholder='[{"track_id":1,"side":"for","cap_number":2,"colour":"white","evidence":"Justification visuelle"}]'></textarea></label>
 <label><input name="all_points_reviewed" type="checkbox" value="true" required> Toutes les positions et les identités sélectionnées sont revues</label>
 <label><input name="calibration_reviewed" type="checkbox" value="true" required> Les dimensions, les repères et le décor sont revus</label>
