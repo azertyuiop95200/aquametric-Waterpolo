@@ -18,13 +18,15 @@ def source_binding(match,segment):
     return digest([match.id,None,match.video_source,match.video_path,match.video_url])
 
 def save_scan(db,match,segment,kind,result,path):
-    if kind not in {"tracklets","ball_motion","r7_review","r7_decision"} or not isinstance(result,dict):
+    if kind not in {"tracklets","ball_motion","r7_review","r7_decision","r7_metric_review"} or not isinstance(result,dict):
         raise ValueError("Type de proposition invalide.")
     # Reject unexpected promotion even when callers change in a later release.
     if any(result.get(key) is True for key in ("confirmed","identity_verified","metrics_validated","statistical_use_allowed","pts_validated")):
         raise ValueError("Un prototype ne peut pas certifier une mesure.")
     binding=source_binding(match,segment)
     stat=path.stat()
+    if result.get("source_sha256_at_creation") and result.get("source_file_size") is not None and (result["source_file_size"],result.get("source_file_mtime_ns"))!=(stat.st_size,stat.st_mtime_ns):
+        raise ValueError("Source modifiée avant enregistrement.")
     payload={"schema":"vision-scan-v1","kind":kind,"source_binding":binding,
         "source_file_size":stat.st_size,"source_file_mtime_ns":stat.st_mtime_ns,
         "source_bytes_verified":False,"result":result}
@@ -71,7 +73,7 @@ def report(db,match):
                 "tracklets":r.get("tracklets_total"),"tracklets_at_least_3":r.get("tracklets_at_least_3"),
                 "ball_candidates":len(r.get("candidates",[])) if row.kind=="ball_motion" else None,
                 "digest":row.digest,"candidate_count":len(r.get("packet",{}).get("candidates",[])) if row.kind=="r7_review" else None,
-                "review_counts":r.get("review",{}).get("counts"),"unreviewed":r.get("review",{}).get("unreviewed"),"packet_sha256":r.get("packet",{}).get("packet_sha256") or r.get("review",{}).get("packet_sha256"),"source_bytes_verified":False})
+                "review_counts":r.get("review",{}).get("counts"),"unreviewed":r.get("review",{}).get("unreviewed"),"packet_sha256":r.get("packet",{}).get("packet_sha256") or r.get("review",{}).get("packet_sha256"),"source_bytes_verified":False,"metric_review":r if row.kind=="r7_metric_review" else None})
         except (ValueError,TypeError,KeyError,AttributeError):stale+=1
     return {"status":"experimental_partial" if any(r["scan_status"]=="completed" for r in rows) else "unavailable","rows":rows,"stale_count":stale,
         "scope":"per_window_not_unique_athletes","source_binding":"metadata_only_not_video_hash",
