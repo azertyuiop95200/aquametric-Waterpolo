@@ -747,6 +747,10 @@ def r7_metric(match_id:int,scan_id:int,request:Request,payload:dict,db:Session=D
     segment,path=_r7_local_source(db,match,row.segment_id)
     if row.source_binding!=source_binding(match,segment):raise HTTPException(409,"Source modifiée.")
     if segment is not None and payload.get("period")!=segment.period:raise HTTPException(422,"Période incompatible avec la partie.")
+    if segment is None:
+        from models import MatchVideoSegment
+        registered=list(db.scalars(select(MatchVideoSegment).where(MatchVideoSegment.match_id==match.id,MatchVideoSegment.source_type=="upload",MatchVideoSegment.video_path==match.video_path)))
+        if len(registered)>1 or (registered and payload.get("period")!=registered[0].period):raise HTTPException(422,"Période de la source principale ambiguë ou incompatible.")
     if payload.get("scan_digest")!=row.digest:raise HTTPException(409,"Référence de scan périmée.")
     if not _METRIC_SLOT.acquire(blocking=False):raise HTTPException(429,"Un calcul est déjà en cours.")
     try:
@@ -757,3 +761,37 @@ def r7_metric(match_id:int,scan_id:int,request:Request,payload:dict,db:Session=D
         return {"ok":True,"scan_id":saved.id,"status":result["status"],"players":result["players"]}
     except (ValueError,TypeError,KeyError,AttributeError,OSError,cv2.error) as exc:raise HTTPException(422,"Revue métrique impossible : vérifier source, pistes, identités et repères.") from exc
     finally:_METRIC_SLOT.release()
+
+
+@router.get("/matches/{match_id}/analysis/r7-evidence/{scan_id}")
+def r7_evidence(match_id:int,scan_id:int,request:Request,db:Session=Depends(get_db)):
+    from models import VisionScanEvidence
+    from services.vision_scan_evidence import read_scan,source_binding
+    from models import MatchVideoSegment
+    _,match=_owned_match(match_id,request,db)
+    row=db.get(VisionScanEvidence,scan_id)
+    if row is None or row.match_id!=match.id:raise HTTPException(404,"Preuve introuvable.")
+    segment=db.get(MatchVideoSegment,row.segment_id) if row.segment_id is not None else None
+    if row.segment_id is not None and (segment is None or segment.match_id!=match.id):raise HTTPException(409,"Partie périmée.")
+    if row.source_binding!=source_binding(match,segment):raise HTTPException(409,"Source modifiée.")
+    try:return JSONResponse(read_scan(row),headers={"Cache-Control":"private, no-store"})
+    except (ValueError,TypeError,KeyError):raise HTTPException(409,"Preuve incohérente.") from None
+
+@router.post("/matches/{match_id}/analysis/r7-metric-form")
+def r7_metric_form(match_id:int,request:Request,scan_ref:str=Form(...),period:int=Form(...),
+        reference_frame:int=Form(...),length_m:float=Form(...),width_m:float=Form(...),
+        anchors_json:str=Form(...),polygon_json:str=Form(...),tracks_json:str=Form(...),
+        all_points_reviewed:bool=Form(False),calibration_reviewed:bool=Form(False),
+        nominal_time_acknowledged:bool=Form(False),db:Session=Depends(get_db)):
+    import json
+    _owned_match(match_id,request,db)
+    try:
+        if len(scan_ref)>90 or any(len(x)>12000 for x in (anchors_json,polygon_json,tracks_json)):raise ValueError()
+        ident,digest=scan_ref.split(":",1)
+        payload=dict(scan_digest=digest,period=period,reference_frame=reference_frame,length_m=length_m,width_m=width_m,
+            anchors=json.loads(anchors_json),polygon=json.loads(polygon_json),tracks=json.loads(tracks_json),
+            all_points_reviewed=all_points_reviewed,calibration_reviewed=calibration_reviewed,nominal_time_acknowledged=nominal_time_acknowledged)
+        scan_id=int(ident)
+    except (TypeError,ValueError):raise HTTPException(422,"Saisie JSON ou référence invalide.") from None
+    r7_metric(match_id,scan_id,request,payload,db)
+    return RedirectResponse(f"/matches/{match_id}/analysis/result#visionR7",status_code=303)
