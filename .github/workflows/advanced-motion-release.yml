@@ -34,6 +34,7 @@ jobs:
           python -m unittest discover -s tests -p test_r7_link_review.py -v
           python -m unittest discover -s tests -p test_pass_ledger.py -v
           python -m unittest discover -s tests -p test_ball_control.py -v
+          python -m unittest discover -s tests -p test_ball_motion_review.py -v
           python -m unittest discover -s tests -p test_lineup_exposure.py -v
           python -m unittest discover -s tests -p test_lineup_performance.py -v
       - name: Original possession specialist tests
@@ -109,15 +110,16 @@ jobs:
           python -m unittest discover -s tests -p test_pass_control_http.py -v
           python -m unittest discover -s tests -p test_lineup_http.py -v
           python -m unittest discover -s tests -p test_local_batch_http.py -v
+          python -m unittest discover -s tests -p test_ball_motion_http.py -v
 
-  live-release-twelve:
+  live-release-thirteen:
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
-      - name: Verify live release twelve and isolated guest report
+      - name: Verify live release thirteen and isolated guest report
         env:
           BASE: https://aquametric-ultimate-guest.onrender.com
-          EXPECTED: 2621a1f55b668a8310b231355cae77016079d109
+          EXPECTED: ee0907a879feb6eb6d4558d71d8ababf57076c88
         run: |
           set -euo pipefail
           tmp=$(mktemp -d)

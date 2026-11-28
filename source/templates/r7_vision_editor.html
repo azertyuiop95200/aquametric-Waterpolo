@@ -31,3 +31,14 @@
 {% endif %}
 </details>
 {% endif %}
+
+{% if snapshot.vision_scan_evidence is defined and match.video_source=='upload' %}
+<details class="report-card section-wide"><summary>Recherche assistée du ballon (25 i/s)</summary>
+<p>Deux positions du ballon revues dans les cinq images précédentes, coordonnées normalisées de 0 à 1. Le résultat propose des positions à vérifier, sans créer de passe ni de possession.</p>
+<form action="/matches/{{match.id}}/analysis/r7-ball-motion" method="post">
+<label>Image cible <input type="number" name="frame_index" min="1" required></label>
+<label>Deux repères revus (JSON) <textarea name="seeds_json" maxlength="4000" required placeholder='[{"frame":1,"x":0.4,"y":0.5,"reviewed":true},{"frame":2,"x":0.42,"y":0.5,"reviewed":true}]'></textarea></label>
+<button type="submit">Rechercher le ballon</button>
+</form>
+</details>
+{% endif %}

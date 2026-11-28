@@ -72,6 +72,7 @@ def report(db,match):
                 "sampled_frames":len(frames) if row.kind=="tracklets" else None,
                 "tracklets":r.get("tracklets_total"),"tracklets_at_least_3":r.get("tracklets_at_least_3"),
                 "ball_candidates":len(r.get("candidates",[])) if row.kind=="ball_motion" else None,
+                "ball_motion_review":r if row.kind=="ball_motion" else None,
                 "digest":row.digest,"candidate_count":len(r.get("packet",{}).get("candidates",[])) if row.kind=="r7_review" else None,
                 "review_counts":r.get("review",{}).get("counts"),"unreviewed":r.get("review",{}).get("unreviewed"),"packet_sha256":r.get("packet",{}).get("packet_sha256") or r.get("review",{}).get("packet_sha256"),"source_bytes_verified":False,"metric_review":r if row.kind=="r7_metric_review" else None,"fragment_link_review":r.get("fragment_link_review") if row.kind=="tracklets" else None})
         except (ValueError,TypeError,KeyError,AttributeError):stale+=1

@@ -27,6 +27,16 @@
 {% else %}<p>Aucun raccordement admissible proposé.</p>{% endif %}
 </details>
 {% endfor %}
+{% for r in v.rows if r.ball_motion_review is defined and r.ball_motion_review is not none %}
+{% set b=r.ball_motion_review %}
+<h3>Recherche assistée du ballon — scan #{{r.id}}</h3>
+<p>Image locale {{b.frame_index}}, état {{b.status}}, {{b.candidates|length}} propositions. Deux repères revus déclarés par le propriétaire, cadence nominale ; aucune trajectoire ou possession confirmée.</p>
+{% if b.candidates %}
+<table class="metric-table"><thead><tr><th>Position x normalisée</th><th>Position y normalisée</th><th>Score de classement (non probabiliste)</th></tr></thead><tbody>
+{% for c in b.candidates %}<tr><td>{{c.x}}</td><td>{{c.y}}</td><td>{{c.ranking_score}}</td></tr>{% endfor %}
+</tbody></table>
+{% else %}<p>Aucune proposition admissible ; ne signifie pas absence du ballon.</p>{% endif %}
+{% endfor %}
 {% for r in v.rows if r.metric_review is not none %}
 {% set m=r.metric_review %}
 <h3>Fenêtre métrique R7 #{{r.id}} — période {{m.period}}</h3>
