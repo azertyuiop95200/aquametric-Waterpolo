@@ -1,0 +1,23 @@
+{% if snapshot.video_actions is defined and snapshot.video_actions.pass_ledger is defined %}
+{% set p=snapshot.video_actions.pass_ledger %}
+{% set b=snapshot.video_actions.ball_control %}
+<section class="report-card section-wide" id="passControl">
+<h2>Passes et maîtrise visible du ballon</h2>
+<p>Détections candidates du moteur vidéo, non confirmées. Les passes à issue inconnue ne sont ni des réussites ni des échecs. Les durées de contrôle sont en temps vidéo, pas en chrono de jeu. Aucun total de match extrapolé.</p>
+{% if not snapshot.video_actions.available and not b.intervals %}<p>Non mesuré : aucune observation exploitable de passe ou de contrôle continu.</p>{% endif %}
+<table class="metric-table"><thead><tr><th>Équipe</th><th>Tentatives détectées</th><th>Réussies</th><th>Échecs</th><th>Issue inconnue</th><th>Réussite (%)</th><th>Contrôle visible (s)</th></tr></thead><tbody>
+{% for s,label in [('for','Notre équipe'),('against','Adversaire'),('unknown','Non attribuée')] %}
+{% set t=p.teams[s] %}<tr><td>{{label}}</td>{% for v in [t.attempts,t.completed,t.failed,t.unknown,t.completion_pct,b.teams[s].control_video_seconds] %}<td>{{v if v is not none else 'Non mesuré'}}</td>{% endfor %}</tr>{% endfor %}
+</tbody></table>
+{% for s,label in [('for','Notre équipe'),('against','Adversaire')] %}
+{% set t=p.teams[s] %}<h3>{{label}} — transmissions candidates par bonnet</h3>
+{% if t.players %}<table class="metric-table"><thead><tr><th>Bonnet</th><th>Passes émises</th><th>Réceptions</th></tr></thead><tbody>{% for r in t.players %}<tr><td>{{r.cap}}</td><td>{{r.sent}}</td><td>{{r.received}}</td></tr>{% endfor %}</tbody></table>{% else %}<p>Identités de transmission non établies.</p>{% endif %}
+{% if t.network %}<table class="metric-table"><thead><tr><th>Émettrice</th><th>Receveuse</th><th>Passes détectées</th></tr></thead><tbody>{% for e in t.network %}<tr><td>{{e.from}}</td><td>{{e.to}}</td><td>{{e.count}}</td></tr>{% endfor %}</tbody></table>{% endif %}
+{% if t.attempts is not none %}<p>{{t.unattributed_passers}} tentatives sans passeuse attribuée ; {{t.unattributed_receivers}} réussites sans receveuse attribuée.</p>{% endif %}
+{% if t.methods %}<p>Modes : {% for k,v in t.methods.items() %}{{k}} : {{v}}{% if not loop.last %} · {% endif %}{% endfor %}.</p>{% endif %}
+{% if b.teams[s].players %}<table class="metric-table"><thead><tr><th>Bonnet</th><th>Contrôle vidéo observé (s)</th></tr></thead><tbody>{% for r in b.teams[s].players %}<tr><td>{{r.cap}}</td><td>{{r.control_video_seconds}}</td></tr>{% endfor %}</tbody></table>{% endif %}
+{% endfor %}
+{% if b.intervals %}<p>Union des intervalles observés : {{b.observed_video_seconds}} s ; conflit d'attribution : {{b.conflicting_video_seconds}} s ; {{b.excluded_intervals}} intervalles rejetés. Les lacunes ne sont pas comblées.</p>
+<details><summary>Intervalles de contrôle</summary><table class="metric-table"><thead><tr><th>Début</th><th>Fin</th><th>Équipe</th><th>Bonnet</th><th>État</th></tr></thead><tbody>{% for r in b.intervals %}<tr><td>{{r.start_second}}</td><td>{{r.end_second}}</td><td>{{r.side}}</td><td>{{r.cap_number if r.cap_number is not none else 'Inconnu'}}</td><td>{{r.status}}</td></tr>{% endfor %}</tbody></table></details>{% endif %}
+</section>
+{% endif %}
