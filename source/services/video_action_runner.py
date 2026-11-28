@@ -94,7 +94,10 @@ def normalize_observations(payload: dict, segment: dict) -> dict:
         # Literal duplicates are safely removed; close-in-time shots or passes
         # from different players must not be collapsed into one event.
         signature = (event["second"], event["event_type"], event["side"], event["cap_number"])
-        if any((e["second"], e["event_type"], e["side"], e["cap_number"]) == signature for e in events):
+        # Keep incompatible receiver evidence for the canonical reducer to
+        # reject, rather than silently accepting the first observation.
+        duplicates = [e for e in events if (e["second"], e["event_type"], e["side"], e["cap_number"]) == signature]
+        if duplicates and not any(e.get("receiver_cap_number") is not None and event.get("receiver_cap_number") is not None and e["receiver_cap_number"] != event["receiver_cap_number"] for e in duplicates):
             ignored["duplicates"] += 1
             continue
         events.append(event)
