@@ -732,3 +732,28 @@ def r7_review(match_id:int,scan_id:int,request:Request,payload:dict,db:Session=D
         return {"scan_id":saved.id,"review":reviewed}
     except (ValueError,OSError,KeyError,TypeError) as exc:raise HTTPException(422,"Revue R7 invalide.") from exc
     finally:_METRIC_SLOT.release()
+
+
+@router.post("/matches/{match_id}/analysis/r7-metric/{scan_id}")
+def r7_metric(match_id:int,scan_id:int,request:Request,payload:dict,db:Session=Depends(get_db)):
+    from models import VisionScanEvidence
+    from services.vision_scan_evidence import read_scan,save_scan,source_binding
+    from services.r7_metric_review import analyze
+    import cv2
+    _,match=_owned_match(match_id,request,db)
+    if request.session.get("web_demo"):raise HTTPException(403,"Compte propriétaire connecté requis.")
+    row=db.get(VisionScanEvidence,scan_id)
+    if row is None or row.match_id!=match.id or row.kind!="tracklets":raise HTTPException(404,"Scan introuvable.")
+    segment,path=_r7_local_source(db,match,row.segment_id)
+    if row.source_binding!=source_binding(match,segment):raise HTTPException(409,"Source modifiée.")
+    if segment is not None and payload.get("period")!=segment.period:raise HTTPException(422,"Période incompatible avec la partie.")
+    if payload.get("scan_digest")!=row.digest:raise HTTPException(409,"Référence de scan périmée.")
+    if not _METRIC_SLOT.acquire(blocking=False):raise HTTPException(429,"Un calcul est déjà en cours.")
+    try:
+        scan=read_scan(row)["result"]
+        result=analyze(path,scan,payload,[p.cap_number for p in match.team.players])
+        result.update(scan_id=scan_id,scan_digest=row.digest)
+        saved=save_scan(db,match,segment,"r7_metric_review",result,path)
+        return {"ok":True,"scan_id":saved.id,"status":result["status"],"players":result["players"]}
+    except (ValueError,TypeError,KeyError,AttributeError,OSError,cv2.error) as exc:raise HTTPException(422,"Revue métrique impossible : vérifier source, pistes, identités et repères.") from exc
+    finally:_METRIC_SLOT.release()
