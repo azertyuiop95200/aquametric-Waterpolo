@@ -582,11 +582,14 @@ def build_analysis_zip(db, match, evidence_dir: Path) -> io.BytesIO:
             for r in snapshot["vision_scan_evidence"]["rows"] if (m:=r.get("metric_review")) is not None for p in m["players"]]))
         from services.measurement_report import flatten_measurements
         auto_report = snapshot["video_actions"]
+        archive.writestr(f"{root}/03_events/lineup_exposure.json",json.dumps({k:auto_report[k] for k in ("lineup_exposure","lineup_performance")},ensure_ascii=False,indent=2))
+        archive.writestr(f"{root}/02_kpis/observed_player_game_time.csv",_csv_text(["side","cap","playing_seconds","excluded_seconds"],[dict(side=side,**r) for side,t in auto_report["lineup_exposure"]["teams"].items() for r in t["players"]]))
+        archive.writestr(f"{root}/04_sequences/observed_numerical_states.csv",_csv_text(["for_players","against_players","seconds"],auto_report["lineup_exposure"]["numerical_states"]))
         archive.writestr(f"{root}/03_events/pass_control.json",json.dumps({k:auto_report[k] for k in ("pass_ledger","ball_control")},ensure_ascii=False,indent=2))
         archive.writestr(f"{root}/03_events/pass_network.csv",_csv_text(["side","from","to","count"],[dict(side=side,**r) for side,t in auto_report["pass_ledger"]["teams"].items() for r in t["network"]]))
         archive.writestr(f"{root}/03_events/ball_control_intervals.csv",_csv_text(["start_second","end_second","side","cap_number","status","seconds"],auto_report["ball_control"]["intervals"]))
         archive.writestr(f"{root}/03_events/automatic_video_actions.csv", _csv_text(
-            ["key", "second", "event_type", "side", "cap_number", "confidence", "counted", "phase", "period", "zone", "cage_zone", "hand", "shot_type", "pass_type", "cause", "pressure", "decision", "evidence", "identity_evidence", "team_evidence", "receiver_cap_number", "receiver_evidence", "pass_method", "clip_url"], auto_report["events"]))
+            ["key", "second", "event_type", "side", "cap_number", "confidence", "counted", "phase", "period", "zone", "cage_zone", "hand", "shot_type", "pass_type", "cause", "pressure", "decision", "evidence", "identity_evidence", "team_evidence", "receiver_cap_number", "receiver_evidence", "pass_method", "game_clock_seconds", "game_clock_evidence", "clip_url"], auto_report["events"]))
         archive.writestr(f"{root}/02_kpis/automatic_team_measurements.csv", _csv_text(
             ["perspective", "scope", "metric", "value"], [
                 {"perspective": side, "scope": "automatic_detections", **row}

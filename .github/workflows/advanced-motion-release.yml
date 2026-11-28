@@ -34,6 +34,8 @@ jobs:
           python -m unittest discover -s tests -p test_r7_link_review.py -v
           python -m unittest discover -s tests -p test_pass_ledger.py -v
           python -m unittest discover -s tests -p test_ball_control.py -v
+          python -m unittest discover -s tests -p test_lineup_exposure.py -v
+          python -m unittest discover -s tests -p test_lineup_performance.py -v
       - name: Original possession specialist tests
         env:
           PYTHONPATH: source:.
@@ -105,15 +107,16 @@ jobs:
           python -m unittest discover -s tests -p test_r7_metric_review.py -v
           python -m unittest discover -s tests -p test_possession_window_http.py -v
           python -m unittest discover -s tests -p test_pass_control_http.py -v
+          python -m unittest discover -s tests -p test_lineup_http.py -v
 
-  live-release-ten:
+  live-release-eleven:
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
-      - name: Verify live release ten and isolated guest report
+      - name: Verify live release eleven and isolated guest report
         env:
           BASE: https://aquametric-ultimate-guest.onrender.com
-          EXPECTED: 9426151fff816ecfad5e6e1e6e843cf7afabe2ad
+          EXPECTED: 9db572d06e4ea28e7e9f29bdcf194fe75e78ef6a
         run: |
           set -euo pipefail
           tmp=$(mktemp -d)
@@ -148,6 +151,8 @@ jobs:
           grep -Fq 'id="visionR7"' "$tmp/export"
           grep -Fq 'id="possessionEvidence"' "$tmp/report"
           grep -Fq 'id="possessionEvidence"' "$tmp/export"
+          grep -Fq 'id="passControl"' "$tmp/report"
+          grep -Fq 'id="passControl"' "$tmp/export"
           # The live uncalibrated URL dossier must reject a collective review.
           code=$(curl -sS --max-time 30 -b "$tmp/cookies" -H "Origin: $BASE" --data-urlencode 'binding={}' --data-urlencode 'action=add' -o "$tmp/rejected" -w '%{http_code}' "$BASE/matches/$id/analysis/collective-review")
           [[ "$code" == 400 || "$code" == 422 ]]
