@@ -429,6 +429,12 @@ def analysis_snapshot(db, match):
     snapshot["recognition_quality"] = audit(snapshot["automatic"], snapshot["video_actions"])
     from services.vision_scan_evidence import report as vision_scan_report
     snapshot["vision_scan_evidence"] = vision_scan_report(db, match)
+    from services.possession_window_review import read_report as possession_window_report
+    try:
+        snapshot["possession_evidence"] = possession_window_report(db, match, auto)
+    except (ValueError,TypeError,KeyError,AttributeError,OverflowError):
+        from services.possession_evidence import report as empty_possession_report
+        snapshot["possession_evidence"] = dict(empty_possession_report([]),status="invalid",analysis_id=None,sources=[])
     # Basic counters over an empty event set are implementation zeros, not
     # measured match statistics. Apply the same contract to JSON/CSV and HTML.
     for side in ("team", "opponent"):
@@ -559,6 +565,10 @@ def build_analysis_zip(db, match, evidence_dir: Path) -> io.BytesIO:
                         and row.get("file_path") and (Path(evidence_dir) / Path(row["file_path"]).name).is_file()]
         archive.writestr(f"{root}/01_report/report.html", _html_report(match, snapshot, export_media))
         archive.writestr(f"{root}/01_report/analysis.json", json.dumps(snapshot, ensure_ascii=False, indent=2, default=str))
+        p_review=snapshot["possession_evidence"]
+        archive.writestr(f"{root}/03_events/possession_evidence.json",json.dumps(p_review,ensure_ascii=False,indent=2,allow_nan=False))
+        archive.writestr(f"{root}/03_events/possession_windows.csv",_csv_text(
+            ["id","source","period","start_s","end_s","before","after","status","minimum_changes","exact_count","attributed_cause","turnover","prior_shot","restart_award","restart_verified","game_duration_s","evidence"],p_review["rows"]))
         from services.vision_scan_evidence import export_scans
         for record in export_scans(db,match,snapshot["vision_scan_evidence"]):
             archive.writestr(f"{root}/05_evidence/vision_scans/scan_{record['id']}.json",json.dumps(record,ensure_ascii=False,indent=2,allow_nan=False))

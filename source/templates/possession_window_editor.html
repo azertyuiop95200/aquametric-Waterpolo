@@ -1,0 +1,29 @@
+{% if snapshot.possession_evidence is defined %}
+{% set p=snapshot.possession_evidence %}
+{% if p.analysis_id is not none and p.sources %}
+<details class="report-card section-wide"><summary>Annoter une fenêtre de contrôle du ballon</summary>
+<p>Revue manuelle de la vidéo locale, réservée au propriétaire connecté. Temps de la vidéo choisie, non temps de jeu. Aucun événement sportif n'est créé automatiquement. Les fenêtres doivent être distinctes, d'une durée maximale de 30 secondes.</p>
+<form action="/matches/{{match.id}}/analysis/possession-window" method="post">
+<input type="hidden" name="analysis_id" value="{{p.analysis_id}}">
+<label>Source <select name="source" required>{% for s in p.sources %}<option value="{{s.key}}">{{s.label}}{% if s.period is not none %} — période {{s.period}}{% endif %}</option>{% endfor %}</select></label>
+<label>Période <input name="period" type="number" min="1" max="8" value="1" required></label>
+<label>Début vidéo (s) <input name="start" type="number" min="0" max="43200" step=".1" required></label>
+<label>Fin vidéo (s) <input name="end" type="number" min="0" max="43200" step=".1" required></label>
+{% for field,label in [('before','Avant'),('after','Après')] %}
+<label>{{label}} — équipe <select name="{{field}}"><option value="unknown">Inconnue</option><option value="for">Notre équipe</option><option value="against">Adversaire</option></select></label>
+<label>{{label}} — preuve <select name="{{field}}_state"><option value="unknown">Inconnue</option><option value="apparent">Apparente</option><option value="observed">Observée</option></select></label>
+{% endfor %}
+<label>Cause candidate <select name="cause"><option value="unknown">Indéterminée</option>{% for k,v in p.causes.items() if k!='unknown' %}<option value="{{k}}">{{k|replace('_',' ')}}</option>{% endfor %}</select></label>
+<label><input name="cause_verified" type="checkbox" value="true"> Cause vérifiée</label>
+<label><input name="decision_verified" type="checkbox" value="true"> Décision arbitrale identifiée et documentée</label>
+<label><input name="exact" type="checkbox" value="true"> Une seule transition observée sans lacune</label>
+<label><input name="prior_shot" type="checkbox" value="true"> Fenêtre déjà associée à un tir recensé</label>
+<label>Reprise attribuée <select name="restart_award"><option value="unknown">Non établie</option><option value="for">Notre équipe</option><option value="against">Adversaire</option><option value="neutral">Neutre</option></select></label>
+<label><input name="restart_verified" type="checkbox" value="true"> Attribution de reprise vérifiée</label>
+<label>Preuves visibles <textarea name="evidence" minlength="3" maxlength="180" required></textarea></label>
+<label><input name="source_reviewed" type="checkbox" value="true" required> Source, période et bornes vidéo revues</label>
+<button type="submit">Enregistrer la fenêtre de possession</button>
+</form>
+</details>
+{% endif %}
+{% endif %}

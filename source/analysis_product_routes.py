@@ -795,3 +795,32 @@ def r7_metric_form(match_id:int,request:Request,scan_ref:str=Form(...),period:in
     except (TypeError,ValueError):raise HTTPException(422,"Saisie JSON ou référence invalide.") from None
     r7_metric(match_id,scan_id,request,payload,db)
     return RedirectResponse(f"/matches/{match_id}/analysis/result#visionR7",status_code=303)
+
+
+@router.post("/matches/{match_id}/analysis/possession-window")
+def save_possession_window(match_id:int,request:Request,analysis_id:int=Form(...),
+        source:str=Form(...),period:int=Form(...),start:float=Form(...),end:float=Form(...),
+        before:str=Form(...),after:str=Form(...),before_state:str=Form(...),after_state:str=Form(...),
+        cause:str=Form("unknown"),cause_verified:bool=Form(False),decision_verified:bool=Form(False),
+        exact:bool=Form(False),prior_shot:bool=Form(False),restart_award:str=Form("unknown"),
+        restart_verified:bool=Form(False),source_reviewed:bool=Form(False),evidence:str=Form(...),
+        db:Session=Depends(get_db)):
+    from models import AutonomousAnalysis
+    from services.possession_window_review import append
+    import cv2
+    _,match=_owned_match(match_id,request,db)
+    if request.session.get("web_demo"):raise HTTPException(403,"Compte propriétaire connecté requis.")
+    if not _METRIC_SLOT.acquire(blocking=False):raise HTTPException(429,"Un calcul est déjà en cours.")
+    try:
+        auto=db.scalar(select(AutonomousAnalysis).where(AutonomousAnalysis.match_id==match.id).order_by(AutonomousAnalysis.id.desc()).limit(1))
+        if auto is None or auto.id!=analysis_id:raise HTTPException(409,"Analyse périmée.")
+        raw=dict(analysis_id=analysis_id,source=source,period=period,start=start,end=end,before=before,after=after,
+                 before_state=before_state,after_state=after_state,cause=cause,cause_verified=cause_verified,
+                 decision_verified=decision_verified,exact=exact,prior_shot=prior_shot,restart_award=restart_award,
+                 restart_verified=restart_verified,source_reviewed=source_reviewed,evidence=evidence)
+        append(db,match,auto,raw,UPLOAD_DIR);db.commit()
+        return RedirectResponse(f"/matches/{match_id}/analysis/result#possessionEvidence",status_code=303)
+    except (ValueError,TypeError,KeyError,AttributeError,OverflowError,OSError,cv2.error) as exc:
+        db.rollback()
+        raise HTTPException(422,str(exc) if isinstance(exc,ValueError) else "Revue de possession invalide.") from None
+    finally:_METRIC_SLOT.release()

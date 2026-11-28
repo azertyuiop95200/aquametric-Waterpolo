@@ -1,0 +1,14 @@
+{% if snapshot.possession_evidence is defined %}
+{% set p=snapshot.possession_evidence %}
+<section class="report-card section-wide" id="possessionEvidence">
+<h2>Possessions — contrôles et causes documentés</h2>
+<p>{{p.note}}</p>
+<p>Fenêtres de contrôle revues manuellement, indépendantes des événements officiels et des statistiques générales. Source vidéo vérifiée au calcul, liaison par métadonnées à la lecture. Aucun temps de jeu, aucun total de match extrapolé.</p>
+<p>{{p.rows|length}} fenêtre(s) de revue · {{p.rejected|length}} rejet(s). Les taux et durées effectives restent indisponibles sans couverture complète.</p>
+{% for b in p.bounds %}<p>Source {{b.source}} · Q{{b.period}} : au moins {{b.lower_bound}} changement(s) sur fenêtres disjointes hors tirs déjà liés.</p>{% endfor %}
+<table><thead><tr><th>Source / quart</th><th>Temps vidéo (s)</th><th>Avant → après</th><th>Constat</th><th>Cause attribuée</th><th>Reprise attribuée</th><th>Preuve</th></tr></thead><tbody>
+{% for r in p.rows %}<tr><td>{{r.source}} / {{r.period}}</td><td>{{r.start_s}}–{{r.end_s}}</td><td>{{r.before}} → {{r.after}}</td><td>{{ {'opposite_endpoints':'Contrôles opposés','same_team_endpoints':'Même équipe aux bornes','probable_opposite_endpoints':'Changement probable','unresolved':'Indéterminé'}.get(r.status,r.status) }}</td><td>{{r.attributed_cause or 'Non établie'}}</td><td>{{r.restart_award if r.restart_verified else 'Non établie'}}</td><td>{{r.evidence}}</td></tr>{% else %}<tr><td colspan="7">Aucune fenêtre de possession annotée.</td></tr>{% endfor %}
+</tbody></table>
+{% if p.rejected %}<details><summary>Annotations exclues</summary>{% for r in p.rejected %}<p>{{r.id}} : {{r.reason}}</p>{% endfor %}</details>{% endif %}
+</section>
+{% endif %}
