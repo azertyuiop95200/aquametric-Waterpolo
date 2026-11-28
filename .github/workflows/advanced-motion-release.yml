@@ -112,19 +112,22 @@ jobs:
           python -m unittest discover -s tests -p test_local_batch_http.py -v
           python -m unittest discover -s tests -p test_ball_motion_http.py -v
 
-  live-release-thirteen:
+  live-release-fourteen:
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
-      - name: Verify live release thirteen and isolated guest report
+      - name: Verify live release fourteen and isolated guest report
         env:
           BASE: https://aquametric-ultimate-guest.onrender.com
-          EXPECTED: ee0907a879feb6eb6d4558d71d8ababf57076c88
+          EXPECTED: 9fe9e0eaf95efce21e389843f0380819ab2caf14
         run: |
           set -euo pipefail
           tmp=$(mktemp -d)
           trap 'rm -rf "$tmp"' EXIT
-          curl --retry 2 --max-time 60 -fsS "$BASE/health" -o "$tmp/health"
+          for attempt in $(seq 1 36); do
+            if curl --max-time 15 -fsS "$BASE/health" -o "$tmp/health" && python -c 'import json,sys; p=json.load(open(sys.argv[1])); assert p.get("ok") is True and p.get("git_commit")==sys.argv[2],p' "$tmp/health" "$EXPECTED"; then break; fi
+            sleep 8
+          done
           python -c 'import json,sys; p=json.load(open(sys.argv[1])); assert p.get("ok") is True and p.get("git_commit")==sys.argv[2],p' "$tmp/health" "$EXPECTED"
           curl -LfsS --max-time 60 -c "$tmp/cookies" -b "$tmp/cookies" "$BASE/guest/ultimate" -o "$tmp/guest"
           grep -Fq '/analysis/url/create' "$tmp/guest"
@@ -164,4 +167,4 @@ jobs:
           # No session cookie is supplied: owner-scoped report must not leak.
           code=$(curl -sS --max-time 30 -o "$tmp/anonymous" -w '%{http_code}' "$BASE$loc")
           case "$code" in 301|302|303|307|308|401|403|404) ;; *) echo "Unexpected anonymous status $code"; exit 1;; esac
-          echo 'LIVE_GUEST_MOTION_REPORT_OK'
+          echo 'LIVE_BALL_MOTION_RELEASE14_OK'
