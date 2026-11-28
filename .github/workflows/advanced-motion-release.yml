@@ -110,19 +110,22 @@ jobs:
           python -m unittest discover -s tests -p test_lineup_http.py -v
           python -m unittest discover -s tests -p test_local_batch_http.py -v
 
-  live-release-twelve:
+  live-release-thirteen:
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
-      - name: Verify live release twelve and isolated guest report
+      - name: Verify live release thirteen and isolated guest report
         env:
           BASE: https://aquametric-ultimate-guest.onrender.com
-          EXPECTED: 2621a1f55b668a8310b231355cae77016079d109
+          EXPECTED: ee0907a879feb6eb6d4558d71d8ababf57076c88
         run: |
           set -euo pipefail
           tmp=$(mktemp -d)
           trap 'rm -rf "$tmp"' EXIT
-          curl --retry 2 --max-time 60 -fsS "$BASE/health" -o "$tmp/health"
+          for attempt in $(seq 1 36); do
+            if curl --max-time 15 -fsS "$BASE/health" -o "$tmp/health" && python -c 'import json,sys; p=json.load(open(sys.argv[1])); assert p.get("ok") is True and p.get("git_commit")==sys.argv[2],p' "$tmp/health" "$EXPECTED"; then break; fi
+            sleep 8
+          done
           python -c 'import json,sys; p=json.load(open(sys.argv[1])); assert p.get("ok") is True and p.get("git_commit")==sys.argv[2],p' "$tmp/health" "$EXPECTED"
           curl -LfsS --max-time 60 -c "$tmp/cookies" -b "$tmp/cookies" "$BASE/guest/ultimate" -o "$tmp/guest"
           grep -Fq '/analysis/url/create' "$tmp/guest"
@@ -156,10 +159,12 @@ jobs:
           grep -Fq 'id="passControl"' "$tmp/export"
           grep -Fq 'id="lineupExposure"' "$tmp/report"
           grep -Fq 'id="lineupExposure"' "$tmp/export"
+          grep -Fq 'Le scan automatique réparti traite des fenêtres de 25 images source' "$tmp/report"
+          grep -Fq 'Le scan automatique réparti traite des fenêtres de 25 images source' "$tmp/export"
           # The live uncalibrated URL dossier must reject a collective review.
           code=$(curl -sS --max-time 30 -b "$tmp/cookies" -H "Origin: $BASE" --data-urlencode 'binding={}' --data-urlencode 'action=add' -o "$tmp/rejected" -w '%{http_code}' "$BASE/matches/$id/analysis/collective-review")
           [[ "$code" == 400 || "$code" == 422 ]]
           # No session cookie is supplied: owner-scoped report must not leak.
           code=$(curl -sS --max-time 30 -o "$tmp/anonymous" -w '%{http_code}' "$BASE$loc")
           case "$code" in 301|302|303|307|308|401|403|404) ;; *) echo "Unexpected anonymous status $code"; exit 1;; esac
-          echo 'LIVE_GUEST_MOTION_REPORT_OK'
+          echo 'LIVE_LOCAL_BATCH_RELEASE13_OK'
