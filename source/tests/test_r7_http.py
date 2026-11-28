@@ -78,3 +78,17 @@ class R7HTTPTests(unittest.TestCase):
             self.assertEqual(self.client.post(self.base+'r7-packet',data=dict(frame_index=2)).status_code,409)
         self.assertEqual(self.client.post(self.base+'r7-scan',data=dict(frame_count=76)).status_code,422)
         self.assertEqual(self.qa.snapshot()['vision_scan_evidence']['rows'],[])
+
+    def test_optional_link_review_report(self):
+        r=self.client.post(self.base+'r7-scan',data=dict(start_frame=0,frame_count=25,tracking_mode='head_flow_links'),follow_redirects=False)
+        self.assertEqual(r.status_code,303,r.text)
+        row=self.qa.snapshot()['vision_scan_evidence']['rows'][0]
+        self.assertEqual(row['mode'],'head_flow_links')
+        self.assertFalse(row['fragment_link_review']['identity_verified'])
+        self.assertFalse(row['fragment_link_review']['statistical_use_allowed'])
+        for url in (self.qa.report,self.qa.export):
+            r=self.client.get(url);self.assertEqual(r.status_code,200);self.assertIn('raccordements candidats de fragments',r.text)
+        with Session(self.qa.engine) as db:
+            with zipfile.ZipFile(build_analysis_zip(db,db.get(Match,10),self.path.parent)) as z:
+                name=next(n for n in z.namelist() if '/vision_scans/' in n)
+                self.assertIn('fragment_link_review',json.loads(z.read(name))['result'])
