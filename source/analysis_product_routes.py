@@ -824,3 +824,35 @@ def save_possession_window(match_id:int,request:Request,analysis_id:int=Form(...
         db.rollback()
         raise HTTPException(422,str(exc) if isinstance(exc,ValueError) else "Revue de possession invalide.") from None
     finally:_METRIC_SLOT.release()
+
+
+@router.post("/matches/{match_id}/analysis/r7-ball-motion")
+def r7_ball_motion(match_id:int,request:Request,frame_index:int=Form(...),
+        seeds_json:str=Form(...),segment_id:int|None=Form(None),db:Session=Depends(get_db)):
+    import json
+    import cv2
+    from services.ball_motion_review import scan_motion_clip
+    from services.r7_review_pipeline import file_hash
+    from services.vision_scan_evidence import save_scan
+    _,match=_owned_match(match_id,request,db)
+    if request.session.get("web_demo"):raise HTTPException(403,"Compte propriétaire connecté requis.")
+    segment,path=_r7_local_source(db,match,segment_id)
+    if len(seeds_json)>4000:raise HTTPException(422,"Repères trop volumineux.")
+    if not _METRIC_SLOT.acquire(blocking=False):raise HTTPException(429,"Un calcul est déjà en cours.")
+    try:
+        seeds=json.loads(seeds_json)
+        stat=path.stat()
+        if stat.st_size>1200*1024*1024:raise ValueError("Source trop volumineuse.")
+        sha=file_hash(path)
+        result=scan_motion_clip(path,frame_index,seeds)
+        end=path.stat()
+        if (stat.st_size,stat.st_mtime_ns)!=(end.st_size,end.st_mtime_ns):raise ValueError("Source modifiée.")
+        result.update(source_sha256_at_creation=sha,source_file_size=stat.st_size,
+            source_file_mtime_ns=stat.st_mtime_ns,seeds=seeds,statistical_use_allowed=False,
+            metrics_validated=False)
+        save_scan(db,match,segment,"ball_motion",result,path)
+        return RedirectResponse(f"/matches/{match_id}/analysis/result#visionR7",status_code=303)
+    except (ValueError,TypeError,KeyError,OSError,OverflowError,cv2.error) as exc:
+        db.rollback()
+        raise HTTPException(422,"Revue du ballon impossible : vérifier les deux repères, la source et la cadence de 25 i/s.") from None
+    finally:_METRIC_SLOT.release()
