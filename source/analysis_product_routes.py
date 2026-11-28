@@ -782,15 +782,18 @@ def r7_metric_form(match_id:int,request:Request,scan_ref:str=Form(...),period:in
         reference_frame:int=Form(...),length_m:float=Form(...),width_m:float=Form(...),
         anchors_json:str=Form(...),polygon_json:str=Form(...),tracks_json:str=Form(...),
         all_points_reviewed:bool=Form(False),calibration_reviewed:bool=Form(False),
-        nominal_time_acknowledged:bool=Form(False),db:Session=Depends(get_db)):
+        nominal_time_acknowledged:bool=Form(False),additional_references_json:str=Form(''),
+        same_goal_and_side_reviewed:bool=Form(False),db:Session=Depends(get_db)):
     import json
     _owned_match(match_id,request,db)
     try:
-        if len(scan_ref)>90 or any(len(x)>12000 for x in (anchors_json,polygon_json,tracks_json)):raise ValueError()
+        if len(scan_ref)>90 or any(len(x)>12000 for x in (anchors_json,polygon_json,tracks_json,additional_references_json)):raise ValueError()
         ident,digest=scan_ref.split(":",1)
         payload=dict(scan_digest=digest,period=period,reference_frame=reference_frame,length_m=length_m,width_m=width_m,
             anchors=json.loads(anchors_json),polygon=json.loads(polygon_json),tracks=json.loads(tracks_json),
             all_points_reviewed=all_points_reviewed,calibration_reviewed=calibration_reviewed,nominal_time_acknowledged=nominal_time_acknowledged)
+        if additional_references_json.strip():
+            payload.update(additional_references=json.loads(additional_references_json),same_goal_and_side_reviewed=same_goal_and_side_reviewed)
         scan_id=int(ident)
     except (TypeError,ValueError):raise HTTPException(422,"Saisie JSON ou référence invalide.") from None
     r7_metric(match_id,scan_id,request,payload,db)
