@@ -79,3 +79,10 @@ class PassControlHTTPTests(unittest.TestCase):
         self.save();self.client.get('/__qa_session/2')
         self.assertEqual(self.client.get(self.qa.report).status_code,404)
         self.assertEqual(self.client.get(self.qa.export).status_code,404)
+
+    def test_exact_timestamp_conflicting_receivers(self):
+        p=payload();p["actions"]=[action(1.,"pass_complete",receiver_cap_number=3,receiver_evidence="Receiver visible"),
+            action(1.,"pass_complete",receiver_cap_number=4,receiver_evidence="Other receiver visible")]
+        self.save(p);v=self.qa.snapshot()["video_actions"]
+        self.assertIsNone(v["pass_ledger"]["teams"]["for"]["attempts"])
+        self.assertEqual(v["excluded_count"],2)
