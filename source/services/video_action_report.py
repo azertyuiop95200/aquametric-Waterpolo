@@ -168,9 +168,14 @@ def action_report(db, match, *, run=None):
     from services.ball_control import control_report
     result["pass_ledger"] = pass_ledger([])
     result["ball_control"] = control_report([])
+    from services.lineup_exposure import lineup_report
+    from services.lineup_performance import analyze_performance
+    result["lineup_exposure"] = lineup_report([])
+    result["lineup_performance"] = analyze_performance([],result["lineup_exposure"])
     if not run:
         return result
     control_rows = []
+    lineup_rows = []
     segments = json.loads(run.segments_json or "[]")
     rows = []
     visibility = defaultdict(list)
@@ -180,6 +185,11 @@ def action_report(db, match, *, run=None):
         if segment["status"] == "complete":
             if payload.get("scene") in {"water_polo", "mixed"}:
                 processed_intervals.append((segment["start"], segment["end"]))
+                for r in payload.get("lineups", []):
+                    # Clock endpoints remain untouched. Only observations with a source-video
+                    # interval intersecting this segment can contribute to the union.
+                    if isinstance(r,dict) and type(r.get("start_second")) in (int,float) and type(r.get("end_second")) in (int,float) and 0 <= r["start_second"] < r["end_second"] <= run.duration_seconds + 1e-6 and r["start_second"] < segment["end"] and r["end_second"] > segment["start"]:
+                        lineup_rows.append(r)
                 for r in payload.get("ball_control", []):
                     if isinstance(r,dict) and type(r.get("start_second")) in (int,float) and type(r.get("end_second")) in (int,float) and segment["start"] <= r["start_second"] < r["end_second"] <= segment["end"] + 1e-6:
                         control_rows.append(r)
@@ -220,6 +230,8 @@ def action_report(db, match, *, run=None):
     result["tactical_timeline"] = tactical_timeline(counted)
     result["pass_ledger"] = pass_ledger(counted)
     result["ball_control"] = control_report(control_rows)
+    result["lineup_exposure"] = lineup_report(lineup_rows)
+    result["lineup_performance"] = analyze_performance(counted,result["lineup_exposure"])
     result["families"] = [{"key": key, "label": label, "observations": visibility[key]} for key, label in FAMILIES.items()]
     return result
 
