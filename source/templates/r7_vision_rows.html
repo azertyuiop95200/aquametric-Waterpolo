@@ -41,6 +41,13 @@
 {% set m=r.metric_review %}
 <h3>Fenêtre métrique R7 #{{r.id}} — période {{m.period}}</h3>
 <p>Scan #{{m.scan_id}} · {{m.aligned_frames}}/{{m.requested_frames}} images alignées. Positions et identités revues, projection estimative sur le plan de l'eau, cadence nominale non validée par PTS. La source a été vérifiée au calcul, pas à la lecture. Cette fenêtre n'est pas ajoutée aux totaux existants.</p>
+{% if m.calibration_mode is defined and m.calibration_mode=='multi_reference_consensus' %}
+<p>Calibration dynamique : {{m.reference_details|length}} références, au moins deux projections concordantes par position (seuil expérimental {{m.consensus_tolerance_m}} m). {{m.projection_quality|selectattr('accepted')|list|length}}/{{m.projection_quality|length}} positions acceptées. L'accord entre modèles ne valide pas la précision réelle en mètres.</p>
+<details><summary>Qualité des projections par position</summary>
+<table class="metric-table"><thead><tr><th>Piste</th><th>Image</th><th>Références concordantes</th><th>Écart maximal estimé (m)</th><th>État</th></tr></thead><tbody>
+{% for q in m.projection_quality %}<tr><td>{{q.track_id}}</td><td>{{q.frame}}</td><td>{{q.support if q.accepted else '—'}}</td><td>{{'%.3f'|format(q.spread_m) if q.spread_m is not none else '—'}}</td><td>{{'Acceptée' if q.accepted else 'Non exploitable'}}</td></tr>{% endfor %}
+</tbody></table></details>
+{% endif %}
 <table class="metric-table"><thead><tr><th>Joueuse</th><th>Piste</th><th>Points projetés</th><th>Durée observée (s)</th><th>Distance estimée (m)</th><th>Vitesse moyenne estimée (m/s)</th><th>Temps de jeu</th></tr></thead><tbody>
 {% for p in m.players %}<tr><td>{{p.identity.side}} · bonnet {{p.identity.cap_number}}</td><td>{{p.track_id}}</td><td>{{p.projected_points}}/{{p.requested_points}}</td><td>{{'%.3f'|format(p.metrics.observed_s)}}</td><td>{{'%.2f'|format(p.metrics.distance_m) if p.metrics.distance_m is not none else 'Non mesuré'}}</td><td>{{'%.2f'|format(p.metrics.mean_speed_mps) if p.metrics.mean_speed_mps is not none else 'Non mesuré'}}</td><td>Non mesuré</td></tr>{% endfor %}
 </tbody></table>
