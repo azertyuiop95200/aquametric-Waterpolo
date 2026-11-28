@@ -56,7 +56,7 @@ def run_progress(db, match, *, run=None):
 
 def _action_family(kind):
     if kind in {"goal", "shot_on_target", "shot_off_target", "shot_blocked", "shot_unknown"}: return "shot"
-    if kind in {"assist", "key_pass", "pass_complete", "bad_pass"}: return "pass"
+    if kind in {"assist", "key_pass", "pass_complete", "bad_pass", "pass_unknown"}: return "pass"
     if kind in {"touch", "centre_touch"}: return "touch"
     return kind
 
@@ -64,7 +64,7 @@ def _action_family(kind):
 def canonical_actions(actions):
     """Prevent counting goal+shot and assist+pass for the same visible action."""
     priorities = {"goal": 4, "shot_on_target": 3, "shot_off_target": 2, "shot_blocked": 2, "shot_unknown": -1, "assist": 4, "key_pass": 3,
-                  "pass_complete": 2, "centre_touch": 2}
+                  "pass_complete": 2, "pass_unknown": -1, "centre_touch": 2}
     result = []
     for action in sorted(actions, key=lambda row: (row["second"], -priorities.get(row["event_type"], 0))):
         family = _action_family(action["event_type"])
@@ -77,8 +77,9 @@ def canonical_actions(actions):
             # Contradictory outcomes are not resolved by taking the higher
             # confidence score. Keep the observation in the ledger for review.
             types = {duplicate["event_type"], action["event_type"]}
-            compatible = types <= {"goal", "shot_on_target"} or types <= {"assist", "key_pass", "pass_complete"} or types <= {"touch", "centre_touch"} or len(types) == 1 or ("shot_unknown" in types and family == "shot")
-            if not compatible or duplicate.get("conflict"):
+            compatible = types <= {"goal", "shot_on_target"} or types <= {"assist", "key_pass", "pass_complete"} or types <= {"touch", "centre_touch"} or len(types) == 1 or ("shot_unknown" in types and family == "shot") or ("pass_unknown" in types and family == "pass")
+            receiver_conflict = family == "pass" and duplicate.get("receiver_cap_number") is not None and action.get("receiver_cap_number") is not None and duplicate["receiver_cap_number"] != action["receiver_cap_number"]
+            if not compatible or duplicate.get("conflict") or receiver_conflict:
                 duplicate["counted"] = False
                 duplicate["conflict"] = "Issues contradictoires dans les détections de la même action."
                 action["counted"] = False
@@ -135,7 +136,7 @@ def bounded_possessions(actions):
                 shots = [a for a in observed if a["event_type"] in {"goal", "shot_on_target", "shot_off_target", "shot_blocked", "shot_unknown"}]
                 intervals.append({"start_second": start["second"], "end_second": action["second"],
                                   "video_duration_seconds": round(action["second"] - start["second"], 3),
-                                  "passes": sum(a["event_type"] in {"assist","key_pass","pass_complete","bad_pass"} for a in observed),
+                                  "passes": sum(a["event_type"] in {"assist","key_pass","pass_complete","bad_pass","pass_unknown"} for a in observed),
                                   "shots": len(shots), "goals": sum(a["event_type"] == "goal" for a in shots),
                                   "outcome": action.get("possession_outcome", "unknown"),
                                   "first_shot_after_seconds": round(shots[0]["second"] - start["second"], 3) if shots else None})
@@ -163,8 +164,13 @@ def action_report(db, match, *, run=None):
               "physical": [{"metric": key, "label": AUTO_LABELS.get(key, key), "value": None, "reason": value} for key, value in PHYSICAL_LIMITS.items()],
               "families": [], "scope": "automatic_detections", "model": run.model if run else "",
               "note": "Statistiques calculées sur les actions détectées automatiquement, sans validation humaine. Les zéros signifient aucune détection dans cet échantillon. Les images manquantes, actions masquées ou bonnets illisibles peuvent modifier les totaux. La couverture traitée ne mesure pas la précision du modèle."}
+    from services.pass_ledger import pass_ledger
+    from services.ball_control import control_report
+    result["pass_ledger"] = pass_ledger([])
+    result["ball_control"] = control_report([])
     if not run:
         return result
+    control_rows = []
     segments = json.loads(run.segments_json or "[]")
     rows = []
     visibility = defaultdict(list)
@@ -174,6 +180,9 @@ def action_report(db, match, *, run=None):
         if segment["status"] == "complete":
             if payload.get("scene") in {"water_polo", "mixed"}:
                 processed_intervals.append((segment["start"], segment["end"]))
+                for r in payload.get("ball_control", []):
+                    if isinstance(r,dict) and type(r.get("start_second")) in (int,float) and type(r.get("end_second")) in (int,float) and segment["start"] <= r["start_second"] < r["end_second"] <= segment["end"] + 1e-6:
+                        control_rows.append(r)
             for action in payload.get("actions", []):
                 rows.append({**action, "counted": action["confidence"] >= .65 and payload.get("scene") in {"water_polo","mixed"} and not action.get("is_replay")})
             for item in payload.get("observability", []):
@@ -209,6 +218,8 @@ def action_report(db, match, *, run=None):
                                   "report": summarize_actions(actions), "event_keys": [a["key"] for a in actions]})
     from services.tactical_timeline import tactical_timeline
     result["tactical_timeline"] = tactical_timeline(counted)
+    result["pass_ledger"] = pass_ledger(counted)
+    result["ball_control"] = control_report(control_rows)
     result["families"] = [{"key": key, "label": label, "observations": visibility[key]} for key, label in FAMILIES.items()]
     return result
 
