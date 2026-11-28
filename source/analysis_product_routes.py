@@ -659,3 +659,76 @@ def save_collective_review(
         raise HTTPException(422,str(exc) if isinstance(exc,ValueError) else "Revue collective invalide.") from None
     finally:
         _METRIC_SLOT.release()
+
+
+def _r7_local_source(db,match,segment_id):
+    from models import MatchVideoSegment
+    segment=db.get(MatchVideoSegment,segment_id) if segment_id is not None else None
+    if segment_id is not None and (segment is None or segment.match_id!=match.id):
+        raise HTTPException(404,"Partie introuvable.")
+    kind=segment.source_type if segment else match.video_source
+    name=segment.video_path if segment else match.video_path
+    if kind!="upload" or not name:raise HTTPException(400,"Une vidéo locale est nécessaire.")
+    path=UPLOAD_DIR / Path(name).name
+    if not path.is_file():raise HTTPException(404,"Vidéo locale absente.")
+    return segment,path
+
+@router.post("/matches/{match_id}/analysis/r7-scan")
+def r7_scan(match_id:int,request:Request,start_frame:int=Form(0),frame_count:int=Form(25),
+            tracking_mode:str=Form("head_flow"),segment_id:int|None=Form(None),db:Session=Depends(get_db)):
+    from services.local_clip_scan import scan_clip
+    from services.vision_scan_evidence import save_scan
+    _,match=_owned_match(match_id,request,db)
+    if request.session.get("web_demo"):raise HTTPException(403,"Le scan expérimental est réservé au compte propriétaire connecté.")
+    segment,path=_r7_local_source(db,match,segment_id)
+    if not _METRIC_SLOT.acquire(blocking=False):raise HTTPException(429,"Un calcul est déjà en cours.")
+    try:
+        result=scan_clip(path,start_frame,frame_count,tracking_mode=tracking_mode)
+        save_scan(db,match,segment,"tracklets",result,path)
+    except (ValueError,OSError) as exc:raise HTTPException(422,str(exc)) from exc
+    finally:_METRIC_SLOT.release()
+    return RedirectResponse(f"/matches/{match_id}/analysis/result#visionR7",status_code=303)
+
+@router.post("/matches/{match_id}/analysis/r7-packet")
+def r7_packet(match_id:int,request:Request,frame_index:int=Form(...),budget:int=Form(3),
+              segment_id:int|None=Form(None),db:Session=Depends(get_db)):
+    from services.r7_review_pipeline import packet_from_video
+    from services.vision_scan_evidence import save_scan
+    _,match=_owned_match(match_id,request,db)
+    if request.session.get("web_demo"):raise HTTPException(403,"Compte propriétaire connecté requis.")
+    segment,path=_r7_local_source(db,match,segment_id)
+    weights=os.getenv("AQUAMETRIC_R7_PRIVATE_WEIGHTS","")
+    if not weights:raise HTTPException(409,"Poids privés R7 non configurés sur ce serveur.")
+    if not _METRIC_SLOT.acquire(blocking=False):raise HTTPException(429,"Un calcul est déjà en cours.")
+    try:
+        result=packet_from_video(path,frame_index,weights,budget=budget)
+        row=save_scan(db,match,segment,"r7_review",result,path)
+        return {"scan_id":row.id,"packet":result["packet"]}
+    except (ValueError,OSError,KeyError,TypeError) as exc:raise HTTPException(422,"Impossible de créer le paquet R7 : vérifier source, fenêtre et modèle.") from exc
+    finally:_METRIC_SLOT.release()
+
+@router.post("/matches/{match_id}/analysis/r7-review/{scan_id}")
+def r7_review(match_id:int,scan_id:int,request:Request,payload:dict,db:Session=Depends(get_db)):
+    from models import VisionScanEvidence
+    from services.vision_scan_evidence import read_scan,save_scan,source_binding
+    from services.candidate_review import validate_response
+    from services.r7_review_pipeline import file_hash
+    _,match=_owned_match(match_id,request,db)
+    if request.session.get("web_demo"):raise HTTPException(403,"Compte propriétaire connecté requis.")
+    row=db.get(VisionScanEvidence,scan_id)
+    if not row or row.match_id!=match.id or row.kind!="r7_review":raise HTTPException(404,"Paquet introuvable.")
+    segment,path=_r7_local_source(db,match,row.segment_id)
+    if row.source_binding!=source_binding(match,segment):raise HTTPException(409,"Source modifiée.")
+    if not _METRIC_SLOT.acquire(blocking=False):raise HTTPException(429,"Un calcul est déjà en cours.")
+    try:
+        packet=read_scan(row)["result"]["packet"]
+        if file_hash(path)!=packet["source_sha256"]:raise HTTPException(409,"Empreinte vidéo modifiée.")
+        reviewed=validate_response(packet,payload)
+        # Session owner authenticated; labels still are not independently validated.
+        result=dict(engine="head-candidate-review-v1",review=reviewed,packet_scan_id=scan_id,
+                    frame_index=packet["source_frame_index"],statistical_use_allowed=False,
+                    identity_verified=False,metrics_validated=False,pts_validated=False)
+        saved=save_scan(db,match,segment,"r7_decision",result,path)
+        return {"scan_id":saved.id,"review":reviewed}
+    except (ValueError,OSError,KeyError,TypeError) as exc:raise HTTPException(422,"Revue R7 invalide.") from exc
+    finally:_METRIC_SLOT.release()
