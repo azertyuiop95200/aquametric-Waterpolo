@@ -64,7 +64,7 @@ def report(db,match):
             r=read_scan(row)["result"]
             frames=r.get("frames",[])
             rows.append({"id":row.id,"segment_id":row.segment_id,"period":segment.period if segment else None,
-                "kind":row.kind,"engine":r.get("engine"),"mode":r.get("tracking_mode"),
+                "kind":row.kind,"engine":r.get("engine"),"mode":r.get("tracking_mode"),"scan_status":r.get("scan_status","completed"),
                 "first_frame":r.get("first_frame",r.get("frame_index")),
                 "end_frame_exclusive":r.get("end_frame_exclusive"),
                 "sampled_frames":len(frames) if row.kind=="tracklets" else None,
@@ -73,7 +73,7 @@ def report(db,match):
                 "digest":row.digest,"candidate_count":len(r.get("packet",{}).get("candidates",[])) if row.kind=="r7_review" else None,
                 "review_counts":r.get("review",{}).get("counts"),"unreviewed":r.get("review",{}).get("unreviewed"),"packet_sha256":r.get("packet",{}).get("packet_sha256") or r.get("review",{}).get("packet_sha256"),"source_bytes_verified":False})
         except (ValueError,TypeError,KeyError,AttributeError):stale+=1
-    return {"status":"experimental_partial" if rows else "unavailable","rows":rows,"stale_count":stale,
+    return {"status":"experimental_partial" if any(r["scan_status"]=="completed" for r in rows) else "unavailable","rows":rows,"stale_count":stale,
         "scope":"per_window_not_unique_athletes","source_binding":"metadata_only_not_video_hash",
         "identity_verified":False,"metrics_validated":False,"statistical_use_allowed":False}
 
