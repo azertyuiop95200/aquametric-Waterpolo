@@ -31,6 +31,7 @@ jobs:
           python -m unittest discover -s tests -p test_guest_full_policy.py -v
           python -m unittest discover -s tests -p test_elite_performance.py -v
           python -m unittest discover -s tests -p test_r7_candidate_review.py -v
+          python -m unittest discover -s tests -p test_r7_link_review.py -v
       - working-directory: source
         env:
           PYTHONPATH: .:tests
