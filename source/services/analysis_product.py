@@ -427,6 +427,8 @@ def analysis_snapshot(db, match):
         snapshot["spatial_3d"]={"status":"invalid","context":None,"rows":[],"reason":"Simulation 3D incohérente."}
     from services.recognition_quality import audit
     snapshot["recognition_quality"] = audit(snapshot["automatic"], snapshot["video_actions"])
+    from services.vision_scan_evidence import report as vision_scan_report
+    snapshot["vision_scan_evidence"] = vision_scan_report(db, match)
     # Basic counters over an empty event set are implementation zeros, not
     # measured match statistics. Apply the same contract to JSON/CSV and HTML.
     for side in ("team", "opponent"):
@@ -450,6 +452,9 @@ def run_product_analysis(db, match, upload_dir: Path, evidence_dir: Path, *, inc
             visual_samples=180, ocr_samples=48,
         )
         build_exact_evidence_pack(db, match, upload_dir, evidence_dir)
+        # Bounded initial scan, not whole-match coverage. Never promotes candidates.
+        from services.r7_initial_scan import initial_scan
+        initial_scan(db, match, source_path)
         return result
 
     if match.video_url:
@@ -554,6 +559,17 @@ def build_analysis_zip(db, match, evidence_dir: Path) -> io.BytesIO:
                         and row.get("file_path") and (Path(evidence_dir) / Path(row["file_path"]).name).is_file()]
         archive.writestr(f"{root}/01_report/report.html", _html_report(match, snapshot, export_media))
         archive.writestr(f"{root}/01_report/analysis.json", json.dumps(snapshot, ensure_ascii=False, indent=2, default=str))
+        from services.vision_scan_evidence import export_scans
+        for record in export_scans(db,match,snapshot["vision_scan_evidence"]):
+            archive.writestr(f"{root}/05_evidence/vision_scans/scan_{record['id']}.json",json.dumps(record,ensure_ascii=False,indent=2,allow_nan=False))
+        archive.writestr(f"{root}/05_evidence/r7_reviewed_window_metrics.csv", _csv_text(
+            ["review_id","scan_id","segment_id","period","side","cap_number","track_id","requested_points","projected_points","observed_s","distance_m","mean_speed_mps","playing_seconds","scope","time_basis"], [
+            dict(review_id=r["id"],scan_id=m["scan_id"],segment_id=r["segment_id"],period=m["period"],
+                 side=p["identity"]["side"],cap_number=p["identity"]["cap_number"],track_id=p["track_id"],
+                 requested_points=p["requested_points"],projected_points=p["projected_points"],
+                 observed_s=p["metrics"]["observed_s"],distance_m=p["metrics"]["distance_m"],
+                 mean_speed_mps=p["metrics"]["mean_speed_mps"],playing_seconds=None,scope=m["scope"],time_basis=m["time_basis"])
+            for r in snapshot["vision_scan_evidence"]["rows"] if (m:=r.get("metric_review")) is not None for p in m["players"]]))
         from services.measurement_report import flatten_measurements
         auto_report = snapshot["video_actions"]
         archive.writestr(f"{root}/03_events/automatic_video_actions.csv", _csv_text(

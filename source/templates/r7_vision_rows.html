@@ -1,0 +1,41 @@
+{% if snapshot.vision_scan_evidence is defined %}
+{% set v=snapshot.vision_scan_evidence %}
+<section class="report-card section-wide" id="visionR7">
+<h2>Annexe technique — suivi et revues R7</h2>
+<p>Propositions expérimentales par fenêtre, pas un nombre de joueuses ni des événements sportifs confirmés. Les scans bruts restent des pistes anonymes en coordonnées image. Seules les fenêtres explicitement revues ci-dessous donnent des estimations métriques ; aucune horloge de jeu ou précision réelle n'est déduite. La première fenêtre automatique est limitée à 25 images source ; les fenêtres peuvent se recouvrir. Liaison courante par métadonnées, pas vérification des octets à la lecture du rapport.</p>
+{% if v.rows %}
+<table class="metric-table"><thead><tr><th>Fenêtre / revue</th><th>Partie / période</th><th>Mode</th><th>Indices source</th><th>Images traitées</th><th>Pistes / ≥3 points</th><th>Revue de propositions</th></tr></thead><tbody>
+{% for r in v.rows %}<tr><td>#{{r.id}} · {{r.kind}}{% if r.scan_status=='failed' %} — échec de décodage ou scan{% endif %}</td><td>{{r.segment_id if r.segment_id is not none else 'Source principale'}} / {{r.period if r.period is not none else 'Non établie'}}</td><td>{{r.mode or r.engine or 'Non disponible'}}</td><td>{{r.first_frame if r.first_frame is not none else '—'}}–{{r.end_frame_exclusive if r.end_frame_exclusive is not none else '—'}} (fin exclue)</td><td>{{r.sampled_frames if r.sampled_frames is not none else '—'}}</td><td>{{r.tracklets if r.tracklets is not none else '—'}} / {{r.tracklets_at_least_3 if r.tracklets_at_least_3 is not none else '—'}}</td><td>{% if r.review_counts is not none %}{{r.review_counts.head_present}} têtes proposées retenues · {{r.review_counts.not_head}} parasites · {{r.review_counts.uncertain}} incertaines · {{r.unreviewed}} non revues. Étiquettes non validées indépendamment.{% elif r.candidate_count is not none %}{{r.candidate_count}} propositions supplémentaires à revoir{% else %}—{% endif %}</td></tr>{% endfor %}
+</tbody></table>
+<p>Les réponses successives sont des versions de revue, pas des totaux additionnables. Preuves détaillées par fenêtre dans le ZIP privé (vision_scans).</p>
+{% else %}<p>Non mesuré : aucune fenêtre de suivi R7 enregistrée.</p>{% endif %}
+{% for r in v.rows if r.fragment_link_review is defined and r.fragment_link_review is not none %}
+<details><summary>Scan #{{r.id}} — {{r.fragment_link_review.links|length}} raccordements candidats de fragments</summary>
+<p>Raccordements proposés par flux optique réciproque, sans interpolation, ni attribution automatique à une joueuse. À revoir visuellement ; ils ne changent pas les trajectoires métriques.</p>
+{% if r.fragment_link_review.links %}
+<table class="metric-table"><thead><tr><th>Piste précédente</th><th>Piste suivante</th><th>Temps vidéo nominal (s)</th><th>Échantillons manquants</th><th>Écarts optiques aller / retour (px)</th></tr></thead><tbody>
+{% for e in r.fragment_link_review.links %}<tr><td>{{e.from_track_id}}</td><td>{{e.to_track_id}}</td><td>{{e.from_second}} → {{e.to_second}}</td><td>{{e.missing_samples}}</td><td>{{e.forward_error_px}} / {{e.reverse_error_px}}</td></tr>{% endfor %}
+</tbody></table>
+{% else %}<p>Aucun raccordement admissible proposé.</p>{% endif %}
+</details>
+{% endfor %}
+{% for r in v.rows if r.metric_review is not none %}
+{% set m=r.metric_review %}
+<h3>Fenêtre métrique R7 #{{r.id}} — période {{m.period}}</h3>
+<p>Scan #{{m.scan_id}} · {{m.aligned_frames}}/{{m.requested_frames}} images alignées. Positions et identités revues, projection estimative sur le plan de l'eau, cadence nominale non validée par PTS. La source a été vérifiée au calcul, pas à la lecture. Cette fenêtre n'est pas ajoutée aux totaux existants.</p>
+<table class="metric-table"><thead><tr><th>Joueuse</th><th>Piste</th><th>Points projetés</th><th>Durée observée (s)</th><th>Distance estimée (m)</th><th>Vitesse moyenne estimée (m/s)</th><th>Temps de jeu</th></tr></thead><tbody>
+{% for p in m.players %}<tr><td>{{p.identity.side}} · bonnet {{p.identity.cap_number}}</td><td>{{p.track_id}}</td><td>{{p.projected_points}}/{{p.requested_points}}</td><td>{{'%.3f'|format(p.metrics.observed_s)}}</td><td>{{'%.2f'|format(p.metrics.distance_m) if p.metrics.distance_m is not none else 'Non mesuré'}}</td><td>{{'%.2f'|format(p.metrics.mean_speed_mps) if p.metrics.mean_speed_mps is not none else 'Non mesuré'}}</td><td>Non mesuré</td></tr>{% endfor %}
+</tbody></table>
+{% for p in m.players if p.occupation is not none %}
+<figure><figcaption>Occupation observée — {{p.identity.side}} · bonnet {{p.identity.cap_number}} (fenêtre uniquement)</figcaption>
+<svg viewBox="0 0 {{m.length_m}} {{m.width_m}}" role="img" aria-label="Carte métrique de la fenêtre revue" style="width:100%;max-width:480px;background:#dcecf4;border:1px solid #54778a">
+{% for c in p.occupation.cells %}<rect x="{{c.x}}" y="{{c.y}}" width="{{c.w}}" height="{{c.h}}" fill="#e47722" opacity="{{c.opacity}}"/>{% endfor %}
+<path d="M{{m.length_m/2}} 0 V{{m.width_m}}" stroke="#54778a" stroke-width=".08"/>
+<path d="M0 {{m.width_m/2-1.5}} V{{m.width_m/2+1.5}} M{{m.length_m}} {{m.width_m/2-1.5}} V{{m.width_m/2+1.5}}" stroke="#203c51" stroke-width=".22"/>
+{% for seg in p.segments %}<polyline points="{% for q in seg %}{{q.x_m}},{{q.y_m}} {% endfor %}" fill="none" stroke="#154878" stroke-width=".12"/>{% endfor %}
+</svg><p><small>Orange : densité du temps observé ; bleu : trajectoire estimée. Pas une carte du match entier.</small></p></figure>
+{% endfor %}
+{% endfor %}
+{% if v.stale_count %}<p>{{v.stale_count}} enregistrement(s) périmé(s) ou incohérent(s) exclu(s).</p>{% endif %}
+</section>
+{% endif %}

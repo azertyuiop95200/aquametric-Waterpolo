@@ -1,0 +1,33 @@
+{% if snapshot.vision_scan_evidence is defined and match.video_source=='upload' %}
+<details class="report-card section-wide"><summary>Contrôler le suivi R7 sur une fenêtre vidéo (expérimental)</summary>
+<p>Compte propriétaire connecté requis. Les résultats restent des pistes candidates, non des mesures sportives. Les indices sont locaux au fichier principal. Le raccordement propose des liens à vérifier, sans fusionner les pistes ; réduire la fenêtre pour les vidéos haute résolution.</p>
+<form action="/matches/{{match.id}}/analysis/r7-scan" method="post">
+<label>Image de départ <input type="number" name="start_frame" min="0" value="0" required></label>
+<label>Nombre d'images source <input type="number" name="frame_count" min="1" max="75" value="25" required></label>
+<label>Suivi <select name="tracking_mode"><option value="head_flow">Têtes et flux optique R7</option><option value="head_flow_links">Têtes R7 + propositions de raccordement des fragments</option><option value="baseline">Couleur : têtes et ballon candidats</option></select></label>
+<button type="submit">Analyser la fenêtre</button>
+</form>
+<p>Revue HOG temporelle : disponible via API propriétaire lorsque les poids privés sont configurés sur le serveur. Elle n'est pas activée par défaut ; aucune identité n'est déduite.</p>
+{% set scans=snapshot.vision_scan_evidence.rows|selectattr('kind','equalto','tracklets')|selectattr('scan_status','equalto','completed')|list %}
+{% if scans %}
+<h3>Revue métrique d'une fenêtre</h3>
+<p>Inspecter les positions et identités sur la vidéo avant validation. Les fichiers de preuve fournissent les indices, les pistes et les coordonnées normalisées. Les anciens scans sans empreinte vidéo doivent être refaits.</p>
+{% for s in scans %}<p><a href="/matches/{{match.id}}/analysis/r7-evidence/{{s.id}}">Preuve du scan #{{s.id}} (JSON privé)</a></p>{% endfor %}
+<form action="/matches/{{match.id}}/analysis/r7-metric-form" method="post">
+<label>Scan <select name="scan_ref" required>{% for s in scans %}<option value="{{s.id}}:{{s.digest}}">#{{s.id}} — images {{s.first_frame}} à {{s.end_frame_exclusive}} (fin exclue)</option>{% endfor %}</select></label>
+<label>Période <input name="period" type="number" min="1" max="8" value="1" required></label>
+<label>Image de référence échantillonnée <input name="reference_frame" type="number" min="0" required></label>
+<label>Longueur vérifiée (m) <input name="length_m" type="number" min="15" max="30" step=".1" required></label>
+<label>Largeur vérifiée (m) <input name="width_m" type="number" min="12.5" max="20" step=".1" required></label>
+<p>Coordonnées image normalisées de 0 à 1. Repères dans l'ordre : deux poteaux (y négatif puis positif dans le repère du bassin), coin côté positif, repères latéraux 2 m et 6 m. Polygone du décor fixe pour compenser la caméra ; ne pas inclure les joueuses ni l'eau mobile.</p>
+<label>Cinq repères (JSON) <textarea name="anchors_json" required placeholder="[[x,y],[x,y],[x,y],[x,y],[x,y]]"></textarea></label>
+<label>Polygone décor (JSON) <textarea name="polygon_json" required placeholder="[[x,y],[x,y],[x,y],...]"></textarea></label>
+<label>Pistes revues (JSON) <textarea name="tracks_json" required placeholder='[{"track_id":1,"side":"for","cap_number":2,"colour":"white","evidence":"Justification visuelle"}]'></textarea></label>
+<label><input name="all_points_reviewed" type="checkbox" value="true" required> Toutes les positions et les identités sélectionnées sont revues</label>
+<label><input name="calibration_reviewed" type="checkbox" value="true" required> Les dimensions, les repères et le décor sont revus</label>
+<label><input name="nominal_time_acknowledged" type="checkbox" value="true" required> J'accepte une estimation par cadence nominale (pas un temps de jeu vérifié)</label>
+<button type="submit">Calculer la fenêtre revue</button>
+</form>
+{% endif %}
+</details>
+{% endif %}
