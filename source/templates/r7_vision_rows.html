@@ -1,0 +1,14 @@
+{% if snapshot.vision_scan_evidence is defined %}
+{% set v=snapshot.vision_scan_evidence %}
+<section class="report-card section-wide" id="visionR7">
+<h2>Annexe technique — suivi et revues R7</h2>
+<p>Propositions expérimentales par fenêtre, pas un nombre de joueuses ni des événements sportifs confirmés. Pistes anonymes en coordonnées image ; aucune calibration, identité, horloge de jeu ou précision réelle déduite. La première fenêtre automatique est limitée à 25 images source ; les fenêtres peuvent se recouvrir. Liaison courante par métadonnées, pas vérification des octets à la lecture du rapport.</p>
+{% if v.rows %}
+<table class="metric-table"><thead><tr><th>Fenêtre / revue</th><th>Partie / période</th><th>Mode</th><th>Indices source</th><th>Images traitées</th><th>Pistes / ≥3 points</th><th>Revue de propositions</th></tr></thead><tbody>
+{% for r in v.rows %}<tr><td>#{{r.id}} · {{r.kind}}{% if r.scan_status=='failed' %} — échec de décodage ou scan{% endif %}</td><td>{{r.segment_id if r.segment_id is not none else 'Source principale'}} / {{r.period if r.period is not none else 'Non établie'}}</td><td>{{r.mode or r.engine or 'Non disponible'}}</td><td>{{r.first_frame if r.first_frame is not none else '—'}}–{{r.end_frame_exclusive if r.end_frame_exclusive is not none else '—'}} (fin exclue)</td><td>{{r.sampled_frames if r.sampled_frames is not none else '—'}}</td><td>{{r.tracklets if r.tracklets is not none else '—'}} / {{r.tracklets_at_least_3 if r.tracklets_at_least_3 is not none else '—'}}</td><td>{% if r.review_counts is not none %}{{r.review_counts.head_present}} têtes proposées retenues · {{r.review_counts.not_head}} parasites · {{r.review_counts.uncertain}} incertaines · {{r.unreviewed}} non revues. Étiquettes non validées indépendamment.{% elif r.candidate_count is not none %}{{r.candidate_count}} propositions supplémentaires à revoir{% else %}—{% endif %}</td></tr>{% endfor %}
+</tbody></table>
+<p>Les réponses successives sont des versions de revue, pas des totaux additionnables. Preuves détaillées par fenêtre dans le ZIP privé (vision_scans).</p>
+{% else %}<p>Non mesuré : aucune fenêtre de suivi R7 enregistrée.</p>{% endif %}
+{% if v.stale_count %}<p>{{v.stale_count}} enregistrement(s) périmé(s) ou incohérent(s) exclu(s).</p>{% endif %}
+</section>
+{% endif %}
