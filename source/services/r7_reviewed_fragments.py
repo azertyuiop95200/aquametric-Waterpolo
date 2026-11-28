@@ -2,7 +2,9 @@
 from math import isfinite
 
 def fragment_ids(item,scan,by_id,fps):
+    if not isinstance(item,dict):raise ValueError("Identité invalide.")
     first=item.get("track_id")
+    if type(first) is not int:raise ValueError("Identifiant de piste invalide.")
     ids=item.get("fragment_track_ids",[first])
     if not isinstance(ids,list) or not 1<=len(ids)<=4 or any(type(k) is not int for k in ids):
         raise ValueError("Une à quatre pistes par identité.")
@@ -15,7 +17,7 @@ def fragment_ids(item,scan,by_id,fps):
     if not isinstance(evidence,str) or not 3<=len(evidence.strip())<=300:
         raise ValueError("Justification des raccordements requise.")
     review=scan.get("fragment_link_review",{})
-    if review.get("engine")!="r7-fragment-links-v1" or review.get("statistical_use_allowed") is not False:
+    if not isinstance(review,dict) or review.get("engine")!="r7-fragment-links-v1" or review.get("statistical_use_allowed") is not False:
         raise ValueError("Scan avec propositions de raccordement requis.")
     cuts=[f["source_frame_index"] for f in scan["frames"] if f.get("scene_reset") is True]
     for a,b in zip(ids,ids[1:]):
