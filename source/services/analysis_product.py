@@ -562,6 +562,14 @@ def build_analysis_zip(db, match, evidence_dir: Path) -> io.BytesIO:
         from services.vision_scan_evidence import export_scans
         for record in export_scans(db,match,snapshot["vision_scan_evidence"]):
             archive.writestr(f"{root}/05_evidence/vision_scans/scan_{record['id']}.json",json.dumps(record,ensure_ascii=False,indent=2,allow_nan=False))
+        archive.writestr(f"{root}/05_evidence/r7_reviewed_window_metrics.csv", _csv_text(
+            ["review_id","scan_id","segment_id","period","side","cap_number","track_id","requested_points","projected_points","observed_s","distance_m","mean_speed_mps","playing_seconds","scope","time_basis"], [
+            dict(review_id=r["id"],scan_id=m["scan_id"],segment_id=r["segment_id"],period=m["period"],
+                 side=p["identity"]["side"],cap_number=p["identity"]["cap_number"],track_id=p["track_id"],
+                 requested_points=p["requested_points"],projected_points=p["projected_points"],
+                 observed_s=p["metrics"]["observed_s"],distance_m=p["metrics"]["distance_m"],
+                 mean_speed_mps=p["metrics"]["mean_speed_mps"],playing_seconds=None,scope=m["scope"],time_basis=m["time_basis"])
+            for r in snapshot["vision_scan_evidence"]["rows"] if (m:=r.get("metric_review")) is not None for p in m["players"]]))
         from services.measurement_report import flatten_measurements
         auto_report = snapshot["video_actions"]
         archive.writestr(f"{root}/03_events/automatic_video_actions.csv", _csv_text(
