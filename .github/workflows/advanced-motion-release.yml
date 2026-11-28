@@ -14,7 +14,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: pip install jinja2 fastapi sqlalchemy pytest pydantic opencv-python-headless numpy
+      - run: pip install jinja2 fastapi sqlalchemy pytest pydantic 'opencv-python-headless>=4.10,<5' numpy
       - run: python -m compileall -q source
       - working-directory: source
         env:
@@ -30,6 +30,7 @@ jobs:
           python -m unittest discover -s tests -p test_metric_field.py -v
           python -m unittest discover -s tests -p test_guest_full_policy.py -v
           python -m unittest discover -s tests -p test_elite_performance.py -v
+          python -m unittest discover -s tests -p test_r7_candidate_review.py -v
       - working-directory: source
         env:
           PYTHONPATH: .:tests
@@ -91,16 +92,18 @@ jobs:
           DATABASE_URL: 'sqlite://'
           AQUAMETRIC_VIDEO_ACTIONS: '0'
           PYTHONPATH: ..:.
-        run: python -m unittest discover -s tests -p test_calibrated_http_review.py -v
+        run: |
+          python -m unittest discover -s tests -p test_calibrated_http_review.py -v
+          python -m unittest discover -s tests -p test_r7_http.py -v
 
-  live-release-seven:
+  live-release-eight:
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
-      - name: Verify live release seven and isolated guest report
+      - name: Verify live release eight and isolated guest report
         env:
           BASE: https://aquametric-ultimate-guest.onrender.com
-          EXPECTED: c30f26211112056660c7553452ed746a141c39d8
+          EXPECTED: c6ee727786928332176a0e6d75a7e09a7932248a
         run: |
           set -euo pipefail
           tmp=$(mktemp -d)
