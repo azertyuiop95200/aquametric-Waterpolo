@@ -95,6 +95,7 @@ jobs:
         run: |
           python -m unittest discover -s tests -p test_calibrated_http_review.py -v
           python -m unittest discover -s tests -p test_r7_http.py -v
+          python -m unittest discover -s tests -p test_r7_metric_review.py -v
 
   live-release-eight:
     runs-on: ubuntu-latest
