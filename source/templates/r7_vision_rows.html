@@ -9,6 +9,16 @@
 </tbody></table>
 <p>Les réponses successives sont des versions de revue, pas des totaux additionnables. Preuves détaillées par fenêtre dans le ZIP privé (vision_scans).</p>
 {% else %}<p>Non mesuré : aucune fenêtre de suivi R7 enregistrée.</p>{% endif %}
+{% for r in v.rows if r.fragment_link_review is defined and r.fragment_link_review is not none %}
+<details><summary>Scan #{{r.id}} — {{r.fragment_link_review.links|length}} raccordements candidats de fragments</summary>
+<p>Raccordements proposés par flux optique réciproque, sans interpolation, ni attribution automatique à une joueuse. À revoir visuellement ; ils ne changent pas les trajectoires métriques.</p>
+{% if r.fragment_link_review.links %}
+<table class="metric-table"><thead><tr><th>Piste précédente</th><th>Piste suivante</th><th>Temps vidéo nominal (s)</th><th>Échantillons manquants</th><th>Écarts optiques aller / retour (px)</th></tr></thead><tbody>
+{% for e in r.fragment_link_review.links %}<tr><td>{{e.from_track_id}}</td><td>{{e.to_track_id}}</td><td>{{e.from_second}} → {{e.to_second}}</td><td>{{e.missing_samples}}</td><td>{{e.forward_error_px}} / {{e.reverse_error_px}}</td></tr>{% endfor %}
+</tbody></table>
+{% else %}<p>Aucun raccordement admissible proposé.</p>{% endif %}
+</details>
+{% endfor %}
 {% for r in v.rows if r.metric_review is not none %}
 {% set m=r.metric_review %}
 <h3>Fenêtre métrique R7 #{{r.id}} — période {{m.period}}</h3>
