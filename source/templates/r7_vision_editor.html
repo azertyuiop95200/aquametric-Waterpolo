@@ -1,10 +1,10 @@
 {% if snapshot.vision_scan_evidence is defined and match.video_source=='upload' %}
 <details class="report-card section-wide"><summary>Contrôler le suivi R7 sur une fenêtre vidéo (expérimental)</summary>
-<p>Compte propriétaire connecté requis. Les résultats restent des pistes candidates, non des mesures sportives. Les indices sont locaux au fichier principal.</p>
+<p>Compte propriétaire connecté requis. Les résultats restent des pistes candidates, non des mesures sportives. Les indices sont locaux au fichier principal. Le raccordement propose des liens à vérifier, sans fusionner les pistes ; réduire la fenêtre pour les vidéos haute résolution.</p>
 <form action="/matches/{{match.id}}/analysis/r7-scan" method="post">
 <label>Image de départ <input type="number" name="start_frame" min="0" value="0" required></label>
 <label>Nombre d'images source <input type="number" name="frame_count" min="1" max="75" value="25" required></label>
-<label>Suivi <select name="tracking_mode"><option value="head_flow">Têtes et flux optique R7</option><option value="baseline">Couleur : têtes et ballon candidats</option></select></label>
+<label>Suivi <select name="tracking_mode"><option value="head_flow">Têtes et flux optique R7</option><option value="head_flow_links">Têtes R7 + propositions de raccordement des fragments</option><option value="baseline">Couleur : têtes et ballon candidats</option></select></label>
 <button type="submit">Analyser la fenêtre</button>
 </form>
 <p>Revue HOG temporelle : disponible via API propriétaire lorsque les poids privés sont configurés sur le serveur. Elle n'est pas activée par défaut ; aucune identité n'est déduite.</p>
