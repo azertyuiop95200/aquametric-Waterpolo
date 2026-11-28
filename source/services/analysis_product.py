@@ -561,6 +561,8 @@ def _html_report(match, snapshot, export_media=None) -> str:
 
 def build_analysis_zip(db, match, evidence_dir: Path) -> io.BytesIO:
     snapshot = analysis_snapshot(db, match)
+    from services.private_review_export import collect
+    snapshot["review_proof_files"], review_files = collect(match, evidence_dir)
     root = f"AquaMetric_{_slug(match.team.name)}_vs_{_slug(match.opponent)}_{match.id}"
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
@@ -581,6 +583,8 @@ def build_analysis_zip(db, match, evidence_dir: Path) -> io.BytesIO:
                         and row.get("file_path") and (Path(evidence_dir) / Path(row["file_path"]).name).is_file()]
         archive.writestr(f"{root}/01_report/report.html", _html_report(match, snapshot, export_media))
         archive.writestr(f"{root}/01_report/analysis.json", json.dumps(snapshot, ensure_ascii=False, indent=2, default=str))
+        for path, data in review_files.items():
+            archive.writestr(f"{root}/{path}", data)
         archive.writestr(f"{root}/03_events/possession_evidence.json", json.dumps(snapshot["possession_evidence"],ensure_ascii=False,indent=2))
         from services.vision_scan_evidence import export_scans
         for record in export_scans(db,match,snapshot["vision_scan_evidence"]):

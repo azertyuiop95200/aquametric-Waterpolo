@@ -718,7 +718,7 @@ def local_ball_motion(match_id: int, request: Request, frame_index: int = Form(.
                       ax: float = Form(...), ay: float = Form(...),
                       bx: float = Form(...), by: float = Form(...),
                       reviewed: bool = Form(False), segment_id: int = Form(0),
-                      db: Session = Depends(get_db)):
+                      mode: str = Form("motion"), db: Session = Depends(get_db)):
     from models import MatchVideoSegment
     from services.ball_motion_review import scan_motion_clip
     user = require_user(request, db)
@@ -740,7 +740,7 @@ def local_ball_motion(match_id: int, request: Request, frame_index: int = Form(.
     seeds = [dict(frame=seed_a, x=ax, y=ay, reviewed=reviewed),
              dict(frame=seed_b, x=bx, y=by, reviewed=reviewed)]
     try:
-        result = scan_motion_clip(source, frame_index, seeds)
+        result = scan_motion_clip(source, frame_index, seeds, mode=mode)
     except ValueError as exc:
         raise HTTPException(422, detail=str(exc)) from None
     from services.vision_scan_evidence import save_scan

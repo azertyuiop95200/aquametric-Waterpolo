@@ -6,6 +6,7 @@ from services.possession_evidence import validate, CAUSES
 from services.pass_review import validate_pass_review, summarize_pass_review
 from services.evidence_manifest import validate_manifest
 from services.possession_context import decisions as possession_context
+from services.shot_reference_summary import summarize_shots
 
 MAX_BYTES=512*1024
 MAX_ROWS=2000
@@ -100,7 +101,7 @@ def summarize(p,home_color):
     ev=[]
     for e in r["events"]:
         ev.append(dict(id=e["event_id"],time=e["video_end_s"],start=e["video_start_s"],side=side(e.get("team_before")),
-            kind=e["source_kind"],cause=e["cause"],state=e["source_review_state"],location=locate(t,e["video_end_s"]),
+            kind=e["source_kind"],cause=e["cause"],cause_verified=e["cause_verified"],state=e["source_review_state"],location=locate(t,e["video_end_s"]),
             observation=e.get("source_observation","")))
     iv=[]
     for e in r["possession_review_intervals"]:
@@ -131,6 +132,7 @@ def summarize(p,home_color):
                 confirmed_referee_decisions=sum(e["decision_verified"] for e in iv), exact_total_changes=None,
                 duration_s=t["duration_s"],home_color=home_color,coverage_complete=False,
                 pass_review=summarize_pass_review(r,t["duration_s"]),
+                shot_review=summarize_shots(r["events"]),
                 evidence_manifest=validate_manifest(r),
                 possession_context=possession_context(r,t['duration_s']),
                 verified_match_event_count=0,note="Référence importée, non fusionnée aux événements du match. Temps locaux relatifs au premier échantillon de chaque partie; alignement au lecteur à vérifier.")

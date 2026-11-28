@@ -7,8 +7,14 @@
 <p>{{ref.revision_count|default(0)}} ancienne(s) version(s) conservée(s) et exportée(s) dans le ZIP du match.</p>
 <p>{{p.note}}</p>
 {% if p.evidence_manifest %}<p>{{p.evidence_manifest.entries}} liens vers {{p.evidence_manifest.distinct_paths}} fichiers de preuves. {{p.evidence_manifest.note}}</p>{% endif %}<p>{{p.events|length}} événements · {{p.intervals|length}} fenêtres · {{p.duration_s}} s de vidéo · Notre équipe : {{"couleur non déterminée" if p.home_color=="unknown" else p.home_color}}.</p>
-<details><summary>Événements de référence</summary><table><thead><tr><th>ID</th><th>Temps global</th><th>Partie / temps local</th><th>Équipe</th><th>Nature</th><th>État</th><th>Observation</th></tr></thead><tbody>
-{% for e in p.events %}<tr><td>{{e.id}}</td><td>{{e.time}}</td><td>{{e.location.file}} / {{e.location.local_s}} s</td><td>{{e.side}}</td><td>{{e.cause}}</td><td>{{e.state}}</td><td>{{e.observation}}</td></tr>{% endfor %}
+{% if p.shot_review and (p.shot_review.teams.values()|sum(attribute='reviewed') or p.shot_review.teams.values()|sum(attribute='candidates')) %}
+<h3>Tirs — revue vidéo partielle</h3><p>{{p.shot_review.note}}</p>
+<table><thead><tr><th>Bonnets</th><th>Tirs revus</th><th>Candidats</th><th>Indices de but</th><th>Issues non résolues</th></tr></thead><tbody>
+{% for color,stats in p.shot_review.teams.items() %}<tr><td>{{color}}</td><td>{{stats.reviewed}}</td><td>{{stats.candidates}}</td><td>{{stats.goal_indications}}</td><td>{{stats.unknown_outcomes}}</td></tr>{% endfor %}</tbody></table>
+{% if p.shot_review.conflict_ids %}<p>Fenêtres exclues pour recouvrement : {{p.shot_review.conflict_ids|join(', ')}}</p>{% endif %}
+{% endif %}
+<details open><summary>Événements de référence</summary><table><thead><tr><th>ID</th><th>Temps global</th><th>Partie / temps local</th><th>Équipe</th><th>Nature</th><th>État</th><th>Observation</th></tr></thead><tbody>
+{% for e in p.events %}<tr><td>{{e.id}}</td><td>{{e.time}}</td><td>{{e.location.file}} / {{e.location.local_s}} s</td><td>{{e.side}}</td><td>{{ {'shot':'Tir revu','shot_candidate':'Tir candidat','pass_like':'Transmission','ball_hold':'Contrôle'}.get(e.kind,e.kind) }}<br>{{e.cause}}{% if not e.cause_verified %} (issue non vérifiée){% endif %}</td><td>{{e.state}}</td><td>{{e.observation}}{% if snapshot.review_proof_files is defined %}{% for proof in snapshot.review_proof_files.get(ref.digest,{}).get(e.id,[]) %}<br><a href="{{proof}}">Planche vidéo vérifiée</a>{% endfor %}{% endif %}</td></tr>{% endfor %}
 </tbody></table></details>
 <p>Au moins {{p.lower_bound_excluding_linked_shots}} changement(s) sur fenêtres disjointes hors tirs liés. {{p.referee_signals}} fenêtre(s) avec geste arbitral observé, {{p.confirmed_referee_decisions}} décision(s) déclarée(s) vérifiée(s) dans cette référence. Total exact non établi.</p>
 {% if p.endpoint_conflict_ids %}<p>Contrôles simultanés contradictoires : {{p.endpoint_conflict_ids|join(", ")}}. Fenêtres exclues de la borne minimale, à revoir.</p>{% endif %}

@@ -40,8 +40,9 @@ def propose(previous,current,following,*,frame_index,seeds):
     out.sort(key=lambda d:-d['ranking_score'])
     return dict(base,status='candidates' if out else 'no_supported_candidate',candidates=out[:8])
 
-def scan_motion_clip(path,frame_index,seeds):
+def scan_motion_clip(path,frame_index,seeds,*,mode="motion"):
     """Three exact source-local frames; 25 fps nominal domain only."""
+    if mode not in ("motion","fusion"):raise ValueError("Mode inconnu.")
     if type(frame_index) is not int or frame_index<1:raise ValueError('Indice central invalide.')
     c=cv2.VideoCapture(str(path))
     try:
@@ -57,7 +58,12 @@ def scan_motion_clip(path,frame_index,seeds):
             if not ok or f is None or round(c.get(cv2.CAP_PROP_POS_FRAMES))!=i+1:
                 raise ValueError('Index de décodage non vérifiable.')
             frames.append(f)
-        result=propose(*frames,frame_index=frame_index,seeds=seeds)
+        if mode=="fusion":
+            from services.ball_assisted_fusion import fuse
+            result=fuse(*frames,frame_index=frame_index,seeds=seeds)
+        else:
+            result=propose(*frames,frame_index=frame_index,seeds=seeds)
+        result["tracking_mode"]=mode
         result.update(source_frame_count_reported=total,source_fps_reported=fps,
                       nominal_second=frame_index/fps,pts_validated=False,
                       seed_review_verified_by_server=False)
