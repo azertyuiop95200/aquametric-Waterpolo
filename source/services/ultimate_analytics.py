@@ -103,7 +103,8 @@ def _basic(events):
     on_target = c["goal"] + c["shot_on_target"]
     passes_ok = sum(c[k] for k in PASS_SUCCESS)
     passes_bad = sum(c[k] for k in PASS_FAILURE)
-    pass_attempts = passes_ok + passes_bad
+    passes_unknown = sum(getattr(e, "event_type", "") == "pass_unknown" for e in events)
+    pass_attempts = passes_ok + passes_bad + passes_unknown
     losses = sum(c[k] for k in LOSS_EVENTS)
     return {
         "events": len(events),
@@ -118,7 +119,7 @@ def _basic(events):
         "passes_completed": passes_ok,
         "passes_failed": passes_bad,
         "pass_attempts": pass_attempts,
-        "pass_completion_pct": _pct(passes_ok, pass_attempts),
+        "pass_completion_pct": _pct(passes_ok, pass_attempts) if not passes_unknown else None,
         "turnovers": losses,
         "ball_wins": sum(c[k] for k in DEFENSIVE_WINS),
         "exclusions_earned": c["exclusion_earned"],
