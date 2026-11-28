@@ -1,10 +1,17 @@
 from __future__ import annotations
 from collections import Counter
-from services.tactical_engine import analyze_match_tactics
+from services.tactical_engine import analyze_match_tactics, SHOT_EVENTS
 
 
 def _perspective(event):
     return getattr(getattr(event, 'context_meta', None), 'perspective', 'for')
+
+
+def _tagged_score(counts_for, counts_against):
+    # No tags for a side means no observed sample, not a confirmed zero.
+    home = counts_for.get("goal", 0) if counts_for else "—"
+    away = counts_against.get("goal", 0) if counts_against else "—"
+    return f"{home}–{away}"
 
 
 def build_match_report(match, auto_analysis=None, auto_candidates=None):
@@ -18,9 +25,9 @@ def build_match_report(match, auto_analysis=None, auto_candidates=None):
     counts_against = Counter(e.event_type for e in against_events)
     pp_for = [e for e in for_events if getattr(getattr(e, 'context_meta', None), 'phase_tag', '') == 'power_play']
     pp_against = [e for e in against_events if getattr(getattr(e, 'context_meta', None), 'phase_tag', '') == 'power_play']
-    team_shots = sum(counts_for.get(x, 0) for x in ('shot_on_target','shot_off_target','shot_blocked','goal'))
+    team_shots = sum(counts_for.get(x, 0) for x in SHOT_EVENTS)
     headline = [
-        {"label": "Tagged score", "value": f"{counts_for.get('goal',0) if for_events else '—'}–{counts_against.get('goal',0) if against_events else '—'}", "detail": "confirmed sample only; not the final match score"},
+        {"label": "Tagged score", "value": _tagged_score(counts_for, counts_against), "detail": "confirmed sample only; not the final match score"},
         {"label": "Team shots", "value": team_shots if for_events else None, "detail": "visible verified attempts, goals included"},
         {"label": "Turnovers", "value": counts_for.get('turnover', 0) + counts_for.get('bad_pass', 0) if for_events else None, "detail": "team possession losses in confirmed sample"},
         {"label": "Blocks + steals", "value": counts_for.get('block', 0) + counts_for.get('interception', 0) if for_events else None, "detail": "team defensive events in confirmed sample"},
@@ -30,9 +37,14 @@ def build_match_report(match, auto_analysis=None, auto_candidates=None):
         import json
         try: auto_summary = json.loads(auto_analysis.summary_json or '{}')
         except Exception: auto_summary = {}
+        if not isinstance(auto_summary, dict):
+            auto_summary = {}
     candidates = list(auto_candidates or [])
     data_quality = {
         "verified_events": len(events),
+        "verified_for": len(for_events),
+        "verified_against": len(against_events),
+        "scope": "verified event sample only; full-match coverage not established",
         "auto_candidates": len(candidates),
         "ocr_available": bool(getattr(auto_analysis, 'ocr_available', False)) if auto_analysis else False,
         "tactical_confidence": tactical.get("confidence", "INSUFFICIENT DATA"),
@@ -56,7 +68,7 @@ def build_match_report(match, auto_analysis=None, auto_candidates=None):
 def _executive_summary(counts_for, counts_against, tactical, auto_summary):
     parts = []
     if counts_for.get('goal', 0) or counts_against.get('goal', 0):
-        parts.append(f"Tagged score evidence currently reads {counts_for.get('goal',0)}–{counts_against.get('goal',0)}.")
+        parts.append(f"Tagged score evidence currently reads {_tagged_score(counts_for, counts_against)}; this is not the final match score.")
     losses = counts_for.get('turnover',0)+counts_for.get('bad_pass',0)
     if losses:
         parts.append(f"{losses} verified team possession losses should be reviewed with their preceding sequence.")

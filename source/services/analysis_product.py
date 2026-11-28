@@ -434,6 +434,9 @@ def _html_report(match, snapshot, export_media=None) -> str:
     ) or "<li>Aucun constat fort sans preuve suffisante.</li>"
     def measured(side, key):
         return side[key] if side.get("events") and side.get(key) is not None else "Non mesuré"
+    def measured_rate(side, key):
+        value = measured(side, key)
+        return f"{value} %" if value != "Non mesuré" else value
     diagnostics = snapshot.get("diagnostics", {})
     observation_rows = "".join(
         f"<tr><td>{float(row.get('second', 0)):.1f} s</td><td>{html.escape(str(row.get('raw_text', '')))}</td></tr>"
@@ -444,19 +447,20 @@ def _html_report(match, snapshot, export_media=None) -> str:
     env = Environment(loader=FileSystemLoader(Path(__file__).resolve().parents[1] / "templates"), autoescape=select_autoescape())
     statistics_html = env.get_template("analysis_all_measurements.html").render(snapshot=snapshot, match=match)
     media_html = env.get_template("analysis_export_media.html").render(export_media=export_media or [])
-    return f"""<!doctype html><html lang='fr'><meta charset='utf-8'><title>AquaMetric analysis</title>
-<style>body{{font-family:Arial,sans-serif;max-width:1000px;margin:40px auto;padding:0 24px;color:#15202b}}table{{border-collapse:collapse;width:100%}}td,th{{border:1px solid #ccd6dd;padding:8px;text-align:left}}small{{color:#657786}}</style>
+    return f"""<!doctype html><html lang='fr'><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'><title>AquaMetric · Rapport sportif</title>
+<style>body{{font-family:Arial,sans-serif;max-width:1000px;margin:32px auto;padding:0 20px;color:#152b37;line-height:1.55}}h2,h3{{color:#0b5365}}table{{border-collapse:collapse;width:100%}}td,th{{border:1px solid #d5e0e3;padding:8px;text-align:left;overflow-wrap:anywhere}}th{{background:#e8f1f3}}small,.muted{{color:#536777}}img,video,iframe{{max-width:100%}}.report-card{{min-width:0}}.report-status{{padding:12px;border-left:4px solid #bc8129;background:#fbf5e9}}@media print{{body{{margin:0;padding:0}}tr{{break-inside:avoid}}}}</style>
 <h1>{html.escape(match.team.name)} vs {html.escape(match.opponent)}</h1>
 <p>{html.escape(match.competition or '')} · {html.escape(match.match_date or '')}</p>
-<h2>État réel de l’analyse</h2><p>{html.escape(diagnostics.get('message', 'Couverture du match non établie.'))}</p>
-{ocr_html}
-<h2>Couverture Ultimate</h2><p><strong>{coverage['score']}% · {html.escape(coverage['readiness'])}</strong></p>
-<h2>KPIs vérifiés</h2><table><tr><th></th><th>{html.escape(match.team.name)}</th><th>{html.escape(match.opponent)}</th></tr>
+<p class='report-status'><strong>État réel de l’analyse :</strong> {html.escape(diagnostics.get('message', 'Couverture du match non établie.'))} Les mesures décrivent les actions confirmées, pas nécessairement le match entier.</p>
+<h2>Synthèse sportive · échantillon vérifié</h2><table><tr><th></th><th>{html.escape(match.team.name)}</th><th>{html.escape(match.opponent)}</th></tr>
 <tr><td>Buts</td><td>{measured(team, 'goals')}</td><td>{measured(opponent, 'goals')}</td></tr><tr><td>Tirs</td><td>{measured(team, 'shots')}</td><td>{measured(opponent, 'shots')}</td></tr>
-<tr><td>Passes réussies</td><td>{team['pass_completion_pct'] if team['pass_completion_pct'] is not None else '—'}%</td><td>{opponent['pass_completion_pct'] if opponent['pass_completion_pct'] is not None else '—'}%</td></tr>
+<tr><td>Passes réussies</td><td>{measured_rate(team, 'pass_completion_pct')}</td><td>{measured_rate(opponent, 'pass_completion_pct')}</td></tr>
 <tr><td>Pertes</td><td>{measured(team, 'turnovers')}</td><td>{measured(opponent, 'turnovers')}</td></tr></table>
 <h2>Constats coach fondés sur les données</h2><ul>{findings_html}</ul>
 {statistics_html}
+<h2>Annexe · preuves et limites</h2>
+{ocr_html}
+<p>État de préparation des données : {html.escape(str(coverage.get('readiness', 'Non établi')))}. Ce diagnostic ne mesure pas la précision sportive ni la couverture vidéo.</p>
 {media_html}
 <h2>Preuves</h2><p>{len(snapshot['verified_events'])} événements vérifiés · {len(snapshot['automatic']['candidates'])} candidats automatiques · {len(snapshot['artifacts'])} médias/références.</p>
 <p><small>Les candidats automatiques restent distincts des faits confirmés. Les extraits proviennent uniquement des pixels fournis par l'utilisateur.</small></p></html>"""

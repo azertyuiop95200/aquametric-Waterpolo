@@ -49,7 +49,16 @@ jobs:
           UPLOAD_DIR: /tmp/aquametric_v122_uploads
           EVIDENCE_DIR: /tmp/aquametric_v122_evidence
           SECRET_KEY: ci-only-secret-not-used-in-production
+          AQUAMETRIC_REPORT_FIXTURE_DIR: /tmp/aquametric-synthetic-report
         run: python -m pytest -q
+
+      - name: Save synthetic report regression artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: synthetic-report-regression
+          path: /tmp/aquametric-synthetic-report/
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Smoke test V12.2 main pages and Ultimate routes
         working-directory: source

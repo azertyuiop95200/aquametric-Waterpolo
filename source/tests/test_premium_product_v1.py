@@ -72,5 +72,11 @@ def test_global_product_design_and_match_brief_are_loaded():
 
 def test_dashboard_is_now_coach_command_center():
     html = (ROOT / "templates" / "dashboard.html").read_text(encoding="utf-8")
-    for needle in ["Tableau de bord", "Reprendre une analyse", "/matches/new", "/knowledge", "/simulation"]:
+    for needle in ["Tableau de bord", "Reprendre une analyse", "/matches/new", "/knowledge", "/analysis-history"]:
         assert needle in html
+
+
+def test_analysis_dashboard_excludes_result_simulation_and_rankings():
+    html = (ROOT / 'templates' / 'dashboard.html').read_text(encoding='utf-8')
+    for route in ('/simulation', '/competitions', '/scouting'):
+        assert f'href="{route}"' not in html
